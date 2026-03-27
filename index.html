@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CIALPA — Sistema de gestión del relevamiento escolar en Paraguay" />
+  <title>CIALPA — Relevamiento Escolar</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="assets/css/app.css" />
+
+  <!-- Favicon placeholder -->
+  <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+</head>
+<body>
+
+<!-- ── Global Loading Overlay ───────────────────────────────── -->
+<div id="global-loading" aria-live="assertive" role="status">
+  <div class="loading-spinner"></div>
+  <span class="loading-message">Cargando...</span>
+</div>
+
+<!-- ── Toast Container ──────────────────────────────────────── -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ────────────────────────────────────────────────────────────
+     LOGIN SCREEN
+     ──────────────────────────────────────────────────────────── -->
+<div id="login-screen" style="display:flex;">
+  <div class="login-card">
+    <div class="login-card__logo">
+      <img src="assets/img/logo.png" alt="CIALPA Logo"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+      <div class="login-card__logo-placeholder" style="display:none;">C</div>
+    </div>
+    <h1 class="login-card__title">CIALPA</h1>
+    <p class="login-card__subtitle">Relevamiento Escolar · Paraguay</p>
+
+    <p id="login-error" class="login-error"></p>
+
+    <form id="login-form" autocomplete="on" novalidate>
+      <div class="form-group">
+        <label for="login-usuario">Usuario</label>
+        <input
+          id="login-usuario"
+          type="text"
+          class="form-control"
+          name="usuario"
+          placeholder="Tu usuario"
+          autocomplete="username"
+          required
+          autofocus
+        />
+      </div>
+      <div class="form-group">
+        <label for="login-password">Contraseña</label>
+        <input
+          id="login-password"
+          type="password"
+          class="form-control"
+          name="password"
+          placeholder="Tu contraseña"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem;">
+        Ingresar
+      </button>
+    </form>
+
+    <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
+      v2.0.0 &mdash; CIALPA &copy; 2025
+    </p>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────
+     APP SHELL
+     ──────────────────────────────────────────────────────────── -->
+<div id="app-shell" style="display:none;">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside id="sidebar" role="navigation" aria-label="Navegación principal">
+    <div class="sidebar__logo">
+      <img src="assets/img/logo.png" alt="CIALPA"
+           onerror="this.style.display='none';" />
+      <div class="sidebar__logo-text">
+        CIALPA
+        <small>Relevamiento Escolar</small>
+      </div>
+    </div>
+
+    <ul id="sidebar-nav">
+      <!-- Populated by AppController._buildSidebar() -->
+    </ul>
+
+    <div class="sidebar__footer">
+      v2.0.0
+    </div>
+  </aside>
+
+  <!-- ── Main Area ─────────────────────────────────────────── -->
+  <div id="main-area">
+
+    <!-- Header bar -->
+    <header id="app-header">
+      <button id="sidebar-toggle" aria-label="Abrir menú" title="Menú">☰</button>
+      <span id="page-title">CIALPA — Relevamiento Escolar</span>
+      <div id="user-bar">
+        <!-- Populated by AppController._renderUserBar() -->
+      </div>
+    </header>
+
+    <!-- Content area -->
+    <main id="content-area" role="main">
+
+      <!-- ======================================================
+           MODULE: INICIO
+           ====================================================== -->
+      <div id="module-inicio" class="module-panel">
+        <div class="page-header">
+          <h2>Inicio</h2>
+          <span id="inicio-fecha" class="text-muted" style="font-size:.875rem;"></span>
+        </div>
+        <div class="page-content">
+
+          <div class="inicio-hero">
+            <h2>Bienvenido al Sistema de Relevamiento Escolar</h2>
+            <p>Gestioná las encuestas de infraestructura escolar desde este panel.</p>
+          </div>
+
+          <div class="inicio-grid">
+            <div class="kpi-card" id="inicio-kpi-total" style="border-top-color:#1F3864;">
+              <span class="kpi-value" id="inicio-total">—</span>
+              <span class="kpi-label">Total Escuelas</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-final" style="border-top-color:#28a745;">
+              <span class="kpi-value" id="inicio-final">—</span>
+              <span class="kpi-label">Relevadas</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-curso" style="border-top-color:#fd7e14;">
+              <span class="kpi-value" id="inicio-curso">—</span>
+              <span class="kpi-label">En Curso</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-pendiente" style="border-top-color:#6c757d;">
+              <span class="kpi-value" id="inicio-pendiente">—</span>
+              <span class="kpi-label">Pendientes</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-avance" style="border-top-color:#E84C22;">
+              <span class="kpi-value" id="inicio-avance">—</span>
+              <span class="kpi-label">% Avance</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">Acciones rápidas</h4>
+            </div>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ver Mapa</button>
+              <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Aplicar Encuesta</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
+              <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: MAPA
+           ====================================================== -->
+      <div id="module-mapa" class="module-panel">
+        <div class="page-header">
+          <h2>Mapa de Escuelas</h2>
+          <div style="display:flex;gap:.5rem;align-items:center;">
+            <span class="badge" style="background:var(--state-pendiente)">Pend: <span id="map-count-pendiente">0</span></span>
+            <span class="badge" style="background:var(--state-en-curso)">Curso: <span id="map-count-en_curso">0</span></span>
+            <span class="badge" style="background:var(--state-finalizada)">Final: <span id="map-count-finalizada">0</span></span>
+            <span class="badge" style="background:var(--state-incidencia)">Inc: <span id="map-count-incidencia">0</span></span>
+            <span class="badge" style="background:var(--color-secondary)">Total: <span id="map-count-total">0</span></span>
+          </div>
+        </div>
+
+        <div class="map-layout">
+          <!-- Sidebar -->
+          <div class="map-sidebar">
+            <div class="map-sidebar__filters">
+              <form id="map-filter-form">
+                <input id="filter-search" type="text" class="form-control form-control-sm"
+                  placeholder="Buscar escuela..." />
+                <select id="filter-departamento" class="form-control form-control-sm">
+                  <option value="">Todos los departamentos</option>
+                </select>
+                <select id="filter-zona" class="form-control form-control-sm">
+                  <option value="">Todas las zonas</option>
+                  <option value="Urbana">Urbana</option>
+                  <option value="Rural">Rural</option>
+                  <option value="Rural Remota">Rural Remota</option>
+                </select>
+                <select id="filter-encuestador" class="form-control form-control-sm">
+                  <option value="">Todos los encuestadores</option>
+                </select>
+                <select id="filter-estado" class="form-control form-control-sm">
+                  <option value="">Todos los estados</option>
+                  <option value="pendiente">Pendiente</option>
+                  <option value="en_curso">En Curso</option>
+                  <option value="finalizada">Finalizada</option>
+                  <option value="incidencia">Con Incidencia</option>
+                </select>
+              </form>
+              <div class="map-sidebar__filter-btns">
+                <button id="map-filter-apply" class="btn btn-sm btn-primary" style="flex:1;">Filtrar</button>
+                <button id="map-filter-clear" class="btn btn-sm btn-outline">Limpiar</button>
+              </div>
+            </div>
+
+            <div id="map-school-list">
+              <p class="map-list__empty">Cargando escuelas...</p>
+            </div>
+          </div>
+
+          <!-- Map container -->
+          <div class="map-main">
+            <div id="map-container"></div>
+            <div id="map-info-panel" class="map-info-panel"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: APLICAR ENCUESTA
+           ====================================================== -->
+      <div id="module-encuesta" class="module-panel">
+        <div class="page-header">
+          <h2>Aplicar Encuesta</h2>
+          <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mapa')">
+            Seleccionar en Mapa
+          </button>
+        </div>
+        <div class="page-content">
+          <div id="survey-panel">
+            <div class="survey-empty">
+              <div class="survey-empty__icon">🏫</div>
+              <h3>Seleccioná una escuela</h3>
+              <p>Usá el mapa o la lista para seleccionar la escuela que vas a relevar.</p>
+              <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ir al Mapa</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: ENCUESTADORES (admin only)
+           ====================================================== -->
+      <div id="module-encuestadores" class="module-panel" data-min-role="admin">
+        <div class="page-header">
+          <h2>Gestión de Encuestadores</h2>
+          <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">
+            + Nuevo Encuestador
+          </button>
+        </div>
+        <div class="page-content">
+          <div class="table-wrapper card">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Usuario</th>
+                  <th>Nombre</th>
+                  <th>Documento</th>
+                  <th>Teléfono</th>
+                  <th>Zona</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="enc-tbody">
+                <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: MANUAL
+           ====================================================== -->
+      <div id="module-manual" class="module-panel">
+        <div class="page-header">
+          <h2>Manual de Usuario</h2>
+          <a href="manual/index.html" target="_blank" class="btn btn-outline btn-sm">Ver versión completa</a>
+        </div>
+        <div class="page-content">
+          <div class="card">
+            <p>El manual completo está disponible como panel lateral. Hacé clic en el botón <strong>?</strong> en la esquina inferior izquierda, o navegá a la versión completa.</p>
+            <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="ManualModule.open()">Abrir Manual</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('encuesta')">Cómo aplicar encuesta</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('incidencias')">Registrar incidencias</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('errores')">Solución de errores</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: INCIDENCIAS
+           ====================================================== -->
+      <div id="module-incidencias" class="module-panel">
+        <div class="page-header">
+          <h2>Incidencias</h2>
+          <button class="btn btn-sm btn-danger" onclick="IncidenciasModule.openNew('')">
+            + Nueva Incidencia
+          </button>
+        </div>
+        <div class="page-content">
+          <div class="table-wrapper card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha/Hora</th>
+                  <th>Escuela</th>
+                  <th>Encuestador</th>
+                  <th>Tipo</th>
+                  <th>Prioridad</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="incidencias-tbody">
+                <tr><td colspan="7" class="text-center text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: MI JORNADA
+           ====================================================== -->
+      <div id="module-jornada" class="module-panel">
+        <div class="page-header">
+          <h2>Mi Jornada</h2>
+          <button id="jornada-refresh" class="btn btn-sm btn-outline">↺ Actualizar</button>
+        </div>
+        <div class="page-content">
+          <div id="jornada-user-card">
+            <!-- Rendered by JornadaModule -->
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom:1.5rem;">
+            <div class="kpi-card" style="border-top-color:#1F3864;">
+              <span class="kpi-value" id="jornada-kpi-hoy">—</span>
+              <span class="kpi-label">Sesiones hoy</span>
+            </div>
+            <div class="kpi-card" style="border-top-color:#28a745;">
+              <span class="kpi-value" id="jornada-kpi-fin">—</span>
+              <span class="kpi-label">Finalizadas hoy</span>
+            </div>
+            <div class="kpi-card" style="border-top-color:#dc3545;">
+              <span class="kpi-value" id="jornada-kpi-inc">—</span>
+              <span class="kpi-label">Incidencias hoy</span>
+            </div>
+            <div class="kpi-card" style="border-top-color:#E84C22;">
+              <span class="kpi-value" id="jornada-kpi-min">—</span>
+              <span class="kpi-label">Tiempo total</span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:1.25rem;">
+            <div class="card__header">
+              <h4 class="card__title">Historial de sesiones</h4>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Inicio</th>
+                    <th>Escuela</th>
+                    <th>Fin</th>
+                    <th>Duración</th>
+                    <th>Estado</th>
+                    <th>Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody id="jornada-sessions-tbody">
+                  <tr><td colspan="7" class="text-center text-muted">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">Mis incidencias</h4>
+            </div>
+            <div id="jornada-incidencias">
+              <!-- Rendered by JornadaModule -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: PANEL ESTADÍSTICO (supervisor/admin)
+           ====================================================== -->
+      <div id="module-estadisticas" class="module-panel" data-min-role="supervisor">
+        <div class="page-header">
+          <h2>Panel Estadístico</h2>
+          <div style="display:flex;gap:.5rem;">
+            <button class="btn btn-sm btn-outline" onclick="StatsModule.exportCSV()">Exportar CSV</button>
+            <button class="btn btn-sm btn-primary" onclick="StatsModule.loadStats()">↺ Actualizar</button>
+          </div>
+        </div>
+        <div class="page-content">
+
+          <!-- Filters -->
+          <div class="card" style="margin-bottom:1.25rem;">
+            <form id="stats-filter-form" class="form-row" style="align-items:flex-end;gap:.75rem;">
+              <div class="form-group" style="margin:0;">
+                <label>Fecha desde</label>
+                <input type="date" name="fecha_desde" class="form-control form-control-sm" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>Fecha hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>Departamento</label>
+                <select name="departamento" class="form-control form-control-sm">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0;">
+                <label>Encuestador</label>
+                <select name="encuestador" class="form-control form-control-sm">
+                  <option value="">Todos</option>
+                </select>
+              </div>
+              <div style="display:flex;gap:.5rem;">
+                <button id="stats-filter-apply" type="button" class="btn btn-sm btn-primary">Filtrar</button>
+                <button id="stats-filter-reset" type="button" class="btn btn-sm btn-outline">Limpiar</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- KPIs -->
+          <div class="stats-grid">
+            <div class="kpi-card" id="kpi-total" style="border-top-color:#1F3864;">
+              <span class="kpi-value" id="kpi-total-val">—</span>
+              <span class="kpi-label">Total Escuelas</span>
+            </div>
+            <div class="kpi-card" id="kpi-finalizadas" style="border-top-color:#28a745;">
+              <span class="kpi-value">—</span>
+              <span class="kpi-label">Relevadas</span>
+            </div>
+            <div class="kpi-card" id="kpi-en-curso" style="border-top-color:#fd7e14;">
+              <span class="kpi-value">—</span>
+              <span class="kpi-label">En Curso</span>
+            </div>
+            <div class="kpi-card" id="kpi-pendientes" style="border-top-color:#6c757d;">
+              <span class="kpi-value">—</span>
+              <span class="kpi-label">Pendientes</span>
+            </div>
+            <div class="kpi-card" id="kpi-incidencias" style="border-top-color:#dc3545;">
+              <span class="kpi-value">—</span>
+              <span class="kpi-label">Con Incidencia</span>
+            </div>
+            <div class="kpi-card" id="kpi-avance" style="border-top-color:#E84C22;">
+              <span class="kpi-value">—</span>
+              <span class="kpi-label">% Avance</span>
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="card" style="margin-bottom:1.25rem;">
+            <h5 class="card__title" style="margin-bottom:.5rem;">Avance general</h5>
+            <div class="progress-track">
+              <div id="stats-progress-bar" class="progress-bar" style="width:0%;">0%</div>
+            </div>
+          </div>
+
+          <!-- Charts -->
+          <div class="charts-grid">
+            <div class="chart-card chart-card--full">
+              <canvas id="chart-departamento"></canvas>
+            </div>
+            <div class="chart-card">
+              <canvas id="chart-donut"></canvas>
+            </div>
+            <div class="chart-card">
+              <canvas id="chart-daily"></canvas>
+            </div>
+          </div>
+
+          <!-- Encuestadores ranking -->
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">Ranking de Encuestadores</h4>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Encuestador</th>
+                    <th>Asignadas</th>
+                    <th>Finalizadas</th>
+                    <th>Incidencias</th>
+                    <th>Tiempo promedio</th>
+                  </tr>
+                </thead>
+                <tbody id="stats-enc-tbody">
+                  <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Recent activity -->
+          <div class="card" style="margin-top:1.25rem;">
+            <div class="card__header">
+              <h4 class="card__title">Actividad Reciente</h4>
+            </div>
+            <div id="stats-activity">
+              <p class="text-muted text-center">Cargando...</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: CONFIGURACIÓN (admin only)
+           ====================================================== -->
+      <div id="module-configuracion" class="module-panel" data-min-role="admin">
+        <div class="page-header">
+          <h2>Configuración</h2>
+        </div>
+        <div class="page-content">
+          <div id="admin-config-panel">
+            <div class="admin-tabs">
+              <button data-admin-tab="config" class="active" onclick="AdminModule._switchTab ? AdminModule._switchTab('config') : null">Parámetros</button>
+              <button data-admin-tab="encuestadores" onclick="AdminModule._switchTab ? AdminModule._switchTab('encuestadores') : null">Encuestadores</button>
+              <button data-admin-tab="auditoria" onclick="AdminModule._switchTab ? AdminModule._switchTab('auditoria') : null">Auditoría</button>
+            </div>
+
+            <div data-admin-content="config" class="active">
+              <div id="admin-config-list">
+                <p class="text-muted text-center" style="padding:2rem;">Cargando configuración...</p>
+              </div>
+            </div>
+
+            <div data-admin-content="encuestadores">
+              <div style="margin-bottom:1rem;display:flex;justify-content:flex-end;">
+                <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo Encuestador</button>
+              </div>
+              <div class="table-wrapper card">
+                <table>
+                  <thead>
+                    <tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Zona</th><th>Estado</th><th>Acciones</th></tr>
+                  </thead>
+                  <tbody id="enc-tbody-admin">
+                    <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div data-admin-content="auditoria">
+              <div class="audit-filters">
+                <form id="audit-filter-form" class="form-row">
+                  <div class="form-group" style="margin:0;">
+                    <label>Usuario</label>
+                    <input type="text" name="usuario" class="form-control form-control-sm" placeholder="Usuario..." />
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>Acción</label>
+                    <input type="text" name="accion" class="form-control form-control-sm" placeholder="Acción..." />
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>Desde</label>
+                    <input type="date" name="fecha_desde" class="form-control form-control-sm" />
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>Hasta</label>
+                    <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
+                  </div>
+                  <div style="align-self:flex-end;">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="AdminModule.applyAuditFilters()">Filtrar</button>
+                  </div>
+                </form>
+              </div>
+              <div class="table-wrapper card">
+                <table>
+                  <thead>
+                    <tr><th>ID</th><th>Fecha/Hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>
+                  </thead>
+                  <tbody id="audit-tbody">
+                    <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="audit-pagination" style="margin-top:.75rem;text-align:center;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: AUDITORÍA (admin only — standalone nav item)
+           ====================================================== -->
+      <div id="module-auditoria" class="module-panel" data-min-role="admin">
+        <div class="page-header">
+          <h2>Auditoría del Sistema</h2>
+        </div>
+        <div class="page-content">
+          <div class="audit-filters">
+            <form id="audit-filter-form-standalone" class="form-row">
+              <div class="form-group" style="margin:0;"><label>Usuario</label>
+                <input type="text" name="usuario" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label>Acción</label>
+                <input type="text" name="accion" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label>Desde</label>
+                <input type="date" name="fecha_desde" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label>Hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control form-control-sm" /></div>
+              <div style="align-self:flex-end;">
+                <button type="button" class="btn btn-sm btn-primary" onclick="AdminModule.applyAuditFilters()">Filtrar</button>
+              </div>
+            </form>
+          </div>
+          <div class="table-wrapper card">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Fecha/Hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>
+              </thead>
+              <tbody id="audit-tbody-standalone">
+                <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="audit-pagination-standalone" style="margin-top:.75rem;text-align:center;"></div>
+        </div>
+      </div>
+
+    </main><!-- /content-area -->
+  </div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+<!-- ── Manual FAB ────────────────────────────────────────────── -->
+<button id="manual-fab" title="Abrir Manual" aria-label="Abrir Manual de Usuario">?</button>
+
+<!-- ────────────────────────────────────────────────────────────
+     MODAL: Incidencia
+     ──────────────────────────────────────────────────────────── -->
+<div id="modal-incidencia" class="modal" style="display:none;">
+  <div class="modal__overlay" onclick="UI.closeModal('modal-incidencia')"></div>
+  <div class="modal__panel modal__panel--dialog">
+    <div class="modal__header">
+      <h3>Registrar Incidencia</h3>
+      <button class="modal__close" onclick="UI.closeModal('modal-incidencia')">&times;</button>
+    </div>
+    <div class="modal__body">
+      <form id="form-incidencia">
+        <input type="hidden" name="id_escuela" />
+        <div class="form-group">
+          <label>Tipo de incidencia *</label>
+          <select name="tipo_incidencia" class="form-control" required>
+            <option value="">Seleccionar...</option>
+            <option>Escuela cerrada</option>
+            <option>Acceso bloqueado</option>
+            <option>Director/a ausente</option>
+            <option>Formulario incompleto</option>
+            <option>Problema técnico</option>
+            <option>Seguridad / riesgo</option>
+            <option>Otra</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Prioridad *</label>
+          <select name="prioridad" class="form-control" required>
+            <option value="alta">Alta</option>
+            <option value="media" selected>Media</option>
+            <option value="baja">Baja</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Descripción *</label>
+          <textarea name="descripcion" class="form-control" rows="4"
+            placeholder="Describí el problema con el mayor detalle posible..." required></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-incidencia')">Cancelar</button>
+      <button class="btn btn-danger" onclick="IncidenciasModule.save()">Registrar Incidencia</button>
+    </div>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────
+     MODAL: Encuestador
+     ──────────────────────────────────────────────────────────── -->
+<div id="modal-encuestador" class="modal" style="display:none;">
+  <div class="modal__overlay" onclick="UI.closeModal('modal-encuestador')"></div>
+  <div class="modal__panel modal__panel--wide">
+    <div class="modal__header">
+      <h3 class="modal__title">Encuestador</h3>
+      <button class="modal__close" onclick="UI.closeModal('modal-encuestador')">&times;</button>
+    </div>
+    <div class="modal__body">
+      <form id="form-encuestador">
+        <input type="hidden" name="id_encuestador" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Usuario *</label>
+            <input type="text" name="usuario" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Contraseña (dejar vacío para no cambiar)</label>
+            <input type="password" name="password" class="form-control" autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombres *</label>
+            <input type="text" name="nombres" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Apellidos *</label>
+            <input type="text" name="apellidos" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Documento</label>
+            <input type="text" name="documento" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" name="telefono" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Correo</label>
+            <input type="email" name="correo" class="form-control" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Zona asignada</label>
+            <select name="zona_asignada" class="form-control">
+              <option value="">Sin asignar</option>
+              <option>Urbana</option>
+              <option>Rural</option>
+              <option>Rural Remota</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Rol</label>
+            <select name="rol" class="form-control">
+              <option value="encuestador">Encuestador</option>
+              <option value="supervisor">Supervisor</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:.5rem;padding-top:1.5rem;">
+            <input type="checkbox" name="activo" id="enc-activo" checked style="width:auto;" />
+            <label for="enc-activo" style="margin:0;">Activo</label>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-encuestador')">Cancelar</button>
+      <button class="btn btn-primary" onclick="AdminModule.saveEncuestador()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────
+     SCRIPTS (order matters)
+     ──────────────────────────────────────────────────────────── -->
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet MarkerCluster -->
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<!-- App scripts -->
+<script src="assets/js/config.js"></script>
+<script src="assets/js/api.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/map.js"></script>
+<script src="assets/js/survey.js"></script>
+<script src="assets/js/stats.js"></script>
+<script src="assets/js/admin.js"></script>
+<script src="assets/js/jornada.js"></script>
+<script src="assets/js/manual.js"></script>
+<script src="assets/js/app.js"></script>
+
+<script>
+  // Set today's date in Inicio module
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('inicio-fecha');
+    if (el) el.textContent = new Date().toLocaleDateString('es-PY', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manual de Usuario — CIALPA Relevamiento Escolar</title>
+  <style>
+    :root {
+      --primary:   #E84C22;
+      --secondary: #1F3864;
+      --success:   #28a745;
+      --warning:   #fd7e14;
+      --danger:    #dc3545;
+      --muted:     #6c757d;
+      --border:    #dee2e6;
+      --bg:        #f0f2f5;
+      --surface:   #ffffff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: #212529;
+      line-height: 1.6;
+    }
+
+    /* Layout */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      min-width: 220px;
+      background: var(--secondary);
+      color: #fff;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .sidebar__header {
+      padding: 1.5rem 1rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+      background: rgba(0,0,0,.15);
+    }
+    .sidebar__header h1 { font-size: 1.1rem; color: #fff; margin-bottom: .2rem; }
+    .sidebar__header p  { font-size: .75rem; opacity: .7; }
+
+    .sidebar__search {
+      padding: .75rem;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    #manual-search {
+      width: 100%;
+      padding: .45rem .75rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      font-size: .82rem;
+    }
+    #manual-search::placeholder { color: rgba(255,255,255,.5); }
+
+    .sidebar nav ul { padding: .5rem 0; }
+    .sidebar nav li { list-style: none; }
+    .sidebar nav a {
+      display: block;
+      padding: .6rem 1rem;
+      color: rgba(255,255,255,.75);
+      text-decoration: none;
+      font-size: .84rem;
+      border-left: 3px solid transparent;
+      transition: all .15s;
+    }
+    .sidebar nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
+    .sidebar nav a.active {
+      background: rgba(232,76,34,.15);
+      border-left-color: var(--primary);
+      color: #fff;
+      font-weight: 500;
+    }
+
+    .sidebar__print {
+      padding: .75rem 1rem;
+      border-top: 1px solid rgba(255,255,255,.1);
+    }
+    .sidebar__print button {
+      width: 100%;
+      padding: .45rem;
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: .82rem;
+    }
+
+    /* Main content */
+    .content {
+      flex: 1;
+      max-width: 860px;
+      padding: 2rem 2rem 4rem;
+    }
+
+    .content-header {
+      background: linear-gradient(135deg, var(--secondary), #2a4d8f 60%, var(--primary));
+      color: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+    }
+    .content-header h1 { font-size: 1.6rem; margin-bottom: .4rem; }
+    .content-header p  { opacity: .85; font-size: .95rem; }
+    .content-header .version { font-size: .8rem; opacity: .65; margin-top: .5rem; }
+
+    /* Sections */
+    .manual-section {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 1.5rem;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+
+    .section-anchor { display: block; height: 80px; margin-top: -80px; }
+
+    .manual-section h2 {
+      color: var(--secondary);
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      padding-bottom: .6rem;
+      border-bottom: 2px solid var(--primary);
+    }
+    .manual-section h3 { color: var(--secondary); font-size: 1.05rem; margin: 1.2rem 0 .5rem; }
+    .manual-section p  { margin-bottom: .7rem; font-size: .925rem; }
+    .manual-section ul, .manual-section ol { padding-left: 1.5rem; margin-bottom: .75rem; }
+    .manual-section li { font-size: .925rem; margin-bottom: .35rem; }
+    .manual-section ol { list-style: decimal; }
+    .manual-section ul { list-style: disc; }
+    .manual-section a  { color: var(--primary); }
+
+    .callout {
+      border-left: 4px solid var(--warning);
+      background: #fff8f0;
+      padding: .75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin: .75rem 0;
+      font-size: .9rem;
+    }
+    .callout--tip      { border-color: var(--success); background: #f0fff4; }
+    .callout--warning  { border-color: var(--warning); background: #fff8f0; }
+    .callout--danger   { border-color: var(--danger);  background: #fff0f0; }
+    .callout--info     { border-color: #17a2b8; background: #f0faff; }
+
+    table.manual-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .875rem;
+      margin: .75rem 0;
+    }
+    table.manual-table th {
+      background: var(--secondary);
+      color: #fff;
+      padding: .5rem .75rem;
+      text-align: left;
+    }
+    table.manual-table td { padding: .5rem .75rem; border: 1px solid var(--border); }
+    table.manual-table tr:nth-child(even) td { background: #f8f9fa; }
+
+    .badge {
+      display: inline-block;
+      padding: .2em .55em;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .badge--pendiente  { background: #6c757d; }
+    .badge--en-curso   { background: #fd7e14; }
+    .badge--finalizada { background: #28a745; }
+    .badge--incidencia { background: #dc3545; }
+
+    .step-list { counter-reset: step-counter; }
+    .step-list li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 2.4rem;
+      margin-bottom: .7rem;
+      list-style: none;
+    }
+    .step-list li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: .05rem;
+      width: 1.6rem;
+      height: 1.6rem;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 50%;
+      font-size: .78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .screenshot-placeholder {
+      background: #f0f2f5;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: .875rem;
+      margin: 1rem 0;
+    }
+
+    /* Back to top */
+    #back-to-top {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--secondary);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,.2);
+      display: none;
+    }
+    #back-to-top.visible { display: flex; align-items: center; justify-content: center; }
+
+    /* Print */
+    @media print {
+      .sidebar, #back-to-top { display: none; }
+      .content { max-width: 100%; padding: 1rem; }
+      .manual-section { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+      .content-header { background: var(--secondary) !important; color: #fff !important; }
+    }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .content { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <div class="sidebar">
+    <div class="sidebar__header">
+      <h1>Manual CIALPA</h1>
+      <p>Relevamiento Escolar</p>
+    </div>
+    <div class="sidebar__search">
+      <input id="manual-search" type="text" placeholder="Buscar en el manual..." oninput="searchManual(this.value)" />
+    </div>
+    <nav>
+      <ul id="nav-list">
+        <li><a href="#s-intro">1. Introducción</a></li>
+        <li><a href="#s-acceso">2. Acceso y Login</a></li>
+        <li><a href="#s-mapa">3. Uso del Mapa</a></li>
+        <li><a href="#s-encuesta">4. Aplicar Encuesta</a></li>
+        <li><a href="#s-estados">5. Estados</a></li>
+        <li><a href="#s-incidencias">6. Incidencias</a></li>
+        <li><a href="#s-jornada">7. Mi Jornada</a></li>
+        <li><a href="#s-formulario">8. Formulario MEC</a></li>
+        <li><a href="#s-sincronizacion">9. Sincronización</a></li>
+        <li><a href="#s-roles">10. Roles y Permisos</a></li>
+        <li><a href="#s-estadisticas">11. Panel Estadístico</a></li>
+        <li><a href="#s-configuracion">12. Configuración</a></li>
+        <li><a href="#s-auditoria">13. Auditoría</a></li>
+        <li><a href="#s-errores">14. Errores Comunes</a></li>
+        <li><a href="#s-contacto">15. Soporte y Contacto</a></li>
+      </ul>
+    </nav>
+    <div class="sidebar__print">
+      <button onclick="window.print()">🖨 Imprimir Manual</button>
+    </div>
+  </div>
+
+  <!-- ── Content ───────────────────────────────────────────── -->
+  <div class="content">
+
+    <div class="content-header">
+      <h1>Manual de Usuario</h1>
+      <p>Sistema de Relevamiento Escolar — CIALPA</p>
+      <p class="version">Versión 2.0.0 &bull; Paraguay &bull; 2025</p>
+    </div>
+
+    <!-- ── 1. Introducción ─────────────────────────────────── -->
+    <div class="manual-section" id="sec-intro">
+      <span class="section-anchor" id="s-intro"></span>
+      <h2>1. Introducción al Sistema</h2>
+
+      <p>Bienvenido al sistema <strong>CIALPA — Relevamiento Escolar</strong>, una plataforma web diseñada para gestionar el relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.</p>
+
+      <p>El sistema permite a los encuestadores registrar sus visitas a cada escuela, completar el formulario oficial del Ministerio de Educación y Ciencias (MEC), y registrar incidencias de campo. Los supervisores y administradores pueden monitorear el avance en tiempo real desde cualquier dispositivo con conexión a internet.</p>
+
+      <h3>Objetivos del sistema</h3>
+      <ul>
+        <li>Centralizar el seguimiento de visitas a establecimientos educativos.</li>
+        <li>Registrar el inicio y cierre de cada sesión de relevamiento con marca de tiempo.</li>
+        <li>Gestionar y hacer seguimiento de incidencias de campo.</li>
+        <li>Proveer estadísticas de avance por departamento, distrito y encuestador.</li>
+        <li>Mantener un registro de auditoría de todas las acciones del sistema.</li>
+      </ul>
+
+      <h3>Componentes del sistema</h3>
+      <table class="manual-table">
+        <tr><th>Componente</th><th>Descripción</th></tr>
+        <tr><td>Aplicación Web (Frontend)</td><td>Interfaz de usuario accesible desde cualquier navegador moderno. Alojada en GitHub Pages.</td></tr>
+        <tr><td>Backend (Google Apps Script)</td><td>Procesa las solicitudes, autentica usuarios y lee/escribe datos en Google Sheets.</td></tr>
+        <tr><td>Base de Datos (Google Sheets)</td><td>Almacena todos los datos: escuelas, usuarios, sesiones, incidencias, auditoría.</td></tr>
+        <tr><td>Formulario MEC</td><td>Sistema externo del Ministerio de Educación donde se registra la encuesta oficial.</td></tr>
+      </table>
+
+      <h3>Requisitos técnicos</h3>
+      <ul>
+        <li>Navegador web moderno: Chrome 90+, Firefox 88+, Edge 90+, Safari 14+.</li>
+        <li>Conexión a internet (mínimo 3G para uso básico).</li>
+        <li>Credenciales de acceso provistas por el administrador.</li>
+        <li>Credenciales del MEC para completar el formulario oficial.</li>
+      </ul>
+    </div>
+
+    <!-- ── 2. Acceso ────────────────────────────────────────── -->
+    <div class="manual-section" id="sec-acceso">
+      <span class="section-anchor" id="s-acceso"></span>
+      <h2>2. Acceso y Login</h2>
+
+      <h3>Ingresar al sistema</h3>
+      <ol class="step-list">
+        <li>Abrí tu navegador web.</li>
+        <li>Navegá a la URL de la aplicación (te la provee el administrador).</li>
+        <li>En la pantalla de login, ingresá tu <strong>usuario</strong> y <strong>contraseña</strong>.</li>
+        <li>Hacé clic en el botón <em>Ingresar</em>.</li>
+        <li>Si las credenciales son correctas, serás dirigido al panel principal.</li>
+      </ol>
+
+      <div class="callout callout--warning">
+        <strong>Importante:</strong> Si ves el mensaje "Credenciales inválidas", verificá que el usuario y contraseña sean correctos. Si el problema persiste, contactá al administrador.
+      </div>
+
+      <h3>Seguridad de la sesión</h3>
+      <p>La sesión tiene una duración máxima de <strong>8 horas</strong>. Pasado ese tiempo, el sistema te pedirá que vuelvas a iniciar sesión por seguridad. Tus datos no se pierden.</p>
+
+      <h3>Cerrar sesión</h3>
+      <p>Para cerrar sesión correctamente:</p>
+      <ol class="step-list">
+        <li>Hacé clic en tu nombre en la barra superior derecha.</li>
+        <li>Hacé clic en el botón <em>Salir</em>.</li>
+        <li>Confirmá la acción en el diálogo.</li>
+      </ol>
+
+      <div class="callout callout--tip">
+        <strong>Recomendación:</strong> Siempre cerrá sesión al terminar tu jornada, especialmente si usás un dispositivo compartido.
+      </div>
+    </div>
+
+    <!-- ── 3. Mapa ──────────────────────────────────────────── -->
+    <div class="manual-section" id="sec-mapa">
+      <span class="section-anchor" id="s-mapa"></span>
+      <h2>3. Uso del Mapa</h2>
+
+      <p>El módulo <strong>Mapa</strong> es la herramienta central de trabajo. Muestra todas las escuelas de tu zona en un mapa interactivo de Paraguay.</p>
+
+      <h3>Navegación básica</h3>
+      <ul>
+        <li><strong>Zoom:</strong> Usá la rueda del mouse o los botones + / − en el mapa.</li>
+        <li><strong>Desplazamiento:</strong> Hacé clic y arrastrá el mapa.</li>
+        <li><strong>Capas base:</strong> Podés alternar entre mapa base (OSM) y satélite (Esri) con el control en la esquina superior derecha.</li>
+      </ul>
+
+      <h3>Colores de los marcadores</h3>
+      <table class="manual-table">
+        <tr><th>Color</th><th>Estado</th><th>Significado</th></tr>
+        <tr><td><span class="badge badge--pendiente">●</span></td><td>Pendiente</td><td>Aún no fue relevada.</td></tr>
+        <tr><td><span class="badge badge--en-curso">●</span></td><td>En Curso</td><td>Hay una sesión activa en este momento.</td></tr>
+        <tr><td><span class="badge badge--finalizada">●</span></td><td>Finalizada</td><td>El relevamiento fue completado.</td></tr>
+        <tr><td><span class="badge badge--incidencia">●</span></td><td>Con Incidencia</td><td>Hubo un problema durante el relevamiento.</td></tr>
+      </table>
+
+      <h3>Agrupación de marcadores</h3>
+      <p>Cuando hay muchas escuelas en un área, los marcadores se agrupan en <em>clusters</em>. El número dentro del cluster indica cuántas escuelas contiene. Al hacer clic en el cluster, el mapa hace zoom y los separa.</p>
+
+      <h3>Popup de escuela</h3>
+      <p>Hacé clic en cualquier marcador para ver la información de esa escuela:</p>
+      <ul>
+        <li>Nombre y código de la escuela.</li>
+        <li>Departamento, distrito, localidad y zona.</li>
+        <li>Encuestador asignado.</li>
+        <li>Estado actual del relevamiento.</li>
+        <li>Botón para iniciar la encuesta (si tenés permiso).</li>
+      </ul>
+
+      <h3>Filtros disponibles</h3>
+      <p>El panel lateral izquierdo ofrece los siguientes filtros:</p>
+      <ul>
+        <li><strong>Búsqueda:</strong> Por nombre o código de escuela.</li>
+        <li><strong>Departamento:</strong> Filtra por departamento.</li>
+        <li><strong>Zona:</strong> Urbana / Rural / Rural Remota.</li>
+        <li><strong>Encuestador:</strong> Filtra las escuelas asignadas a un encuestador específico.</li>
+        <li><strong>Estado:</strong> Muestra solo escuelas en determinado estado.</li>
+      </ul>
+      <p>Los filtros se aplican al hacer clic en <em>Filtrar</em>. Para limpiar todos los filtros, usá el botón <em>Limpiar</em>.</p>
+    </div>
+
+    <!-- ── 4. Aplicar Encuesta ──────────────────────────────── -->
+    <div class="manual-section" id="sec-encuesta">
+      <span class="section-anchor" id="s-encuesta"></span>
+      <h2>4. Aplicar Encuesta</h2>
+
+      <h3>Proceso completo de relevamiento</h3>
+      <ol class="step-list">
+        <li>Navegá al módulo <strong>Mapa</strong> en el menú lateral.</li>
+        <li>Localizá la escuela que vas a visitar usando los filtros o buscando por nombre.</li>
+        <li>Hacé clic en el marcador de la escuela para abrir el popup.</li>
+        <li>Hacé clic en <em>Aplicar Encuesta</em> en el popup. Serás redirigido al módulo de encuesta.</li>
+        <li>Verificá que los datos de la escuela sean correctos.</li>
+        <li>Hacé clic en el botón <strong>Iniciar Encuesta</strong>. Esto registra el inicio de la sesión en el sistema con la hora exacta.</li>
+        <li>Se abrirá el formulario oficial del MEC en una nueva ventana o pestaña del navegador.</li>
+        <li>Completá el formulario del MEC con toda la información relevada en la escuela.</li>
+        <li>Guardá el formulario del MEC.</li>
+        <li>Volvé a la ventana de la aplicación CIALPA.</li>
+        <li>Hacé clic en <strong>Finalizar Encuesta</strong>. El sistema registrará el cierre de la sesión.</li>
+        <li>Podés agregar observaciones opcionales sobre el relevamiento.</li>
+      </ol>
+
+      <div class="callout callout--danger">
+        <strong>¡Importante!</strong> No cerrés la aplicación CIALPA mientras el formulario MEC está abierto. Si lo hacés, la sesión quedará "En Curso" y será necesario cerrarla manualmente más tarde.
+      </div>
+
+      <h3>Si el navegador bloquea la ventana emergente</h3>
+      <p>Al iniciar la encuesta, el formulario MEC se abre en una nueva ventana. Si el navegador lo bloquea:</p>
+      <ol class="step-list">
+        <li>Buscá el ícono de ventana bloqueada en la barra de direcciones del navegador.</li>
+        <li>Hacé clic en él y seleccioná "Permitir ventanas emergentes para este sitio".</li>
+        <li>Recargá la página o volvé a hacer clic en <em>Abrir Formulario MEC</em>.</li>
+      </ol>
+
+      <h3>Sesiones simultáneas</h3>
+      <p>El sistema <strong>no permite</strong> tener dos sesiones activas para la misma escuela al mismo tiempo. Si intentás iniciar una encuesta para una escuela que ya tiene una sesión activa, el sistema te avisará y te preguntará si querés recuperar esa sesión.</p>
+    </div>
+
+    <!-- ── 5. Estados ───────────────────────────────────────── -->
+    <div class="manual-section" id="sec-estados">
+      <span class="section-anchor" id="s-estados"></span>
+      <h2>5. Estados de Relevamiento</h2>
+
+      <p>Cada escuela tiene asignado uno de los siguientes estados, que refleja el avance del relevamiento:</p>
+
+      <table class="manual-table">
+        <tr>
+          <th>Estado</th>
+          <th>Descripción</th>
+          <th>¿Quién lo asigna?</th>
+        </tr>
+        <tr>
+          <td><span class="badge badge--pendiente">Pendiente</span></td>
+          <td>La escuela está en el listado pero aún no fue visitada.</td>
+          <td>Estado inicial (automático).</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge--en-curso">En Curso</span></td>
+          <td>Hay una sesión de relevamiento activa para esta escuela.</td>
+          <td>Automático al iniciar encuesta.</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge--finalizada">Finalizada</span></td>
+          <td>El relevamiento fue completado exitosamente.</td>
+          <td>Automático al cerrar sesión como "completada".</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge--incidencia">Con Incidencia</span></td>
+          <td>Hubo un problema que impidió completar el relevamiento.</td>
+          <td>Automático al cerrar sesión con incidencia.</td>
+        </tr>
+      </table>
+
+      <div class="callout callout--info">
+        <strong>Nota:</strong> Una escuela con estado "Con Incidencia" puede ser relevada nuevamente en una visita posterior, una vez que el supervisor resuelva la incidencia.
+      </div>
+    </div>
+
+    <!-- ── 6. Incidencias ───────────────────────────────────── -->
+    <div class="manual-section" id="sec-incidencias">
+      <span class="section-anchor" id="s-incidencias"></span>
+      <h2>6. Registro de Incidencias</h2>
+
+      <p>Una incidencia es cualquier situación que impida completar el relevamiento normalmente. Registrar incidencias correctamente es fundamental para la gestión del proyecto.</p>
+
+      <h3>Cómo registrar una incidencia durante la sesión</h3>
+      <ol class="step-list">
+        <li>Con la sesión activa en el módulo <em>Aplicar Encuesta</em>, hacé clic en el botón <strong>Registrar Incidencia</strong>.</li>
+        <li>Confirmá la acción en el diálogo que aparece.</li>
+        <li>Completá la descripción de la incidencia.</li>
+        <li>Seleccioná el tipo de incidencia y la prioridad.</li>
+        <li>Hacé clic en <em>Registrar Incidencia</em>.</li>
+      </ol>
+
+      <h3>Tipos de incidencia</h3>
+      <ul>
+        <li><strong>Escuela cerrada:</strong> No hay actividad en el establecimiento.</li>
+        <li><strong>Acceso bloqueado:</strong> No es posible ingresar al establecimiento.</li>
+        <li><strong>Director/a ausente:</strong> No está la autoridad para atender la encuesta.</li>
+        <li><strong>Formulario incompleto:</strong> No fue posible completar todos los campos del formulario.</li>
+        <li><strong>Problema técnico:</strong> Falla técnica en el sistema o dispositivo.</li>
+        <li><strong>Seguridad / riesgo:</strong> Existe una situación de riesgo para el encuestador.</li>
+        <li><strong>Otra:</strong> Cualquier otro motivo.</li>
+      </ul>
+
+      <h3>Prioridades</h3>
+      <table class="manual-table">
+        <tr><th>Prioridad</th><th>Cuándo usarla</th></tr>
+        <tr><td>Alta</td><td>Situación de riesgo, escuela que no puede ser relevada sin acción inmediata del supervisor.</td></tr>
+        <tr><td>Media</td><td>Situación que requiere seguimiento, puede resolverse en el corto plazo.</td></tr>
+        <tr><td>Baja</td><td>Situación menor, puede resolverse en la próxima visita programada.</td></tr>
+      </table>
+
+      <h3>¿Qué pasa después?</h3>
+      <p>La incidencia queda registrada y visible para el supervisor. El supervisor podrá:</p>
+      <ul>
+        <li>Coordinar una revisita a la escuela.</li>
+        <li>Gestionar la resolución del problema.</li>
+        <li>Marcar la incidencia como resuelta una vez atendida.</li>
+      </ul>
+    </div>
+
+    <!-- ── 7. Mi Jornada ────────────────────────────────────── -->
+    <div class="manual-section" id="sec-jornada">
+      <span class="section-anchor" id="s-jornada"></span>
+      <h2>7. Mi Jornada</h2>
+
+      <p>El módulo <strong>Mi Jornada</strong> es tu panel personal de actividad. Podés ver todo lo que hiciste hoy y en jornadas anteriores.</p>
+
+      <h3>¿Qué muestra?</h3>
+      <ul>
+        <li><strong>Tarjeta de usuario:</strong> Tu nombre, rol, fecha actual y estado actual (si estás en campo o no).</li>
+        <li><strong>KPIs del día:</strong> Sesiones realizadas hoy, finalizadas, incidencias y tiempo total trabajado.</li>
+        <li><strong>Historial de sesiones:</strong> Tabla con todas tus sesiones: fecha, hora de inicio, escuela, hora de cierre, duración y estado.</li>
+        <li><strong>Mis incidencias:</strong> Lista de las incidencias que registraste.</li>
+      </ul>
+
+      <h3>Actualizar datos</h3>
+      <p>Usá el botón <em>↺ Actualizar</em> en la parte superior del módulo para recargar los datos más recientes del servidor.</p>
+    </div>
+
+    <!-- ── 8. Formulario MEC ─────────────────────────────────── -->
+    <div class="manual-section" id="sec-formulario">
+      <span class="section-anchor" id="s-formulario"></span>
+      <h2>8. Formulario MEC</h2>
+
+      <p>El formulario oficial del <strong>Ministerio de Educación y Ciencias (MEC)</strong> es donde se registra la información del relevamiento. Se abre en una nueva ventana del navegador al iniciar una encuesta.</p>
+
+      <h3>Acceso al formulario</h3>
+      <p>URL del sistema MEC: <strong>demo.mec.gov.py</strong></p>
+      <p>Necesitás tus credenciales del MEC (diferentes de las de CIALPA) para iniciar sesión en el formulario.</p>
+
+      <h3>Pasos para completar el formulario</h3>
+      <ol class="step-list">
+        <li>En la ventana del formulario MEC, iniciá sesión con tus credenciales del MEC.</li>
+        <li>Buscá la escuela por su código oficial o nombre.</li>
+        <li>Completá todos los campos requeridos con la información relevada in situ.</li>
+        <li>Adjuntá las fotografías o evidencias requeridas si el sistema lo permite.</li>
+        <li>Guardá el formulario antes de cerrar la ventana.</li>
+        <li>Volvé a la aplicación CIALPA y cerrá la sesión.</li>
+      </ol>
+
+      <div class="callout callout--warning">
+        <strong>Recordatorio:</strong> Guardá el formulario MEC antes de cerrar la ventana. Una vez cerrado el formulario, deberías volver a CIALPA y cerrar la sesión con el botón <em>Finalizar Encuesta</em>.
+      </div>
+    </div>
+
+    <!-- ── 9. Sincronización ─────────────────────────────────── -->
+    <div class="manual-section" id="sec-sincronizacion">
+      <span class="section-anchor" id="s-sincronizacion"></span>
+      <h2>9. Sincronización de Datos</h2>
+
+      <p>Los datos del sistema se sincronizan automáticamente con el servidor (Google Sheets) cada vez que realizás una acción importante (inicio de sesión, cierre de encuesta, registro de incidencia).</p>
+
+      <h3>¿Qué pasa si pierdo la conexión?</h3>
+      <div class="callout callout--danger">
+        <strong>Sin conexión a internet</strong> no podés iniciar nuevas sesiones, ya que el sistema requiere comunicación con el servidor para registrar el inicio y cierre de cada encuesta.
+      </div>
+
+      <p>Si perdés la conexión durante una sesión activa:</p>
+      <ol class="step-list">
+        <li>No cerrés la aplicación.</li>
+        <li>Esperá a que se restaure la conexión a internet.</li>
+        <li>El sistema mostrará una advertencia en la pantalla cuando no haya conexión.</li>
+        <li>Una vez restaurada la conexión, podrás cerrar la sesión normalmente.</li>
+      </ol>
+
+      <h3>Reintentos automáticos</h3>
+      <p>El sistema intenta cada solicitud hasta 3 veces automáticamente si hay problemas de red. Si después de los reintentos la solicitud falla, verás un mensaje de error con opciones para reintentar manualmente.</p>
+    </div>
+
+    <!-- ── 10. Roles ──────────────────────────────────────────── -->
+    <div class="manual-section" id="sec-roles">
+      <span class="section-anchor" id="s-roles"></span>
+      <h2>10. Roles y Permisos</h2>
+
+      <p>El sistema tiene tres roles con diferentes niveles de acceso:</p>
+
+      <table class="manual-table">
+        <tr>
+          <th>Rol</th>
+          <th>Módulos accesibles</th>
+          <th>Acciones disponibles</th>
+        </tr>
+        <tr>
+          <td><strong>Encuestador</strong></td>
+          <td>Inicio, Mapa, Aplicar Encuesta, Manual, Incidencias, Mi Jornada</td>
+          <td>Ver escuelas, iniciar/cerrar sesiones, registrar incidencias, ver su jornada.</td>
+        </tr>
+        <tr>
+          <td><strong>Supervisor</strong></td>
+          <td>Todo lo del Encuestador + Panel Estadístico</td>
+          <td>Todo lo anterior + ver estadísticas de todos los encuestadores, resolver incidencias.</td>
+        </tr>
+        <tr>
+          <td><strong>Administrador</strong></td>
+          <td>Acceso completo a todos los módulos</td>
+          <td>Todo lo anterior + Configuración del sistema, gestión de encuestadores, Auditoría.</td>
+        </tr>
+      </table>
+
+      <div class="callout callout--info">
+        <strong>Nota:</strong> Si intentás acceder a un módulo para el que no tenés permiso, el sistema mostrará un mensaje de acceso restringido.
+      </div>
+    </div>
+
+    <!-- ── 11. Estadísticas ───────────────────────────────────── -->
+    <div class="manual-section" id="sec-estadisticas">
+      <span class="section-anchor" id="s-estadisticas"></span>
+      <h2>11. Panel Estadístico</h2>
+
+      <p><em>Disponible para Supervisores y Administradores.</em></p>
+
+      <h3>Indicadores clave (KPIs)</h3>
+      <ul>
+        <li><strong>Total Escuelas:</strong> Número total de establecimientos en el relevamiento.</li>
+        <li><strong>Relevadas:</strong> Escuelas con estado "Finalizada".</li>
+        <li><strong>En Curso:</strong> Sesiones activas en este momento.</li>
+        <li><strong>Pendientes:</strong> Escuelas aún no visitadas.</li>
+        <li><strong>Con Incidencia:</strong> Escuelas con incidencias registradas.</li>
+        <li><strong>% Avance:</strong> Porcentaje de escuelas relevadas sobre el total.</li>
+      </ul>
+
+      <h3>Gráficos disponibles</h3>
+      <ul>
+        <li><strong>Barras apiladas por departamento:</strong> Muestra la distribución de estados para cada departamento.</li>
+        <li><strong>Donut general:</strong> Distribución porcentual de todos los estados.</li>
+        <li><strong>Línea de progreso diario:</strong> Encuestas completadas por día.</li>
+      </ul>
+
+      <h3>Ranking de Encuestadores</h3>
+      <p>Tabla con estadísticas de cada encuestador: escuelas asignadas, finalizadas, incidencias registradas y tiempo promedio por encuesta.</p>
+
+      <h3>Filtros</h3>
+      <p>Podés filtrar todos los datos por rango de fechas, departamento y encuestador.</p>
+
+      <h3>Exportación</h3>
+      <p>Usá el botón <em>Exportar CSV</em> para descargar los datos estadísticos por departamento en formato CSV (compatible con Excel).</p>
+    </div>
+
+    <!-- ── 12. Configuración ─────────────────────────────────── -->
+    <div class="manual-section" id="sec-configuracion">
+      <span class="section-anchor" id="s-configuracion"></span>
+      <h2>12. Configuración del Sistema</h2>
+
+      <p><em>Exclusivo para Administradores.</em></p>
+
+      <h3>Parámetros del sistema</h3>
+      <p>En la pestaña <em>Parámetros</em> podés modificar valores de configuración del sistema, como la URL del formulario MEC, mensajes del sistema, etc. Solo los parámetros marcados como "editables" son accesibles desde esta pantalla.</p>
+
+      <h3>Gestión de Encuestadores</h3>
+      <p>En la pestaña <em>Encuestadores</em> podés:</p>
+      <ul>
+        <li><strong>Crear</strong> nuevos usuarios encuestadores.</li>
+        <li><strong>Editar</strong> los datos de un encuestador existente (nombre, contacto, zona asignada).</li>
+        <li><strong>Desactivar</strong> cuentas (sin eliminar el historial).</li>
+        <li><strong>Cambiar contraseñas</strong> de encuestadores.</li>
+      </ul>
+
+      <div class="callout callout--warning">
+        <strong>Precaución:</strong> Al desactivar un encuestador, éste no podrá iniciar sesión. Las sesiones y datos históricos se conservan.
+      </div>
+    </div>
+
+    <!-- ── 13. Auditoría ─────────────────────────────────────── -->
+    <div class="manual-section" id="sec-auditoria">
+      <span class="section-anchor" id="s-auditoria"></span>
+      <h2>13. Auditoría del Sistema</h2>
+
+      <p><em>Exclusivo para Administradores.</em></p>
+
+      <p>El módulo de Auditoría registra un log completo de todas las acciones importantes realizadas en el sistema:</p>
+
+      <ul>
+        <li>Inicios y cierres de sesión de todos los usuarios.</li>
+        <li>Inicio y cierre de sesiones de relevamiento.</li>
+        <li>Registro de incidencias.</li>
+        <li>Cambios de configuración del sistema.</li>
+        <li>Creación, edición y desactivación de cuentas de encuestadores.</li>
+      </ul>
+
+      <h3>Filtros disponibles</h3>
+      <ul>
+        <li><strong>Usuario:</strong> Ver acciones de un usuario específico.</li>
+        <li><strong>Acción:</strong> Filtrar por tipo de acción (login, inicio_sesion, etc.).</li>
+        <li><strong>Rango de fechas:</strong> Filtrar por período.</li>
+      </ul>
+
+      <p>Los registros se muestran paginados. Usá los botones de navegación al final de la tabla para ver páginas anteriores.</p>
+    </div>
+
+    <!-- ── 14. Errores ────────────────────────────────────────── -->
+    <div class="manual-section" id="sec-errores">
+      <span class="section-anchor" id="s-errores"></span>
+      <h2>14. Solución de Errores Comunes</h2>
+
+      <h3>El botón "Iniciar Encuesta" no responde</h3>
+      <p><strong>Posibles causas y soluciones:</strong></p>
+      <ul>
+        <li>No hay conexión a internet → Verificá tu conexión y volvé a intentarlo.</li>
+        <li>No seleccionaste una escuela → Seleccioná una escuela desde el mapa primero.</li>
+        <li>Ya tenés una sesión activa → Cerrá la sesión anterior antes de iniciar una nueva.</li>
+        <li>Error del servidor → Esperá unos minutos y volvé a intentar.</li>
+      </ul>
+
+      <h3>"Credenciales inválidas" al login</h3>
+      <ul>
+        <li>Verificá que el usuario y contraseña estén escritos correctamente (distingue mayúsculas/minúsculas).</li>
+        <li>Asegurate de no tener activado el bloqueo de mayúsculas.</li>
+        <li>Si el problema persiste, contactá al administrador para resetear tu contraseña.</li>
+      </ul>
+
+      <h3>El formulario MEC no abre</h3>
+      <ul>
+        <li>El navegador puede estar bloqueando ventanas emergentes. Buscá el ícono de bloqueo en la barra de direcciones y permitilas para este sitio.</li>
+        <li>En el módulo de encuesta, buscá el botón <em>Abrir Formulario MEC</em> para intentarlo nuevamente.</li>
+      </ul>
+
+      <h3>"Tu sesión ha expirado"</h3>
+      <p>Las sesiones duran 8 horas por seguridad. Cerrá el diálogo y volvé a ingresar con tu usuario y contraseña. Tus datos de relevamiento no se pierden.</p>
+
+      <h3>El mapa no carga</h3>
+      <ul>
+        <li>Verificá tu conexión a internet.</li>
+        <li>Recargá la página (F5 o Ctrl+R).</li>
+        <li>Si el mapa no muestra escuelas, puede haber un problema con el servidor. Contactá al administrador.</li>
+      </ul>
+
+      <h3>Error general "Error de conexión con el servidor"</h3>
+      <p>Este mensaje aparece cuando no se puede comunicar con el backend. El sistema reintenta automáticamente 3 veces. Si el error persiste:</p>
+      <ol class="step-list">
+        <li>Verificá tu conexión a internet.</li>
+        <li>Esperá 2–3 minutos y volvé a intentar.</li>
+        <li>Si el error continúa, contactá al soporte técnico.</li>
+      </ol>
+
+      <div class="callout callout--info">
+        <strong>Consejo:</strong> Al reportar un error, anotá exactamente qué acción estabas realizando, el mensaje de error que apareció y la fecha/hora aproximada. Esto facilita enormemente la resolución.
+      </div>
+    </div>
+
+    <!-- ── 15. Contacto ──────────────────────────────────────── -->
+    <div class="manual-section" id="sec-contacto">
+      <span class="section-anchor" id="s-contacto"></span>
+      <h2>15. Soporte y Contacto</h2>
+
+      <p>Para soporte técnico o consultas relacionadas con el sistema CIALPA:</p>
+
+      <table class="manual-table">
+        <tr><th>Canal</th><th>Datos</th></tr>
+        <tr><td>Email</td><td>soporte@cialpa.gov.py</td></tr>
+        <tr><td>Teléfono</td><td>(021) 000-000</td></tr>
+        <tr><td>Horario de atención</td><td>Lunes a viernes, 8:00 – 17:00 hs (hora Paraguay)</td></tr>
+      </table>
+
+      <h3>Información a incluir en un reporte de error</h3>
+      <ol class="step-list">
+        <li>Tu nombre de usuario.</li>
+        <li>Descripción detallada del problema.</li>
+        <li>Pasos exactos para reproducir el error.</li>
+        <li>Captura de pantalla del error (si es posible).</li>
+        <li>Fecha y hora aproximada en que ocurrió.</li>
+        <li>Dispositivo y navegador que estás usando.</li>
+      </ol>
+
+      <div class="callout callout--tip">
+        <strong>Guía rápida:</strong> Si es la primera vez que usás el sistema, te recomendamos leer las secciones 2 (Login), 3 (Mapa) y 4 (Aplicar Encuesta) antes de salir a campo.
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="text-align:center;color:#6c757d;font-size:.8rem;margin-top:2rem;padding:1rem;">
+      CIALPA — Relevamiento Escolar &bull; Manual v2.0.0 &bull; Paraguay 2025
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /layout -->
+
+<!-- Back to top -->
+<button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Volver arriba">↑</button>
+
+<script>
+  // Scroll spy & back-to-top
+  const navLinks = document.querySelectorAll('.sidebar nav a');
+  const sections = document.querySelectorAll('.manual-section');
+  const backTop = document.getElementById('back-to-top');
+
+  window.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(s => {
+      if (window.scrollY >= s.offsetTop - 120) current = s.id;
+    });
+    navLinks.forEach(a => {
+      a.classList.remove('active');
+      if (a.getAttribute('href') === '#s-' + current.replace('sec-', '')) a.classList.add('active');
+    });
+    backTop.classList.toggle('visible', window.scrollY > 400);
+  });
+
+  // Search
+  function searchManual(q) {
+    const query = q.toLowerCase().trim();
+    sections.forEach(section => {
+      if (!query) { section.style.display = ''; return; }
+      const text = section.textContent.toLowerCase();
+      section.style.display = text.includes(query) ? '' : 'none';
+    });
+  }
+</script>
+</body>
+</html>
