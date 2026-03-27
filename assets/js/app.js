@@ -281,6 +281,13 @@ const AppController = (() => {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app-shell').style.display = 'none';
 
+    // Show demo notice when GAS is not configured
+    const demoNotice = document.getElementById('demo-notice');
+    if (demoNotice) {
+      const isDemo = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
+      demoNotice.style.display = isDemo ? 'block' : 'none';
+    }
+
     const form = document.getElementById('login-form');
     if (form) {
       form.addEventListener('submit', async e => {

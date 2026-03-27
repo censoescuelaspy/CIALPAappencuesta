@@ -12,7 +12,7 @@
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const SPREADSHEET_ID = ''; // Set this to your Google Sheets ID after creating the sheet
+const SPREADSHEET_ID = '1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg'; // Google Sheets ID
 const SHEET_NAMES = {
   ESCUELAS:     'escuelas_seleccionadas',
   USUARIOS:     'usuarios',
