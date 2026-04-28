@@ -161,15 +161,15 @@ const API = (() => {
         let url = APP_CONFIG.GAS_URL;
         let fetchOptions = {
           method,
-          headers: { 'Content-Type': 'application/json' },
           redirect: 'follow',
         };
 
         if (method === 'GET') {
           const params = new URLSearchParams(payload);
           url = `${APP_CONFIG.GAS_URL}?${params.toString()}`;
-          delete fetchOptions.headers['Content-Type'];
         } else {
+          // text/plain avoids CORS preflight; GAS parses JSON from postData.contents
+          fetchOptions.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
           fetchOptions.body = JSON.stringify(payload);
         }
 
