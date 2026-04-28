@@ -6,7 +6,7 @@
 
 const APP_CONFIG = {
   // Google Apps Script Web App URL — fill after deploying GAS
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbz8ZOzDhNVLeSGsSM94vlLEwLy9PzK8AshNPbPZp3uEyZyEg5_MUBLLM8FrWlpBinCUHA/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxmfkifnwz3WoaCzzTAmQO0TuvRwenmiJY3GSdEYqi564TtoCbEOTzD7CTgK4-vaOWKjQ/exec',
 
   // MEC online form URL
   FORM_URL: 'https://demo.mec.gov.py/demo_rue/login',
