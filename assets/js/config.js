@@ -6,7 +6,7 @@
 
 const APP_CONFIG = {
   // Google Apps Script Web App URL — fill after deploying GAS
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbwKls1jXCwh-Np9UMoir2VD3LtQlxxdJ0e3cetBeQDzJCnSNWAIHYnapTaPD1fgC75M/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbxPvBLzZ_uIdNLr5PMfaAFJkw749LfL26qj07thvXjVxaYO6tQ0jbq1kc3Qqb1DbjTZEA/exec',
 
   // External survey application defaults. These values can be overridden from Google Sheets CONFIG.
   FORM_URL: 'https://demo.mec.gov.py/demo_rue/login',
