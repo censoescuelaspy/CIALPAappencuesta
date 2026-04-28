@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.gs — Authentication service
- * Version: 2.0.0
+ * Version: 2.1.0
  */
 
 const AuthService = (() => {
@@ -89,11 +89,13 @@ const AuthService = (() => {
     const idCol = headers.indexOf('id_usuario');
     const tokenCol = headers.indexOf('token_actual');
     const accessCol = headers.indexOf('ultimo_acceso');
+    const expiryCol = headers.indexOf('token_expiry');
 
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][idCol]) === String(id_usuario)) {
         if (tokenCol !== -1) sheet.getRange(i + 1, tokenCol + 1).setValue(token);
         if (accessCol !== -1) sheet.getRange(i + 1, accessCol + 1).setValue(_timestamp());
+        if (expiryCol !== -1) sheet.getRange(i + 1, expiryCol + 1).setValue(expiry ? expiry.toISOString() : '');
         break;
       }
     }
@@ -109,6 +111,10 @@ const AuthService = (() => {
 
     if (!user) return { valid: false };
     if (String(user.activo).toLowerCase() !== 'true') return { valid: false };
+    if (user.token_expiry) {
+      const expiryTime = new Date(user.token_expiry).getTime();
+      if (!isNaN(expiryTime) && Date.now() > expiryTime) return { valid: false };
+    }
 
     return {
       valid: true,

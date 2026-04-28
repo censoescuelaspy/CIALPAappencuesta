@@ -1,7 +1,7 @@
 /* ============================================================
    CIALPA — Relevamiento Escolar
    app.css — Complete application styles
-   Version: 2.0.0
+   Version: 2.1.0
    ============================================================ */
 
 /* ── CSS Custom Properties ────────────────────────────────── */
@@ -1221,4 +1221,118 @@ td {
   #main-area { margin: 0; }
   .module-panel--active { display: block !important; }
   .card, .kpi-card { box-shadow: none; border: 1px solid #ddd; }
+}
+
+/* ── Control operativo de módulos, v2.1 ───────────────────── */
+.survey-note {
+  margin-top: .75rem;
+  color: var(--color-text-muted);
+  font-size: .875rem;
+  line-height: 1.45;
+}
+
+.survey-actions--stacked {
+  align-items: stretch;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.module-tracker {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: rgba(248, 250, 252, .9);
+}
+
+.module-tracker__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.module-tracker__header h4 {
+  margin: 0 0 .25rem 0;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.module-tracker__header p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: .875rem;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .75rem;
+}
+
+.module-card {
+  border: 1px solid var(--color-border);
+  background: #fff;
+  border-radius: var(--radius-md);
+  padding: .8rem;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+}
+
+.module-card--en_curso {
+  border-color: #fd7e14;
+  box-shadow: 0 0 0 3px rgba(253, 126, 20, .12);
+}
+
+.module-card--finalizado {
+  border-color: #28a745;
+  background: linear-gradient(180deg, rgba(40,167,69,.08), #fff);
+}
+
+.module-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .5rem;
+}
+
+.module-card__order {
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-weight: 700;
+  font-size: .8rem;
+}
+
+.module-card__status {
+  font-size: .72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.module-card__title {
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.25;
+  margin-bottom: .8rem;
+}
+
+.module-card__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-sm {
+  padding: .45rem .7rem;
+  font-size: .8rem;
 }

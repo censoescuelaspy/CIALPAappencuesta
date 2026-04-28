@@ -1,67 +1,68 @@
 /**
- * CIALPA — Relevamiento Escolar
- * api.js — API layer for Google Apps Script backend
- * Version: 2.0.0
+ * CIALPA, Relevamiento Escolar
+ * api.js, capa de integración con Google Apps Script
+ * Version: 2.1.0
  */
 
 const API = (() => {
   'use strict';
 
-  // ── Demo mode ─────────────────────────────────────────────────────────────
-  // Active when GAS_URL is still the placeholder. Allows full app testing
-  // without a deployed backend. Credentials: admin/admin123 or encuestador/enc123
-
   const _IS_DEMO = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
 
   const _DEMO_USERS = [
-    { usuario: 'admin',       password: 'admin123', nombres: 'Admin',    apellidos: 'Sistema',  rol: 'admin',       id_usuario: 'u_admin' },
-    { usuario: 'encuestador', password: 'enc123',   nombres: 'Juan',     apellidos: 'Pérez',    rol: 'encuestador', id_usuario: 'u_enc1'  },
-    { usuario: 'supervisor',  password: 'sup123',   nombres: 'María',    apellidos: 'González', rol: 'supervisor',  id_usuario: 'u_sup1'  },
+    { usuario: 'admin', password: 'admin123', nombres: 'Admin', apellidos: 'Sistema', rol: 'admin', id_usuario: 'u_admin' },
+    { usuario: 'encuestador', password: 'enc123', nombres: 'Juan', apellidos: 'Pérez', rol: 'encuestador', id_usuario: 'u_enc1' },
+    { usuario: 'supervisor', password: 'sup123', nombres: 'María', apellidos: 'González', rol: 'supervisor', id_usuario: 'u_sup1' },
   ];
 
   const _DEMO_ESCUELAS = [
-    { id_escuela: 'E001', nombre: 'Escuela Básica Nro. 1 Mariscal López', departamento: 'Central',     zona: 'Urbana',        estado: 'pendiente',  lat: -25.286,  lng: -57.647, encuestador_asignado: '' },
-    { id_escuela: 'E002', nombre: 'Colegio Nacional Cap. Bado',            departamento: 'Amambay',     zona: 'Urbana',        estado: 'en_curso',   lat: -23.266,  lng: -55.533, encuestador_asignado: 'Juan Pérez' },
-    { id_escuela: 'E003', nombre: 'Escuela Básica Ita Paso',               departamento: 'Concepción',  zona: 'Rural',         estado: 'finalizada', lat: -22.834,  lng: -57.434, encuestador_asignado: 'Juan Pérez' },
-    { id_escuela: 'E004', nombre: 'Escuela Básica Mbocayaty',              departamento: 'Guairá',      zona: 'Rural',         estado: 'pendiente',  lat: -25.981,  lng: -56.429, encuestador_asignado: '' },
-    { id_escuela: 'E005', nombre: 'Colegio San José',                      departamento: 'Alto Paraná', zona: 'Urbana',        estado: 'finalizada', lat: -25.510,  lng: -54.611, encuestador_asignado: 'María González' },
-    { id_escuela: 'E006', nombre: 'Escuela Pedro Juan Caballero',          departamento: 'Amambay',     zona: 'Urbana',        estado: 'incidencia', lat: -22.554,  lng: -55.727, encuestador_asignado: 'Juan Pérez' },
-    { id_escuela: 'E007', nombre: 'Escuela Rural Aguaray',                 departamento: 'San Pedro',   zona: 'Rural Remota',  estado: 'pendiente',  lat: -24.083,  lng: -56.588, encuestador_asignado: '' },
-    { id_escuela: 'E008', nombre: 'Escuela Básica Villa Hayes',            departamento: 'Presidente Hayes', zona: 'Urbana',   estado: 'en_curso',   lat: -25.100,  lng: -57.521, encuestador_asignado: 'María González' },
+    { id_escuela: 'ESC_0010046', codigo_local: '0010046', nombre: 'ESCUELA BÁSICA N° 3 REPÚBLICA DEL BRASIL', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'pendiente', latitud: -25.2968, longitud: -57.6309, encuestador_asignado: '', supervisor_asignado: '' },
+    { id_escuela: 'ESC_0011004', codigo_local: '0011004', nombre: 'ESCUELA BÁSICA N° 2 CELSA SPERATTI', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'en_curso', latitud: -25.2830, longitud: -57.6350, encuestador_asignado: 'Juan Pérez', supervisor_asignado: 'María González' },
+    { id_escuela: 'ESC_0011007', codigo_local: '0011007', nombre: 'COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'finalizada', latitud: -25.2890, longitud: -57.6170, encuestador_asignado: 'Juan Pérez', supervisor_asignado: 'María González' },
+    { id_escuela: 'ESC_0012095', codigo_local: '0012095', nombre: 'ESCUELA BÁSICA N° 1 REPÚBLICA ARGENTINA', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'pendiente', latitud: -25.3035, longitud: -57.6380, encuestador_asignado: '', supervisor_asignado: '' },
   ];
 
+  const _DEMO_SESIONES = [];
+  const _DEMO_MODULOS = [];
+
   const _DEMO_STATS = {
-    total: 8, pendiente: 3, en_curso: 2, finalizada: 2, incidencia: 1,
+    total: 4,
+    pendiente: 2,
+    en_curso: 1,
+    finalizada: 1,
+    incidencia: 0,
     porcentaje_avance: 25,
-    por_departamento: [
-      { departamento: 'Central', total: 1, finalizada: 0, en_curso: 1 },
-      { departamento: 'Amambay', total: 2, finalizada: 0, en_curso: 1 },
-      { departamento: 'Alto Paraná', total: 1, finalizada: 1, en_curso: 0 },
-    ],
-    por_zona: [
-      { zona: 'Urbana', total: 5 }, { zona: 'Rural', total: 2 }, { zona: 'Rural Remota', total: 1 },
-    ],
+    por_departamento: [{ departamento: 'Capital', total: 4, finalizada: 1, en_curso: 1 }],
+    por_zona: [{ zona: 'Urbana', total: 4 }],
     por_encuestador: [
-      { encuestador: 'Juan Pérez', asignadas: 3, finalizadas: 1 },
-      { encuestador: 'María González', asignadas: 2, finalizadas: 1 },
+      { encuestador: 'Juan Pérez', asignadas: 2, finalizadas: 1 },
+      { encuestador: 'María González', asignadas: 0, finalizadas: 0 },
     ],
     historico: [
-      { fecha: '2026-03-20', finalizadas: 0 }, { fecha: '2026-03-21', finalizadas: 1 },
-      { fecha: '2026-03-22', finalizadas: 1 }, { fecha: '2026-03-23', finalizadas: 2 },
-      { fecha: '2026-03-24', finalizadas: 2 }, { fecha: '2026-03-25', finalizadas: 2 },
+      { fecha: '2026-04-27', finalizadas: 0 },
+      { fecha: '2026-04-28', finalizadas: 1 },
     ],
+    modulos: { total: 0, finalizados: 0, promedio_minutos: 0 },
   };
 
   const _DEMO_ENCUESTADORES = [
-    { id_encuestador: 'u_enc1', nombres: 'Juan', apellidos: 'Pérez',    usuario: 'encuestador', activo: true, zona_asignada: 'Amambay' },
-    { id_encuestador: 'u_sup1', nombres: 'María', apellidos: 'González', usuario: 'supervisor',  activo: true, zona_asignada: 'Alto Paraná' },
+    { id_encuestador: 'u_enc1', nombres: 'Juan', apellidos: 'Pérez', usuario: 'encuestador', activo: true, zona_asignada: 'Capital', rol: 'encuestador' },
+    { id_encuestador: 'u_sup1', nombres: 'María', apellidos: 'González', usuario: 'supervisor', activo: true, zona_asignada: 'Capital', rol: 'supervisor' },
   ];
 
+  const _DEMO_CONFIG = {
+    FORM_URL: 'https://demo.mec.gov.py/demo_rue/login',
+    FORM_LAUNCH_MODE: 'web',
+    FORM_ANDROID_INTENT_URL: '',
+    FORM_CUSTOM_SCHEME_URL: '',
+    FORM_FALLBACK_SECONDS: '2',
+    operativo: true,
+    fecha_inicio: '2026-04-27',
+    fecha_fin: '2026-08-31',
+  };
+
   function _demoCall(endpoint, data) {
-    // Small artificial delay to simulate network
-    return new Promise(resolve => setTimeout(() => {
-      resolve(_demoDispatch(endpoint, data));
-    }, 300));
+    return new Promise(resolve => setTimeout(() => resolve(_demoDispatch(endpoint, data || {})), 180));
   }
 
   function _demoDispatch(endpoint, data) {
@@ -72,36 +73,70 @@ const API = (() => {
           const { password: _, ...safeUser } = u;
           return { status: 'ok', data: { token: 'demo_' + Date.now(), ...safeUser } };
         }
-        return { status: 'error', message: 'Credenciales inválidas.\n\nModo DEMO — use:\n  admin / admin123\n  encuestador / enc123\n  supervisor / sup123' };
+        return { status: 'error', message: 'Credenciales inválidas. Modo DEMO: admin/admin123, encuestador/enc123 o supervisor/sup123.' };
       }
-      case 'logout':          return { status: 'ok' };
-      case 'getEscuelas':     return { status: 'ok', data: _DEMO_ESCUELAS };
-      case 'getEscuela':      return { status: 'ok', data: _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela) || null };
+      case 'logout': return { status: 'ok' };
+      case 'getEscuelas': return { status: 'ok', data: _DEMO_ESCUELAS };
+      case 'getEscuela': return { status: 'ok', data: _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || null };
       case 'updateEscuelaEstado': {
-        const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela);
-        if (esc) esc.estado = data.estado;
+        const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela);
+        if (esc) esc.estado_relevamiento = data.estado;
         return { status: 'ok' };
       }
-      case 'getStats':        return { status: 'ok', data: _DEMO_STATS };
-      case 'getEncuestadores':return { status: 'ok', data: _DEMO_ENCUESTADORES };
+      case 'asignarEscuela': return { status: 'ok' };
+      case 'iniciarSesion': {
+        const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || _DEMO_ESCUELAS[0];
+        const now = new Date();
+        const ses = { id_sesion: 'SES_DEMO_' + Date.now(), id_escuela: esc.id_escuela, codigo_local: esc.codigo_local, nombre_escuela: esc.nombre, usuario: 'demo', inicio_iso: now.toISOString(), fecha_inicio: now.toISOString().slice(0, 10), hora_inicio: now.toTimeString().slice(0, 8), estado: 'en_curso', url_formulario_usada: _DEMO_CONFIG.FORM_URL, launch_mode: _DEMO_CONFIG.FORM_LAUNCH_MODE, total_modulos: 9, modulos_completados: 0 };
+        _DEMO_SESIONES.push(ses);
+        esc.estado_relevamiento = 'en_curso';
+        return { status: 'ok', data: ses };
+      }
+      case 'cerrarSesion': {
+        const ses = _DEMO_SESIONES.find(s => s.id_sesion === data.id_sesion);
+        if (ses) {
+          ses.estado = data.estado || 'finalizada';
+          ses.fin_iso = new Date().toISOString();
+          ses.folio_externo = data.folio_externo || '';
+          const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === ses.id_escuela);
+          if (esc) esc.estado_relevamiento = ses.estado;
+        }
+        return { status: 'ok', data: { duracion_minutos: 1, modulos: { total: 9, completados: _DEMO_MODULOS.filter(m => m.id_sesion === data.id_sesion && m.estado === 'finalizado').length } } };
+      }
+      case 'getSesionesAbiertas': return { status: 'ok', data: _DEMO_SESIONES.filter(s => s.estado === 'en_curso') };
+      case 'getMisSesiones': return { status: 'ok', data: _DEMO_SESIONES };
+      case 'registrarEventoSesion': return { status: 'ok' };
+      case 'iniciarModulo': {
+        const mod = { id_modulo: 'MOD_DEMO_' + Date.now(), id_sesion: data.id_sesion, id_escuela: data.id_escuela || '', modulo: data.modulo, modulo_nombre: data.modulo_nombre || data.modulo, orden: data.orden || '', inicio_iso: new Date().toISOString(), estado: 'en_curso' };
+        _DEMO_MODULOS.push(mod);
+        return { status: 'ok', data: mod };
+      }
+      case 'cerrarModulo': {
+        const mod = _DEMO_MODULOS.find(m => m.id_modulo === data.id_modulo || (m.id_sesion === data.id_sesion && m.modulo === data.modulo && m.estado === 'en_curso'));
+        if (mod) {
+          mod.estado = data.estado || 'finalizado';
+          mod.fin_iso = new Date().toISOString();
+          mod.duracion_minutos = 1;
+          mod.observacion = data.observacion || '';
+        }
+        return { status: 'ok', data: mod || null };
+      }
+      case 'getModulosSesion': return { status: 'ok', data: _DEMO_MODULOS.filter(m => m.id_sesion === data.id_sesion) };
+      case 'getStats': return { status: 'ok', data: _DEMO_STATS };
+      case 'getResumenOperativo': return { status: 'ok', data: { stats: _DEMO_STATS, sesiones_abiertas: _DEMO_SESIONES.filter(s => s.estado === 'en_curso'), incidencias_abiertas: [] } };
+      case 'getEncuestadores': return { status: 'ok', data: _DEMO_ENCUESTADORES };
       case 'saveEncuestador': return { status: 'ok' };
       case 'deleteEncuestador': return { status: 'ok' };
-      case 'saveIncidencia':  return { status: 'ok', data: { id_incidencia: 'inc_demo_' + Date.now() } };
-      case 'getIncidencias':  return { status: 'ok', data: [] };
+      case 'saveIncidencia': return { status: 'ok', data: { id_incidencia: 'INC_DEMO_' + Date.now() } };
+      case 'getIncidencias': return { status: 'ok', data: [] };
       case 'resolverIncidencia': return { status: 'ok' };
-      case 'iniciarSesion':   return { status: 'ok', data: { id_sesion: 'ses_demo_' + Date.now() } };
-      case 'cerrarSesion':    return { status: 'ok' };
-      case 'getSesionesAbiertas': return { status: 'ok', data: [] };
-      case 'getMisSesiones':  return { status: 'ok', data: [] };
-      case 'getConfig':       return { status: 'ok', data: { operativo: true, fecha_inicio: '2026-03-01', fecha_fin: '2026-06-30' } };
-      case 'setConfig':       return { status: 'ok' };
-      case 'getCatalogos':    return { status: 'ok', data: [] };
-      case 'getAuditoria':    return { status: 'ok', data: [] };
-      default:                return { status: 'ok', data: null };
+      case 'getConfig': return { status: 'ok', data: _DEMO_CONFIG };
+      case 'setConfig': _DEMO_CONFIG[data.clave] = data.valor; return { status: 'ok' };
+      case 'getCatalogos': return { status: 'ok', data: [] };
+      case 'getAuditoria': return { status: 'ok', data: [] };
+      default: return { status: 'ok', data: null };
     }
   }
-
-  // ── End demo mode ──────────────────────────────────────────────────────────
 
   let _loadingCount = 0;
 
@@ -119,8 +154,7 @@ const API = (() => {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
-      return response;
+      return await fetch(url, { ...options, signal: controller.signal });
     } finally {
       clearTimeout(id);
     }
@@ -130,180 +164,100 @@ const API = (() => {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  /**
-   * Core API call with retry logic.
-   * @param {string} endpoint - Action name (e.g. 'login', 'getEscuelas')
-   * @param {string} method - 'GET' or 'POST'
-   * @param {object} data - Payload for POST, query params for GET
-   * @param {object} options - { skipAuth, skipLoading, retries }
-   */
   async function call(endpoint, method = 'GET', data = {}, options = {}) {
     const { skipAuth = false, skipLoading = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS } = options;
-
     if (!skipLoading) _incrementLoading();
 
-    // Demo mode: bypass network when GAS is not configured
     if (_IS_DEMO) {
       const result = await _demoCall(endpoint, data);
       if (!skipLoading) _decrementLoading();
       return result;
     }
 
-    // Attach auth token
     const token = Auth.getToken ? Auth.getToken() : null;
     const payload = { action: endpoint, ...data };
     if (token && !skipAuth) payload.token = token;
-
     let lastError;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         let url = APP_CONFIG.GAS_URL;
-        let fetchOptions = {
-          method,
-          redirect: 'follow',
-        };
-
+        let fetchOptions = { method, redirect: 'follow' };
         if (method === 'GET') {
           const params = new URLSearchParams(payload);
           url = `${APP_CONFIG.GAS_URL}?${params.toString()}`;
         } else {
-          // text/plain avoids CORS preflight; GAS parses JSON from postData.contents
           fetchOptions.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
           fetchOptions.body = JSON.stringify(payload);
         }
-
-        // GAS requires no-cors workaround sometimes — use text then parse
         const response = await _fetchWithTimeout(url, fetchOptions, APP_CONFIG.API_TIMEOUT_MS);
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         const text = await response.text();
         let json;
         try {
           json = JSON.parse(text);
         } catch {
-          throw new Error('Respuesta inválida del servidor (no es JSON).');
+          throw new Error('Respuesta inválida del servidor, no es JSON.');
         }
-
         if (!skipLoading) _decrementLoading();
         return json;
-
       } catch (err) {
         lastError = err;
-        if (attempt < retries) {
-          await _sleep(APP_CONFIG.API_RETRY_DELAY_MS * attempt);
-        }
+        if (attempt < retries) await _sleep(APP_CONFIG.API_RETRY_DELAY_MS * attempt);
       }
     }
 
     if (!skipLoading) _decrementLoading();
-
-    // Surface error to UI
     const msg = lastError?.message || 'Error de conexión con el servidor.';
     console.error(`[API] Error en endpoint "${endpoint}":`, lastError);
     throw new Error(msg);
   }
 
-  // ── Escuelas ──────────────────────────────────────────────────────────────
+  async function getEscuelas(filters = {}) { return call('getEscuelas', 'GET', filters, { skipLoading: true }); }
+  async function getEscuela(id) { return call('getEscuela', 'GET', { id_escuela: id }); }
+  async function updateEscuelaEstado(id, estado, observacion = '') { return call('updateEscuelaEstado', 'POST', { id_escuela: id, estado, observacion }); }
+  async function asignarEscuela(datos) { return call('asignarEscuela', 'POST', datos); }
 
-  async function getEscuelas(filters = {}) {
-    return call('getEscuelas', 'GET', filters, { skipLoading: true });
-  }
+  async function iniciarSesion(id_escuela, datos = {}) { return call('iniciarSesion', 'POST', { id_escuela, ...datos }); }
+  async function cerrarSesion(id_sesion, datos) { return call('cerrarSesion', 'POST', { id_sesion, ...datos }); }
+  async function getSesionesAbiertas() { return call('getSesionesAbiertas', 'GET', {}, { skipLoading: true }); }
+  async function getMisSesiones() { return call('getMisSesiones', 'GET', {}, { skipLoading: true }); }
+  async function registrarEventoSesion(datos) { return call('registrarEventoSesion', 'POST', datos, { skipLoading: true }); }
 
-  async function getEscuela(id) {
-    return call('getEscuela', 'GET', { id_escuela: id });
-  }
+  async function iniciarModulo(datos) { return call('iniciarModulo', 'POST', datos); }
+  async function cerrarModulo(datos) { return call('cerrarModulo', 'POST', datos); }
+  async function getModulosSesion(id_sesion) { return call('getModulosSesion', 'GET', { id_sesion }, { skipLoading: true }); }
 
-  async function updateEscuelaEstado(id, estado, observacion = '') {
-    return call('updateEscuelaEstado', 'POST', { id_escuela: id, estado, observacion });
-  }
+  async function getEncuestadores() { return call('getEncuestadores', 'GET', {}, { skipLoading: true }); }
+  async function saveEncuestador(datos) { return call('saveEncuestador', 'POST', datos); }
+  async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 
-  // ── Sesiones ──────────────────────────────────────────────────────────────
+  async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
+  async function getIncidencias(filters = {}) { return call('getIncidencias', 'GET', filters, { skipLoading: true }); }
+  async function resolverIncidencia(id, resolucion) { return call('resolverIncidencia', 'POST', { id_incidencia: id, resolucion }); }
 
-  async function iniciarSesion(id_escuela) {
-    return call('iniciarSesion', 'POST', { id_escuela });
-  }
+  async function getConfig() { return call('getConfig', 'GET', {}, { skipLoading: true }); }
+  async function setConfig(clave, valor) { return call('setConfig', 'POST', { clave, valor }); }
 
-  async function cerrarSesion(id_sesion, datos) {
-    return call('cerrarSesion', 'POST', { id_sesion, ...datos });
-  }
-
-  async function getSesionesAbiertas() {
-    return call('getSesionesAbiertas', 'GET', {}, { skipLoading: true });
-  }
-
-  async function getMisSesiones() {
-    return call('getMisSesiones', 'GET', {}, { skipLoading: true });
-  }
-
-  // ── Encuestadores ─────────────────────────────────────────────────────────
-
-  async function getEncuestadores() {
-    return call('getEncuestadores', 'GET', {}, { skipLoading: true });
-  }
-
-  async function saveEncuestador(datos) {
-    return call('saveEncuestador', 'POST', datos);
-  }
-
-  async function deleteEncuestador(id) {
-    return call('deleteEncuestador', 'POST', { id_encuestador: id });
-  }
-
-  // ── Incidencias ───────────────────────────────────────────────────────────
-
-  async function saveIncidencia(datos) {
-    return call('saveIncidencia', 'POST', datos);
-  }
-
-  async function getIncidencias(filters = {}) {
-    return call('getIncidencias', 'GET', filters, { skipLoading: true });
-  }
-
-  async function resolverIncidencia(id, resolucion) {
-    return call('resolverIncidencia', 'POST', { id_incidencia: id, resolucion });
-  }
-
-  // ── Configuración ─────────────────────────────────────────────────────────
-
-  async function getConfig() {
-    return call('getConfig', 'GET', {}, { skipLoading: true });
-  }
-
-  async function setConfig(clave, valor) {
-    return call('setConfig', 'POST', { clave, valor });
-  }
-
-  // ── Estadísticas ──────────────────────────────────────────────────────────
-
-  async function getStats(filters = {}) {
-    return call('getStats', 'GET', filters, { skipLoading: true });
-  }
-
-  // ── Auditoría ─────────────────────────────────────────────────────────────
-
-  async function getAuditoria(filters = {}) {
-    return call('getAuditoria', 'GET', filters, { skipLoading: true });
-  }
-
-  // ── Catálogos ─────────────────────────────────────────────────────────────
-
-  async function getCatalogos(tipo) {
-    return call('getCatalogos', 'GET', { tipo }, { skipLoading: true });
-  }
+  async function getStats(filters = {}) { return call('getStats', 'GET', filters, { skipLoading: true }); }
+  async function getResumenOperativo(filters = {}) { return call('getResumenOperativo', 'GET', filters, { skipLoading: true }); }
+  async function getAuditoria(filters = {}) { return call('getAuditoria', 'GET', filters, { skipLoading: true }); }
+  async function getCatalogos(tipo) { return call('getCatalogos', 'GET', { tipo }, { skipLoading: true }); }
 
   return {
     call,
     getEscuelas,
     getEscuela,
     updateEscuelaEstado,
+    asignarEscuela,
     iniciarSesion,
     cerrarSesion,
     getSesionesAbiertas,
     getMisSesiones,
+    registrarEventoSesion,
+    iniciarModulo,
+    cerrarModulo,
+    getModulosSesion,
     getEncuestadores,
     saveEncuestador,
     deleteEncuestador,
@@ -313,6 +267,7 @@ const API = (() => {
     getConfig,
     setConfig,
     getStats,
+    getResumenOperativo,
     getAuditoria,
     getCatalogos,
   };

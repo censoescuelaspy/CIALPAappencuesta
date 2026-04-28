@@ -1,19 +1,23 @@
 /**
  * CIALPA — Relevamiento Escolar
  * config.js — Central application configuration
- * Version: 2.0.0
+ * Version: 2.1.0
  */
 
 const APP_CONFIG = {
   // Google Apps Script Web App URL — fill after deploying GAS
   GAS_URL: 'https://script.google.com/macros/s/AKfycbxmfkifnwz3WoaCzzTAmQO0TuvRwenmiJY3GSdEYqi564TtoCbEOTzD7CTgK4-vaOWKjQ/exec',
 
-  // MEC online form URL
+  // External survey application defaults. These values can be overridden from Google Sheets CONFIG.
   FORM_URL: 'https://demo.mec.gov.py/demo_rue/login',
+  FORM_LAUNCH_MODE: 'web',
+  FORM_ANDROID_INTENT_URL: '',
+  FORM_CUSTOM_SCHEME_URL: '',
+  FORM_FALLBACK_SECONDS: 2,
 
   // App metadata
   APP_NAME: 'CIALPA — Relevamiento Escolar',
-  VERSION: '2.0.0',
+  VERSION: '2.1.0',
   LOGO_URL: 'assets/img/logo.png',
 
   // Map defaults (Paraguay center)
@@ -48,6 +52,9 @@ const APP_CONFIG = {
     EN_CURSO: 'en_curso',
     FINALIZADA: 'finalizada',
     INCIDENCIA: 'incidencia',
+    PARCIAL: 'parcial',
+    SUSPENDIDA: 'suspendida',
+    REVISAR: 'revisar',
   },
 
   // State colors (matches CSS variables)
@@ -56,6 +63,9 @@ const APP_CONFIG = {
     en_curso: '#fd7e14',
     finalizada: '#28a745',
     incidencia: '#dc3545',
+    parcial: '#0d6efd',
+    suspendida: '#6f42c1',
+    revisar: '#ffc107',
   },
 
   // State labels in Spanish
@@ -64,6 +74,9 @@ const APP_CONFIG = {
     en_curso: 'En Curso',
     finalizada: 'Finalizada',
     incidencia: 'Con Incidencia',
+    parcial: 'Parcial',
+    suspendida: 'Suspendida',
+    revisar: 'Revisar',
   },
 
   // Incidence types

@@ -1,314 +1,283 @@
 /**
- * CIALPA — Relevamiento Escolar
- * setup.gs — One-time setup functions
- * Version: 2.0.0
+ * CIALPA, Relevamiento Escolar
+ * setup.gs, inicialización y migración del backend
+ * Version 2.1.0
  *
- * Run these functions once from the Apps Script editor to initialize the spreadsheet.
+ * Ejecutar migrarBackendV21() una sola vez luego de reemplazar el código GAS.
  */
 
-/**
- * Run this function ONCE to create all required sheets with correct headers.
- * In the Apps Script editor: Run > setupSheets
- */
 function setupSheets() {
   const ss = _getSpreadsheet();
-  const sheetsConfig = [
-    {
-      name: SHEET_NAMES.ESCUELAS,
-      headers: [
-        'id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito',
-        'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento',
-        'encuestador_asignado', 'fecha_ultimo_evento', 'observaciones',
-      ],
-    },
-    {
-      name: SHEET_NAMES.USUARIOS,
-      headers: [
-        'id_usuario', 'usuario', 'password_hash', 'nombres', 'apellidos',
-        'rol', 'activo', 'fecha_alta', 'ultimo_acceso', 'token_actual',
-      ],
-    },
-    {
-      name: SHEET_NAMES.ENCUESTADORES,
-      headers: [
-        'id_encuestador', 'usuario', 'nombres', 'apellidos', 'documento',
-        'telefono', 'correo', 'zona_asignada', 'rol', 'foto_url',
-        'activo', 'fecha_alta', 'fecha_actualizacion',
-      ],
-    },
-    {
-      name: SHEET_NAMES.SESIONES,
-      headers: [
-        'id_sesion', 'id_escuela', 'usuario', 'fecha_inicio', 'hora_inicio',
-        'fecha_fin', 'hora_fin', 'duracion_minutos', 'estado',
-        'observacion_cierre', 'url_formulario_usada',
-      ],
-    },
-    {
-      name: SHEET_NAMES.EVENTOS,
-      headers: [
-        'id_evento', 'id_sesion', 'id_escuela', 'usuario',
-        'tipo_evento', 'fecha_hora', 'detalle',
-      ],
-    },
-    {
-      name: SHEET_NAMES.INCIDENCIAS,
-      headers: [
-        'id_incidencia', 'id_escuela', 'usuario', 'fecha_hora',
-        'tipo_incidencia', 'descripcion', 'prioridad',
-        'estado_resolucion', 'evidencia_url',
-      ],
-    },
-    {
-      name: SHEET_NAMES.CONFIG,
-      headers: ['clave', 'valor', 'descripcion', 'categoria', 'editable', 'fecha_actualizacion'],
-    },
-    {
-      name: SHEET_NAMES.AUDITORIA,
-      headers: ['id_registro', 'usuario', 'accion', 'fecha_hora', 'detalle', 'ip_aproximada'],
-    },
-    {
-      name: SHEET_NAMES.CATALOGOS,
-      headers: ['tipo', 'codigo', 'descripcion', 'orden', 'activo'],
-    },
-  ];
+  const sheetsConfig = _setupSheetsConfigV21_();
 
   sheetsConfig.forEach(cfg => {
     let sheet = ss.getSheetByName(cfg.name);
-    if (!sheet) {
-      sheet = ss.insertSheet(cfg.name);
-      Logger.log('Created sheet: ' + cfg.name);
-    } else {
-      Logger.log('Sheet already exists: ' + cfg.name);
-    }
-    // Write headers only if sheet is empty
-    if (sheet.getLastRow() === 0) {
+    if (!sheet) sheet = ss.insertSheet(cfg.name);
+
+    if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
       sheet.appendRow(cfg.headers);
-      // Style header row
-      const headerRange = sheet.getRange(1, 1, 1, cfg.headers.length);
-      headerRange.setBackground('#1F3864');
-      headerRange.setFontColor('#ffffff');
-      headerRange.setFontWeight('bold');
-      sheet.setFrozenRows(1);
+    } else {
+      _appendMissingHeaders_(sheet, cfg.headers);
     }
+
+    const headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    headerRange.setBackground('#1F3864');
+    headerRange.setFontColor('#ffffff');
+    headerRange.setFontWeight('bold');
+    sheet.setFrozenRows(1);
   });
 
-  Logger.log('Setup complete! All sheets created.');
-  SpreadsheetApp.getUi().alert('Configuración completada. Todas las hojas fueron creadas.');
+  SpreadsheetApp.getUi().alert('Configuración completada. Hojas creadas o migradas sin eliminar datos existentes.');
 }
 
-/**
- * Create the default admin user.
- * Run this ONCE after setupSheets().
- * Default credentials: admin / cialpa2025
- * CHANGE THE PASSWORD AFTER FIRST LOGIN.
- */
+function migrarBackendV21() {
+  setupSheets();
+  seedConfig();
+  seedCatalogos();
+  normalizarEscuelasSeleccionadasV21();
+  SpreadsheetApp.getUi().alert('Migración v2.1 completada. La app ya puede leer la hoja escuelas_seleccionadas con el esquema de muestreo original.');
+}
+
+function normalizarEscuelasSeleccionadasV21() {
+  const sheet = _getSheet(SHEET_NAMES.ESCUELAS);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+  const required = _escuelasHeadersV21_();
+  _appendMissingHeaders_(sheet, required);
+
+  const updatedHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+  const idx = name => updatedHeaders.indexOf(name) + 1;
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+
+  const values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  const get = (row, aliases) => {
+    for (let i = 0; i < aliases.length; i++) {
+      const pos = updatedHeaders.indexOf(aliases[i]);
+      if (pos >= 0 && row[pos] !== '' && row[pos] !== null && row[pos] !== undefined) return row[pos];
+    }
+    return '';
+  };
+
+  values.forEach((row, i) => {
+    const rowNum = i + 2;
+    const codigo = String(get(row, ['codigo_local', 'CODIGO', 'Código', 'codigo', 'Código del local escolar']) || '').trim();
+    const id = codigo ? 'ESC_' + codigo.replace(/\D/g, '') : String(get(row, ['id_escuela']) || '').trim();
+    const nombre = String(get(row, ['nombre', 'NOMBRE', 'Nombre', 'Nombre de Local Escolar']) || '').trim();
+    const depto = String(get(row, ['departamento', 'DEPTO', 'Departamento']) || '').trim();
+    const distrito = String(get(row, ['distrito', 'DIST', 'Distrito']) || '').trim();
+    const localidad = _sanitizeLocalidad_(get(row, ['localidad', 'LOCALIDAD', 'Localidad']));
+    const zona = _normalizeZonaSetup_(get(row, ['zona', 'ZONA', 'Zona']));
+    const lat = get(row, ['latitud', 'LAT_DEC', 'LATITUD', 'lat', 'Latitud']);
+    const lng = get(row, ['longitud', 'LNG_DEC', 'LONGITUD', 'lng', 'Longitud']);
+
+    if (idx('id_escuela')) sheet.getRange(rowNum, idx('id_escuela')).setValue(id || ('ESC_ROW_' + rowNum));
+    if (idx('codigo_local')) sheet.getRange(rowNum, idx('codigo_local')).setValue(codigo);
+    if (idx('nombre')) sheet.getRange(rowNum, idx('nombre')).setValue(nombre);
+    if (idx('departamento')) sheet.getRange(rowNum, idx('departamento')).setValue(depto);
+    if (idx('distrito')) sheet.getRange(rowNum, idx('distrito')).setValue(distrito);
+    if (idx('localidad')) sheet.getRange(rowNum, idx('localidad')).setValue(localidad);
+    if (idx('zona')) sheet.getRange(rowNum, idx('zona')).setValue(zona);
+    if (idx('latitud')) sheet.getRange(rowNum, idx('latitud')).setValue(lat);
+    if (idx('longitud')) sheet.getRange(rowNum, idx('longitud')).setValue(lng);
+    if (idx('estado_relevamiento') && !String(get(row, ['estado_relevamiento']) || '').trim()) sheet.getRange(rowNum, idx('estado_relevamiento')).setValue('pendiente');
+    if (idx('fecha_ultimo_evento') && !String(get(row, ['fecha_ultimo_evento']) || '').trim()) sheet.getRange(rowNum, idx('fecha_ultimo_evento')).setValue(_timestamp());
+  });
+}
+
 function createDefaultAdmin() {
   const password = 'cialpa2025';
   const passwordHash = AuthService._hashPassword(password);
-  const id = 'USR_ADMIN_001';
-
   const sheet = _getSheet(SHEET_NAMES.USUARIOS);
-
-  // Check if already exists
   const existing = _sheetToObjects(SHEET_NAMES.USUARIOS);
-  if (existing.some(u => u.usuario === 'admin')) {
-    Logger.log('Admin user already exists.');
+  if (existing.some(u => String(u.usuario).toLowerCase() === 'admin')) {
     SpreadsheetApp.getUi().alert('El usuario admin ya existe.');
     return;
   }
-
-  sheet.appendRow([
-    id, 'admin', passwordHash, 'Administrador', 'Sistema',
-    'admin', 'true', _today(), '', '',
-  ]);
-
-  Logger.log('Admin user created. Usuario: admin | Contraseña: cialpa2025');
-  SpreadsheetApp.getUi().alert(
-    'Usuario admin creado.\n' +
-    'Usuario: admin\n' +
-    'Contraseña: cialpa2025\n\n' +
-    '¡CAMBIÁ LA CONTRASEÑA INMEDIATAMENTE!'
-  );
+  sheet.appendRow(['USR_ADMIN_001', 'admin', passwordHash, 'Administrador', 'Sistema', 'admin', 'true', _today(), '', '']);
+  SpreadsheetApp.getUi().alert('Usuario admin creado. Usuario: admin, contraseña: cialpa2025. Cambiar la contraseña inmediatamente.');
 }
 
-/**
- * Seed default configuration values.
- * Run ONCE after setupSheets().
- */
 function seedConfig() {
   const sheet = _getSheet(SHEET_NAMES.CONFIG);
   const existing = _sheetToObjects(SHEET_NAMES.CONFIG);
-
   const defaults = [
-    ['FORM_URL',             'https://demo.mec.gov.py/demo_rue/login',  'URL del formulario MEC',          'sistema',  'true',  ''],
-    ['APP_NAME',             'CIALPA — Relevamiento Escolar',            'Nombre de la aplicación',         'sistema',  'false', ''],
-    ['SESSION_TIMEOUT_HOURS','8',                                         'Horas de expiración de sesión',   'seguridad','true',  ''],
-    ['MAP_CENTER_LAT',       '-23.4',                                     'Latitud centro del mapa',         'mapa',     'true',  ''],
-    ['MAP_CENTER_LNG',       '-58.0',                                     'Longitud centro del mapa',        'mapa',     'true',  ''],
-    ['MAP_ZOOM',             '7',                                          'Zoom inicial del mapa',           'mapa',     'true',  ''],
-    ['CONTACTO_EMAIL',       'soporte@cialpa.gov.py',                     'Email de soporte',                'contacto', 'true',  ''],
-    ['CONTACTO_TELEFONO',    '(021) 000-000',                             'Teléfono de soporte',             'contacto', 'true',  ''],
-    ['ALLOW_MULTIPLE_SESSIONS','false',                                   'Permitir sesiones múltiples',     'seguridad','true',  ''],
+    ['FORM_URL', 'https://demo.mec.gov.py/demo_rue/login', 'URL web de respaldo para abrir el formulario externo cuando no se use deep link.', 'encuesta_externa', 'true', ''],
+    ['FORM_LAUNCH_MODE', 'web', 'Modo de apertura del aplicativo externo: web, android_intent, custom_scheme.', 'encuesta_externa', 'true', ''],
+    ['FORM_ANDROID_INTENT_URL', '', 'URI intent:// o android-app:// para abrir el aplicativo de encuesta instalado en Android.', 'encuesta_externa', 'true', ''],
+    ['FORM_CUSTOM_SCHEME_URL', '', 'Esquema personalizado del aplicativo externo, por ejemplo rueinfraestructura://start.', 'encuesta_externa', 'true', ''],
+    ['FORM_FALLBACK_SECONDS', '2', 'Segundos de espera antes de usar URL web de respaldo si el deep link no responde.', 'encuesta_externa', 'true', ''],
+    ['APP_NAME', 'CIALPA, Relevamiento Escolar', 'Nombre de la aplicación.', 'sistema', 'false', ''],
+    ['SESSION_TIMEOUT_HOURS', '10', 'Horas máximas sugeridas para una sesión operativa abierta.', 'seguridad', 'true', ''],
+    ['MAP_CENTER_LAT', '-23.4', 'Latitud centro del mapa.', 'mapa', 'true', ''],
+    ['MAP_CENTER_LNG', '-58.0', 'Longitud centro del mapa.', 'mapa', 'true', ''],
+    ['MAP_ZOOM', '7', 'Zoom inicial del mapa.', 'mapa', 'true', ''],
+    ['CONTACTO_EMAIL', 'soporte@cialpa.gov.py', 'Correo de soporte operativo.', 'contacto', 'true', ''],
+    ['CONTACTO_TELEFONO', '(021) 000-000', 'Teléfono de soporte operativo.', 'contacto', 'true', ''],
+    ['ALLOW_MULTIPLE_SESSIONS', 'false', 'Permitir más de una sesión abierta sobre la misma escuela.', 'seguridad', 'true', ''],
+    ['DEFAULT_ESTIMATED_MINUTES', '180', 'Tiempo inicial esperado de relevamiento por escuela, ajustable luego con evidencia empírica.', 'planificacion', 'true', '']
   ];
 
   defaults.forEach(row => {
-    if (!existing.some(c => c.clave === row[0])) {
-      sheet.appendRow(row);
-      Logger.log('Config seeded: ' + row[0]);
-    }
+    if (!existing.some(c => String(c.clave) === row[0])) sheet.appendRow(row);
   });
-
-  Logger.log('Config seed complete.');
-  SpreadsheetApp.getUi().alert('Configuración inicial cargada.');
 }
 
-/**
- * Seed catalog values.
- */
 function seedCatalogos() {
   const sheet = _getSheet(SHEET_NAMES.CATALOGOS);
   const existing = _sheetToObjects(SHEET_NAMES.CATALOGOS);
-
   const defaults = [
-    // Zones
-    ['zona', 'URB', 'Urbana',        '1', 'true'],
-    ['zona', 'RUR', 'Rural',         '2', 'true'],
-    ['zona', 'REM', 'Rural Remota',  '3', 'true'],
-    // Incidence types
-    ['tipo_incidencia', 'CER', 'Escuela cerrada',        '1', 'true'],
-    ['tipo_incidencia', 'BLO', 'Acceso bloqueado',       '2', 'true'],
-    ['tipo_incidencia', 'DIR', 'Director/a ausente',     '3', 'true'],
-    ['tipo_incidencia', 'INC', 'Formulario incompleto',  '4', 'true'],
-    ['tipo_incidencia', 'TEC', 'Problema técnico',       '5', 'true'],
-    ['tipo_incidencia', 'SEG', 'Seguridad / riesgo',     '6', 'true'],
-    ['tipo_incidencia', 'OTR', 'Otra',                   '7', 'true'],
-    // Priority
-    ['prioridad', 'ALT', 'Alta',   '1', 'true'],
-    ['prioridad', 'MED', 'Media',  '2', 'true'],
-    ['prioridad', 'BAJ', 'Baja',   '3', 'true'],
-    // Roles
+    ['zona', 'URB', 'Urbana', '1', 'true'],
+    ['zona', 'RUR', 'Rural', '2', 'true'],
+    ['zona', 'REM', 'Rural Remota', '3', 'true'],
+    ['estado_relevamiento', 'PEN', 'Pendiente', '1', 'true'],
+    ['estado_relevamiento', 'CUR', 'En curso', '2', 'true'],
+    ['estado_relevamiento', 'FIN', 'Finalizada', '3', 'true'],
+    ['estado_relevamiento', 'PAR', 'Parcial', '4', 'true'],
+    ['estado_relevamiento', 'SUS', 'Suspendida', '5', 'true'],
+    ['estado_relevamiento', 'REV', 'Revisar', '6', 'true'],
+    ['tipo_incidencia', 'CER', 'Escuela cerrada', '1', 'true'],
+    ['tipo_incidencia', 'BLO', 'Acceso bloqueado', '2', 'true'],
+    ['tipo_incidencia', 'DIR', 'Director/a ausente', '3', 'true'],
+    ['tipo_incidencia', 'INC', 'Formulario incompleto', '4', 'true'],
+    ['tipo_incidencia', 'TEC', 'Problema técnico', '5', 'true'],
+    ['tipo_incidencia', 'SEG', 'Seguridad o riesgo', '6', 'true'],
+    ['tipo_incidencia', 'OTR', 'Otra', '7', 'true'],
+    ['prioridad', 'ALT', 'Alta', '1', 'true'],
+    ['prioridad', 'MED', 'Media', '2', 'true'],
+    ['prioridad', 'BAJ', 'Baja', '3', 'true'],
     ['rol', 'ADM', 'Administrador', '1', 'true'],
-    ['rol', 'SUP', 'Supervisor',    '2', 'true'],
-    ['rol', 'ENC', 'Encuestador',   '3', 'true'],
+    ['rol', 'SUP', 'Supervisor', '2', 'true'],
+    ['rol', 'ENC', 'Encuestador', '3', 'true'],
+    ['modulo_relevamiento', 'establecimiento', 'Datos generales del establecimiento', '1', 'true'],
+    ['modulo_relevamiento', 'direccion_contacto', 'Dirección, contacto y llegada', '2', 'true'],
+    ['modulo_relevamiento', 'espacios_fisicos', 'Inventario de espacios físicos', '3', 'true'],
+    ['modulo_relevamiento', 'aulas', 'Aulas y ambientes pedagógicos', '4', 'true'],
+    ['modulo_relevamiento', 'sanitarios', 'Sanitarios y saneamiento', '5', 'true'],
+    ['modulo_relevamiento', 'agua_energia', 'Agua, energía y conectividad', '6', 'true'],
+    ['modulo_relevamiento', 'seguridad_accesibilidad', 'Seguridad, accesibilidad y riesgos', '7', 'true'],
+    ['modulo_relevamiento', 'evidencias', 'Fotografías y evidencias', '8', 'true'],
+    ['modulo_relevamiento', 'revision_cierre', 'Revisión final y cierre', '9', 'true']
   ];
 
   defaults.forEach(row => {
-    if (!existing.some(c => c.tipo === row[0] && c.codigo === row[1])) {
-      sheet.appendRow(row);
-    }
+    if (!existing.some(c => String(c.tipo) === row[0] && String(c.codigo) === row[1])) sheet.appendRow(row);
   });
-
-  Logger.log('Catalogs seeded.');
-  SpreadsheetApp.getUi().alert('Catálogos cargados.');
 }
 
-/**
- * Full initialization in one click.
- * Run: initAll()
- */
 function initAll() {
   setupSheets();
   createDefaultAdmin();
   seedConfig();
   seedCatalogos();
-  Logger.log('Full initialization complete!');
 }
 
-/**
- * Import schools from a temporary sheet named "IMPORT_TEMP".
- *
- * How to use:
- *   1. Open the Spreadsheet and create a new sheet named exactly "IMPORT_TEMP".
- *   2. Paste the contents of listado_relevamiento_infraestructura_escuelas_paraguay.txt
- *      (including the header row) starting at cell A1.
- *   3. From the Apps Script editor run: importEscuelas()
- *   4. Delete or clear "IMPORT_TEMP" after a successful import.
- *
- * Expected column order (matches the MEC TXT export, 22 columns):
- *   0  Código del departamento
- *   1  Departamento
- *   2  Código del distrito
- *   3  Distrito
- *   4  Localidad
- *   5  Zona
- *   6  Código del local escolar   ← codigo_local
- *   7  Nombre del local escolar   ← nombre
- *   8-17  (education level flags — stored as observaciones summary)
- *   18 Matrícula                  ← stored in observaciones
- *   19 Director nombre
- *   20 Director teléfono
- *   21 Director correo
- */
 function importEscuelas() {
   const ss = _getSpreadsheet();
   const importSheet = ss.getSheetByName('IMPORT_TEMP');
   if (!importSheet) {
-    SpreadsheetApp.getUi().alert(
-      'No se encontró la hoja "IMPORT_TEMP".\n' +
-      'Creá una hoja con ese nombre, pegá los datos del TXT y volvé a ejecutar.'
-    );
+    SpreadsheetApp.getUi().alert('No se encontró la hoja IMPORT_TEMP. Pegue allí los datos fuente antes de ejecutar la importación.');
     return;
   }
-
-  const allValues = importSheet.getDataRange().getValues();
-  if (allValues.length < 2) {
-    SpreadsheetApp.getUi().alert('La hoja IMPORT_TEMP está vacía o solo tiene encabezado.');
+  const values = importSheet.getDataRange().getValues();
+  if (values.length < 2) {
+    SpreadsheetApp.getUi().alert('La hoja IMPORT_TEMP no contiene registros para importar.');
     return;
   }
-
-  const destSheet = _getSheet(SHEET_NAMES.ESCUELAS);
-  const existing  = _sheetToObjects(SHEET_NAMES.ESCUELAS);
-  const existingCodes = new Set(existing.map(e => String(e.codigo_local).trim()));
-
-  const today = _today();
+  const headers = values[0].map(h => String(h).trim());
+  const dest = _getSheet(SHEET_NAMES.ESCUELAS);
+  _appendMissingHeaders_(dest, _escuelasHeadersV21_());
+  const existing = _sheetToObjects(SHEET_NAMES.ESCUELAS);
+  const existingCodes = new Set(existing.map(e => String(e.codigo_local || e.CODIGO || '').trim()).filter(Boolean));
   let inserted = 0;
-  let skipped  = 0;
-
-  // Skip row 0 (header)
-  for (let i = 1; i < allValues.length; i++) {
-    const r = allValues[i];
-    const codigoLocal = String(r[6] || '').trim();
-    if (!codigoLocal || codigoLocal === '0') { skipped++; continue; }
-    if (existingCodes.has(codigoLocal))      { skipped++; continue; }
-
-    const matricula = String(r[18] || '').trim();
-    const obs = matricula ? 'Matrícula: ' + matricula : '';
-
-    const idEscuela = 'ESC_' + codigoLocal;
-    destSheet.appendRow([
-      idEscuela,                          // id_escuela
-      codigoLocal,                        // codigo_local
-      String(r[7] || '').trim(),          // nombre
-      String(r[1] || '').trim(),          // departamento
-      String(r[3] || '').trim(),          // distrito
-      String(r[4] || '').trim(),          // localidad
-      String(r[5] || '').trim(),          // zona
-      '',                                 // latitud  (no disponible en TXT)
-      '',                                 // longitud (no disponible en TXT)
-      'pendiente',                        // estado_relevamiento
-      '',                                 // encuestador_asignado
-      today,                              // fecha_ultimo_evento
-      obs,                                // observaciones
-    ]);
-
-    existingCodes.add(codigoLocal);
+  let skipped = 0;
+  const h = name => headers.indexOf(name);
+  const val = (row, names) => {
+    for (let i = 0; i < names.length; i++) {
+      const ix = h(names[i]);
+      if (ix >= 0 && row[ix] !== '' && row[ix] !== null && row[ix] !== undefined) return row[ix];
+    }
+    return '';
+  };
+  const destHeaders = dest.getRange(1, 1, 1, dest.getLastColumn()).getValues()[0].map(x => String(x).trim());
+  values.slice(1).forEach(row => {
+    const codigo = String(val(row, ['codigo_local', 'CODIGO', 'Código del local escolar', 'Codigo del local escolar']) || '').trim();
+    if (!codigo || existingCodes.has(codigo)) { skipped++; return; }
+    const obj = {
+      id_escuela: 'ESC_' + codigo.replace(/\D/g, ''),
+      codigo_local: codigo,
+      nombre: val(row, ['nombre', 'NOMBRE', 'Nombre del local escolar', 'Nombre de Local Escolar']),
+      departamento: val(row, ['departamento', 'DEPTO', 'Departamento']),
+      distrito: val(row, ['distrito', 'DIST', 'Distrito']),
+      localidad: _sanitizeLocalidad_(val(row, ['localidad', 'LOCALIDAD', 'Localidad'])),
+      zona: _normalizeZonaSetup_(val(row, ['zona', 'ZONA', 'Zona'])),
+      latitud: val(row, ['latitud', 'LAT_DEC', 'Latitud']),
+      longitud: val(row, ['longitud', 'LNG_DEC', 'Longitud']),
+      estado_relevamiento: 'pendiente',
+      fecha_ultimo_evento: _timestamp(),
+      observaciones: ''
+    };
+    dest.appendRow(destHeaders.map(col => obj[col] !== undefined ? obj[col] : ''));
+    existingCodes.add(codigo);
     inserted++;
-  }
-
-  const msg = 'Importación completada.\nInsertadas: ' + inserted + '\nOmitidas (ya existían o sin código): ' + skipped;
-  Logger.log(msg);
-  SpreadsheetApp.getUi().alert(msg);
+  });
+  SpreadsheetApp.getUi().alert('Importación completada. Insertadas: ' + inserted + '. Omitidas: ' + skipped + '.');
 }
 
-/**
- * Utility: hash a password (useful to generate hashes for initial data import).
- * Change the password variable below, then run this function and check the Logs.
- */
 function hashPassword() {
   const password = 'YOUR_PASSWORD_HERE';
   const hash = AuthService._hashPassword(password);
-  Logger.log('Password: ' + password);
-  Logger.log('Hash: ' + hash);
-  SpreadsheetApp.getUi().alert('Hash: ' + hash + '\n\nVerificá los Logs para más detalle.');
+  SpreadsheetApp.getUi().alert('Hash: ' + hash);
+}
+
+function _setupSheetsConfigV21_() {
+  return [
+    { name: SHEET_NAMES.ESCUELAS, headers: _escuelasHeadersV21_() },
+    { name: SHEET_NAMES.USUARIOS, headers: ['id_usuario', 'usuario', 'password_hash', 'nombres', 'apellidos', 'rol', 'activo', 'fecha_alta', 'ultimo_acceso', 'token_actual', 'token_expiry'] },
+    { name: SHEET_NAMES.ENCUESTADORES, headers: ['id_encuestador', 'usuario', 'nombres', 'apellidos', 'documento', 'telefono', 'correo', 'zona_asignada', 'rol', 'foto_url', 'activo', 'fecha_alta', 'fecha_actualizacion'] },
+    { name: SHEET_NAMES.SESIONES, headers: _sesionesHeadersV21_() },
+    { name: SHEET_NAMES.MODULOS, headers: _modulosHeadersV21_() },
+    { name: SHEET_NAMES.EVENTOS, headers: ['id_evento', 'id_sesion', 'id_escuela', 'usuario', 'tipo_evento', 'fecha_hora', 'detalle'] },
+    { name: SHEET_NAMES.INCIDENCIAS, headers: ['id_incidencia', 'id_escuela', 'usuario', 'fecha_hora', 'tipo_incidencia', 'descripcion', 'prioridad', 'estado_resolucion', 'evidencia_url'] },
+    { name: SHEET_NAMES.CONFIG, headers: ['clave', 'valor', 'descripcion', 'categoria', 'editable', 'fecha_actualizacion'] },
+    { name: SHEET_NAMES.AUDITORIA, headers: ['id_registro', 'usuario', 'accion', 'fecha_hora', 'detalle', 'ip_aproximada'] },
+    { name: SHEET_NAMES.CATALOGOS, headers: ['tipo', 'codigo', 'descripcion', 'orden', 'activo'] }
+  ];
+}
+
+function _escuelasHeadersV21_() {
+  return ['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado', 'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado', 'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo', 'ultimo_registro_externo'];
+}
+
+function _sesionesHeadersV21_() {
+  return ['id_sesion', 'id_escuela', 'codigo_local', 'nombre_escuela', 'usuario', 'supervisor', 'fecha_inicio', 'hora_inicio', 'inicio_iso', 'fecha_fin', 'hora_fin', 'fin_iso', 'duracion_minutos', 'duracion_segundos', 'estado', 'observacion_cierre', 'url_formulario_usada', 'launch_mode', 'dispositivo', 'gps_inicio_lat', 'gps_inicio_lng', 'gps_fin_lat', 'gps_fin_lng', 'folio_externo', 'ultimo_registro_externo', 'modulos_completados', 'total_modulos', 'calidad_cierre', 'creado_en', 'actualizado_en'];
+}
+
+function _modulosHeadersV21_() {
+  return ['id_modulo', 'id_sesion', 'id_escuela', 'usuario', 'modulo', 'modulo_nombre', 'orden', 'inicio_iso', 'fin_iso', 'duracion_minutos', 'estado', 'observacion', 'registros_estimados', 'registros_completados', 'creado_en', 'actualizado_en'];
+}
+
+function _appendMissingHeaders_(sheet, requiredHeaders) {
+  const lastCol = sheet.getLastColumn();
+  const current = lastCol ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim()) : [];
+  const missing = requiredHeaders.filter(h => !current.includes(h));
+  if (!current.length) {
+    sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
+    return;
+  }
+  missing.forEach(h => sheet.getRange(1, sheet.getLastColumn() + 1).setValue(h));
+}
+
+function _normalizeZonaSetup_(value) {
+  const s = String(value || '').trim().toLowerCase();
+  if (!s) return '';
+  if (s.includes('urb')) return 'Urbana';
+  if (s.includes('rem')) return 'Rural Remota';
+  if (s.includes('rur')) return 'Rural';
+  return String(value || '').trim();
+}
+
+function _sanitizeLocalidad_(value) {
+  const s = String(value || '').trim();
+  if (/^mon\s|^tue\s|^wed\s|^thu\s|^fri\s|^sat\s|^sun\s/i.test(s) && s.includes('GMT')) return '';
+  return s;
 }

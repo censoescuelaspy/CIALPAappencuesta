@@ -141,3 +141,22 @@ git push -u origin main
 ---
 
 *Última actualización: 2026-04-27*
+
+## Actualización v2.1, auditoría operativa profunda
+
+1. Subir o reemplazar los archivos del frontend en GitHub Pages.
+2. Reemplazar todos los archivos de la carpeta `gas` en el proyecto Apps Script.
+3. Ejecutar `migrarBackendV21()` una sola vez.
+4. Confirmar que se creó la hoja `modulos_relevamiento`.
+5. Confirmar que `escuelas_seleccionadas` conserva las columnas originales del muestreo y agrega columnas operativas.
+6. Configurar en `configuracion` el modo real de apertura del aplicativo externo:
+   - `FORM_LAUNCH_MODE = web`, si solo se tiene URL.
+   - `FORM_LAUNCH_MODE = android_intent`, si el aplicativo instalado expone Intent URI.
+   - `FORM_LAUNCH_MODE = custom_scheme`, si el aplicativo expone un esquema como `rueinfraestructura://start`.
+7. Probar con una escuela piloto:
+   - aparece en mapa/lista,
+   - inicia sesión,
+   - abre app externa,
+   - registra módulos,
+   - cierra con folio externo o último registro,
+   - actualiza las hojas `sesiones_relevamiento`, `modulos_relevamiento` y `eventos_relevamiento`.

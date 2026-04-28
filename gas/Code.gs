@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.0.0
+ * Version: 2.1.0
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -18,6 +18,7 @@ const SHEET_NAMES = {
   USUARIOS:     'usuarios',
   ENCUESTADORES:'encuestadores',
   SESIONES:     'sesiones_relevamiento',
+  MODULOS:      'modulos_relevamiento',
   EVENTOS:      'eventos_relevamiento',
   INCIDENCIAS:  'incidencias',
   CONFIG:       'configuracion',
@@ -83,12 +84,19 @@ function _handleRequest(e) {
       case 'getEscuelas':     return _respond(SheetsService.getEscuelas(params));
       case 'getEscuela':      return _respond(SheetsService.getEscuela(params.id_escuela));
       case 'updateEscuelaEstado': return _respond(SheetsService.updateEscuelaEstado(params));
+      case 'asignarEscuela': return _respond(SheetsService.asignarEscuela(params));
 
       // Sesiones
       case 'iniciarSesion':   return _respond(SheetsService.iniciarSesion(params));
       case 'cerrarSesion':    return _respond(SheetsService.cerrarSesion(params));
       case 'getSesionesAbiertas': return _respond(SheetsService.getSesionesAbiertas(params));
       case 'getMisSesiones':  return _respond(SheetsService.getMisSesiones(params));
+      case 'registrarEventoSesion': return _respond(SheetsService.registrarEventoSesion(params));
+
+      // Módulos de relevamiento
+      case 'iniciarModulo':   return _respond(SheetsService.iniciarModulo(params));
+      case 'cerrarModulo':    return _respond(SheetsService.cerrarModulo(params));
+      case 'getModulosSesion':return _respond(SheetsService.getModulosSesion(params));
 
       // Encuestadores
       case 'getEncuestadores':return _respond(SheetsService.getEncuestadores());
@@ -106,6 +114,7 @@ function _handleRequest(e) {
 
       // Stats
       case 'getStats':        return _respond(SheetsService.getStats(params));
+      case 'getResumenOperativo': return _respond(SheetsService.getResumenOperativo(params));
 
       // Auditoría
       case 'getAuditoria':    return _respond(SheetsService.getAuditoria(params));
