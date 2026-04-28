@@ -223,6 +223,55 @@ function importEscuelas() {
   SpreadsheetApp.getUi().alert('Importación completada. Insertadas: ' + inserted + '. Omitidas: ' + skipped + '.');
 }
 
+/**
+ * Inserta las 5 escuelas del pre-piloto 2026-04-28.
+ * Ejecutar una sola vez desde el editor GAS.
+ */
+function insertEscuelasPiloto() {
+  const piloto = [
+    { codigo: '0010046', nombre: 'ESCUELA BÁSICA N° 3 REPÚBLICA DEL BRASIL',          equipo: 1, encuestador: 'Dahiana Ramon',    supervisor: 'Ada Guerrero',       lat: -25.2968, lng: -57.6309 },
+    { codigo: '0011004', nombre: 'ESCUELA BÁSICA N° 2 CELSA SPERATTI',                equipo: 2, encuestador: 'Yannina Perez',    supervisor: 'Andrea Cespedes',    lat: -25.2830, lng: -57.6350 },
+    { codigo: '0011007', nombre: 'COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO',      equipo: 3, encuestador: 'Ivan Garcia',      supervisor: 'Angel Martinez',     lat: -25.2890, lng: -57.6170 },
+    { codigo: '0012095', nombre: 'ESCUELA BÁSICA N° 1 REPÚBLICA ARGENTINA',           equipo: 4, encuestador: 'Licet Armoa',      supervisor: 'Alejandro Romero',   lat: -25.3035, lng: -57.6380 },
+    { codigo: '0012047', nombre: 'ESCUELA BÁSICA N° 170 GENERAL MÁXIMO SANTOS',       equipo: 5, encuestador: '',                 supervisor: '',                   lat: -25.2850, lng: -57.6290 },
+  ];
+
+  const dest = _getSheet(SHEET_NAMES.ESCUELAS);
+  _appendMissingHeaders_(dest, _escuelasHeadersV21_());
+  const destHeaders = dest.getRange(1, 1, 1, dest.getLastColumn()).getValues()[0].map(x => String(x).trim());
+  const existing = _sheetToObjects(SHEET_NAMES.ESCUELAS);
+  const existingCodes = new Set(existing.map(e => String(e.codigo_local || '').trim()).filter(Boolean));
+
+  let inserted = 0;
+  piloto.forEach((e, i) => {
+    if (existingCodes.has(e.codigo)) return;
+    const obj = {
+      id_escuela: 'ESC_' + e.codigo.replace(/\D/g, ''),
+      codigo_local: e.codigo,
+      nombre: e.nombre,
+      departamento: 'Capital',
+      distrito: 'Asunción',
+      localidad: 'Asunción',
+      zona: 'Urbana',
+      latitud: e.lat,
+      longitud: e.lng,
+      estado_relevamiento: 'pendiente',
+      encuestador_asignado: e.encuestador,
+      supervisor_asignado: e.supervisor,
+      fecha_ultimo_evento: _timestamp(),
+      observaciones: 'Pre-piloto 2026-04-28, Equipo ' + e.equipo,
+      orden_visita: i + 1,
+      prioridad_operativa: 'alta',
+      tiempo_estimado_min: 180,
+    };
+    dest.appendRow(destHeaders.map(col => obj[col] !== undefined ? obj[col] : ''));
+    existingCodes.add(e.codigo);
+    inserted++;
+  });
+
+  SpreadsheetApp.getUi().alert('Escuelas del pre-piloto insertadas: ' + inserted + '. Ya existían: ' + (piloto.length - inserted) + '.');
+}
+
 function hashPassword() {
   const password = 'YOUR_PASSWORD_HERE';
   const hash = AuthService._hashPassword(password);
