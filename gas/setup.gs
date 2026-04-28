@@ -216,6 +216,92 @@ function initAll() {
 }
 
 /**
+ * Import schools from a temporary sheet named "IMPORT_TEMP".
+ *
+ * How to use:
+ *   1. Open the Spreadsheet and create a new sheet named exactly "IMPORT_TEMP".
+ *   2. Paste the contents of listado_relevamiento_infraestructura_escuelas_paraguay.txt
+ *      (including the header row) starting at cell A1.
+ *   3. From the Apps Script editor run: importEscuelas()
+ *   4. Delete or clear "IMPORT_TEMP" after a successful import.
+ *
+ * Expected column order (matches the MEC TXT export, 22 columns):
+ *   0  Código del departamento
+ *   1  Departamento
+ *   2  Código del distrito
+ *   3  Distrito
+ *   4  Localidad
+ *   5  Zona
+ *   6  Código del local escolar   ← codigo_local
+ *   7  Nombre del local escolar   ← nombre
+ *   8-17  (education level flags — stored as observaciones summary)
+ *   18 Matrícula                  ← stored in observaciones
+ *   19 Director nombre
+ *   20 Director teléfono
+ *   21 Director correo
+ */
+function importEscuelas() {
+  const ss = _getSpreadsheet();
+  const importSheet = ss.getSheetByName('IMPORT_TEMP');
+  if (!importSheet) {
+    SpreadsheetApp.getUi().alert(
+      'No se encontró la hoja "IMPORT_TEMP".\n' +
+      'Creá una hoja con ese nombre, pegá los datos del TXT y volvé a ejecutar.'
+    );
+    return;
+  }
+
+  const allValues = importSheet.getDataRange().getValues();
+  if (allValues.length < 2) {
+    SpreadsheetApp.getUi().alert('La hoja IMPORT_TEMP está vacía o solo tiene encabezado.');
+    return;
+  }
+
+  const destSheet = _getSheet(SHEET_NAMES.ESCUELAS);
+  const existing  = _sheetToObjects(SHEET_NAMES.ESCUELAS);
+  const existingCodes = new Set(existing.map(e => String(e.codigo_local).trim()));
+
+  const today = _today();
+  let inserted = 0;
+  let skipped  = 0;
+
+  // Skip row 0 (header)
+  for (let i = 1; i < allValues.length; i++) {
+    const r = allValues[i];
+    const codigoLocal = String(r[6] || '').trim();
+    if (!codigoLocal || codigoLocal === '0') { skipped++; continue; }
+    if (existingCodes.has(codigoLocal))      { skipped++; continue; }
+
+    const matricula = String(r[18] || '').trim();
+    const obs = matricula ? 'Matrícula: ' + matricula : '';
+
+    const idEscuela = 'ESC_' + codigoLocal;
+    destSheet.appendRow([
+      idEscuela,                          // id_escuela
+      codigoLocal,                        // codigo_local
+      String(r[7] || '').trim(),          // nombre
+      String(r[1] || '').trim(),          // departamento
+      String(r[3] || '').trim(),          // distrito
+      String(r[4] || '').trim(),          // localidad
+      String(r[5] || '').trim(),          // zona
+      '',                                 // latitud  (no disponible en TXT)
+      '',                                 // longitud (no disponible en TXT)
+      'pendiente',                        // estado_relevamiento
+      '',                                 // encuestador_asignado
+      today,                              // fecha_ultimo_evento
+      obs,                                // observaciones
+    ]);
+
+    existingCodes.add(codigoLocal);
+    inserted++;
+  }
+
+  const msg = 'Importación completada.\nInsertadas: ' + inserted + '\nOmitidas (ya existían o sin código): ' + skipped;
+  Logger.log(msg);
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+/**
  * Utility: hash a password (useful to generate hashes for initial data import).
  * Change the password variable below, then run this function and check the Logs.
  */
