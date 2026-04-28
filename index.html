@@ -303,17 +303,17 @@
            ====================================================== -->
       <div id="module-manual" class="module-panel">
         <div class="page-header">
-          <h2>Manual de Usuario</h2>
-          <a href="manual/index.html" target="_blank" class="btn btn-outline btn-sm">Ver versión completa</a>
+          <h2>Manual del Encuestador</h2>
+          <a href="manual/index.html" target="_blank" class="btn btn-outline btn-sm">Ver manual completo</a>
         </div>
         <div class="page-content">
           <div class="card">
-            <p>El manual completo está disponible como panel lateral. Hacé clic en el botón <strong>?</strong> en la esquina inferior izquierda, o navegá a la versión completa.</p>
+            <p>El manual del encuestador está disponible como panel lateral y como documento completo en formato Markdown. Use este material para operar la app web CIALPA y coordinar su uso con el aplicativo externo de encuesta.</p>
             <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
-              <button class="btn btn-primary" onclick="ManualModule.open()">Abrir Manual</button>
-              <button class="btn btn-outline" onclick="ManualModule.open('encuesta')">Cómo aplicar encuesta</button>
-              <button class="btn btn-outline" onclick="ManualModule.open('incidencias')">Registrar incidencias</button>
-              <button class="btn btn-outline" onclick="ManualModule.open('errores')">Solución de errores</button>
+              <button class="btn btn-primary" onclick="ManualModule.open()">Abrir manual</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('aplicar')">Aplicar encuesta externa</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('incidencias')">Incidencias</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('errores')">Errores frecuentes</button>
             </div>
           </div>
         </div>
@@ -666,7 +666,7 @@
 </div><!-- /app-shell -->
 
 <!-- ── Manual FAB ────────────────────────────────────────────── -->
-<button id="manual-fab" title="Abrir Manual" aria-label="Abrir Manual de Usuario">?</button>
+<button id="manual-fab" title="Abrir manual" aria-label="Abrir manual del Encuestador">?</button>
 
 <!-- ────────────────────────────────────────────────────────────
      MODAL: Incidencia

@@ -1,33 +1,26 @@
 /**
- * CIALPA — Relevamiento Escolar
- * manual.js — Manual / help module
- * Version: 2.0.0
+ * CIALPA, Relevamiento Escolar
+ * manual.js, visor rápido del Manual del Encuestador
+ * Version: 2.2.0
  */
 
 const ManualModule = (() => {
   'use strict';
 
   const SECTIONS = [
-    { id: 'intro', title: '1. Introducción al Sistema' },
-    { id: 'acceso', title: '2. Acceso y Login' },
-    { id: 'mapa', title: '3. Uso del Mapa' },
-    { id: 'encuesta', title: '4. Aplicar Encuesta' },
-    { id: 'estados', title: '5. Estados de Relevamiento' },
-    { id: 'incidencias', title: '6. Registro de Incidencias' },
-    { id: 'jornada', title: '7. Mi Jornada' },
-    { id: 'formulario', title: '8. Formulario MEC' },
-    { id: 'sincronizacion', title: '9. Sincronización de Datos' },
-    { id: 'roles', title: '10. Roles y Permisos' },
-    { id: 'estadisticas', title: '11. Panel Estadístico' },
-    { id: 'configuracion', title: '12. Configuración (Admin)' },
-    { id: 'auditoria', title: '13. Auditoría (Admin)' },
-    { id: 'errores', title: '14. Solución de Errores Comunes' },
-    { id: 'contacto', title: '15. Soporte y Contacto' },
+    { id: 'alcance', title: '1. Alcance operativo' },
+    { id: 'flujo', title: '2. Flujo de trabajo' },
+    { id: 'escuelas', title: '3. Escuelas asignadas' },
+    { id: 'aplicar', title: '4. Aplicar encuesta externa' },
+    { id: 'tiempos', title: '5. Medición de tiempos' },
+    { id: 'modulos', title: '6. Control por módulos' },
+    { id: 'incidencias', title: '7. Incidencias' },
+    { id: 'cierre', title: '8. Cierre y folio externo' },
+    { id: 'calidad', title: '9. Control de calidad' },
+    { id: 'errores', title: '10. Errores frecuentes' },
   ];
 
   let _isOpen = false;
-
-  // ── Toggle manual drawer ──────────────────────────────────────────────────
 
   function toggle() {
     _isOpen ? close() : open();
@@ -62,33 +55,19 @@ const ManualModule = (() => {
     });
   }
 
-  // ── Search ────────────────────────────────────────────────────────────────
-
   function search(query) {
     const q = (query || '').trim().toLowerCase();
     const container = document.getElementById('manual-content');
     if (!container) return;
-
-    if (!q) {
-      container.querySelectorAll('mark').forEach(m => {
-        m.replaceWith(document.createTextNode(m.textContent));
-      });
-      container.querySelectorAll('.manual-section').forEach(s => s.style.display = '');
-      return;
-    }
-
-    // Show only matching sections
     container.querySelectorAll('.manual-section').forEach(section => {
       const text = section.textContent.toLowerCase();
-      section.style.display = text.includes(q) ? '' : 'none';
+      section.style.display = !q || text.includes(q) ? '' : 'none';
     });
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
-
   function renderModal() {
     const existing = document.getElementById('modal-manual');
-    if (existing) return; // already rendered
+    if (existing) return;
 
     const modal = document.createElement('div');
     modal.id = 'modal-manual';
@@ -97,11 +76,12 @@ const ManualModule = (() => {
       <div class="modal__overlay" onclick="ManualModule.close()"></div>
       <div class="modal__panel modal__panel--drawer">
         <div class="modal__header">
-          <h2>Manual de Usuario — CIALPA</h2>
+          <h2>Manual del Encuestador</h2>
           <div class="manual-header-actions">
             <input id="manual-search" type="text" class="form-control form-control-sm"
               placeholder="Buscar en el manual..." oninput="ManualModule.search(this.value)" />
-            <a href="manual/index.html" target="_blank" class="btn btn-sm btn-outline">Ver completo</a>
+            <a href="manual/index.html" target="_blank" class="btn btn-sm btn-outline">Ver manual completo</a>
+            <a href="manual/MANUAL_ENCUESTADOR_CIALPA.md" target="_blank" class="btn btn-sm btn-outline">Ver Markdown</a>
             <button class="modal__close" onclick="ManualModule.close()">&times;</button>
           </div>
         </div>
@@ -122,10 +102,8 @@ const ManualModule = (() => {
       </div>`;
 
     document.body.appendChild(modal);
-
-    // Scroll spy
     const content = modal.querySelector('.manual-content');
-    content.addEventListener('scroll', _onContentScroll);
+    if (content) content.addEventListener('scroll', _onContentScroll);
   }
 
   function _onContentScroll() {
@@ -148,186 +126,72 @@ const ManualModule = (() => {
 
   function _getSectionContent(id) {
     const contents = {
-      intro: `
-        <p>Bienvenido al sistema <strong>CIALPA — Relevamiento Escolar</strong>, una plataforma web diseñada para gestionar el relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.</p>
-        <p>El sistema permite a los encuestadores registrar sus visitas a cada escuela, completar el formulario oficial del MEC, y registrar incidencias. Los supervisores y administradores pueden monitorear el avance en tiempo real.</p>
-        <h4>Objetivos del sistema</h4>
-        <ul>
-          <li>Centralizar el seguimiento de visitas a escuelas.</li>
-          <li>Registrar el inicio y cierre de cada sesión de relevamiento.</li>
-          <li>Gestionar incidencias de campo.</li>
-          <li>Proveer estadísticas de avance por departamento y encuestador.</li>
-        </ul>`,
-      acceso: `
-        <p>Para acceder al sistema:</p>
+      alcance: `
+        <p>La app web CIALPA funciona como consola operativa de campo. No sustituye el cuestionario técnico externo del MEC/RUE/Apps. Su finalidad es seleccionar la escuela correcta, abrir o intentar abrir el aplicativo externo, registrar inicio y cierre del relevamiento, medir tiempos, documentar incidencias y producir información útil para supervisión, cronogramas y control de calidad.</p>
+        <p><strong>Regla básica:</strong> todo relevamiento iniciado en CIALPA debe cerrarse en CIALPA, aunque el cuestionario técnico se haya completado en otra aplicación.</p>`,
+      flujo: `
         <ol>
-          <li>Abrí el navegador y navegá a la URL de la aplicación.</li>
-          <li>Ingresá tu <strong>usuario</strong> y <strong>contraseña</strong> provistos por el administrador.</li>
-          <li>Hacé clic en <em>Ingresar</em>.</li>
-        </ol>
-        <p><strong>Nota:</strong> Si olvidaste tu contraseña, contactá al administrador.</p>
-        <p>La sesión expira automáticamente a las 8 horas por seguridad. Si la sesión expiró, el sistema te redirigirá al login.</p>
-        <h4>Cierre de sesión</h4>
-        <p>Para cerrar sesión de forma segura, hacé clic en tu nombre en la parte superior derecha y seleccioná <em>Cerrar sesión</em>.</p>`,
-      mapa: `
-        <p>El módulo de <strong>Mapa</strong> muestra todas las escuelas de tu zona en un mapa interactivo.</p>
-        <h4>Colores de los marcadores</h4>
-        <ul>
-          <li><span style="color:#6c757d">●</span> <strong>Gris:</strong> Pendiente de relevar.</li>
-          <li><span style="color:#fd7e14">●</span> <strong>Naranja:</strong> En curso (sesión activa).</li>
-          <li><span style="color:#28a745">●</span> <strong>Verde:</strong> Relevamiento finalizado.</li>
-          <li><span style="color:#dc3545">●</span> <strong>Rojo:</strong> Con incidencia.</li>
-        </ul>
-        <h4>Filtros disponibles</h4>
-        <ul>
-          <li>Departamento, Distrito, Zona, Encuestador, Estado.</li>
-          <li>Búsqueda por nombre o código de escuela.</li>
-        </ul>
-        <h4>Interacción</h4>
-        <p>Hacé clic en un marcador para ver la información de la escuela. Desde el popup podés iniciar la encuesta directamente.</p>
-        <p>Usá la lista lateral para navegar entre escuelas filtradas.</p>`,
-      encuesta: `
-        <p>Para aplicar una encuesta:</p>
-        <ol>
-          <li>Seleccioná la escuela desde el mapa o la lista.</li>
-          <li>Hacé clic en <em>Aplicar Encuesta</em>.</li>
-          <li>En el módulo <em>Aplicar Encuesta</em>, verificá los datos de la escuela.</li>
-          <li>Hacé clic en <strong>Iniciar Encuesta</strong>. Esto registra el inicio de la sesión en el sistema.</li>
-          <li>Se abrirá el formulario oficial del MEC en una nueva ventana.</li>
-          <li>Completá el formulario del MEC.</li>
-          <li>Al terminar, volvé a la aplicación y hacé clic en <strong>Finalizar Encuesta</strong>.</li>
-        </ol>
-        <p><strong>Importante:</strong> No cerrés la aplicación mientras el formulario está abierto, ya que la sesión quedaría abierta en el sistema.</p>`,
-      estados: `
-        <p>Cada escuela tiene uno de los siguientes estados:</p>
-        <table class="manual-table">
-          <tr><th>Estado</th><th>Significado</th></tr>
-          <tr><td><span class="badge" style="background:#6c757d">Pendiente</span></td><td>Aún no fue relevada.</td></tr>
-          <tr><td><span class="badge" style="background:#fd7e14">En Curso</span></td><td>Hay una sesión activa en este momento.</td></tr>
-          <tr><td><span class="badge" style="background:#28a745">Finalizada</span></td><td>El relevamiento fue completado.</td></tr>
-          <tr><td><span class="badge" style="background:#dc3545">Con Incidencia</span></td><td>Hubo un problema durante el relevamiento.</td></tr>
-        </table>`,
-      incidencias: `
-        <p>Si encontrás un problema durante el relevamiento (escuela cerrada, director ausente, etc.):</p>
-        <ol>
-          <li>Hacé clic en <strong>Registrar Incidencia</strong> durante la sesión activa.</li>
-          <li>Seleccioná el tipo de incidencia.</li>
-          <li>Describí el problema en detalle.</li>
-          <li>Asigná una prioridad (Alta / Media / Baja).</li>
-          <li>Guardá la incidencia.</li>
-        </ol>
-        <p>Las incidencias quedan registradas y visibles para el supervisor, quien podrá coordinar una revisita.</p>
-        <h4>Tipos de incidencia</h4>
-        <ul>
-          <li>Escuela cerrada</li>
-          <li>Acceso bloqueado</li>
-          <li>Director/a ausente</li>
-          <li>Formulario incompleto</li>
-          <li>Problema técnico</li>
-          <li>Seguridad / riesgo</li>
-          <li>Otra</li>
-        </ul>`,
-      jornada: `
-        <p>El módulo <strong>Mi Jornada</strong> muestra un resumen de tu actividad diaria:</p>
-        <ul>
-          <li>Escuelas relevadas hoy.</li>
-          <li>Tiempo total trabajado.</li>
-          <li>Incidencias registradas.</li>
-          <li>Historial de sesiones.</li>
-        </ul>
-        <p>Podés ver el detalle de cada sesión: hora de inicio, hora de cierre, duración, y observaciones.</p>`,
-      formulario: `
-        <p>El formulario oficial del <strong>MEC (Ministerio de Educación y Ciencias)</strong> se abre en una nueva ventana al iniciar la encuesta.</p>
-        <p>URL del formulario: <a href="https://demo.mec.gov.py/demo_rue/login" target="_blank">demo.mec.gov.py</a></p>
-        <p><strong>Pasos para completar el formulario:</strong></p>
-        <ol>
-          <li>Iniciá sesión con tus credenciales del MEC.</li>
-          <li>Buscá la escuela por código o nombre.</li>
-          <li>Completá todos los campos requeridos.</li>
-          <li>Guardá el formulario antes de cerrar.</li>
-          <li>Volvé a la aplicación CIALPA y cerrá la sesión.</li>
+          <li>Inicie sesión en CIALPA.</li>
+          <li>Verifique su escuela asignada.</li>
+          <li>Registre la llegada al local escolar.</li>
+          <li>Presione <strong>Aplicar encuesta</strong>.</li>
+          <li>Complete el cuestionario en el aplicativo externo.</li>
+          <li>Registre módulos, pausas o incidencias relevantes.</li>
+          <li>Vuelva a CIALPA y cierre el relevamiento.</li>
+          <li>Registre folio externo, último registro u observación final.</li>
         </ol>`,
-      sincronizacion: `
-        <p>Los datos se sincronizan automáticamente con el servidor (Google Sheets) cada vez que realizás una acción (inicio de sesión, cierre de sesión, registro de incidencia).</p>
-        <p>Si perdés la conexión a internet durante una sesión:</p>
-        <ul>
-          <li>No cerrés la aplicación.</li>
-          <li>Esperá a que se restaure la conexión.</li>
-          <li>El sistema reintentará automáticamente (hasta 3 veces).</li>
-        </ul>
-        <p><strong>Sin conexión:</strong> El sistema muestra una advertencia en la barra superior. No podés iniciar nuevas sesiones sin conexión.</p>`,
-      roles: `
+      escuelas: `
+        <p>Antes de iniciar, confirme código de local, nombre, departamento, distrito, coordenadas y estado operativo. Si la escuela no aparece, aparece duplicada o tiene datos incompatibles, reporte al supervisor. No cree registros informales ni seleccione otra escuela parecida.</p>
         <table class="manual-table">
-          <tr><th>Rol</th><th>Permisos</th></tr>
-          <tr>
-            <td><strong>Encuestador</strong></td>
-            <td>Ver mapa, aplicar encuestas, registrar incidencias, ver su jornada.</td>
-          </tr>
-          <tr>
-            <td><strong>Supervisor</strong></td>
-            <td>Todo lo anterior + ver estadísticas de todos los encuestadores.</td>
-          </tr>
-          <tr>
-            <td><strong>Administrador</strong></td>
-            <td>Acceso completo: configuración, gestión de encuestadores, auditoría.</td>
-          </tr>
+          <tr><th>Estado</th><th>Acción esperada</th></tr>
+          <tr><td>Pendiente</td><td>Puede iniciar visita.</td></tr>
+          <tr><td>En curso</td><td>Verifique si corresponde a su sesión activa.</td></tr>
+          <tr><td>Parcial</td><td>Continúe solo con instrucción del supervisor.</td></tr>
+          <tr><td>Finalizada</td><td>No reabra salvo autorización.</td></tr>
+          <tr><td>Con incidencia</td><td>Revise la observación y coordine solución.</td></tr>
         </table>`,
-      estadisticas: `
-        <p>El panel estadístico (accesible a supervisores y administradores) muestra:</p>
+      aplicar: `
+        <p>El botón <strong>Aplicar encuesta</strong> puede abrir una URL, una aplicación instalada o un esquema de Android, según la configuración del dispositivo. Si la apertura automática no funciona, abra manualmente el aplicativo externo y registre la observación.</p>
+        <p><strong>Importante:</strong> CIALPA no puede leer automáticamente el cierre interno de la app externa. Por eso el encuestador debe volver a CIALPA para cerrar la sesión.</p>`,
+      tiempos: `
+        <p>El tiempo total se calcula entre el inicio del relevamiento en CIALPA y el cierre registrado en CIALPA. Si hubo pausas largas, problemas de conectividad o interrupciones, descríbalas en observaciones.</p>
+        <p>Estos tiempos permiten estimar duración promedio por escuela, carga diaria de trabajo, complejidad por tipo de local y necesidades de personal para la encuesta grande.</p>`,
+      modulos: `
+        <p>Cuando el relevamiento sea complejo, registre tiempos por módulo: identificación, exteriores, servicios, electricidad, bloques, áreas de recreación, aulas, dependencias, laboratorios, talleres, sanitarios, evidencias y revisión final.</p>
+        <p>No cierre el relevamiento con módulos abiertos sin explicación.</p>`,
+      incidencias: `
+        <p>Registre incidencia ante escuela cerrada, responsable ausente, rechazo, falta de conectividad, error de app, ubicación incorrecta, GPS no disponible, problema de seguridad o interrupción operativa.</p>
+        <p>Todo cierre parcial o reprogramación debe incluir motivo, módulo pendiente, fecha tentativa y observación breve.</p>`,
+      cierre: `
+        <ol>
+          <li>Confirme que el cuestionario externo terminó o que el cierre parcial está justificado.</li>
+          <li>Cierre módulos pendientes.</li>
+          <li>Registre folio externo o último registro disponible.</li>
+          <li>Indique si el relevamiento fue completo, parcial o con incidencia.</li>
+          <li>Presione <strong>Finalizar relevamiento</strong>.</li>
+          <li>Verifique que el estado de la escuela cambie correctamente.</li>
+        </ol>`,
+      calidad: `
         <ul>
-          <li><strong>KPIs:</strong> Total, relevadas, en curso, pendientes, con incidencia, % de avance.</li>
-          <li><strong>Gráfico de barras:</strong> Estado por departamento.</li>
-          <li><strong>Gráfico de líneas:</strong> Progreso diario de relevamientos.</li>
-          <li><strong>Donut:</strong> Distribución general de estados.</li>
-          <li><strong>Ranking encuestadores:</strong> Escuelas relevadas, incidencias, tiempo promedio.</li>
-        </ul>
-        <p>Podés filtrar por rango de fechas, departamento y encuestador.</p>
-        <p>Usá el botón <em>Exportar CSV</em> para descargar los datos.</p>`,
-      configuracion: `
-        <p><em>Exclusivo para administradores.</em></p>
-        <p>En este módulo podés:</p>
-        <ul>
-          <li>Modificar parámetros del sistema (URL del formulario, textos, etc.).</li>
-          <li>Gestionar encuestadores (crear, editar, desactivar).</li>
-          <li>Asignar zonas a encuestadores.</li>
+          <li>Código y nombre de escuela coinciden con la asignación.</li>
+          <li>Coordenadas dentro del rango esperado para Paraguay.</li>
+          <li>Inicio y cierre registrados.</li>
+          <li>Aplicativo externo usado o apertura manual documentada.</li>
+          <li>Incidencias cargadas.</li>
+          <li>Folio externo registrado cuando exista.</li>
+          <li>Observación final clara.</li>
         </ul>`,
-      auditoria: `
-        <p><em>Exclusivo para administradores.</em></p>
-        <p>El log de auditoría registra todas las acciones importantes del sistema:</p>
-        <ul>
-          <li>Inicios y cierres de sesión de usuarios.</li>
-          <li>Inicio y cierre de sesiones de relevamiento.</li>
-          <li>Cambios de configuración.</li>
-          <li>Creación/edición/eliminación de encuestadores.</li>
-        </ul>
-        <p>Podés filtrar por usuario, acción y rango de fechas.</p>`,
       errores: `
-        <h4>El botón "Iniciar Encuesta" no responde</h4>
-        <p>Verificá que tengas conexión a internet y que hayas seleccionado una escuela.</p>
-        <h4>"Credenciales inválidas" al login</h4>
-        <p>Verificá usuario y contraseña. Si el problema persiste, contactá al administrador.</p>
-        <h4>El formulario MEC no abre</h4>
-        <p>Verificá que el navegador no esté bloqueando ventanas emergentes. Habilitá las ventanas emergentes para este sitio.</p>
-        <h4>"Sesión expirada"</h4>
-        <p>Las sesiones duran 8 horas. Volvé a ingresar con tu usuario y contraseña.</p>
-        <h4>Error de conexión</h4>
-        <p>El sistema reintenta automáticamente. Si el error persiste, verificá tu conexión a internet.</p>`,
-      contacto: `
-        <p>Para soporte técnico o consultas, contactá al equipo de CIALPA:</p>
-        <ul>
-          <li><strong>Email:</strong> soporte@cialpa.gov.py</li>
-          <li><strong>Teléfono:</strong> (021) 000-000</li>
-          <li><strong>Horario de atención:</strong> Lunes a viernes, 8:00 – 17:00 hs.</li>
-        </ul>
-        <p>Para reportar errores técnicos, incluí:</p>
-        <ul>
-          <li>Descripción del error.</li>
-          <li>Pasos para reproducirlo.</li>
-          <li>Captura de pantalla si es posible.</li>
-          <li>Nombre de usuario y fecha/hora del error.</li>
-        </ul>`,
+        <h4>No aparecen escuelas</h4>
+        <p>Revise filtros, actualice datos y reinicie sesión. Si persiste, reporte al administrador para revisar la hoja de escuelas seleccionadas.</p>
+        <h4>El botón Aplicar encuesta no abre la app externa</h4>
+        <p>Abra manualmente la app externa, continúe el relevamiento y registre observación técnica.</p>
+        <h4>Se perdió conectividad</h4>
+        <p>Continúe si el aplicativo externo lo permite. Registre incidencia si afecta el avance o la sincronización.</p>
+        <h4>Quedó una sesión abierta</h4>
+        <p>Ingrese nuevamente a la escuela y cierre la sesión si corresponde. Si no puede hacerlo, avise al supervisor.</p>`
     };
-    return contents[id] || '<p>Contenido no disponible.</p>';
+    return contents[id] || '<p>Contenido no disponible. Consulte la versión completa del manual.</p>';
   }
 
   return {

@@ -295,3 +295,8 @@ Todas se cargan desde CDN en el `index.html`. No requieren instalación.
 ---
 
 *CIALPA — Relevamiento Escolar v2.0.0 · Paraguay 2025*
+
+
+## Manual del Encuestador
+
+La versión 2.2 incorpora el manual operativo completo en `manual/MANUAL_ENCUESTADOR_CIALPA.md` y su visor web en `manual/index.html`. El manual diferencia explícitamente la app web CIALPA del aplicativo externo de encuesta y agrega procedimientos para medición de tiempos, registro por módulos, incidencias, cierre parcial, folio externo y control de calidad.

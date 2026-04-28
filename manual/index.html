@@ -1,847 +1,3218 @@
 <!DOCTYPE html>
-<html lang="es">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es" xml:lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Manual de Usuario — CIALPA Relevamiento Escolar</title>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="dcterms.date" content="2026-04-28" />
+  <title>Manual del Encuestador</title>
   <style>
-    :root {
-      --primary:   #E84C22;
-      --secondary: #1F3864;
-      --success:   #28a745;
-      --warning:   #fd7e14;
-      --danger:    #dc3545;
-      --muted:     #6c757d;
-      --border:    #dee2e6;
-      --bg:        #f0f2f5;
-      --surface:   #ffffff;
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
     }
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; font-size: 16px; }
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: #212529;
-      line-height: 1.6;
-    }
-
-    /* Layout */
-    .layout { display: flex; min-height: 100vh; }
-
-    /* Sidebar */
-    .sidebar {
-      width: 260px;
-      min-width: 220px;
-      background: var(--secondary);
-      color: #fff;
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      overflow-y: auto;
-      flex-shrink: 0;
-    }
-    .sidebar__header {
-      padding: 1.5rem 1rem 1rem;
-      border-bottom: 1px solid rgba(255,255,255,.1);
-      background: rgba(0,0,0,.15);
-    }
-    .sidebar__header h1 { font-size: 1.1rem; color: #fff; margin-bottom: .2rem; }
-    .sidebar__header p  { font-size: .75rem; opacity: .7; }
-
-    .sidebar__search {
-      padding: .75rem;
-      border-bottom: 1px solid rgba(255,255,255,.1);
-    }
-    #manual-search {
-      width: 100%;
-      padding: .45rem .75rem;
-      border-radius: 4px;
-      border: 1px solid rgba(255,255,255,.2);
-      background: rgba(255,255,255,.1);
-      color: #fff;
-      font-size: .82rem;
-    }
-    #manual-search::placeholder { color: rgba(255,255,255,.5); }
-
-    .sidebar nav ul { padding: .5rem 0; }
-    .sidebar nav li { list-style: none; }
-    .sidebar nav a {
-      display: block;
-      padding: .6rem 1rem;
-      color: rgba(255,255,255,.75);
-      text-decoration: none;
-      font-size: .84rem;
-      border-left: 3px solid transparent;
-      transition: all .15s;
-    }
-    .sidebar nav a:hover { background: rgba(255,255,255,.08); color: #fff; }
-    .sidebar nav a.active {
-      background: rgba(232,76,34,.15);
-      border-left-color: var(--primary);
-      color: #fff;
-      font-weight: 500;
-    }
-
-    .sidebar__print {
-      padding: .75rem 1rem;
-      border-top: 1px solid rgba(255,255,255,.1);
-    }
-    .sidebar__print button {
-      width: 100%;
-      padding: .45rem;
-      background: var(--primary);
-      color: #fff;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: .82rem;
-    }
-
-    /* Main content */
-    .content {
-      flex: 1;
-      max-width: 860px;
-      padding: 2rem 2rem 4rem;
-    }
-
-    .content-header {
-      background: linear-gradient(135deg, var(--secondary), #2a4d8f 60%, var(--primary));
-      color: #fff;
-      padding: 2rem;
-      border-radius: 12px;
-      margin-bottom: 2rem;
-    }
-    .content-header h1 { font-size: 1.6rem; margin-bottom: .4rem; }
-    .content-header p  { opacity: .85; font-size: .95rem; }
-    .content-header .version { font-size: .8rem; opacity: .65; margin-top: .5rem; }
-
-    /* Sections */
-    .manual-section {
-      background: var(--surface);
-      border-radius: 10px;
-      padding: 1.75rem 2rem;
-      margin-bottom: 1.5rem;
-      border: 1px solid var(--border);
-      box-shadow: 0 1px 4px rgba(0,0,0,.06);
-    }
-
-    .section-anchor { display: block; height: 80px; margin-top: -80px; }
-
-    .manual-section h2 {
-      color: var(--secondary);
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
-      padding-bottom: .6rem;
-      border-bottom: 2px solid var(--primary);
-    }
-    .manual-section h3 { color: var(--secondary); font-size: 1.05rem; margin: 1.2rem 0 .5rem; }
-    .manual-section p  { margin-bottom: .7rem; font-size: .925rem; }
-    .manual-section ul, .manual-section ol { padding-left: 1.5rem; margin-bottom: .75rem; }
-    .manual-section li { font-size: .925rem; margin-bottom: .35rem; }
-    .manual-section ol { list-style: decimal; }
-    .manual-section ul { list-style: disc; }
-    .manual-section a  { color: var(--primary); }
-
-    .callout {
-      border-left: 4px solid var(--warning);
-      background: #fff8f0;
-      padding: .75rem 1rem;
-      border-radius: 0 6px 6px 0;
-      margin: .75rem 0;
-      font-size: .9rem;
-    }
-    .callout--tip      { border-color: var(--success); background: #f0fff4; }
-    .callout--warning  { border-color: var(--warning); background: #fff8f0; }
-    .callout--danger   { border-color: var(--danger);  background: #fff0f0; }
-    .callout--info     { border-color: #17a2b8; background: #f0faff; }
-
-    table.manual-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: .875rem;
-      margin: .75rem 0;
-    }
-    table.manual-table th {
-      background: var(--secondary);
-      color: #fff;
-      padding: .5rem .75rem;
-      text-align: left;
-    }
-    table.manual-table td { padding: .5rem .75rem; border: 1px solid var(--border); }
-    table.manual-table tr:nth-child(even) td { background: #f8f9fa; }
-
-    .badge {
-      display: inline-block;
-      padding: .2em .55em;
-      border-radius: 999px;
-      font-size: .75rem;
-      font-weight: 600;
-      color: #fff;
-    }
-    .badge--pendiente  { background: #6c757d; }
-    .badge--en-curso   { background: #fd7e14; }
-    .badge--finalizada { background: #28a745; }
-    .badge--incidencia { background: #dc3545; }
-
-    .step-list { counter-reset: step-counter; }
-    .step-list li {
-      counter-increment: step-counter;
-      position: relative;
-      padding-left: 2.4rem;
-      margin-bottom: .7rem;
-      list-style: none;
-    }
-    .step-list li::before {
-      content: counter(step-counter);
-      position: absolute;
-      left: 0;
-      top: .05rem;
-      width: 1.6rem;
-      height: 1.6rem;
-      background: var(--primary);
-      color: #fff;
-      border-radius: 50%;
-      font-size: .78rem;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .screenshot-placeholder {
-      background: #f0f2f5;
-      border: 2px dashed var(--border);
-      border-radius: 8px;
-      padding: 2rem;
-      text-align: center;
-      color: var(--muted);
-      font-size: .875rem;
-      margin: 1rem 0;
-    }
-
-    /* Back to top */
-    #back-to-top {
-      position: fixed;
-      bottom: 1.5rem;
-      right: 1.5rem;
-      background: var(--secondary);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 44px;
-      height: 44px;
-      font-size: 1.2rem;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,.2);
-      display: none;
-    }
-    #back-to-top.visible { display: flex; align-items: center; justify-content: center; }
-
-    /* Print */
-    @media print {
-      .sidebar, #back-to-top { display: none; }
-      .content { max-width: 100%; padding: 1rem; }
-      .manual-section { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
-      .content-header { background: var(--secondary) !important; color: #fff !important; }
-    }
-
-    @media (max-width: 768px) {
-      .sidebar { display: none; }
-      .content { padding: 1rem; }
-    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
   </style>
+  <link rel="stylesheet" href="manual.css" />
 </head>
 <body>
 
-<div class="layout">
-
-  <!-- ── Sidebar ──────────────────────────────────────────── -->
-  <div class="sidebar">
-    <div class="sidebar__header">
-      <h1>Manual CIALPA</h1>
-      <p>Relevamiento Escolar</p>
-    </div>
-    <div class="sidebar__search">
-      <input id="manual-search" type="text" placeholder="Buscar en el manual..." oninput="searchManual(this.value)" />
-    </div>
-    <nav>
-      <ul id="nav-list">
-        <li><a href="#s-intro">1. Introducción</a></li>
-        <li><a href="#s-acceso">2. Acceso y Login</a></li>
-        <li><a href="#s-mapa">3. Uso del Mapa</a></li>
-        <li><a href="#s-encuesta">4. Aplicar Encuesta</a></li>
-        <li><a href="#s-estados">5. Estados</a></li>
-        <li><a href="#s-incidencias">6. Incidencias</a></li>
-        <li><a href="#s-jornada">7. Mi Jornada</a></li>
-        <li><a href="#s-formulario">8. Formulario MEC</a></li>
-        <li><a href="#s-sincronizacion">9. Sincronización</a></li>
-        <li><a href="#s-roles">10. Roles y Permisos</a></li>
-        <li><a href="#s-estadisticas">11. Panel Estadístico</a></li>
-        <li><a href="#s-configuracion">12. Configuración</a></li>
-        <li><a href="#s-auditoria">13. Auditoría</a></li>
-        <li><a href="#s-errores">14. Errores Comunes</a></li>
-        <li><a href="#s-contacto">15. Soporte y Contacto</a></li>
-      </ul>
-    </nav>
-    <div class="sidebar__print">
-      <button onclick="window.print()">🖨 Imprimir Manual</button>
-    </div>
+<main class="page">
+<header class="hero">
+  <h1>Manual del Encuestador</h1>
+  <p>Relevamiento de Infraestructura Educativa, CIALPA</p>
+  <p><span class="note-chip">Versión 4.0 operativa</span> <span class="note-chip">2026</span> <span class="note-chip">Prepiloto, piloto y encuesta grande</span></p>
+  <div class="top-actions">
+    <a class="btn primary" href="../index.html">Volver a la app</a>
+    <a class="btn" href="MANUAL_ENCUESTADOR_CIALPA.md">Descargar Markdown</a>
   </div>
-
-  <!-- ── Content ───────────────────────────────────────────── -->
-  <div class="content">
-
-    <div class="content-header">
-      <h1>Manual de Usuario</h1>
-      <p>Sistema de Relevamiento Escolar — CIALPA</p>
-      <p class="version">Versión 2.0.0 &bull; Paraguay &bull; 2025</p>
-    </div>
-
-    <!-- ── 1. Introducción ─────────────────────────────────── -->
-    <div class="manual-section" id="sec-intro">
-      <span class="section-anchor" id="s-intro"></span>
-      <h2>1. Introducción al Sistema</h2>
-
-      <p>Bienvenido al sistema <strong>CIALPA — Relevamiento Escolar</strong>, una plataforma web diseñada para gestionar el relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.</p>
-
-      <p>El sistema permite a los encuestadores registrar sus visitas a cada escuela, completar el formulario oficial del Ministerio de Educación y Ciencias (MEC), y registrar incidencias de campo. Los supervisores y administradores pueden monitorear el avance en tiempo real desde cualquier dispositivo con conexión a internet.</p>
-
-      <h3>Objetivos del sistema</h3>
-      <ul>
-        <li>Centralizar el seguimiento de visitas a establecimientos educativos.</li>
-        <li>Registrar el inicio y cierre de cada sesión de relevamiento con marca de tiempo.</li>
-        <li>Gestionar y hacer seguimiento de incidencias de campo.</li>
-        <li>Proveer estadísticas de avance por departamento, distrito y encuestador.</li>
-        <li>Mantener un registro de auditoría de todas las acciones del sistema.</li>
-      </ul>
-
-      <h3>Componentes del sistema</h3>
-      <table class="manual-table">
-        <tr><th>Componente</th><th>Descripción</th></tr>
-        <tr><td>Aplicación Web (Frontend)</td><td>Interfaz de usuario accesible desde cualquier navegador moderno. Alojada en GitHub Pages.</td></tr>
-        <tr><td>Backend (Google Apps Script)</td><td>Procesa las solicitudes, autentica usuarios y lee/escribe datos en Google Sheets.</td></tr>
-        <tr><td>Base de Datos (Google Sheets)</td><td>Almacena todos los datos: escuelas, usuarios, sesiones, incidencias, auditoría.</td></tr>
-        <tr><td>Formulario MEC</td><td>Sistema externo del Ministerio de Educación donde se registra la encuesta oficial.</td></tr>
-      </table>
-
-      <h3>Requisitos técnicos</h3>
-      <ul>
-        <li>Navegador web moderno: Chrome 90+, Firefox 88+, Edge 90+, Safari 14+.</li>
-        <li>Conexión a internet (mínimo 3G para uso básico).</li>
-        <li>Credenciales de acceso provistas por el administrador.</li>
-        <li>Credenciales del MEC para completar el formulario oficial.</li>
-      </ul>
-    </div>
-
-    <!-- ── 2. Acceso ────────────────────────────────────────── -->
-    <div class="manual-section" id="sec-acceso">
-      <span class="section-anchor" id="s-acceso"></span>
-      <h2>2. Acceso y Login</h2>
-
-      <h3>Ingresar al sistema</h3>
-      <ol class="step-list">
-        <li>Abrí tu navegador web.</li>
-        <li>Navegá a la URL de la aplicación (te la provee el administrador).</li>
-        <li>En la pantalla de login, ingresá tu <strong>usuario</strong> y <strong>contraseña</strong>.</li>
-        <li>Hacé clic en el botón <em>Ingresar</em>.</li>
-        <li>Si las credenciales son correctas, serás dirigido al panel principal.</li>
-      </ol>
-
-      <div class="callout callout--warning">
-        <strong>Importante:</strong> Si ves el mensaje "Credenciales inválidas", verificá que el usuario y contraseña sean correctos. Si el problema persiste, contactá al administrador.
-      </div>
-
-      <h3>Seguridad de la sesión</h3>
-      <p>La sesión tiene una duración máxima de <strong>8 horas</strong>. Pasado ese tiempo, el sistema te pedirá que vuelvas a iniciar sesión por seguridad. Tus datos no se pierden.</p>
-
-      <h3>Cerrar sesión</h3>
-      <p>Para cerrar sesión correctamente:</p>
-      <ol class="step-list">
-        <li>Hacé clic en tu nombre en la barra superior derecha.</li>
-        <li>Hacé clic en el botón <em>Salir</em>.</li>
-        <li>Confirmá la acción en el diálogo.</li>
-      </ol>
-
-      <div class="callout callout--tip">
-        <strong>Recomendación:</strong> Siempre cerrá sesión al terminar tu jornada, especialmente si usás un dispositivo compartido.
-      </div>
-    </div>
-
-    <!-- ── 3. Mapa ──────────────────────────────────────────── -->
-    <div class="manual-section" id="sec-mapa">
-      <span class="section-anchor" id="s-mapa"></span>
-      <h2>3. Uso del Mapa</h2>
-
-      <p>El módulo <strong>Mapa</strong> es la herramienta central de trabajo. Muestra todas las escuelas de tu zona en un mapa interactivo de Paraguay.</p>
-
-      <h3>Navegación básica</h3>
-      <ul>
-        <li><strong>Zoom:</strong> Usá la rueda del mouse o los botones + / − en el mapa.</li>
-        <li><strong>Desplazamiento:</strong> Hacé clic y arrastrá el mapa.</li>
-        <li><strong>Capas base:</strong> Podés alternar entre mapa base (OSM) y satélite (Esri) con el control en la esquina superior derecha.</li>
-      </ul>
-
-      <h3>Colores de los marcadores</h3>
-      <table class="manual-table">
-        <tr><th>Color</th><th>Estado</th><th>Significado</th></tr>
-        <tr><td><span class="badge badge--pendiente">●</span></td><td>Pendiente</td><td>Aún no fue relevada.</td></tr>
-        <tr><td><span class="badge badge--en-curso">●</span></td><td>En Curso</td><td>Hay una sesión activa en este momento.</td></tr>
-        <tr><td><span class="badge badge--finalizada">●</span></td><td>Finalizada</td><td>El relevamiento fue completado.</td></tr>
-        <tr><td><span class="badge badge--incidencia">●</span></td><td>Con Incidencia</td><td>Hubo un problema durante el relevamiento.</td></tr>
-      </table>
-
-      <h3>Agrupación de marcadores</h3>
-      <p>Cuando hay muchas escuelas en un área, los marcadores se agrupan en <em>clusters</em>. El número dentro del cluster indica cuántas escuelas contiene. Al hacer clic en el cluster, el mapa hace zoom y los separa.</p>
-
-      <h3>Popup de escuela</h3>
-      <p>Hacé clic en cualquier marcador para ver la información de esa escuela:</p>
-      <ul>
-        <li>Nombre y código de la escuela.</li>
-        <li>Departamento, distrito, localidad y zona.</li>
-        <li>Encuestador asignado.</li>
-        <li>Estado actual del relevamiento.</li>
-        <li>Botón para iniciar la encuesta (si tenés permiso).</li>
-      </ul>
-
-      <h3>Filtros disponibles</h3>
-      <p>El panel lateral izquierdo ofrece los siguientes filtros:</p>
-      <ul>
-        <li><strong>Búsqueda:</strong> Por nombre o código de escuela.</li>
-        <li><strong>Departamento:</strong> Filtra por departamento.</li>
-        <li><strong>Zona:</strong> Urbana / Rural / Rural Remota.</li>
-        <li><strong>Encuestador:</strong> Filtra las escuelas asignadas a un encuestador específico.</li>
-        <li><strong>Estado:</strong> Muestra solo escuelas en determinado estado.</li>
-      </ul>
-      <p>Los filtros se aplican al hacer clic en <em>Filtrar</em>. Para limpiar todos los filtros, usá el botón <em>Limpiar</em>.</p>
-    </div>
-
-    <!-- ── 4. Aplicar Encuesta ──────────────────────────────── -->
-    <div class="manual-section" id="sec-encuesta">
-      <span class="section-anchor" id="s-encuesta"></span>
-      <h2>4. Aplicar Encuesta</h2>
-
-      <h3>Proceso completo de relevamiento</h3>
-      <ol class="step-list">
-        <li>Navegá al módulo <strong>Mapa</strong> en el menú lateral.</li>
-        <li>Localizá la escuela que vas a visitar usando los filtros o buscando por nombre.</li>
-        <li>Hacé clic en el marcador de la escuela para abrir el popup.</li>
-        <li>Hacé clic en <em>Aplicar Encuesta</em> en el popup. Serás redirigido al módulo de encuesta.</li>
-        <li>Verificá que los datos de la escuela sean correctos.</li>
-        <li>Hacé clic en el botón <strong>Iniciar Encuesta</strong>. Esto registra el inicio de la sesión en el sistema con la hora exacta.</li>
-        <li>Se abrirá el formulario oficial del MEC en una nueva ventana o pestaña del navegador.</li>
-        <li>Completá el formulario del MEC con toda la información relevada en la escuela.</li>
-        <li>Guardá el formulario del MEC.</li>
-        <li>Volvé a la ventana de la aplicación CIALPA.</li>
-        <li>Hacé clic en <strong>Finalizar Encuesta</strong>. El sistema registrará el cierre de la sesión.</li>
-        <li>Podés agregar observaciones opcionales sobre el relevamiento.</li>
-      </ol>
-
-      <div class="callout callout--danger">
-        <strong>¡Importante!</strong> No cerrés la aplicación CIALPA mientras el formulario MEC está abierto. Si lo hacés, la sesión quedará "En Curso" y será necesario cerrarla manualmente más tarde.
-      </div>
-
-      <h3>Si el navegador bloquea la ventana emergente</h3>
-      <p>Al iniciar la encuesta, el formulario MEC se abre en una nueva ventana. Si el navegador lo bloquea:</p>
-      <ol class="step-list">
-        <li>Buscá el ícono de ventana bloqueada en la barra de direcciones del navegador.</li>
-        <li>Hacé clic en él y seleccioná "Permitir ventanas emergentes para este sitio".</li>
-        <li>Recargá la página o volvé a hacer clic en <em>Abrir Formulario MEC</em>.</li>
-      </ol>
-
-      <h3>Sesiones simultáneas</h3>
-      <p>El sistema <strong>no permite</strong> tener dos sesiones activas para la misma escuela al mismo tiempo. Si intentás iniciar una encuesta para una escuela que ya tiene una sesión activa, el sistema te avisará y te preguntará si querés recuperar esa sesión.</p>
-    </div>
-
-    <!-- ── 5. Estados ───────────────────────────────────────── -->
-    <div class="manual-section" id="sec-estados">
-      <span class="section-anchor" id="s-estados"></span>
-      <h2>5. Estados de Relevamiento</h2>
-
-      <p>Cada escuela tiene asignado uno de los siguientes estados, que refleja el avance del relevamiento:</p>
-
-      <table class="manual-table">
-        <tr>
-          <th>Estado</th>
-          <th>Descripción</th>
-          <th>¿Quién lo asigna?</th>
-        </tr>
-        <tr>
-          <td><span class="badge badge--pendiente">Pendiente</span></td>
-          <td>La escuela está en el listado pero aún no fue visitada.</td>
-          <td>Estado inicial (automático).</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge--en-curso">En Curso</span></td>
-          <td>Hay una sesión de relevamiento activa para esta escuela.</td>
-          <td>Automático al iniciar encuesta.</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge--finalizada">Finalizada</span></td>
-          <td>El relevamiento fue completado exitosamente.</td>
-          <td>Automático al cerrar sesión como "completada".</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge--incidencia">Con Incidencia</span></td>
-          <td>Hubo un problema que impidió completar el relevamiento.</td>
-          <td>Automático al cerrar sesión con incidencia.</td>
-        </tr>
-      </table>
-
-      <div class="callout callout--info">
-        <strong>Nota:</strong> Una escuela con estado "Con Incidencia" puede ser relevada nuevamente en una visita posterior, una vez que el supervisor resuelva la incidencia.
-      </div>
-    </div>
-
-    <!-- ── 6. Incidencias ───────────────────────────────────── -->
-    <div class="manual-section" id="sec-incidencias">
-      <span class="section-anchor" id="s-incidencias"></span>
-      <h2>6. Registro de Incidencias</h2>
-
-      <p>Una incidencia es cualquier situación que impida completar el relevamiento normalmente. Registrar incidencias correctamente es fundamental para la gestión del proyecto.</p>
-
-      <h3>Cómo registrar una incidencia durante la sesión</h3>
-      <ol class="step-list">
-        <li>Con la sesión activa en el módulo <em>Aplicar Encuesta</em>, hacé clic en el botón <strong>Registrar Incidencia</strong>.</li>
-        <li>Confirmá la acción en el diálogo que aparece.</li>
-        <li>Completá la descripción de la incidencia.</li>
-        <li>Seleccioná el tipo de incidencia y la prioridad.</li>
-        <li>Hacé clic en <em>Registrar Incidencia</em>.</li>
-      </ol>
-
-      <h3>Tipos de incidencia</h3>
-      <ul>
-        <li><strong>Escuela cerrada:</strong> No hay actividad en el establecimiento.</li>
-        <li><strong>Acceso bloqueado:</strong> No es posible ingresar al establecimiento.</li>
-        <li><strong>Director/a ausente:</strong> No está la autoridad para atender la encuesta.</li>
-        <li><strong>Formulario incompleto:</strong> No fue posible completar todos los campos del formulario.</li>
-        <li><strong>Problema técnico:</strong> Falla técnica en el sistema o dispositivo.</li>
-        <li><strong>Seguridad / riesgo:</strong> Existe una situación de riesgo para el encuestador.</li>
-        <li><strong>Otra:</strong> Cualquier otro motivo.</li>
-      </ul>
-
-      <h3>Prioridades</h3>
-      <table class="manual-table">
-        <tr><th>Prioridad</th><th>Cuándo usarla</th></tr>
-        <tr><td>Alta</td><td>Situación de riesgo, escuela que no puede ser relevada sin acción inmediata del supervisor.</td></tr>
-        <tr><td>Media</td><td>Situación que requiere seguimiento, puede resolverse en el corto plazo.</td></tr>
-        <tr><td>Baja</td><td>Situación menor, puede resolverse en la próxima visita programada.</td></tr>
-      </table>
-
-      <h3>¿Qué pasa después?</h3>
-      <p>La incidencia queda registrada y visible para el supervisor. El supervisor podrá:</p>
-      <ul>
-        <li>Coordinar una revisita a la escuela.</li>
-        <li>Gestionar la resolución del problema.</li>
-        <li>Marcar la incidencia como resuelta una vez atendida.</li>
-      </ul>
-    </div>
-
-    <!-- ── 7. Mi Jornada ────────────────────────────────────── -->
-    <div class="manual-section" id="sec-jornada">
-      <span class="section-anchor" id="s-jornada"></span>
-      <h2>7. Mi Jornada</h2>
-
-      <p>El módulo <strong>Mi Jornada</strong> es tu panel personal de actividad. Podés ver todo lo que hiciste hoy y en jornadas anteriores.</p>
-
-      <h3>¿Qué muestra?</h3>
-      <ul>
-        <li><strong>Tarjeta de usuario:</strong> Tu nombre, rol, fecha actual y estado actual (si estás en campo o no).</li>
-        <li><strong>KPIs del día:</strong> Sesiones realizadas hoy, finalizadas, incidencias y tiempo total trabajado.</li>
-        <li><strong>Historial de sesiones:</strong> Tabla con todas tus sesiones: fecha, hora de inicio, escuela, hora de cierre, duración y estado.</li>
-        <li><strong>Mis incidencias:</strong> Lista de las incidencias que registraste.</li>
-      </ul>
-
-      <h3>Actualizar datos</h3>
-      <p>Usá el botón <em>↺ Actualizar</em> en la parte superior del módulo para recargar los datos más recientes del servidor.</p>
-    </div>
-
-    <!-- ── 8. Formulario MEC ─────────────────────────────────── -->
-    <div class="manual-section" id="sec-formulario">
-      <span class="section-anchor" id="s-formulario"></span>
-      <h2>8. Formulario MEC</h2>
-
-      <p>El formulario oficial del <strong>Ministerio de Educación y Ciencias (MEC)</strong> es donde se registra la información del relevamiento. Se abre en una nueva ventana del navegador al iniciar una encuesta.</p>
-
-      <h3>Acceso al formulario</h3>
-      <p>URL del sistema MEC: <strong>demo.mec.gov.py</strong></p>
-      <p>Necesitás tus credenciales del MEC (diferentes de las de CIALPA) para iniciar sesión en el formulario.</p>
-
-      <h3>Pasos para completar el formulario</h3>
-      <ol class="step-list">
-        <li>En la ventana del formulario MEC, iniciá sesión con tus credenciales del MEC.</li>
-        <li>Buscá la escuela por su código oficial o nombre.</li>
-        <li>Completá todos los campos requeridos con la información relevada in situ.</li>
-        <li>Adjuntá las fotografías o evidencias requeridas si el sistema lo permite.</li>
-        <li>Guardá el formulario antes de cerrar la ventana.</li>
-        <li>Volvé a la aplicación CIALPA y cerrá la sesión.</li>
-      </ol>
-
-      <div class="callout callout--warning">
-        <strong>Recordatorio:</strong> Guardá el formulario MEC antes de cerrar la ventana. Una vez cerrado el formulario, deberías volver a CIALPA y cerrar la sesión con el botón <em>Finalizar Encuesta</em>.
-      </div>
-    </div>
-
-    <!-- ── 9. Sincronización ─────────────────────────────────── -->
-    <div class="manual-section" id="sec-sincronizacion">
-      <span class="section-anchor" id="s-sincronizacion"></span>
-      <h2>9. Sincronización de Datos</h2>
-
-      <p>Los datos del sistema se sincronizan automáticamente con el servidor (Google Sheets) cada vez que realizás una acción importante (inicio de sesión, cierre de encuesta, registro de incidencia).</p>
-
-      <h3>¿Qué pasa si pierdo la conexión?</h3>
-      <div class="callout callout--danger">
-        <strong>Sin conexión a internet</strong> no podés iniciar nuevas sesiones, ya que el sistema requiere comunicación con el servidor para registrar el inicio y cierre de cada encuesta.
-      </div>
-
-      <p>Si perdés la conexión durante una sesión activa:</p>
-      <ol class="step-list">
-        <li>No cerrés la aplicación.</li>
-        <li>Esperá a que se restaure la conexión a internet.</li>
-        <li>El sistema mostrará una advertencia en la pantalla cuando no haya conexión.</li>
-        <li>Una vez restaurada la conexión, podrás cerrar la sesión normalmente.</li>
-      </ol>
-
-      <h3>Reintentos automáticos</h3>
-      <p>El sistema intenta cada solicitud hasta 3 veces automáticamente si hay problemas de red. Si después de los reintentos la solicitud falla, verás un mensaje de error con opciones para reintentar manualmente.</p>
-    </div>
-
-    <!-- ── 10. Roles ──────────────────────────────────────────── -->
-    <div class="manual-section" id="sec-roles">
-      <span class="section-anchor" id="s-roles"></span>
-      <h2>10. Roles y Permisos</h2>
-
-      <p>El sistema tiene tres roles con diferentes niveles de acceso:</p>
-
-      <table class="manual-table">
-        <tr>
-          <th>Rol</th>
-          <th>Módulos accesibles</th>
-          <th>Acciones disponibles</th>
-        </tr>
-        <tr>
-          <td><strong>Encuestador</strong></td>
-          <td>Inicio, Mapa, Aplicar Encuesta, Manual, Incidencias, Mi Jornada</td>
-          <td>Ver escuelas, iniciar/cerrar sesiones, registrar incidencias, ver su jornada.</td>
-        </tr>
-        <tr>
-          <td><strong>Supervisor</strong></td>
-          <td>Todo lo del Encuestador + Panel Estadístico</td>
-          <td>Todo lo anterior + ver estadísticas de todos los encuestadores, resolver incidencias.</td>
-        </tr>
-        <tr>
-          <td><strong>Administrador</strong></td>
-          <td>Acceso completo a todos los módulos</td>
-          <td>Todo lo anterior + Configuración del sistema, gestión de encuestadores, Auditoría.</td>
-        </tr>
-      </table>
-
-      <div class="callout callout--info">
-        <strong>Nota:</strong> Si intentás acceder a un módulo para el que no tenés permiso, el sistema mostrará un mensaje de acceso restringido.
-      </div>
-    </div>
-
-    <!-- ── 11. Estadísticas ───────────────────────────────────── -->
-    <div class="manual-section" id="sec-estadisticas">
-      <span class="section-anchor" id="s-estadisticas"></span>
-      <h2>11. Panel Estadístico</h2>
-
-      <p><em>Disponible para Supervisores y Administradores.</em></p>
-
-      <h3>Indicadores clave (KPIs)</h3>
-      <ul>
-        <li><strong>Total Escuelas:</strong> Número total de establecimientos en el relevamiento.</li>
-        <li><strong>Relevadas:</strong> Escuelas con estado "Finalizada".</li>
-        <li><strong>En Curso:</strong> Sesiones activas en este momento.</li>
-        <li><strong>Pendientes:</strong> Escuelas aún no visitadas.</li>
-        <li><strong>Con Incidencia:</strong> Escuelas con incidencias registradas.</li>
-        <li><strong>% Avance:</strong> Porcentaje de escuelas relevadas sobre el total.</li>
-      </ul>
-
-      <h3>Gráficos disponibles</h3>
-      <ul>
-        <li><strong>Barras apiladas por departamento:</strong> Muestra la distribución de estados para cada departamento.</li>
-        <li><strong>Donut general:</strong> Distribución porcentual de todos los estados.</li>
-        <li><strong>Línea de progreso diario:</strong> Encuestas completadas por día.</li>
-      </ul>
-
-      <h3>Ranking de Encuestadores</h3>
-      <p>Tabla con estadísticas de cada encuestador: escuelas asignadas, finalizadas, incidencias registradas y tiempo promedio por encuesta.</p>
-
-      <h3>Filtros</h3>
-      <p>Podés filtrar todos los datos por rango de fechas, departamento y encuestador.</p>
-
-      <h3>Exportación</h3>
-      <p>Usá el botón <em>Exportar CSV</em> para descargar los datos estadísticos por departamento en formato CSV (compatible con Excel).</p>
-    </div>
-
-    <!-- ── 12. Configuración ─────────────────────────────────── -->
-    <div class="manual-section" id="sec-configuracion">
-      <span class="section-anchor" id="s-configuracion"></span>
-      <h2>12. Configuración del Sistema</h2>
-
-      <p><em>Exclusivo para Administradores.</em></p>
-
-      <h3>Parámetros del sistema</h3>
-      <p>En la pestaña <em>Parámetros</em> podés modificar valores de configuración del sistema, como la URL del formulario MEC, mensajes del sistema, etc. Solo los parámetros marcados como "editables" son accesibles desde esta pantalla.</p>
-
-      <h3>Gestión de Encuestadores</h3>
-      <p>En la pestaña <em>Encuestadores</em> podés:</p>
-      <ul>
-        <li><strong>Crear</strong> nuevos usuarios encuestadores.</li>
-        <li><strong>Editar</strong> los datos de un encuestador existente (nombre, contacto, zona asignada).</li>
-        <li><strong>Desactivar</strong> cuentas (sin eliminar el historial).</li>
-        <li><strong>Cambiar contraseñas</strong> de encuestadores.</li>
-      </ul>
-
-      <div class="callout callout--warning">
-        <strong>Precaución:</strong> Al desactivar un encuestador, éste no podrá iniciar sesión. Las sesiones y datos históricos se conservan.
-      </div>
-    </div>
-
-    <!-- ── 13. Auditoría ─────────────────────────────────────── -->
-    <div class="manual-section" id="sec-auditoria">
-      <span class="section-anchor" id="s-auditoria"></span>
-      <h2>13. Auditoría del Sistema</h2>
-
-      <p><em>Exclusivo para Administradores.</em></p>
-
-      <p>El módulo de Auditoría registra un log completo de todas las acciones importantes realizadas en el sistema:</p>
-
-      <ul>
-        <li>Inicios y cierres de sesión de todos los usuarios.</li>
-        <li>Inicio y cierre de sesiones de relevamiento.</li>
-        <li>Registro de incidencias.</li>
-        <li>Cambios de configuración del sistema.</li>
-        <li>Creación, edición y desactivación de cuentas de encuestadores.</li>
-      </ul>
-
-      <h3>Filtros disponibles</h3>
-      <ul>
-        <li><strong>Usuario:</strong> Ver acciones de un usuario específico.</li>
-        <li><strong>Acción:</strong> Filtrar por tipo de acción (login, inicio_sesion, etc.).</li>
-        <li><strong>Rango de fechas:</strong> Filtrar por período.</li>
-      </ul>
-
-      <p>Los registros se muestran paginados. Usá los botones de navegación al final de la tabla para ver páginas anteriores.</p>
-    </div>
-
-    <!-- ── 14. Errores ────────────────────────────────────────── -->
-    <div class="manual-section" id="sec-errores">
-      <span class="section-anchor" id="s-errores"></span>
-      <h2>14. Solución de Errores Comunes</h2>
-
-      <h3>El botón "Iniciar Encuesta" no responde</h3>
-      <p><strong>Posibles causas y soluciones:</strong></p>
-      <ul>
-        <li>No hay conexión a internet → Verificá tu conexión y volvé a intentarlo.</li>
-        <li>No seleccionaste una escuela → Seleccioná una escuela desde el mapa primero.</li>
-        <li>Ya tenés una sesión activa → Cerrá la sesión anterior antes de iniciar una nueva.</li>
-        <li>Error del servidor → Esperá unos minutos y volvé a intentar.</li>
-      </ul>
-
-      <h3>"Credenciales inválidas" al login</h3>
-      <ul>
-        <li>Verificá que el usuario y contraseña estén escritos correctamente (distingue mayúsculas/minúsculas).</li>
-        <li>Asegurate de no tener activado el bloqueo de mayúsculas.</li>
-        <li>Si el problema persiste, contactá al administrador para resetear tu contraseña.</li>
-      </ul>
-
-      <h3>El formulario MEC no abre</h3>
-      <ul>
-        <li>El navegador puede estar bloqueando ventanas emergentes. Buscá el ícono de bloqueo en la barra de direcciones y permitilas para este sitio.</li>
-        <li>En el módulo de encuesta, buscá el botón <em>Abrir Formulario MEC</em> para intentarlo nuevamente.</li>
-      </ul>
-
-      <h3>"Tu sesión ha expirado"</h3>
-      <p>Las sesiones duran 8 horas por seguridad. Cerrá el diálogo y volvé a ingresar con tu usuario y contraseña. Tus datos de relevamiento no se pierden.</p>
-
-      <h3>El mapa no carga</h3>
-      <ul>
-        <li>Verificá tu conexión a internet.</li>
-        <li>Recargá la página (F5 o Ctrl+R).</li>
-        <li>Si el mapa no muestra escuelas, puede haber un problema con el servidor. Contactá al administrador.</li>
-      </ul>
-
-      <h3>Error general "Error de conexión con el servidor"</h3>
-      <p>Este mensaje aparece cuando no se puede comunicar con el backend. El sistema reintenta automáticamente 3 veces. Si el error persiste:</p>
-      <ol class="step-list">
-        <li>Verificá tu conexión a internet.</li>
-        <li>Esperá 2–3 minutos y volvé a intentar.</li>
-        <li>Si el error continúa, contactá al soporte técnico.</li>
-      </ol>
-
-      <div class="callout callout--info">
-        <strong>Consejo:</strong> Al reportar un error, anotá exactamente qué acción estabas realizando, el mensaje de error que apareció y la fecha/hora aproximada. Esto facilita enormemente la resolución.
-      </div>
-    </div>
-
-    <!-- ── 15. Contacto ──────────────────────────────────────── -->
-    <div class="manual-section" id="sec-contacto">
-      <span class="section-anchor" id="s-contacto"></span>
-      <h2>15. Soporte y Contacto</h2>
-
-      <p>Para soporte técnico o consultas relacionadas con el sistema CIALPA:</p>
-
-      <table class="manual-table">
-        <tr><th>Canal</th><th>Datos</th></tr>
-        <tr><td>Email</td><td>soporte@cialpa.gov.py</td></tr>
-        <tr><td>Teléfono</td><td>(021) 000-000</td></tr>
-        <tr><td>Horario de atención</td><td>Lunes a viernes, 8:00 – 17:00 hs (hora Paraguay)</td></tr>
-      </table>
-
-      <h3>Información a incluir en un reporte de error</h3>
-      <ol class="step-list">
-        <li>Tu nombre de usuario.</li>
-        <li>Descripción detallada del problema.</li>
-        <li>Pasos exactos para reproducir el error.</li>
-        <li>Captura de pantalla del error (si es posible).</li>
-        <li>Fecha y hora aproximada en que ocurrió.</li>
-        <li>Dispositivo y navegador que estás usando.</li>
-      </ol>
-
-      <div class="callout callout--tip">
-        <strong>Guía rápida:</strong> Si es la primera vez que usás el sistema, te recomendamos leer las secciones 2 (Login), 3 (Mapa) y 4 (Aplicar Encuesta) antes de salir a campo.
-      </div>
-    </div>
-
-    <!-- Footer -->
-    <div style="text-align:center;color:#6c757d;font-size:.8rem;margin-top:2rem;padding:1rem;">
-      CIALPA — Relevamiento Escolar &bull; Manual v2.0.0 &bull; Paraguay 2025
-    </div>
-
-  </div><!-- /content -->
-</div><!-- /layout -->
-
-<!-- Back to top -->
-<button id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Volver arriba">↑</button>
-
+</header>
+<div class="search-box">
+  <input id="manualSearch" type="search" placeholder="Buscar en el manual..." oninput="filterManual(this.value)" />
+</div>
+<div class="content" id="manualContent">
+
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#manual-del-encuestador"
+id="toc-manual-del-encuestador">Manual del Encuestador</a>
+<ul>
+<li><a href="#tabla-de-contenido-operativa"
+id="toc-tabla-de-contenido-operativa">Tabla de contenido
+operativa</a></li>
+<li><a href="#1-propósito-del-manual-y-alcance-de-la-app-web-cialpa"
+id="toc-1-propósito-del-manual-y-alcance-de-la-app-web-cialpa">1.
+Propósito del manual y alcance de la app web CIALPA</a></li>
+<li><a
+href="#2-diferencia-entre-app-web-cialpa-y-aplicativo-externo-de-encuesta"
+id="toc-2-diferencia-entre-app-web-cialpa-y-aplicativo-externo-de-encuesta">2.
+Diferencia entre app web CIALPA y aplicativo externo de
+encuesta</a></li>
+<li><a href="#3-roles-responsabilidades-y-flujo-general-de-trabajo"
+id="toc-3-roles-responsabilidades-y-flujo-general-de-trabajo">3. Roles,
+responsabilidades y flujo general de trabajo</a>
+<ul>
+<li><a href="#31-roles-principales" id="toc-31-roles-principales">3.1
+Roles principales</a></li>
+<li><a href="#32-flujo-estándar-de-una-visita"
+id="toc-32-flujo-estándar-de-una-visita">3.2 Flujo estándar de una
+visita</a></li>
+</ul></li>
+<li><a href="#4-preparación-antes-de-salir-a-campo"
+id="toc-4-preparación-antes-de-salir-a-campo">4. Preparación antes de
+salir a campo</a>
+<ul>
+<li><a href="#41-verificación-del-dispositivo"
+id="toc-41-verificación-del-dispositivo">4.1 Verificación del
+dispositivo</a></li>
+<li><a href="#42-materiales-mínimos" id="toc-42-materiales-mínimos">4.2
+Materiales mínimos</a></li>
+<li><a href="#43-validación-de-escuelas-asignadas"
+id="toc-43-validación-de-escuelas-asignadas">4.3 Validación de escuelas
+asignadas</a></li>
+</ul></li>
+<li><a href="#5-acceso-a-la-app-web-cialpa"
+id="toc-5-acceso-a-la-app-web-cialpa">5. Acceso a la app web CIALPA</a>
+<ul>
+<li><a href="#51-ingreso" id="toc-51-ingreso">5.1 Ingreso</a></li>
+<li><a href="#52-problemas-frecuentes-de-acceso"
+id="toc-52-problemas-frecuentes-de-acceso">5.2 Problemas frecuentes de
+acceso</a></li>
+<li><a href="#53-cierre-de-sesión" id="toc-53-cierre-de-sesión">5.3
+Cierre de sesión</a></li>
+</ul></li>
+<li><a href="#6-reconocimiento-de-escuelas-asignadas"
+id="toc-6-reconocimiento-de-escuelas-asignadas">6. Reconocimiento de
+escuelas asignadas</a>
+<ul>
+<li><a href="#61-revisión-de-datos-de-escuela"
+id="toc-61-revisión-de-datos-de-escuela">6.1 Revisión de datos de
+escuela</a></li>
+<li><a href="#62-estados-operativos" id="toc-62-estados-operativos">6.2
+Estados operativos</a></li>
+</ul></li>
+<li><a href="#7-inicio-de-jornada-y-llegada-al-local-escolar"
+id="toc-7-inicio-de-jornada-y-llegada-al-local-escolar">7. Inicio de
+jornada y llegada al local escolar</a>
+<ul>
+<li><a href="#71-inicio-de-jornada" id="toc-71-inicio-de-jornada">7.1
+Inicio de jornada</a></li>
+<li><a href="#72-llegada-al-local" id="toc-72-llegada-al-local">7.2
+Llegada al local</a></li>
+<li><a href="#73-casos-especiales-al-llegar"
+id="toc-73-casos-especiales-al-llegar">7.3 Casos especiales al
+llegar</a></li>
+</ul></li>
+<li><a
+href="#8-apertura-del-aplicativo-externo-con-el-botón-aplicar-encuesta"
+id="toc-8-apertura-del-aplicativo-externo-con-el-botón-aplicar-encuesta">8.
+Apertura del aplicativo externo con el botón Aplicar encuesta</a>
+<ul>
+<li><a href="#81-procedimiento-estándar"
+id="toc-81-procedimiento-estándar">8.1 Procedimiento estándar</a></li>
+<li><a href="#82-qué-hacer-si-la-app-externa-no-abre"
+id="toc-82-qué-hacer-si-la-app-externa-no-abre">8.2 Qué hacer si la app
+externa no abre</a></li>
+</ul></li>
+<li><a href="#9-medición-del-tiempo-total-y-del-tiempo-por-módulos"
+id="toc-9-medición-del-tiempo-total-y-del-tiempo-por-módulos">9.
+Medición del tiempo total y del tiempo por módulos</a>
+<ul>
+<li><a href="#91-tiempo-total" id="toc-91-tiempo-total">9.1 Tiempo
+total</a></li>
+<li><a href="#92-tiempo-por-módulos" id="toc-92-tiempo-por-módulos">9.2
+Tiempo por módulos</a></li>
+<li><a href="#93-reglas-para-registrar-módulos"
+id="toc-93-reglas-para-registrar-módulos">9.3 Reglas para registrar
+módulos</a></li>
+<li><a href="#94-interpretación-de-tiempos"
+id="toc-94-interpretación-de-tiempos">9.4 Interpretación de
+tiempos</a></li>
+</ul></li>
+<li><a href="#10-registro-de-incidencias-reprogramaciones-y-evidencias"
+id="toc-10-registro-de-incidencias-reprogramaciones-y-evidencias">10.
+Registro de incidencias, reprogramaciones y evidencias</a>
+<ul>
+<li><a href="#101-cuándo-registrar-una-incidencia"
+id="toc-101-cuándo-registrar-una-incidencia">10.1 Cuándo registrar una
+incidencia</a></li>
+<li><a href="#102-clasificación-sugerida"
+id="toc-102-clasificación-sugerida">10.2 Clasificación sugerida</a></li>
+<li><a href="#103-reprogramación" id="toc-103-reprogramación">10.3
+Reprogramación</a></li>
+<li><a href="#104-evidencias" id="toc-104-evidencias">10.4
+Evidencias</a></li>
+</ul></li>
+<li><a href="#11-cierre-del-relevamiento-y-control-de-consistencia"
+id="toc-11-cierre-del-relevamiento-y-control-de-consistencia">11. Cierre
+del relevamiento y control de consistencia</a>
+<ul>
+<li><a href="#111-cierre-normal" id="toc-111-cierre-normal">11.1 Cierre
+normal</a></li>
+<li><a href="#112-cierre-parcial" id="toc-112-cierre-parcial">11.2
+Cierre parcial</a></li>
+<li><a href="#113-control-mínimo-antes-de-finalizar"
+id="toc-113-control-mínimo-antes-de-finalizar">11.3 Control mínimo antes
+de finalizar</a></li>
+</ul></li>
+<li><a href="#12-supervisión-seguimiento-y-uso-de-los-datos-operativos"
+id="toc-12-supervisión-seguimiento-y-uso-de-los-datos-operativos">12.
+Supervisión, seguimiento y uso de los datos operativos</a></li>
+<li><a href="#13-guía-detallada-del-cuestionario-externo"
+id="toc-13-guía-detallada-del-cuestionario-externo">13. Guía detallada
+del cuestionario externo</a></li>
+</ul></li>
+<li><a href="#contenido"
+id="toc-contenido"><strong>CONTENIDO</strong></a></li>
+<li><a href="#1-introduccion-y-objetivo"
+id="toc-1-introduccion-y-objetivo"><strong>1. INTRODUCCION Y
+OBJETIVO</strong></a>
+<ul>
+<li><a href="#equipo-necesario-en-campo"
+id="toc-equipo-necesario-en-campo"><strong>Equipo necesario en
+campo</strong></a></li>
+</ul></li>
+<li><a href="#2-acceso-al-sistema--rue-registro-unico-del-estudíante"
+id="toc-2-acceso-al-sistema--rue-registro-unico-del-estudíante"><strong>2.
+ACCESO AL SISTEMA , RUE (Registro Unico del
+Estudíante)</strong></a></li>
+<li><a href="#3-pantalla-principal--estructura-de-módulos"
+id="toc-3-pantalla-principal--estructura-de-módulos"><strong>3. PANTALLA
+PRINCIPAL , ESTRUCTURA DE MÓDULOS</strong></a></li>
+<li><a href="#4-módulo-general" id="toc-4-módulo-general"><strong>4.
+MÓDULO GENERAL</strong></a>
+<ul>
+<li><a href="#41-coordenadas-geográficas-e-identificación-del-local"
+id="toc-41-coordenadas-geográficas-e-identificación-del-local"><strong>4.1
+Coordenadas geográficas e identificación del local</strong></a></li>
+<li><a href="#42-instituciones-asociadas"
+id="toc-42-instituciones-asociadas"><strong>4.2 Instituciones
+asociadas</strong></a></li>
+<li><a href="#43-vía-de-acceso-al-local-escolar"
+id="toc-43-vía-de-acceso-al-local-escolar"><strong>4.3 Vía de acceso al
+local escolar</strong></a></li>
+<li><a href="#44-cercado-perimetral"
+id="toc-44-cercado-perimetral"><strong>4.4 Cercado
+perimetral</strong></a></li>
+<li><a href="#45-áreas-exteriores-del-local-escolar"
+id="toc-45-áreas-exteriores-del-local-escolar"><strong>4.5 Áreas
+exteriores del local escolar</strong></a></li>
+<li><a href="#46-desagüe-pluvíal"
+id="toc-46-desagüe-pluvíal"><strong>4.6 Desagüe
+pluvíal</strong></a></li>
+<li><a href="#47-sistemas-de-seguridad-y-emergencia"
+id="toc-47-sistemas-de-seguridad-y-emergencia"><strong>4.7 Sistemas de
+seguridad y emergencia</strong></a></li>
+</ul></li>
+<li><a href="#5-módulo-servicios-básicos"
+id="toc-5-módulo-servicios-básicos"><strong>5. MÓDULO SERVICIOS
+BÁSICOS</strong></a>
+<ul>
+<li><a href="#51-abastecimiento-de-agua"
+id="toc-51-abastecimiento-de-agua"><strong>5.1 Abastecimiento de
+agua</strong></a></li>
+<li><a href="#52-servicio-sanitario--tipo-de-desagüe"
+id="toc-52-servicio-sanitario--tipo-de-desagüe"><strong>5.2 Servicio
+sanitario , tipo de desagüe</strong></a></li>
+<li><a href="#53-servicio-de-internet"
+id="toc-53-servicio-de-internet"><strong>5.3 Servicio de
+internet</strong></a></li>
+</ul></li>
+<li><a href="#6-módulo-electricidad"
+id="toc-6-módulo-electricidad"><strong>6. MÓDULO
+ELECTRICIDAD</strong></a></li>
+<li><a href="#7-módulo-bloques-y-plantas"
+id="toc-7-módulo-bloques-y-plantas"><strong>7. MÓDULO BLOQUES Y
+PLANTAS</strong></a></li>
+<li><a href="#8-módulo-areas-de-recreacion"
+id="toc-8-módulo-areas-de-recreacion"><strong>8. MÓDULO AREAS DE
+RECREACION</strong></a></li>
+<li><a href="#9-módulo-aulas" id="toc-9-módulo-aulas"><strong>9. MÓDULO
+AULAS</strong></a></li>
+<li><a href="#10-módulo-dependencias"
+id="toc-10-módulo-dependencias"><strong>10. MÓDULO
+DEPENDENCIAS</strong></a></li>
+<li><a href="#11-módulo-laboratorio"
+id="toc-11-módulo-laboratorio"><strong>11. MÓDULO
+LABORATORIO</strong></a></li>
+<li><a href="#12-módulo-taller" id="toc-12-módulo-taller"><strong>12.
+MÓDULO TALLER</strong></a></li>
+<li><a href="#13-módulo-sanitarios"
+id="toc-13-módulo-sanitarios"><strong>13. MÓDULO
+SANITARIOS</strong></a></li>
+<li><a href="#14-control-de-calidad-y-cierre"
+id="toc-14-control-de-calidad-y-cierre"><strong>14. CONTROL DE CALIDAD Y
+CIERRE</strong></a></li>
+<li><a href="#15-preguntas-frecuentes-y-glosario"
+id="toc-15-preguntas-frecuentes-y-glosario"><strong>15. PREGUNTAS
+FRECUENTES Y GLOSARIO</strong></a>
+<ul>
+<li><a href="#glosario-de-términos-técnicos"
+id="toc-glosario-de-términos-técnicos"><strong>Glosario de términos
+técnicos</strong></a></li>
+<li><a href="#16-checklist-rápido-para-el-encuestador"
+id="toc-16-checklist-rápido-para-el-encuestador">16. Checklist rápido
+para el encuestador</a></li>
+<li><a href="#17-reglas-de-calidad-para-la-encuesta-grande"
+id="toc-17-reglas-de-calidad-para-la-encuesta-grande">17. Reglas de
+calidad para la encuesta grande</a></li>
+<li><a href="#18-mensajes-modelo-para-observaciones-de-campo"
+id="toc-18-mensajes-modelo-para-observaciones-de-campo">18. Mensajes
+modelo para observaciones de campo</a>
+<ul>
+<li><a href="#escuela-cerrada" id="toc-escuela-cerrada">Escuela
+cerrada</a></li>
+<li><a href="#responsable-ausente"
+id="toc-responsable-ausente">Responsable ausente</a></li>
+<li><a href="#apertura-manual-del-aplicativo-externo"
+id="toc-apertura-manual-del-aplicativo-externo">Apertura manual del
+aplicativo externo</a></li>
+<li><a href="#cierre-parcial" id="toc-cierre-parcial">Cierre
+parcial</a></li>
+<li><a href="#datos-de-escuela-inconsistentes"
+id="toc-datos-de-escuela-inconsistentes">Datos de escuela
+inconsistentes</a></li>
+</ul></li>
+<li><a href="#19-cierre-documental" id="toc-19-cierre-documental">19.
+Cierre documental</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="manual-del-encuestador">Manual del Encuestador</h1>
+<p><strong>Relevamiento de Infraestructura Educativa,
+CIALPA</strong><br />
+<strong>Versión 4.0 operativa, 2026</strong><br />
+<strong>Uso previsto:</strong> prepiloto, piloto y encuesta
+grande.<br />
+<strong>Formato:</strong> Markdown para visualización dentro de la app
+web y para control de versiones en repositorio.</p>
+<blockquote>
+<p><strong>Idea central del manual:</strong> la app web CIALPA no
+sustituye el cuestionario técnico externo del MEC/RUE/Apps. La app web
+funciona como consola operativa de campo, permite seleccionar la
+escuela, abrir el aplicativo externo cuando está instalado en el
+dispositivo, registrar el inicio y cierre del relevamiento, medir
+tiempos totales y por módulo, documentar incidencias, ordenar la jornada
+y entregar información útil para supervisión, cronogramas y control de
+calidad.</p>
+</blockquote>
+<h2 id="tabla-de-contenido-operativa">Tabla de contenido operativa</h2>
+<ol type="1">
+<li>Propósito del manual y alcance de la app web CIALPA.</li>
+<li>Diferencia entre app web CIALPA y aplicativo externo de
+encuesta.</li>
+<li>Roles, responsabilidades y flujo general de trabajo.</li>
+<li>Preparación antes de salir a campo.</li>
+<li>Acceso a la app web CIALPA.</li>
+<li>Reconocimiento de escuelas asignadas.</li>
+<li>Inicio de jornada y llegada al local escolar.</li>
+<li>Apertura del aplicativo externo con el botón <strong>Aplicar
+encuesta</strong>.</li>
+<li>Medición del tiempo total y del tiempo por módulos.</li>
+<li>Registro de incidencias, reprogramaciones y evidencias.</li>
+<li>Cierre del relevamiento y control de consistencia.</li>
+<li>Supervisión, seguimiento y uso de los datos operativos.</li>
+<li>Guía detallada del cuestionario externo, según el documento técnico
+del instrumento.</li>
+<li>Preguntas frecuentes y glosario.</li>
+</ol>
+<hr />
+<h2 id="1-propósito-del-manual-y-alcance-de-la-app-web-cialpa">1.
+Propósito del manual y alcance de la app web CIALPA</h2>
+<p>Este manual establece el procedimiento operativo que debe seguir el
+encuestador para usar la app web CIALPA durante el relevamiento de
+infraestructura educativa. La finalidad es asegurar que cada visita a
+una escuela quede registrada con trazabilidad mínima, tiempos
+confiables, estado de avance, incidencias documentadas y cierre
+verificable.</p>
+<p>La app web CIALPA debe usarse en tres momentos:</p>
+<ol type="1">
+<li><strong>Antes de iniciar el cuestionario externo</strong>, para
+seleccionar la escuela correcta, verificar los datos de identificación,
+iniciar la sesión de relevamiento y registrar la llegada.</li>
+<li><strong>Durante el relevamiento</strong>, para medir el tiempo por
+módulo, registrar eventos relevantes, documentar incidencias, anotar
+interrupciones y dejar evidencia operativa de lo realizado.</li>
+<li><strong>Al finalizar</strong>, para cerrar la sesión, consignar el
+folio o identificador del último registro del aplicativo externo,
+registrar observaciones finales y dejar constancia del estado del
+relevamiento.</li>
+</ol>
+<p>El objetivo operativo no es solo completar el cuestionario. También
+se busca producir información para:</p>
+<ul>
+<li>planificar rutas y cronogramas;</li>
+<li>estimar duración real de levantamiento por tipo de escuela;</li>
+<li>detectar módulos complejos o de mayor tiempo;</li>
+<li>identificar problemas de acceso, conectividad, permisos o
+coordinación;</li>
+<li>comparar desempeño entre equipos, zonas y jornadas;</li>
+<li>estimar cargas de trabajo para la encuesta grande;</li>
+<li>apoyar decisiones de supervisión y reasignación de visitas.</li>
+</ul>
+<hr />
+<h2
+id="2-diferencia-entre-app-web-cialpa-y-aplicativo-externo-de-encuesta">2.
+Diferencia entre app web CIALPA y aplicativo externo de encuesta</h2>
+<p>La operación utiliza dos herramientas complementarias:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Herramienta</th>
+<th>Función principal</th>
+<th>Quién controla la herramienta</th>
+<th>Qué datos registra</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>App web CIALPA</strong></td>
+<td>Gestión operativa del trabajo de campo</td>
+<td>Equipo CIALPA</td>
+<td>Escuela asignada, usuario, estado, inicio, cierre, tiempos, módulos,
+GPS, incidencias, observaciones, folio externo</td>
+</tr>
+<tr class="even">
+<td><strong>Aplicativo externo de encuesta</strong></td>
+<td>Captura técnica del cuestionario de infraestructura</td>
+<td>MEC/RUE/Apps u otro proveedor externo</td>
+<td>Respuestas del instrumento técnico sobre infraestructura, servicios,
+aulas, sanitarios, dependencias y demás módulos</td>
+</tr>
+</tbody>
+</table>
+<p>La app web CIALPA puede abrir o intentar abrir el aplicativo externo
+mediante el botón <strong>Aplicar encuesta</strong>, siempre que el
+dispositivo y la configuración lo permitan. Sin embargo, la app web no
+controla internamente ese aplicativo externo. Por ese motivo, el
+encuestador debe volver a la app web CIALPA al terminar cada módulo o al
+cerrar el cuestionario, para registrar el avance y dejar evidencia de
+finalización.</p>
+<blockquote>
+<p><strong>Regla operativa:</strong> ningún relevamiento debe cerrarse
+en CIALPA si no se completó el cierre en el aplicativo externo o, en su
+defecto, si no se registró claramente el motivo de cierre parcial,
+interrupción o reprogramación.</p>
+</blockquote>
+<hr />
+<h2 id="3-roles-responsabilidades-y-flujo-general-de-trabajo">3. Roles,
+responsabilidades y flujo general de trabajo</h2>
+<h3 id="31-roles-principales">3.1 Roles principales</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Rol</th>
+<th>Responsabilidad operativa</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Encuestador</strong></td>
+<td>Ejecuta la visita, abre la encuesta externa, registra tiempos,
+módulos, incidencias, cierre y observaciones.</td>
+</tr>
+<tr class="even">
+<td><strong>Supervisor</strong></td>
+<td>Monitorea avance, valida cierres, revisa incidencias, autoriza
+revisitas y verifica consistencia operativa.</td>
+</tr>
+<tr class="odd">
+<td><strong>Coordinador de campo</strong></td>
+<td>Organiza equipos, cronogramas, asignaciones, rutas, prioridades y
+comunicación institucional.</td>
+</tr>
+<tr class="even">
+<td><strong>Soporte técnico</strong></td>
+<td>Atiende problemas de acceso, carga de escuelas, apertura del
+aplicativo externo, conectividad y sincronización.</td>
+</tr>
+<tr class="odd">
+<td><strong>Administrador</strong></td>
+<td>Configura usuarios, parámetros del sistema, URL o esquema de
+apertura externa, hojas de datos y catálogos.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-flujo-estándar-de-una-visita">3.2 Flujo estándar de una
+visita</h3>
+<ol type="1">
+<li>Ingresar a la app web CIALPA.</li>
+<li>Verificar usuario, rol y escuela asignada.</li>
+<li>Confirmar que la escuela figura en la lista y en el mapa.</li>
+<li>Iniciar la jornada si corresponde.</li>
+<li>Seleccionar la escuela.</li>
+<li>Registrar llegada al local escolar.</li>
+<li>Presionar <strong>Aplicar encuesta</strong>.</li>
+<li>Confirmar el inicio de la sesión de relevamiento.</li>
+<li>Abrir el aplicativo externo.</li>
+<li>Completar el cuestionario técnico externo.</li>
+<li>Registrar tiempos por módulo en CIALPA, cuando sea posible.</li>
+<li>Registrar incidencias, interrupciones o eventos relevantes.</li>
+<li>Cerrar la encuesta externa.</li>
+<li>Volver a CIALPA.</li>
+<li>Registrar folio externo, último registro o identificador
+disponible.</li>
+<li>Cerrar el relevamiento en CIALPA.</li>
+<li>Verificar que el estado de la escuela cambie a
+<strong>Finalizada</strong>, <strong>Parcial</strong> o <strong>Con
+incidencia</strong>, según corresponda.</li>
+</ol>
+<hr />
+<h2 id="4-preparación-antes-de-salir-a-campo">4. Preparación antes de
+salir a campo</h2>
+<h3 id="41-verificación-del-dispositivo">4.1 Verificación del
+dispositivo</h3>
+<p>Antes de la salida, el encuestador debe confirmar:</p>
+<ul>
+<li>batería cargada;</li>
+<li>cargador y batería externa disponibles;</li>
+<li>navegador actualizado;</li>
+<li>permisos de ubicación activados;</li>
+<li>acceso a internet probado;</li>
+<li>aplicativo externo instalado;</li>
+<li>credenciales del aplicativo externo disponibles;</li>
+<li>credenciales de la app web CIALPA disponibles;</li>
+<li>cámara funcional;</li>
+<li>espacio libre suficiente para fotos o evidencias;</li>
+<li>fecha y hora del dispositivo correctamente configuradas.</li>
+</ul>
+<h3 id="42-materiales-mínimos">4.2 Materiales mínimos</h3>
+<ul>
+<li>dispositivo móvil, tableta o notebook;</li>
+<li>cinta métrica;</li>
+<li>bolígrafo y libreta de respaldo;</li>
+<li>credencial o nota institucional;</li>
+<li>lista de escuelas asignadas;</li>
+<li>contacto del supervisor;</li>
+<li>contacto del responsable de la institución educativa;</li>
+<li>elementos de seguridad personal, si el operativo lo requiere.</li>
+</ul>
+<h3 id="43-validación-de-escuelas-asignadas">4.3 Validación de escuelas
+asignadas</h3>
+<p>El encuestador debe revisar en la app web que cada escuela asignada
+tenga, como mínimo:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Dato</th>
+<th>Uso operativo</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Código de local</td>
+<td>Identificador único para evitar duplicaciones.</td>
+</tr>
+<tr class="even">
+<td>Nombre del local escolar</td>
+<td>Verificación con responsable institucional.</td>
+</tr>
+<tr class="odd">
+<td>Departamento y distrito</td>
+<td>Control de ruta y agregación estadística.</td>
+</tr>
+<tr class="even">
+<td>Coordenadas</td>
+<td>Navegación, mapa y control de llegada.</td>
+</tr>
+<tr class="odd">
+<td>Estado</td>
+<td>Priorización de visitas pendientes, parciales o con incidencia.</td>
+</tr>
+<tr class="even">
+<td>Encuestador o equipo asignado</td>
+<td>Responsabilidad operativa.</td>
+</tr>
+</tbody>
+</table>
+<p>Si una escuela no aparece en la lista, aparece duplicada o tiene
+datos incompatibles, no debe corregirse informalmente en campo. Debe
+reportarse al supervisor o al administrador de datos para su corrección
+en la hoja maestra.</p>
+<hr />
+<h2 id="5-acceso-a-la-app-web-cialpa">5. Acceso a la app web CIALPA</h2>
+<h3 id="51-ingreso">5.1 Ingreso</h3>
+<ol type="1">
+<li>Abrir el enlace oficial de la app web CIALPA.</li>
+<li>Ingresar usuario y contraseña.</li>
+<li>Presionar <strong>Ingresar</strong>.</li>
+<li>Verificar que aparezcan las pestañas correspondientes al rol
+asignado.</li>
+<li>Confirmar que el nombre de usuario visible sea correcto.</li>
+</ol>
+<h3 id="52-problemas-frecuentes-de-acceso">5.2 Problemas frecuentes de
+acceso</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Situación</th>
+<th>Acción recomendada</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Credenciales inválidas</td>
+<td>Verificar mayúsculas, minúsculas y usuario. Si persiste, contactar
+soporte.</td>
+</tr>
+<tr class="even">
+<td>La app no carga</td>
+<td>Verificar conexión, recargar la página, probar otro navegador.</td>
+</tr>
+<tr class="odd">
+<td>No aparecen escuelas</td>
+<td>Actualizar datos, revisar filtros, cerrar sesión y volver a
+ingresar. Si persiste, reportar.</td>
+</tr>
+<tr class="even">
+<td>Usuario sin permisos</td>
+<td>Contactar al administrador para revisar rol y asignación.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-cierre-de-sesión">5.3 Cierre de sesión</h3>
+<p>Al terminar la jornada o cuando el dispositivo quede sin supervisión,
+debe cerrarse sesión. Esto reduce el riesgo de registros asignados a un
+usuario incorrecto.</p>
+<hr />
+<h2 id="6-reconocimiento-de-escuelas-asignadas">6. Reconocimiento de
+escuelas asignadas</h2>
+<p>La app web debe mostrar las escuelas por lista y, cuando existan
+coordenadas válidas, también por mapa. El encuestador debe usar ambos
+recursos:</p>
+<ul>
+<li><strong>lista</strong>, para buscar por código, nombre,
+departamento, distrito o estado;</li>
+<li><strong>mapa</strong>, para validar ubicación, cercanía, ruta y
+agrupación territorial;</li>
+<li><strong>panel de detalle</strong>, para confirmar datos operativos
+antes de iniciar.</li>
+</ul>
+<h3 id="61-revisión-de-datos-de-escuela">6.1 Revisión de datos de
+escuela</h3>
+<p>Antes de iniciar la encuesta, validar:</p>
+<ol type="1">
+<li>código de local;</li>
+<li>nombre del local escolar;</li>
+<li>departamento;</li>
+<li>distrito;</li>
+<li>localidad o dirección de referencia;</li>
+<li>coordenadas;</li>
+<li>equipo o encuestador asignado;</li>
+<li>estado actual del relevamiento.</li>
+</ol>
+<h3 id="62-estados-operativos">6.2 Estados operativos</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Estado</th>
+<th>Significado</th>
+<th>Acción del encuestador</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Pendiente</strong></td>
+<td>Aún no se inició el relevamiento.</td>
+<td>Puede iniciar visita y encuesta.</td>
+</tr>
+<tr class="even">
+<td><strong>En curso</strong></td>
+<td>Existe una sesión activa.</td>
+<td>Revisar si corresponde al mismo encuestador o a otra persona.</td>
+</tr>
+<tr class="odd">
+<td><strong>Parcial</strong></td>
+<td>Se inició pero no se completó todo.</td>
+<td>Continuar solo con autorización o instrucción del supervisor.</td>
+</tr>
+<tr class="even">
+<td><strong>Finalizada</strong></td>
+<td>Relevamiento cerrado.</td>
+<td>No reabrir salvo instrucción expresa.</td>
+</tr>
+<tr class="odd">
+<td><strong>Con incidencia</strong></td>
+<td>Hubo problema operativo o técnico.</td>
+<td>Revisar observación y coordinar solución.</td>
+</tr>
+<tr class="even">
+<td><strong>Reprogramada</strong></td>
+<td>Requiere nueva visita.</td>
+<td>Cumplir fecha y motivo indicado.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="7-inicio-de-jornada-y-llegada-al-local-escolar">7. Inicio de
+jornada y llegada al local escolar</h2>
+<h3 id="71-inicio-de-jornada">7.1 Inicio de jornada</h3>
+<p>La jornada permite medir la carga diaria real de trabajo. Debe
+iniciarse cuando el equipo comienza sus actividades de campo, no cuando
+ya terminó la primera encuesta.</p>
+<p>Registrar, cuando la app lo solicite:</p>
+<ul>
+<li>fecha;</li>
+<li>hora de inicio;</li>
+<li>encuestador;</li>
+<li>zona o ruta;</li>
+<li>vehículo o medio de traslado, si aplica;</li>
+<li>observaciones de salida;</li>
+<li>supervisor responsable.</li>
+</ul>
+<h3 id="72-llegada-al-local">7.2 Llegada al local</h3>
+<p>Al llegar a la escuela:</p>
+<ol type="1">
+<li>seleccionar la escuela correcta;</li>
+<li>confirmar ubicación;</li>
+<li>registrar llegada;</li>
+<li>permitir captura de GPS, si el navegador lo solicita;</li>
+<li>registrar observación si la ubicación difiere del punto del
+mapa;</li>
+<li>confirmar contacto con director, encargado o responsable
+institucional.</li>
+</ol>
+<h3 id="73-casos-especiales-al-llegar">7.3 Casos especiales al
+llegar</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Caso</th>
+<th>Registro esperado</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Escuela cerrada</td>
+<td>Registrar incidencia, foto externa si corresponde, hora de llegada y
+propuesta de revisita.</td>
+</tr>
+<tr class="even">
+<td>No está el responsable</td>
+<td>Registrar incidencia y coordinar nuevo horario.</td>
+</tr>
+<tr class="odd">
+<td>Escuela no coincide con el punto del mapa</td>
+<td>Registrar coordenadas observadas y observación.</td>
+</tr>
+<tr class="even">
+<td>Rechazo a la encuesta</td>
+<td>Registrar incidencia crítica y avisar al supervisor.</td>
+</tr>
+<tr class="odd">
+<td>Riesgo de seguridad</td>
+<td>Suspender la visita y comunicar al supervisor.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2
+id="8-apertura-del-aplicativo-externo-con-el-botón-aplicar-encuesta">8.
+Apertura del aplicativo externo con el botón Aplicar encuesta</h2>
+<p>El botón <strong>Aplicar encuesta</strong> debe usarse para iniciar
+el flujo del cuestionario técnico externo. Según la configuración del
+sistema y del dispositivo, el botón puede:</p>
+<ul>
+<li>abrir una URL del formulario;</li>
+<li>abrir una app instalada mediante esquema personalizado;</li>
+<li>abrir una intención de Android;</li>
+<li>mostrar instrucciones si la apertura automática no es posible.</li>
+</ul>
+<h3 id="81-procedimiento-estándar">8.1 Procedimiento estándar</h3>
+<ol type="1">
+<li>Seleccionar escuela en CIALPA.</li>
+<li>Presionar <strong>Aplicar encuesta</strong>.</li>
+<li>Revisar el mensaje de confirmación.</li>
+<li>Presionar <strong>Iniciar relevamiento</strong>.</li>
+<li>Esperar que CIALPA registre la hora de inicio.</li>
+<li>Abrir el aplicativo externo cuando el dispositivo lo solicite.</li>
+<li>Completar el cuestionario técnico.</li>
+<li>Volver a CIALPA para registrar pausas, módulos o cierre.</li>
+</ol>
+<h3 id="82-qué-hacer-si-la-app-externa-no-abre">8.2 Qué hacer si la app
+externa no abre</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Problema</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>El dispositivo no reconoce el enlace</td>
+<td>Abrir manualmente la app externa instalada. Registrar
+observación.</td>
+</tr>
+<tr class="even">
+<td>Se abre el navegador, pero no la app</td>
+<td>Verificar configuración del dispositivo y reportar a soporte.</td>
+</tr>
+<tr class="odd">
+<td>La app externa pide credenciales</td>
+<td>Ingresarlas según instrucción recibida. Si falla, registrar
+incidencia técnica.</td>
+</tr>
+<tr class="even">
+<td>El formulario no muestra la escuela</td>
+<td>No continuar con otra escuela. Reportar al supervisor.</td>
+</tr>
+<tr class="odd">
+<td>La app externa se cierra</td>
+<td>Volver a abrir, registrar incidencia si hay pérdida de datos.</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>Importante:</strong> si el cuestionario se completa
+manualmente en la app externa, igual debe registrarse el inicio y cierre
+en CIALPA. CIALPA mide el tiempo operativo y documenta la trazabilidad
+de la visita.</p>
+</blockquote>
+<hr />
+<h2 id="9-medición-del-tiempo-total-y-del-tiempo-por-módulos">9.
+Medición del tiempo total y del tiempo por módulos</h2>
+<p>La medición de tiempo es una función crítica de la app web CIALPA.
+Permite estimar duración real del relevamiento y planificar la encuesta
+grande.</p>
+<h3 id="91-tiempo-total">9.1 Tiempo total</h3>
+<p>El tiempo total se mide entre:</p>
+<ul>
+<li><strong>inicio de relevamiento en CIALPA</strong>, antes o al
+momento de abrir el aplicativo externo;</li>
+<li><strong>cierre de relevamiento en CIALPA</strong>, después de
+completar el último registro del cuestionario externo o al declarar
+cierre parcial.</li>
+</ul>
+<p>La duración registrada no debe ser editada manualmente por el
+encuestador. Si hubo pausas largas, interrupciones o problemas, deben
+documentarse en observaciones.</p>
+<h3 id="92-tiempo-por-módulos">9.2 Tiempo por módulos</h3>
+<p>Cuando el relevamiento sea complejo, el encuestador debe registrar el
+inicio y cierre de módulos. Esta medición permite identificar módulos
+críticos.</p>
+<p>Módulos sugeridos para control de tiempo:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Módulo operativo CIALPA</th>
+<th>Correspondencia con el cuestionario</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Identificación y coordenadas</td>
+<td>Módulo General, datos de local</td>
+</tr>
+<tr class="even">
+<td>Exteriores y cercado</td>
+<td>General, cercado, áreas exteriores, seguridad</td>
+</tr>
+<tr class="odd">
+<td>Servicios básicos</td>
+<td>Agua, saneamiento, internet</td>
+</tr>
+<tr class="even">
+<td>Electricidad</td>
+<td>Energía, acometida, tableros, potencias</td>
+</tr>
+<tr class="odd">
+<td>Bloques y plantas</td>
+<td>Registro de bloques, niveles y dependencias</td>
+</tr>
+<tr class="even">
+<td>Áreas de recreación</td>
+<td>Patios, canchas, galerías y espacios abiertos</td>
+</tr>
+<tr class="odd">
+<td>Aulas</td>
+<td>Relevamiento individual de aulas</td>
+</tr>
+<tr class="even">
+<td>Dependencias</td>
+<td>Dirección, secretaría, biblioteca, cocina, sala de profesores y
+otros</td>
+</tr>
+<tr class="odd">
+<td>Laboratorios y talleres</td>
+<td>Laboratorio, taller o espacios técnicos</td>
+</tr>
+<tr class="even">
+<td>Sanitarios</td>
+<td>Baños, boxes, artefactos, accesibilidad y estado</td>
+</tr>
+<tr class="odd">
+<td>Evidencias y revisión final</td>
+<td>Fotos, observaciones, consistencia y cierre</td>
+</tr>
+</tbody>
+</table>
+<h3 id="93-reglas-para-registrar-módulos">9.3 Reglas para registrar
+módulos</h3>
+<ul>
+<li>Iniciar un módulo cuando se comienza efectivamente su
+relevamiento.</li>
+<li>Cerrar el módulo al terminar la captura o revisión de ese bloque de
+preguntas.</li>
+<li>No dejar módulos abiertos al cerrar el relevamiento.</li>
+<li>Registrar observación si el módulo se interrumpió.</li>
+<li>Si se trabaja en paralelo con otro miembro del equipo, aclarar en
+observaciones qué parte fue realizada por cada persona.</li>
+</ul>
+<h3 id="94-interpretación-de-tiempos">9.4 Interpretación de tiempos</h3>
+<p>Los tiempos obtenidos se usarán para estimar:</p>
+<ul>
+<li>duración promedio por escuela;</li>
+<li>duración por tamaño o complejidad del local;</li>
+<li>duración por departamento o distrito;</li>
+<li>módulos de mayor carga;</li>
+<li>necesidades de personal;</li>
+<li>número de visitas por jornada;</li>
+<li>planificación del cronograma de la encuesta grande.</li>
+</ul>
+<hr />
+<h2 id="10-registro-de-incidencias-reprogramaciones-y-evidencias">10.
+Registro de incidencias, reprogramaciones y evidencias</h2>
+<h3 id="101-cuándo-registrar-una-incidencia">10.1 Cuándo registrar una
+incidencia</h3>
+<p>Debe registrarse incidencia cuando ocurra cualquier situación que
+afecte el relevamiento, por ejemplo:</p>
+<ul>
+<li>escuela cerrada;</li>
+<li>responsable ausente;</li>
+<li>negativa o postergación;</li>
+<li>falta de conectividad;</li>
+<li>error del aplicativo externo;</li>
+<li>imposibilidad de abrir la app externa;</li>
+<li>GPS no disponible;</li>
+<li>ubicación incorrecta;</li>
+<li>datos de escuela no reconocidos;</li>
+<li>problemas de seguridad;</li>
+<li>daños estructurales graves que requieren aviso inmediato;</li>
+<li>interrupción por lluvia, corte de energía u otro evento.</li>
+</ul>
+<h3 id="102-clasificación-sugerida">10.2 Clasificación sugerida</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Tipo</th>
+<th>Ejemplos</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Operativa</td>
+<td>Responsable ausente, escuela cerrada, horario incompatible.</td>
+</tr>
+<tr class="even">
+<td>Técnica</td>
+<td>Error de app, problemas de login, sincronización fallida.</td>
+</tr>
+<tr class="odd">
+<td>Geográfica</td>
+<td>Coordenadas incorrectas, ruta inaccesible, ubicación dudosa.</td>
+</tr>
+<tr class="even">
+<td>Institucional</td>
+<td>Negativa, falta de autorización, solicitud de nota oficial.</td>
+</tr>
+<tr class="odd">
+<td>Seguridad</td>
+<td>Riesgo físico, conflicto, condiciones climáticas extremas.</td>
+</tr>
+<tr class="even">
+<td>Calidad de datos</td>
+<td>Duplicidad, código incorrecto, escuela no encontrada.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="103-reprogramación">10.3 Reprogramación</h3>
+<p>Toda reprogramación debe indicar:</p>
+<ul>
+<li>motivo;</li>
+<li>fecha tentativa;</li>
+<li>responsable contactado;</li>
+<li>medio de contacto;</li>
+<li>autorización del supervisor, si corresponde;</li>
+<li>observación breve y objetiva.</li>
+</ul>
+<h3 id="104-evidencias">10.4 Evidencias</h3>
+<p>Las evidencias pueden ser fotografías, capturas de pantalla,
+observaciones, registros de GPS o folios externos. Deben ser pertinentes
+y respetar las reglas institucionales de privacidad.</p>
+<hr />
+<h2 id="11-cierre-del-relevamiento-y-control-de-consistencia">11. Cierre
+del relevamiento y control de consistencia</h2>
+<h3 id="111-cierre-normal">11.1 Cierre normal</h3>
+<p>Al terminar el cuestionario externo:</p>
+<ol type="1">
+<li>volver a CIALPA;</li>
+<li>revisar módulos abiertos;</li>
+<li>cerrar módulos pendientes;</li>
+<li>registrar folio externo o identificador disponible;</li>
+<li>registrar último registro externo, si el aplicativo lo muestra;</li>
+<li>confirmar si el relevamiento fue completo;</li>
+<li>registrar observaciones finales;</li>
+<li>presionar <strong>Finalizar relevamiento</strong>;</li>
+<li>verificar que la escuela cambie de estado.</li>
+</ol>
+<h3 id="112-cierre-parcial">11.2 Cierre parcial</h3>
+<p>Debe usarse cierre parcial si:</p>
+<ul>
+<li>no se pudo completar todo el cuestionario;</li>
+<li>faltaron dependencias, aulas o sanitarios;</li>
+<li>se perdió conectividad o acceso;</li>
+<li>el responsable solicitó continuar otro día;</li>
+<li>hubo interrupción justificada.</li>
+</ul>
+<p>El cierre parcial debe incluir módulo pendiente, motivo, tiempo
+acumulado y propuesta de continuidad.</p>
+<h3 id="113-control-mínimo-antes-de-finalizar">11.3 Control mínimo antes
+de finalizar</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Verificación</th>
+<th>Criterio</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Escuela correcta</td>
+<td>Código y nombre coinciden con la asignación.</td>
+</tr>
+<tr class="even">
+<td>Inicio registrado</td>
+<td>Existe hora de inicio en CIALPA.</td>
+</tr>
+<tr class="odd">
+<td>Aplicativo externo usado</td>
+<td>Se abrió o se registró motivo de apertura manual.</td>
+</tr>
+<tr class="even">
+<td>Módulos cerrados</td>
+<td>No quedan módulos abiertos sin explicación.</td>
+</tr>
+<tr class="odd">
+<td>Folio externo</td>
+<td>Se registra si el aplicativo lo genera.</td>
+</tr>
+<tr class="even">
+<td>Último registro externo</td>
+<td>Se registra si está disponible.</td>
+</tr>
+<tr class="odd">
+<td>Incidencias</td>
+<td>Se cargaron las incidencias ocurridas.</td>
+</tr>
+<tr class="even">
+<td>Observación final</td>
+<td>Describe cierre completo, parcial o reprogramado.</td>
+</tr>
+<tr class="odd">
+<td>Estado actualizado</td>
+<td>La escuela cambia a estado final coherente.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="12-supervisión-seguimiento-y-uso-de-los-datos-operativos">12.
+Supervisión, seguimiento y uso de los datos operativos</h2>
+<p>Los datos registrados en CIALPA permiten construir indicadores de
+gestión de campo:</p>
+<table>
+<thead>
+<tr class="header">
+<th>Indicador</th>
+<th>Uso</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Escuelas pendientes, en curso, finalizadas y con incidencia</td>
+<td>Seguimiento general del operativo.</td>
+</tr>
+<tr class="even">
+<td>Tiempo promedio por escuela</td>
+<td>Planificación de cargas de trabajo.</td>
+</tr>
+<tr class="odd">
+<td>Tiempo promedio por módulo</td>
+<td>Identificación de secciones complejas.</td>
+</tr>
+<tr class="even">
+<td>Incidencias por tipo</td>
+<td>Mejora logística y técnica.</td>
+</tr>
+<tr class="odd">
+<td>Relevamientos por encuestador</td>
+<td>Seguimiento de productividad.</td>
+</tr>
+<tr class="even">
+<td>Duración por departamento o distrito</td>
+<td>Ajuste de cronogramas territoriales.</td>
+</tr>
+<tr class="odd">
+<td>Escuelas reprogramadas</td>
+<td>Gestión de revisitas.</td>
+</tr>
+<tr class="even">
+<td>Cierres parciales</td>
+<td>Control de riesgo de datos incompletos.</td>
+</tr>
+</tbody>
+</table>
+<p>El supervisor debe revisar diariamente:</p>
+<ul>
+<li>sesiones abiertas sin cierre;</li>
+<li>escuelas marcadas como finalizadas sin folio externo;</li>
+<li>cierres parciales sin explicación;</li>
+<li>tiempos extremadamente bajos o altos;</li>
+<li>incidencias críticas;</li>
+<li>duplicaciones o cambios inesperados de estado;</li>
+<li>escuelas sin coordenadas o con coordenadas fuera de rango.</li>
+</ul>
+<hr />
+<h2 id="13-guía-detallada-del-cuestionario-externo">13. Guía detallada
+del cuestionario externo</h2>
+<p>La siguiente sección incorpora y adapta el contenido técnico del
+manual del instrumento externo. Se conserva la lógica de módulos,
+campos, reglas de salto, criterios de medición y control de calidad.
+Esta parte debe ser usada cuando el encuestador ya está dentro del
+aplicativo externo de encuesta.</p>
+<p><em>Pantalla principal del sistema , módulos del cuestionario en
+línea</em></p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Este manual explica, pantalla por pantalla,
+cómo completar el cuestionario en línea para el Relevamiento de
+Infraestructura Educativa. Cada sección incluye capturas del sistema,
+descripción de los campos y reglas de salto.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="contenido"><strong>CONTENIDO</strong></h1>
+<table>
+<thead>
+<tr class="header">
+<th><strong>1</strong></th>
+<th><strong>Introducción y objetivo</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>2</strong></td>
+<td><strong>Acceso al sistema</strong></td>
+</tr>
+<tr class="even">
+<td><strong>3</strong></td>
+<td><strong>Pantalla principal , estructura de módulos</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>4</strong></td>
+<td><strong>MÓDULO GENERAL</strong></td>
+</tr>
+<tr class="even">
+<td>4.1</td>
+<td>Coordenadas geográficas e identificación del local</td>
+</tr>
+<tr class="odd">
+<td>4.2</td>
+<td>Instituciones asociadas</td>
+</tr>
+<tr class="even">
+<td>4.3</td>
+<td>Vía de acceso al local escolar</td>
+</tr>
+<tr class="odd">
+<td>4.4</td>
+<td>Cercado perimetral</td>
+</tr>
+<tr class="even">
+<td>4.5</td>
+<td>Áreas exteriores (escenario, mástil, camineros, rampas)</td>
+</tr>
+<tr class="odd">
+<td>4.6</td>
+<td>Desagüe pluvíal</td>
+</tr>
+<tr class="even">
+<td>4.7</td>
+<td>Seguridad y emergencias</td>
+</tr>
+<tr class="odd">
+<td><strong>5</strong></td>
+<td><strong>MÓDULO SERVICIOS</strong></td>
+</tr>
+<tr class="even">
+<td>5.1</td>
+<td>Abastecimiento de agua</td>
+</tr>
+<tr class="odd">
+<td>5.2</td>
+<td>Servicio sanitario , tipo de desagüe</td>
+</tr>
+<tr class="even">
+<td>5.3</td>
+<td>Servicio de internet</td>
+</tr>
+<tr class="odd">
+<td><strong>6</strong></td>
+<td><strong>MÓDULO ELECTRICIDAD</strong></td>
+</tr>
+<tr class="even">
+<td><strong>7</strong></td>
+<td><strong>MÓDULO BLOQUES Y PLANTAS</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>8</strong></td>
+<td><strong>MÓDULO AREAS DE RECREACION</strong></td>
+</tr>
+<tr class="even">
+<td><strong>9</strong></td>
+<td><strong>MÓDULO AULAS</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>10</strong></td>
+<td><strong>MÓDULO DEPENDENCIAS</strong></td>
+</tr>
+<tr class="even">
+<td><strong>11</strong></td>
+<td><strong>MÓDULO LABORATORIO</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>12</strong></td>
+<td><strong>MÓDULO TALLER</strong></td>
+</tr>
+<tr class="even">
+<td><strong>13</strong></td>
+<td><strong>MÓDULO SANITARIOS</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>14</strong></td>
+<td><strong>Control de calidad y cierre</strong></td>
+</tr>
+<tr class="even">
+<td><strong>15</strong></td>
+<td><strong>Preguntas frecuentes y glosario</strong></td>
+</tr>
+</tbody>
+</table>
+<h1 id="1-introduccion-y-objetivo"><strong>1. INTRODUCCION Y
+OBJETIVO</strong></h1>
+<p>El Relevamiento de Infraestructura Educativa tiene como objetivo
+documentar, de forma sistemática y estandarizada, las condiciones
+físicas de los locales escolares de Paraguay: edificios, aulas,
+servicios básicos, equipamiento y sistemas de seguridad. La información
+recopilada sera la base para la planificación de inversiones y políticas
+del sector educativo.</p>
+<p>El cuestionario en línea esta organizado en módulos expandibles
+(acordeon). Cada módulo agrupa preguntas relacionadas. Algunos campos se
+habilitan o se saltan automáticamente según las respuestas prevías:
+estas reglas se indican a lo largo del manual con cajas de color
+naranja.</p>
+<h2 id="equipo-necesario-en-campo"><strong>Equipo necesario en
+campo</strong></h2>
+<blockquote>
+<p>• Dispositivo con navegador web actualizado (celular, tablet o
+PC).</p>
+<p>• Conexión a internet estable , el sistema funciona offline y
+sincroniza luego.</p>
+<p>• Cinta métrica: para dimensiónes de aulas, sanitarios y áreas de
+recreación.</p>
+<p>• GPS o aplicacion de mapas para verificar o corregir
+coordenadas.</p>
+<p>• Camara fotográfica o celular para registrar evidencias
+visuales.</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Complete TODOS los campos obligatorios
+antes de guardar. El sistema bloquea el avance si hay campos requeridos
+vacíos. Los campos marcados con (*) en este manual son obligatorios.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1
+id="2-acceso-al-sistema--rue-registro-unico-del-estudíante"><strong>2.
+ACCESO AL SISTEMA , RUE (Registro Unico del Estudíante)</strong></h1>
+<p>El cuestionario se carga a través del sistema RUE del Ministerio de
+Educación y Ciencias (MEC) de Paraguay. Para ingresar, acceda a la
+página web del RUE y complete el formulario de acceso con sus datos
+personales.</p>
+<p><img src="assets/image1.PNG"
+style="width:4.5in;height:2.13083in" /></p>
+<p><em>Figura 0 , Pantalla de acceso al sistema RUE (Ministerio de
+Educación y Ciencias)</em></p>
+<p><strong>Pasos para ingresar al sistema</strong></p>
+<blockquote>
+<p>• 1. Tipo de Documento: seleccione 'Cédula de Identidad' (opción por
+defecto).</p>
+<p>• 2. Nacionalidad: seleccione 'Paraguaya' (opción por defecto).</p>
+<p>• 3. N° Documento: ingrese su número de cédula de identidad SIN
+puntos ni guiones.</p>
+<p>• 4. Contraseña: ingrese la contraseña asignada por su
+coordinador.</p>
+<p>• 5. Ingresar como: campo opciónal , dejelo en blanco o seleccione el
+rol indicado por su supervisor.</p>
+<p>• 6. CAPTCHA: copie el código de letras que aparece en la imagen en
+el campo 'Escriba el texto aqui'.</p>
+<p>• Si el código es difícil de leer, haga clic en 'Actualizar código'
+para obtener uno nuevo.</p>
+<p>• 7. Haga clic en el boton 'Ingresar' para acceder al sistema.</p>
+</blockquote>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Tipo de Documento</strong></td>
+<td>Cédula de Identidad (valor por defecto). No modificar salvo
+indicacion del supervisor.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Nacionalidad</strong></td>
+<td>Paraguaya (valor por defecto). Modificar solo si corresponde.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>N° Documento</strong></td>
+<td>Su número de cédula de identidad paraguaya, sin espacios ni
+puntos.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Contraseña</strong></td>
+<td>Asignada en la capacitacion inicial. Si la olvido, use 'Recuperar
+Contraseña'.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Ingresar como</strong></td>
+<td>Campo opciónal. Dejelo en blanco o seleccione el perfil indicado por
+su coordinador.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>CAPTCHA (imagen)</strong></td>
+<td>Escriba exactamente las letras que aparecen en la imagen. Es
+sensible a mayusculas. Si no puede leerlo, haga clic en 'Actualizar
+código'.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>ATENCION:</strong> Si olvido su contraseña, haga clic en el
+enlace 'Recuperar Contraseña' al pie del formulario de acceso. El
+sistema envíara instrucciones a su correo electrónico registrado. Si no
+recuerda el correo, comuníquese con su coordinador de campo.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>CONSEJO:</strong> El sistema RUE requiere conexión a internet
+para iniciar sesion. Una vez dentro, puede trabajar con conectividad
+limitada; sincronice los datos al final de cada jornada.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="3-pantalla-principal--estructura-de-módulos"><strong>3. PANTALLA
+PRINCIPAL , ESTRUCTURA DE MÓDULOS</strong></h1>
+<p>Al abrir el formulario de un local escolar vera la pantalla
+principal. En la franja superior aparecen los datos pre-cargados del
+establecimiento (departamento, distrito, código, nombre y dirección).
+Debajo se presentan los módulos en forma de acordeon: haga clic en
+cualquier módulo para expandirlo y responder sus preguntas.</p>
+<p><img src="assets/image2.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 1 , Pantalla principal con los módulos del
+cuestionario</em></p>
+<p>Los módulos disponibles son:</p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Módulo</strong></th>
+<th><strong>Que se registra</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>General</strong></td>
+<td>Ubicacion GPS, identificación del local, cercado, exteriores y
+seguridad.</td>
+</tr>
+<tr class="even">
+<td><strong>Servicios</strong></td>
+<td>Agua potable, saneamiento, vía de acceso e internet.</td>
+</tr>
+<tr class="odd">
+<td><strong>Electricidad</strong></td>
+<td>Suministro electrico, tipo de acometida, tableros y potencias.</td>
+</tr>
+<tr class="even">
+<td><strong>Bloques y Plantas</strong></td>
+<td>Estructura edilicia: bloques, niveles, instalación eléctrica por
+bloque.</td>
+</tr>
+<tr class="odd">
+<td><strong>Áreas de Recreación</strong></td>
+<td>Patios, canchas y cualquier espacio de esparcimiento.</td>
+</tr>
+<tr class="even">
+<td><strong>Aula</strong></td>
+<td>Relevamiento individual de cada aula: materiales, estado y
+dotacion.</td>
+</tr>
+<tr class="odd">
+<td><strong>Dependencias</strong></td>
+<td>Dirección, secretaria, biblioteca, sala de profesores, cocina,
+etc.</td>
+</tr>
+<tr class="even">
+<td><strong>Laboratorio</strong></td>
+<td>Laboratorios de ciencias, computacion u otros.</td>
+</tr>
+<tr class="odd">
+<td><strong>Taller</strong></td>
+<td>Talleres técnicos, de arte u oficios.</td>
+</tr>
+<tr class="even">
+<td><strong>Sanitarios</strong></td>
+<td>Baños: dimensiónes, artefactos, estado y accesibilidad.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>CONSEJO:</strong> Los módulos que muestran un número entre
+parentesis , por ej. «Bloques y Plantas (1)» , ya tienen al menos un
+registro cargado. Haga clic para expandirlos y revisar o agregar
+información.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="4-módulo-general"><strong>4. MÓDULO GENERAL</strong></h1>
+<p>El módulo General es el primero que debe completarse. Agrupa cuatro
+grandes bloques: (1) ubicación geografica e identificación del local,
+(2) cercado perimetral, (3) caracteristicas de las áreas exteriores y
+(4) sistemas de seguridad contra incendio y emergencias.</p>
+<h2
+id="41-coordenadas-geográficas-e-identificación-del-local"><strong>4.1
+Coordenadas geográficas e identificación del local</strong></h2>
+<p>Al expandir «General» vera la sección de coordenadas y la ficha de
+identificación. La mayoria de los campos estan pre-cargados desde el
+sistema; verifiquelos y corrija si hay errores.</p>
+<p><img src="assets/image3.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 2 , Seccion de coordenadas GPS y datos de identificación
+del local</em></p>
+<p><img src="assets/image4.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 3 , Ficha de identificación pre-cargada</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Latitud / Longitud</strong></td>
+<td>El sistema intenta obtenerlas automáticamente por GPS del
+dispositivo. Si aparece error de mapa, abra Google Maps, coloque el
+marcador sobre la escuela y copie las coordenadas. Precision de ±20 m es
+aceptable.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Coordenada Z (altitud)</strong></td>
+<td>Altitud en metros sobre el nivel del mar. Puede dejarse en blanco si
+el GPS no la provee.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Codigo de local</strong></td>
+<td>Pre-cargado. NO modificar: es el identificador unico del
+establecimiento.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Departamento / Distrito / Localidad</strong></td>
+<td>Pre-cargados. Si son incorrectos, notifique al coordinador antes de
+continuar.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Dirección y N°</strong></td>
+<td>Completar o corregir in situ (calle principal y número o
+referencia).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Nombre del Director</strong></td>
+<td>Completar con el nombre completo del director/a vigente.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Rango valido para Paraguay: Latitud
+entre -19 y -28 | Longitud entre -54 y -63. Si las coordenadas caen
+fuera de este rango, el sistema lo advertira.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h2 id="42-instituciones-asociadas"><strong>4.2 Instituciones
+asociadas</strong></h2>
+<p><img src="assets/image5.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 4 , Instituciones que comparten el local escolar</em></p>
+<p>Indique si el predio es compartido con otras instituciones
+(municipalidad, iglesia, INDI, organizacion comunitaria, etc.). Si hay
+mas de una, registrelas todas. Si el local no comparte instalaciónes,
+deje el campo en blanco o marque 'Ninguna'.</p>
+<h2 id="43-vía-de-acceso-al-local-escolar"><strong>4.3 Vía de acceso al
+local escolar</strong></h2>
+<p><img src="assets/image6.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 5 , Tipo de vía principal de acceso</em></p>
+<p>Seleccione el tipo de superficie que predomina en el tramo final de
+acceso:</p>
+<blockquote>
+<p>• Asfalto , pavimento liso y continuo.</p>
+<p>• Adoquinado , bloques rectangulares de hormigon o piedra.</p>
+<p>• Empedrado , piedras irregulares o canto rodado.</p>
+<p>• Camino de tierra , sin pavimentar, puede ser mejorado o no.</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Marque UNA sola opción: la
+correspondiente al tramo mas largo o predominante del recorrido final
+hasta la entrada del local.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h2 id="44-cercado-perimetral"><strong>4.4 Cercado
+perimetral</strong></h2>
+<p><img src="assets/image7.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 6 , Presencia del cercado perimetral</em></p>
+<p><img src="assets/image8.png"
+style="width:4in;height:3.97495in" /></p>
+<p><em>Figura 7 , Tipo de cercado perimetral</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>4.1 Presencia del cercado</strong></td>
+<td>Si , Completo: el cercado rodea todo el perimetro sin
+interrupciones. Si , Incompleto: existe pero tiene sectores abiertos o
+deteriorados. No: el local no tiene ninguna delimitacion física.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>4.2 Tipo de cercado</strong></td>
+<td>Muralla (muro solido de ladrillo/hormigon) | Verjas de hierro |
+Tejido (alambre tejido tipo ciclón) | Alambrado (alambres lisos o de
+puas). Solo si respondio 'Si' en 4.1.</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr class="header">
+<th><strong>SALTO:</strong> Si respondio «No» → pase a Seccion 5 , Áreas
+Exteriores</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>CONSEJO:</strong> Si el cercado es incompleto, anote en
+Observaciones el porcentaje estimado cubierto y el sector que falta (ej.
+'frente sin cercar, aprox. 40%').</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h2 id="45-áreas-exteriores-del-local-escolar"><strong>4.5 Áreas
+exteriores del local escolar</strong></h2>
+<p>Recorra el predio y verifique la presencia de cada elemento exterior
+antes de responder. Si tiene dudas sobre algun termino, consulte el
+Glosario al final de este manual.</p>
+<p><img src="assets/image9.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 8 , Escenario / tarima exterior</em></p>
+<p><img src="assets/image10.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 9 , Mástil con plataforma de izamiento</em></p>
+<p><img src="assets/image11.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 10 , Camineros (sendas peatonales internas)</em></p>
+<p><img src="assets/image12.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 11 , Rampas de acceso para personas con
+discapacidad</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>5.1 Escenario</strong></td>
+<td>Tarima o plataforma elevada al aire libre, usada para actos
+escolares. No confundir con el salon de actos interior.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>5.2 Mástil / plataforma de izamiento</strong></td>
+<td>Estructura (mástil o poste) con base o plataforma para izar la
+bandera nacional.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>5.3 Camineros</strong></td>
+<td>Sendas pavimentadas o semi-pavimentadas dentro del predio que
+conectan edificios, entradas o sectores. Simples veredas de tierra no
+califican.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>5.4 Rampas para personas con discapacidad</strong></td>
+<td>Si , Cumple norma INTN: ancho minimo 1,20 m, pendiente max. 8%,
+superficie antideslizante y pasamanos a ambos lados. Si , No cumple:
+existe rampa pero no cumple algun criterio INTN. No: no hay rampa.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> La norma INTN de accesibilidad exige: ancho ≥
+1,20 m , pendiente ≤ 8% (1 cm de desnivel cada 12 cm de longitud) ,
+superficie antideslizante , pasamanos continuos a ambos lados a 0,90 m y
+0,75 m de altura.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h2 id="46-desagüe-pluvíal"><strong>4.6 Desagüe pluvíal</strong></h2>
+<p><img src="assets/image13.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 12 , Sistema de desagüe de aguas de lluvía</em></p>
+<p>Observe como escurren las aguas de lluvía en el predio:</p>
+<blockquote>
+<p>• Si , Canalizado: conducido por cañerías, canales con tapa o bocas
+de tormenta.</p>
+<p>• Si , Cielo abierto: escurre por zanjas o canales descubiertos.</p>
+<p>• No: el agua no tiene conducción; escurre libremente por el terreno
+o se acumula.</p>
+</blockquote>
+<h2 id="47-sistemas-de-seguridad-y-emergencia"><strong>4.7 Sistemas de
+seguridad y emergencia</strong></h2>
+<p>Recorra el local con el director o responsable. Verifique visualmente
+cada sistema y anote la cantidad de elementos presentes.</p>
+<p><img src="assets/image14.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 13 , Cámaras de vigilancia CCTV</em></p>
+<p><img src="assets/image15.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 14 , Detectores de humo y/o calor</em></p>
+<p><img src="assets/image16.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 15 , Pulsadores de emergencia</em></p>
+<p><img src="assets/image17.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 16 , Luces de emergencia</em></p>
+<p><img src="assets/image18.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 17 , Extintores contra incendio</em></p>
+<p><img src="assets/image19.png"
+style="width:3.8in;height:3.7762in" /></p>
+<p><em>Figura 18 , Sistema hidráulico (sprinklers / mangueras)</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Vigilancia CCTV</strong></td>
+<td>Si: indique la cantidad de cámaras instaladas y si estan en
+funcionamiento. No: el local no cuenta con cámaras.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>Detectores de humo / calor</strong></td>
+<td>Dispositivos en cielorrasos que activan una alarma al detectar humo
+o calor excesivo. Indique cantidad.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Pulsadores de emergencia</strong></td>
+<td>Botones manuales (generalmente rojos) para activar la alarma.
+Indique cantidad.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>Luces de emergencia</strong></td>
+<td>Luminarias autonomas que se activan ante corte de suministro
+electrico. Indique cantidad.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Extintores</strong></td>
+<td>Indique cantidad. Verifique si la etiqueta de control (carga y fecha
+de vencimiento) esta vigente y anotelo en Observaciones.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>Sistema hidráulico contra incendio</strong></td>
+<td>Redes de tuberias con rociadores (sprinklers) o mangueras conectadas
+a reservorios. Menos frecuente en escuelas pequeñas.</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>CONSEJO:</strong> Si algun extintor tiene la carga vencida o
+falta la etiqueta de control, registrelo en el campo Observaciones del
+módulo General.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="5-módulo-servicios-básicos"><strong>5. MÓDULO SERVICIOS
+BÁSICOS</strong></h1>
+<p>Registra los tres servicios básicos del local: abastecimiento de
+agua, tipo de desagüe sanitario y conectividad a internet.</p>
+<h2 id="51-abastecimiento-de-agua"><strong>5.1 Abastecimiento de
+agua</strong></h2>
+<p><img src="assets/image20.png"
+style="width:4in;height:4in" /></p>
+<p><em>Figura 19 , Fuente de abastecimiento de agua potable</em></p>
+<p>Primero indique si el local cuenta con agua (Si / No).</p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>SALTO:</strong> Si respondio «No» → pase a Seccion 5.2 ,
+Servicio sanitario</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+<p>Si marco Si, identifique la fuente principal de provision:</p>
+<blockquote>
+<p>• ESSAP (ex CORPOSANA) , red pública urbana.</p>
+<p>• Junta de Saneamiento (SENASA) , red comunitaria rural.</p>
+<p>• Prestador / red privada o comunitaria.</p>
+<p>• Pozo artesiano (sin bomba mecánica).</p>
+<p>• Pozo con bomba , registre la potencia en HP.</p>
+<p>• Pozo sin bomba , extraccion manual.</p>
+<p>• Manantial o naciente de agua.</p>
+<p>• Tajamar, rio o arroyo.</p>
+<p>• Recoleccion de agua de lluvía.</p>
+<p>• Aguatero (camion cisterna).</p>
+<p>• Otra fuente , especifique.</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Cuando la fuente es 'pozo con bomba',
+registre obligatoriamente la potencia de la bomba en HP (horse power).
+Consulte la placa del equipo o pregunte al encargado de
+mantenimiento.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h2 id="52-servicio-sanitario--tipo-de-desagüe"><strong>5.2 Servicio
+sanitario , tipo de desagüe</strong></h2>
+<p><img src="assets/image21.png"
+style="width:4in;height:4in" /></p>
+<p><em>Figura 20 , Tipo de desagüe de las instalaciónes
+sanitarias</em></p>
+<p>Primero confirme si el local cuenta con baño e instalaciónes
+sanitarias (Si / No). Si hay baños, indique hacia donde desagua:</p>
+<blockquote>
+<p>• Red de alcantarillado sanitario (cloaca pública).</p>
+<p>• Camara septica y pozo ciego.</p>
+<p>• Pozo ciego solo, sin cámara septica.</p>
+<p>• Superficie de tierra, hoyo abierto, zanja, arroyo o rio.</p>
+<p>• Letrina ventilada de hoyo seco (con tubo de ventilacion).</p>
+<p>• Letrina comun de hoyo seco (con losa, techo, paredes y puerta).</p>
+<p>• Letrina comun sin techo o sin puerta.</p>
+<p>• Otro , especifique.</p>
+</blockquote>
+<h2 id="53-servicio-de-internet"><strong>5.3 Servicio de
+internet</strong></h2>
+<p><img src="assets/image21.png"
+style="width:4in;height:4in" /></p>
+<p><em>Figura 21 , Acceso a internet del local escolar</em></p>
+<p>Indique si el local tiene acceso a internet (Si / No) y el tipo de
+conexión (fibra óptica, ADSL, móvil 4G/3G, satelital, etc.). Pregunte al
+director si la conexión funciona de manera estable.</p>
+<h1 id="6-módulo-electricidad"><strong>6. MÓDULO
+ELECTRICIDAD</strong></h1>
+<p>Relevamiento de la instalación eléctrica general del local. Comprende
+la presencia de energía, tipo y estado de acometida, tableros, potencias
+contratadas/instaladas/requeridas y frecuencia de cortes.</p>
+<p><img src="assets/image20.png"
+style="width:3.8in;height:3.8in" /></p>
+<p><em>Figura 22 , Presencia y provision de energía eléctrica</em></p>
+<p><img src="assets/image20.png"
+style="width:3.8in;height:3.8in" /></p>
+<p><em>Figura 23 , Tipo y estado de la acometida eléctrica</em></p>
+<p><img src="assets/image22.png"
+style="width:3.8in;height:1.45432in" /></p>
+<p><em>Figura 24 , Potencia máxima disponible (contratada)</em></p>
+<p><img src="assets/image23.png"
+style="width:3.8in;height:1.45432in" /></p>
+<p><em>Figura 25 , Potencia instalada en equipos</em></p>
+<p><img src="assets/image23.png"
+style="width:3.8in;height:1.45432in" /></p>
+<p><em>Figura 26 , Potencia requerida por el local</em></p>
+<p><img src="assets/image20.png"
+style="width:3.8in;height:3.8in" /></p>
+<p><em>Figura 27 , Frecuencia de cortes eléctricos</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>3.1 Tiene energía eléctrica</strong></td>
+<td>Si / No. Si responde No, pase directamente al módulo Bloques y
+Plantas.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>3.2 Provision</strong></td>
+<td>ANDE (red pública) / Generador privado / Otro (especificar).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>3.3 Tiene medidor</strong></td>
+<td>Si / No. El medidor (o contador) registra el consumo electrico.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>3.4 Tiene acometida</strong></td>
+<td>Si (indique cantidad de acometidas) / No.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>3.5 Estado de la acometida</strong></td>
+<td>Bueno (sin danos visibles) / Regular (danos menores) / Malo (danos
+graves). Registre el estado por cada acometida si hay mas de una.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.6 Tipo de instalación</strong></td>
+<td>Trifásica (tres cables de fase + neutro, para grandes cargas) /
+Monofásica (un cable de fase + neutro, instalación doméstica
+comun).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>3.7 Tablero principal</strong></td>
+<td>Si / No. Es el tablero donde llega la acometida y se distribuye al
+resto del local.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>3.8 Estado del tablero principal</strong></td>
+<td>Bueno / Regular / Malo. Agregue la capacidad del térmico general en
+Amperios (A).</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>3.9 Tablero secciónal</strong></td>
+<td>Si (indique cantidad) / No. Tableros secundarios que alimentan
+sectores o bloques.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>3.10 Estado del tablero secciónal</strong></td>
+<td>Bueno / Regular / Malo por cada tablero.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>3.11 Puesta a tierra</strong></td>
+<td>Si / No. Sistema de seguridad que conduce corrientes de falla hacia
+la tierra.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Potencia máxima disponible</strong></td>
+<td>kVA contratados con ANDE o el proveedor. Consulte la factura o al
+director.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Potencia instalada</strong></td>
+<td>kVA de todos los equipos eléctricos instalados (aires
+acondicionados, computadoras, cocina, etc.).</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>Potencia requerida</strong></td>
+<td>kVA que el local necesita para funcionar adecuadamente según su
+demanda real.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Frecuencia de cortes</strong></td>
+<td>Nunca / Raramente (menos de 1 vez al mes) / Mensual / Semanal /
+Diario.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<thead>
+<tr class="header">
+<th><strong>SALTO:</strong> Si respondio «No (sin energía)» → pase a
+Módulo Bloques y Plantas , sección 7</th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+<h1 id="7-módulo-bloques-y-plantas"><strong>7. MÓDULO BLOQUES Y
+PLANTAS</strong></h1>
+<p>Un «Bloque» es cada cuerpo constructivo independiente dentro del
+predio escolar. Una «Planta» (o nivel) es cada piso del bloque: PB =
+Planta Baja, P1 = Primer Piso, P2 = Segundo Piso, etc. Cada combinacion
+bloque-planta se registra por separado.</p>
+<p><img src="assets/image24.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 28 , Lista de bloques y boton 'Agregar
+Bloque-Planta'</em></p>
+<p><img src="assets/image25.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 29 , Detalle del bloque: rampas, galeria y
+dimensiónes</em></p>
+<p><img src="assets/image26.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 30 , Detalle del bloque: instalación eléctrica y lista de
+dependencias</em></p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>CONSEJO:</strong> Para agregar un bloque haga clic en el
+boton verde «Agregar Bloque-Planta» y complete el número de bloque y
+planta. Si el local tiene un solo edificio de una sola planta, registre
+unicamente «Bloque 1 , Planta Baja».</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Rampas en el bloque</strong></td>
+<td>Si , Cumple norma INTN / Si , No cumple / No. Igual criterio que las
+rampas exteriores (ver sección 4.5).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Galeria</strong></td>
+<td>Si el bloque tiene corredor cubierto (galeria), marque Si e ingrese
+Largo (m) y Ancho (m) del pasillo.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Dimensiones del bloque</strong></td>
+<td>Perimetro total del bloque: Largo (m) y Ancho (m). Mida la huella
+del bloque en planta. Si tiene forma irregular, mida el rectángulo
+envolvente.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Tablero secciónal en el bloque</strong></td>
+<td>Si / No. Si Si, indique el estado (Bueno / Regular / Malo) y la
+capacidad en A.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Tipo de alimentacion eléctrica</strong></td>
+<td>Embutido (cables ocultos en la pared) / Adosado externo (canaletas
+visibles) / Aereo (cables colgados) / Subterraneo (cables bajo
+tierra).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Instalación eléctrica del bloque</strong></td>
+<td>Como esta tendido el cableado interno: electroductos embutidos /
+canaletas o bandejas externas / cables externos sueltos / electroductos
+externos.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Cortes eléctricos en el bloque</strong></td>
+<td>Si el bloque sufre cortes recurrentes por problemas eléctricos
+propios (no por la red general). Si / No.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Dependencias del bloque</strong></td>
+<td>Tabla con la cantidad de cada tipo de dependencia: aulas, dirección,
+secretaria, biblioteca, laboratorio/taller, salon multiuso, sala de
+profesores, area recreativa con techo, sanitarios. Indique cuantas estan
+en uso, sin uso o en construcción.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> El campo 'Area Construida' surge de los planos
+del local y puede completarse en la etapa de digitalizacion en oficina.
+No es obligatorio en campo.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="8-módulo-areas-de-recreacion"><strong>8. MÓDULO AREAS DE
+RECREACION</strong></h1>
+<p>Registre cada area de recreación por separado: patio central, cancha
+de futbol, cancha de basquet, plaza, area verde, etc. Haga clic en
+«Agregar Area de Recreación» y asigne un nombre descriptivo a cada
+una.</p>
+<p><img src="assets/image27.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 31 , Lista de áreas de recreación y boton para
+agregar</em></p>
+<p><img src="assets/image28.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 32 , Detalle del area: dimensiónes, techo e
+iluminación</em></p>
+<p><img src="assets/image29.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 33 , Detalle del area: piso, estado y rampas de
+acceso</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Nombre del area</strong></td>
+<td>Use un nombre claro y especifico. Ej.: 'Patio central', 'Cancha de
+futbol', 'Galeria de recreo'. Evite nombres genéricos como 'Area
+1'.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Largo (m) / Ancho (m)</strong></td>
+<td>Dimensiones en metros. Si el area es irregular, mida el rectángulo
+que la contiene.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Iluminacion exterior</strong></td>
+<td>Si (funciona) / Si (no funciona) / No. Verifique si las luminarias
+estan operativas.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Tiene techo</strong></td>
+<td>Si (el area tiene cubierta) / No (espacio abierto). Si tiene techo,
+complete material y estado.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Material del techo</strong></td>
+<td>Losa H°A° / Chapa termoacustica / Cerámica (teja) / Zinc /
+Fibrocemento / Paja / Otro.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>Estado del techo</strong></td>
+<td>Bueno (sin defectos visibles) / Regular (defectos menores) / Malo
+(defectos graves que requieren intervencion urgente).</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>Material del piso</strong></td>
+<td>Baldosa (layota, granito, cerámica o calcarea) / Ladrillo / Cemento
+alisado (carpeta) / Tierra / Otro (especificar).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Estado del piso</strong></td>
+<td>Sin roturas , Completo con roturas (indique m2 afectados) ,
+Incompleto (indique m2 afectados) , Con hundimientos (indique m2
+afectados).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Rampas de acceso</strong></td>
+<td>Si , Cumple norma INTN / Si , No cumple / No. Aplica el mismo
+criterio que en las rampas exteriores.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<h1 id="9-módulo-aulas"><strong>9. MÓDULO AULAS</strong></h1>
+<p>Es el módulo mas extenso. Cada aula se registra individualmente con
+información sobre sus dimensiónes, situación, materiales y estado de
+techo, paredes, piso, ventanas, puertas, instalación eléctrica e
+iluminación.</p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Registre CADA aula por separado. Solo
+puede agrupar si se trata de aulas estructuralmente identicas en el
+mismo bloque y misma planta. En caso de duda, registre por separado.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<p><img src="assets/image30.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 34 , Aula: dimensiónes (largo y ancho) y situación
+actual</em></p>
+<p><img src="assets/image31.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 35 , Aula: material de techo y defectos según tipo de
+cubierta</em></p>
+<p><img src="assets/image32.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 36 , Aula: material y defectos de pared</em></p>
+<p><img src="assets/image33.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 37 , Aula: piso, ventanas y puertas</em></p>
+<p><img src="assets/image34.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 38 , Aula: instalación eléctrica, iluminación y
+observaciones</em></p>
+<p><strong>Identificación y dimensiónes</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Bloque / Planta / N° de aula</strong></td>
+<td>Identifique exactamente en que bloque, planta y número de aula se
+encuentra.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Largo (m) y Ancho (m)</strong></td>
+<td>Mida con cinta métrica desde el interior de pared a pared. Registre
+en metros con un decimal (ej.: 7,5).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>2.1 Situación actual</strong></td>
+<td>En uso (clases activas) / Sin uso (indique motivo: abandono,
+reparacion, etc.) / En construcción (aun no habilitada).</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Techo , reglas de salto según material</strong></p>
+<p>Primero marque el material predominante (pregunta 3.1), luego siga el
+salto indicado:</p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Losa H°A° → responda 3.2 (fisuras), 3.3
+(huecos) y 3.11 (goteras/humedad)</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Material ceramico (teja/tejuelon/tejuelita) →
+responda 3.4 a 3.8 y 3.11</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Chapa termoacustica / Zinc / Fibrocemento →
+responda 3.9 (corrosion), 3.10 (chapas rotas) y 3.11</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Paja con estructura de madera → pase
+directamente a la sección PARED (4.x)</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>3.2 Fisuras en losa</strong></td>
+<td>Grietas en la superficie de la losa. Si: indique m2 afectados.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.3 Huecos en losa</strong></td>
+<td>Perforaciones o hundimientos en la losa. Si: indique m2.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>3.4 Defectos en vigas o tirantes</strong></td>
+<td>Roturas, putrefaccion o doblamiento. Si: marque viga o tirante e
+indique cantidad afectada.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.5 Tejuelones sin apoyo</strong></td>
+<td>Piezas que no descansan correctamente sobre el tirante. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>3.6 Tejuelones o tejuelitas rotos</strong></td>
+<td>Piezas cerámicas fracturadas. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.7 Tirantes de distintas dimensiónes</strong></td>
+<td>Indica reparaciones no estandarizadas. Si: indique cantidad.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>3.8 Deslizamientos del techo</strong></td>
+<td>Partes que se corrieron de su posición (vigas, chapas, tejuelones).
+Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.9 Corrosion en estructura metálica</strong></td>
+<td>Oxido visible en vigas o estructura de chapa. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>3.10 Chapas rotas</strong></td>
+<td>Chapas perforadas, dobladas o faltantes. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.11 Goteras o humedad en techo</strong></td>
+<td>Manchas, aureolas o filtraciones visibles. Si: m2.</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Pared , reglas de salto según material</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>4.1 Material de pared</strong></td>
+<td>Ladrillo (con o sin revoque) / Madera / Otro (especificar). Si
+Ladrillo: responda 4.2 a 4.6. Si Madera: pase a 4.7. Si Otro: pase a
+Piso.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>4.2 Fisuras o grietas</strong></td>
+<td>Grietas en paredes de ladrillo. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>4.3 Desaplomado (pared inclinada)</strong></td>
+<td>Pared con inclinacion visible respecto a la vertical. Si / No.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>4.4 Tiene revoque</strong></td>
+<td>Capa de mortero o yeso sobre el ladrillo. Si / No (m2 sin
+revoque).</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>4.5 Desprendimiento de revoque</strong></td>
+<td>Caida o separacion del revoque. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>4.6 Manchas de humedad en pared</strong></td>
+<td>Manchas de humedad por filtracion o capilaridad. Si: m2.</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><strong>4.7 Maderas rotas en pared</strong></td>
+<td>Solo si la pared es de madera: tablones rotos o faltantes. Si:
+m2.</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Piso</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>5.1 Material del piso</strong></td>
+<td>Baldosa (layota, granito, cerámica, calcarea) / Ladrillo / Cemento
+alisado o carpeta / Tierra / Otro (especificar).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Estado del piso</strong></td>
+<td>Sin roturas , Completo con roturas (m2) , Incompleto (m2) , Con
+hundimientos (m2) , Otro (especifique y m2).</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>CONSEJO:</strong> Para estimar m2 afectados: multiplique
+Largo × Ancho de la zona danada. Para zonas irregulares, estime por
+comparacion con el area total del piso.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="10-módulo-dependencias"><strong>10. MÓDULO
+DEPENDENCIAS</strong></h1>
+<p>Las «Dependencias» son todos los espacios del bloque que no son
+aulas, laboratorios, talleres ni sanitarios: Dirección, Secretaria,
+Biblioteca, Sala de Profesores, Salon Multiuso, Depósito/Almacen,
+Cocina/Comedor, Sala de primeros auxilios, etc. Registre cada una por
+separado.</p>
+<p><img src="assets/image35.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 39 , Dependencia: nombre, dimensiónes y situación</em></p>
+<p><img src="assets/image36.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 40 , Dependencia: material y estado del techo</em></p>
+<p><img src="assets/image37.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 41 , Dependencia: paredes y piso</em></p>
+<p><img src="assets/image38.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 42 , Dependencia: ventanas, puertas e
+instalaciónes</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Bloque / Planta / Nombre</strong></td>
+<td>Especifique el nombre exacto de la dependencia: 'Dirección',
+'Secretaria', 'Biblioteca', 'Sala de profesores', 'Cocina', 'Depósito',
+etc.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Largo (m) / Ancho (m)</strong></td>
+<td>Dimensiones interiores en metros con un decimal.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>Situación</strong></td>
+<td>En uso / Sin uso (especifique motivo) / En construcción. Si esta En
+Construccion, pase a la siguiente dependencia.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Techo, Pared, Piso</strong></td>
+<td>Mismos campos y reglas de salto que el Módulo Aulas (ver sección
+9).</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Si la 'Situación' es 'En construcción', el
+sistema saltara automáticamente al siguiente espacio , no necesita
+completar los datos estructurales.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="11-módulo-laboratorio"><strong>11. MÓDULO
+LABORATORIO</strong></h1>
+<p>Registre cada laboratorio por separado: Laboratorio de Ciencias
+(química, biologia, física), Laboratorio de Informatica / Sala de
+cómputo, etc. Especifique el nombre o tipo en el campo
+correspondiente.</p>
+<p><img src="assets/image39.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 43 , Laboratorio: nombre, dimensiónes y situación</em></p>
+<p><img src="assets/image40.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 44 , Laboratorio: material y estado del techo</em></p>
+<p><img src="assets/image41.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 45 , Laboratorio: paredes y piso</em></p>
+<p><img src="assets/image42.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 46 , Laboratorio: ventanas, puertas e
+instalaciónes</em></p>
+<p>Los campos de techo, pared y piso son identicos a los del módulo
+Aulas. Aplican exactamente los mismos saltos según material (ver sección
+9). Adicionalmente, registre si el laboratorio cuenta con mesadas,
+piletas o instalaciónes especiales en el campo Observaciones.</p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Si el laboratorio esta 'En Construccion', el
+sistema pasara automáticamente al próximo espacio.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="12-módulo-taller"><strong>12. MÓDULO TALLER</strong></h1>
+<p>Registre talleres técnicos, de artes o de oficios por separado.
+Ejemplos: Taller de Electricidad, Taller de Carpinteria, Taller de
+Costura, Taller de Mecanica, Sala de Música, etc.</p>
+<p><img src="assets/image43.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 47 , Taller: nombre, dimensiónes y situación</em></p>
+<p><img src="assets/image44.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 48 , Taller: material y estado del techo</em></p>
+<p><img src="assets/image45.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 49 , Taller: paredes y piso</em></p>
+<p><img src="assets/image46.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 50 , Taller: ventanas, puertas e instalaciónes</em></p>
+<p>Reglas de salto para paredes del taller:</p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Ladrillo → responda preguntas 4.2 a 4.6
+(fisuras, desaplomado, revoque, humedad)</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Madera → pase directamente a pregunta 4.7
+(maderas rotas)</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>NOTA:</strong> Otro → pase directamente a la sección Piso
+(5.x)</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="13-módulo-sanitarios"><strong>13. MÓDULO
+SANITARIOS</strong></h1>
+<p>Registre CADA bloque de sanitarios por separado utilizando el boton
+'Agregar Sanitario'. La cantidad de sanitarios registrada aqui debe
+coincidir exactamente con la indicada en la tabla de dependencias del
+módulo Bloques y Plantas.</p>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>ATENCION:</strong> ATENCION con las unidades: las dimensiónes
+del sanitario se ingresan en CENTÍMETROS (cm), no en metros. Un
+sanitario tipico mide entre 200 y 400 cm de largo.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<p><img src="assets/image47.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 51 , Sanitario: dimensiónes (en cm), uso diferenciado y
+espacio para discapacidad</em></p>
+<p><img src="assets/image48.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 52 , Sanitario: divisorias, boxes y artefactos</em></p>
+<p><img src="assets/image49.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 53 , Sanitario: estado de artefactos y
+filtraciones</em></p>
+<p><img src="assets/image50.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 54 , Sanitario 1: techo, paredes y piso</em></p>
+<p><img src="assets/image51.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 55 , Sanitario 2: dimensiónes y uso</em></p>
+<p><img src="assets/image52.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 56 , Sanitario 2: artefactos y estado</em></p>
+<p><img src="assets/image53.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 57 , Sanitario 2: techo</em></p>
+<p><img src="assets/image54.png"
+style="width:4.2in;height:4.1737in" /></p>
+<p><em>Figura 58 , Sanitario 2: paredes y piso</em></p>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Campo / Pregunta</strong></th>
+<th><strong>Descripción y guía de respuesta</strong></th>
+<th><strong>Req.</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Largo (cm) / Ancho (cm)</strong></td>
+<td>Dimensiones interiores en CENTÍMETROS. Mida desde pared interior a
+pared interior.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>2.1 Uso diferenciado</strong></td>
+<td>Solo hombres / Solo mujeres / Indistinto (unisex). Observe los
+símbolos de la puerta o pregunte al director.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>2.2 Espacio accesible para discapacidad</strong></td>
+<td>Si: existe una cabina con espacio suficiente para silla de ruedas
+(minimo 1,50 x 1,50 m) y barras de apoyo. No: no hay espacio
+adaptado.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>2.3 Ofrece Educación Inicial</strong></td>
+<td>Si el local escolar brinda servicios de educacion inicial (jardin de
+infantes).</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>2.4 Sanitarios en aulas de Ed. Inicial</strong></td>
+<td>Si los baños estan incorporados dentro de las aulas del nivel
+inicial (sanitario dentro del aula). Solo si respondio Si en 2.3.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.1 Divisorias internas (boxes)</strong></td>
+<td>Si: el sanitario tiene cabinas individuales separadas por muros o
+tabiques. No: es un espacio abierto sin separaciones.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>3.2 Cantidad de boxes</strong></td>
+<td>Cuente cada cabina individual. Solo si respondio Si en 3.1.</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><strong>3.4 Estado de las puertas de los boxes</strong></td>
+<td>Mayormente completos (cierran bien, sin partes faltantes graves) /
+Mayormente incompletos (partes rotas o faltantes que afectan la
+privacidad) / No tiene puertas.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>4.1 Tipo y cantidad de artefactos</strong></td>
+<td>Cuente cada artefacto: Inodoro / Mingitorio de cerámica / Mingitorio
+de material (concreto) / Letrina comun / Excusado tipo municipal /
+Lavatorio / Ducha.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>4.2 Estado de los artefactos</strong></td>
+<td>Para cada tipo: Bueno (funciona correctamente) / Regular (funciona
+con defectos menores) / Malo (no funciona o defectos graves). Ingrese la
+cantidad en cada categoria.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="odd">
+<td><strong>4.3 Perdidas o filtraciones</strong></td>
+<td>Si: marque si ocurren en el desagüe (caños de salida) o en el agua
+corriente (caños de alimentacion). No: no hay pérdidas visibles.</td>
+<td><strong>Si</strong></td>
+</tr>
+<tr class="even">
+<td><strong>Techo (5.x), Pared (6.x), Piso (7.x)</strong></td>
+<td>Mismos campos y reglas de salto que el Módulo Aulas (ver sección 9).
+El techo del sanitario suele ser losa o chapa.</td>
+<td><strong>Si</strong></td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Si hay sanitarios incorporados a las
+aulas de Educación Inicial, registrelos tambien en este módulo como un
+sanitario adicional.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="14-control-de-calidad-y-cierre"><strong>14. CONTROL DE CALIDAD Y
+CIERRE</strong></h1>
+<p>Antes de guardar y sincronizar el formulario, verifique esta lista.
+Marque cada casilla una vez confirmado el punto.</p>
+<table>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Item de verificacion</strong></th>
+<th><strong>Que debe confirmarse</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>☐</td>
+<td><strong>Identificación completa</strong></td>
+<td>Codigo de local, departamento, distrito, dirección y director
+registrados.</td>
+</tr>
+<tr class="even">
+<td>☐</td>
+<td><strong>Coordenadas válidas</strong></td>
+<td>Latitud entre -19 y -28. Longitud entre -54 y -63. Sin errores de
+mapa pendientes.</td>
+</tr>
+<tr class="odd">
+<td>☐</td>
+<td><strong>Módulo General completo</strong></td>
+<td>Exteriores, desagüe y todos los sistemas de seguridad
+respondidos.</td>
+</tr>
+<tr class="even">
+<td>☐</td>
+<td><strong>Servicios completos</strong></td>
+<td>Agua, saneamiento e internet registrados con sus detalles.</td>
+</tr>
+<tr class="odd">
+<td>☐</td>
+<td><strong>Electricidad completa</strong></td>
+<td>Acometida, tableros, potencias y frecuencia de cortes
+registrados.</td>
+</tr>
+<tr class="even">
+<td>☐</td>
+<td><strong>Al menos un bloque registrado</strong></td>
+<td>Con dimensiónes, instalación eléctrica y tabla de dependencias
+completa.</td>
+</tr>
+<tr class="odd">
+<td>☐</td>
+<td><strong>Todas las aulas registradas</strong></td>
+<td>Cada aula individualmente con techo, pared, piso y situación.</td>
+</tr>
+<tr class="even">
+<td>☐</td>
+<td><strong>Sanitarios = cantidad en Bloques</strong></td>
+<td>El número de sanitarios registrados coincide con el indicado en
+Bloques y Plantas.</td>
+</tr>
+<tr class="odd">
+<td>☐</td>
+<td><strong>Laboratorios y Talleres</strong></td>
+<td>Registrados si el local los tiene. Si no tiene, no es necesario
+agregar.</td>
+</tr>
+<tr class="even">
+<td>☐</td>
+<td><strong>Consistencia entre módulos</strong></td>
+<td>Los datos son coherentes: por ej., si hay energía, la acometida no
+puede estar vacia.</td>
+</tr>
+<tr class="odd">
+<td>☐</td>
+<td><strong>Sincronización exitosa</strong></td>
+<td>El icono de sincronización quedo en verde. El formulario fue envíado
+al servidor.</td>
+</tr>
+</tbody>
+</table>
+<table>
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th><blockquote>
+<p><strong>IMPORTANTE:</strong> Despues de sincronizar, revise que el
+local aparezca marcado como 'Completado' en la lista de asignaciones.
+Contacte al supervisor si el estado no cambia después de varios
+minutos.</p>
+</blockquote></th>
+</tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<h1 id="15-preguntas-frecuentes-y-glosario"><strong>15. PREGUNTAS
+FRECUENTES Y GLOSARIO</strong></h1>
+<p><strong>El GPS no obtiene coordenadas o el mapa da error</strong></p>
+<p>Abra Google Maps en su celular, desplace el marcador sobre la
+ubicación exacta del edificio principal y copie las coordenadas que
+aparecen en la parte inferior de la pantalla. Precision de ±20 m es
+aceptable. Anote en Observaciones que las coordenadas fueron ingresadas
+manualmente.</p>
+<p><strong>La escuela se niega a ser relevada</strong></p>
+<p>Intente coordinar una segúnda visita en otro horario o día. Si la
+negativa persiste, registre el intento en el sistema y comuníqueselo al
+coordinador de campo antes de cerrar el formulario.</p>
+<p><strong>No tengo internet en campo</strong></p>
+<p>El sistema funciona en modo offline. Complete el formulario con
+normalidad: los datos se guardan en el dispositivo y se envían
+automáticamente cuando se recupere la conexión. Sincronice siempre al
+final del día.</p>
+<p><strong>No puedo completar todo en una sola visita</strong></p>
+<p>Guarde el progreso al terminar la visita (boton 'Guardar'). El
+sistema conserva los datos. Coordine una segúnda visita para completar
+los módulos faltantes.</p>
+<p><strong>Como mido los m2 afectados por un defecto</strong></p>
+<p>Estime la zona danada como un rectángulo: Largo (m) × Ancho (m). Para
+formas irregulares, dibuje un rectángulo imaginario que contenga la zona
+y reste las partes no afectadas. No necesita ser exacto: una estimación
+visual es suficiente.</p>
+<p><strong>El local esta cerrado el día de la visita</strong></p>
+<p>Fotografie el exterior, complete los datos visibles desde fuera
+(fachada, cercado, tipo de construcción) y anote en Observaciones que el
+local estaba cerrado con la fecha y hora de la visita. Coordine una
+segúnda visita con el coordinador.</p>
+<p><strong>Encuentro danos estructurales graves</strong></p>
+<p>Documente con fotografías detalladas desde distintos ángulos.
+Registre la descripcion en Observaciones y notifique de inmedíato al
+supervisor del distrito para que active el protocolo de emergencia.</p>
+<p><strong>El sistema no me deja avanzar</strong></p>
+<p>Hay campos obligatorios vacíos o con datos invalidos. Revise que no
+haya mensajes de error en rojo dentro del módulo actual. Los errores mas
+comunes son: coordenadas fuera de rango, campos numericos vacíos y
+respuestas en blanco en preguntas obligatorias.</p>
+<h2 id="glosario-de-términos-técnicos"><strong>Glosario de términos
+técnicos</strong></h2>
+<table>
+<thead>
+<tr class="header">
+<th><strong>Termino</strong></th>
+<th><strong>Definición</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Acometida</strong></td>
+<td>Conexión entre la red eléctrica pública (ANDE u otro proveedor) y el
+tablero principal del local escolar.</td>
+</tr>
+<tr class="even">
+<td><strong>Bloque</strong></td>
+<td>Cuerpo constructivo independiente dentro del predio escolar. Un
+local puede tener uno o varios bloques.</td>
+</tr>
+<tr class="odd">
+<td><strong>Box / Cabina</strong></td>
+<td>Espacio individual dentro del bloque sanitario, delimitado por muros
+o tabiques.</td>
+</tr>
+<tr class="even">
+<td><strong>Carpeta de cemento</strong></td>
+<td>Piso de cemento alisado, sin revestimiento adicional.</td>
+</tr>
+<tr class="odd">
+<td><strong>Dependencia</strong></td>
+<td>Espacio del bloque distinto al aula: dirección, secretaria,
+biblioteca, depósito, cocina, sala de profesores, salon multiuso,
+etc.</td>
+</tr>
+<tr class="even">
+<td><strong>Desaplomado</strong></td>
+<td>Pared con inclinacion visible respecto a la vertical, que indica
+deformacion estructural.</td>
+</tr>
+<tr class="odd">
+<td><strong>H°A° (Hormigón Armado)</strong></td>
+<td>Concreto reforzado con armadura metálica (hierro). Una 'losa de
+H°A°' es un techo plano de concreto armado.</td>
+</tr>
+<tr class="even">
+<td><strong>Huella del bloque</strong></td>
+<td>Contorno o proyección del bloque en el suelo, visto desde arriba
+(planta).</td>
+</tr>
+<tr class="odd">
+<td><strong>Pandeo</strong></td>
+<td>Deformacion de la losa hacia abajo por sobrecarga, defecto
+constructivo o falla de la estructura de soporte.</td>
+</tr>
+<tr class="even">
+<td><strong>Planta / Nivel</strong></td>
+<td>Cada piso del bloque. PB = Planta Baja (planta a nivel del suelo),
+P1 = Primer Piso, P2 = Segundo Piso, etc.</td>
+</tr>
+<tr class="odd">
+<td><strong>Revoque</strong></td>
+<td>Capa de mortero, yeso o material similar que recubre la pared de
+ladrillo para darle terminación.</td>
+</tr>
+<tr class="even">
+<td><strong>Tablero principal</strong></td>
+<td>Tablero electrico donde llega la acometida y desde donde se
+distribuye la corriente al resto del local.</td>
+</tr>
+<tr class="odd">
+<td><strong>Tablero secciónal</strong></td>
+<td>Tablero electrico secundario que alimenta una zona, bloque o planta
+especifica.</td>
+</tr>
+<tr class="even">
+<td><strong>Tejuelon / Tejuelita</strong></td>
+<td>Piezas cerámicas planas usadas como cubierta en techos inclinados,
+apoyadas sobre tirantes de madera.</td>
+</tr>
+<tr class="odd">
+<td><strong>Tirante</strong></td>
+<td>Elemento horizontal de madera o metalico que conforma la estructura
+de soporte de un techo inclinado.</td>
+</tr>
+<tr class="even">
+<td><strong>Norma INTN de accesibilidad</strong></td>
+<td>Estándar paraguayo que exige en rampas: ancho minimo 1,20 m,
+pendiente máxima 8%, superficie antideslizante y pasamanos continuos a
+ambos lados a 0,90 m y 0,75 m de altura.</td>
+</tr>
+</tbody>
+</table>
+<p><em>CIALPA · Relevamiento de Infraestructura Educativa · Manual del
+Encuestador v3.0 · 2026<br />
+Documento de uso interno , no distribuir sin autorizacion</em></p>
+<hr />
+<h2 id="16-checklist-rápido-para-el-encuestador">16. Checklist rápido
+para el encuestador</h2>
+<p>Antes de iniciar:</p>
+<ul class="task-list">
+<li><label><input type="checkbox" />El dispositivo tiene batería
+suficiente.</label></li>
+<li><label><input type="checkbox" />La app externa está
+instalada.</label></li>
+<li><label><input type="checkbox" />La app web CIALPA abre
+correctamente.</label></li>
+<li><label><input type="checkbox" />El usuario puede iniciar
+sesión.</label></li>
+<li><label><input type="checkbox" />Las escuelas asignadas aparecen en
+la lista.</label></li>
+<li><label><input type="checkbox" />El mapa muestra la escuela, si tiene
+coordenadas.</label></li>
+<li><label><input type="checkbox" />El supervisor confirmó la
+ruta.</label></li>
+<li><label><input type="checkbox" />Se tiene contacto del responsable
+escolar.</label></li>
+<li><label><input type="checkbox" />Se cuenta con cinta métrica y
+elementos de respaldo.</label></li>
+</ul>
+<p>Durante el relevamiento:</p>
+<ul class="task-list">
+<li><label><input type="checkbox" />Se registró llegada.</label></li>
+<li><label><input type="checkbox" />Se inició relevamiento en
+CIALPA.</label></li>
+<li><label><input type="checkbox" />Se abrió el aplicativo
+externo.</label></li>
+<li><label><input type="checkbox" />Se registraron módulos o pausas
+relevantes.</label></li>
+<li><label><input type="checkbox" />Se registraron
+incidencias.</label></li>
+<li><label><input type="checkbox" />Se documentaron observaciones
+críticas.</label></li>
+</ul>
+<p>Al cerrar:</p>
+<ul class="task-list">
+<li><label><input type="checkbox" />El aplicativo externo fue cerrado o
+quedó registrado el motivo de cierre parcial.</label></li>
+<li><label><input type="checkbox" />Se registró folio externo o último
+registro disponible.</label></li>
+<li><label><input type="checkbox" />No quedaron módulos
+abiertos.</label></li>
+<li><label><input type="checkbox" />El cierre se marcó como completo,
+parcial o con incidencia.</label></li>
+<li><label><input type="checkbox" />El estado de la escuela quedó
+actualizado.</label></li>
+<li><label><input type="checkbox" />El supervisor fue notificado si hubo
+problema.</label></li>
+</ul>
+<hr />
+<h2 id="17-reglas-de-calidad-para-la-encuesta-grande">17. Reglas de
+calidad para la encuesta grande</h2>
+<p>Para escalar desde el prepiloto y piloto hacia la encuesta grande,
+deben cumplirse estas reglas:</p>
+<ol type="1">
+<li><strong>Trazabilidad completa:</strong> toda escuela visitada debe
+tener inicio, cierre y estado.</li>
+<li><strong>Unicidad:</strong> una misma escuela no debe tener dos
+sesiones finales contradictorias.</li>
+<li><strong>Consistencia temporal:</strong> la hora de cierre debe ser
+posterior a la hora de inicio.</li>
+<li><strong>Coherencia de estado:</strong> una escuela finalizada no
+debe tener módulos críticos abiertos.</li>
+<li><strong>Evidencia mínima:</strong> todo cierre parcial o incidencia
+crítica debe tener observación.</li>
+<li><strong>Control de folio:</strong> cuando el aplicativo externo
+genere identificador, debe registrarse.</li>
+<li><strong>Validación diaria:</strong> el supervisor debe revisar
+sesiones abiertas e incidencias al cierre de cada jornada.</li>
+<li><strong>Corrección centralizada:</strong> errores de escuelas,
+códigos o coordenadas deben corregirse en la base maestra, no
+manualmente en dispositivos aislados.</li>
+</ol>
+<hr />
+<h2 id="18-mensajes-modelo-para-observaciones-de-campo">18. Mensajes
+modelo para observaciones de campo</h2>
+<h3 id="escuela-cerrada">Escuela cerrada</h3>
+<blockquote>
+<p>Se llegó al local escolar a las HH:MM. El local se encontró cerrado y
+no fue posible contactar al responsable institucional. Se informa al
+supervisor para reprogramación.</p>
+</blockquote>
+<h3 id="responsable-ausente">Responsable ausente</h3>
+<blockquote>
+<p>Se llegó al local escolar a las HH:MM. El responsable institucional
+no se encontraba disponible. Se coordinó tentativa de nueva visita para
+FECHA/HORA.</p>
+</blockquote>
+<h3 id="apertura-manual-del-aplicativo-externo">Apertura manual del
+aplicativo externo</h3>
+<blockquote>
+<p>El botón Aplicar encuesta no abrió automáticamente el aplicativo
+externo. Se procedió a abrirlo manualmente desde el dispositivo. El
+relevamiento continuó normalmente.</p>
+</blockquote>
+<h3 id="cierre-parcial">Cierre parcial</h3>
+<blockquote>
+<p>El relevamiento quedó parcial por MOTIVO. Se completaron los módulos
+X, Y y Z. Quedaron pendientes los módulos A y B. Se solicita
+reprogramación.</p>
+</blockquote>
+<h3 id="datos-de-escuela-inconsistentes">Datos de escuela
+inconsistentes</h3>
+<blockquote>
+<p>El código o nombre del local escolar mostrado en CIALPA no coincide
+plenamente con la identificación observada en campo. Se adjunta
+observación para revisión del supervisor.</p>
+</blockquote>
+<hr />
+<h2 id="19-cierre-documental">19. Cierre documental</h2>
+<p>Este manual debe mantenerse versionado junto con la app web.
+Cualquier cambio en el aplicativo externo, en las reglas de campo, en la
+estructura de módulos o en la hoja maestra de escuelas debe reflejarse
+en una nueva versión del manual.</p>
+<p><strong>CIALPA, Relevamiento de Infraestructura Educativa, Manual del
+Encuestador v4.0, 2026.</strong></p>
+</div>
+</main>
 <script>
-  // Scroll spy & back-to-top
-  const navLinks = document.querySelectorAll('.sidebar nav a');
-  const sections = document.querySelectorAll('.manual-section');
-  const backTop = document.getElementById('back-to-top');
-
-  window.addEventListener('scroll', () => {
-    let current = '';
-    sections.forEach(s => {
-      if (window.scrollY >= s.offsetTop - 120) current = s.id;
-    });
-    navLinks.forEach(a => {
-      a.classList.remove('active');
-      if (a.getAttribute('href') === '#s-' + current.replace('sec-', '')) a.classList.add('active');
-    });
-    backTop.classList.toggle('visible', window.scrollY > 400);
-  });
-
-  // Search
-  function searchManual(q) {
-    const query = q.toLowerCase().trim();
-    sections.forEach(section => {
-      if (!query) { section.style.display = ''; return; }
-      const text = section.textContent.toLowerCase();
-      section.style.display = text.includes(query) ? '' : 'none';
-    });
+function normalizeText(value){
+  return (value || '').toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+function filterManual(query){
+  const q = normalizeText(query);
+  const content = document.getElementById('manualContent');
+  const blocks = content.querySelectorAll('h1,h2,h3,h4,p,li,table,blockquote');
+  if(!q){
+    blocks.forEach(el => el.style.display = '');
+    return;
   }
+  blocks.forEach(el => {
+    const text = normalizeText(el.innerText || el.textContent);
+    el.style.display = text.includes(q) ? '' : 'none';
+  });
+}
 </script>
 </body>
 </html>
