@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.4.0</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.5.0</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.4.0</strong>
+      Edición vigente<br><strong class="app-version">v2.5.0</strong>
     </div>
   </aside>
 
@@ -192,7 +192,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.4.0</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.5.0</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -219,6 +219,7 @@
             <span class="badge" style="background:var(--state-incidencia)">Inc: <span id="map-count-incidencia">0</span></span>
             <span class="badge" style="background:var(--color-secondary)">Total: <span id="map-count-total">0</span></span>
             <button class="btn btn-sm btn-outline" onclick="MapModule.toggleRoutes()">Rutas</button>
+            <button class="btn btn-sm btn-outline" onclick="MapModule.cacheVisibleMap()">Guardar mapa offline</button>
             <button class="btn btn-sm btn-primary" data-min-role="admin" onclick="MapModule.promptAutoAssign()">Asignar sectores</button>
           </div>
         </div>
@@ -263,6 +264,7 @@
 
           <!-- Map container -->
           <div class="map-main">
+            <div id="map-offline-state" class="map-offline-state">Mapa offline: calculando...</div>
             <div id="map-container"></div>
             <div id="map-info-panel" class="map-info-panel"></div>
           </div>
@@ -524,6 +526,7 @@
           </div>
 
           <div id="offline-dashboard" class="offline-dashboard"></div>
+          <div id="infra-dashboard" class="infra-dashboard"></div>
 
           <!-- KPIs -->
           <div class="stats-grid">

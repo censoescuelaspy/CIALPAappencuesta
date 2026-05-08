@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -618,6 +618,7 @@ const AppController = (() => {
       if (result.status === 'ok') {
         MapModule.loadMarkers(result.data || []);
         MapModule.populateFilterDropdowns();
+        MapModule.updateOfflineStatus();
         _bindMapFilters();
       }
     } catch (err) {

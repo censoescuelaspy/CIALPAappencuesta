@@ -667,6 +667,32 @@ td {
 
 #map-container { width: 100%; height: 100%; }
 
+.map-offline-state {
+  position: absolute;
+  top: .75rem;
+  left: 3.5rem;
+  z-index: 520;
+  max-width: min(520px, calc(100% - 7rem));
+  padding: .35rem .65rem;
+  border: 1px solid rgba(31,56,100,.22);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.92);
+  color: var(--color-secondary);
+  box-shadow: var(--shadow-sm);
+  font-size: .76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.map-offline-state--ready {
+  border-color: rgba(15,118,110,.32);
+  color: #0f766e;
+  background: rgba(240,253,250,.94);
+}
+
 .map-info-panel {
   position: absolute;
   bottom: 2rem;
@@ -839,6 +865,10 @@ td {
 .chart-card--full { grid-column: 1 / -1; }
 
 .offline-dashboard {
+  margin-bottom: 1.25rem;
+}
+
+.infra-dashboard {
   margin-bottom: 1.25rem;
 }
 
@@ -1057,6 +1087,49 @@ td {
   min-width: 8px;
   border-radius: 4px 4px 0 0;
   background: #e84c22;
+}
+
+.infra-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+}
+
+.infra-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: .65rem;
+}
+
+.infra-item {
+  min-height: 88px;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-sm);
+  background: #fbfcfe;
+  padding: .7rem;
+}
+
+.infra-item span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.infra-item strong {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 1.45rem;
+  line-height: 1.2;
+  margin: .15rem 0;
+}
+
+.infra-item small {
+  color: var(--color-text-muted);
+  font-size: .76rem;
 }
 
 /* ── Admin / Config ───────────────────────────────────────── */
@@ -1505,6 +1578,12 @@ td {
   .ops-actions .btn { flex: 1 1 100%; }
   .offline-metric-grid { grid-template-columns: 1fr 1fr; }
   .css-bar-row { grid-template-columns: 82px 1fr 28px; }
+  .map-offline-state {
+    left: .75rem;
+    right: .75rem;
+    max-width: none;
+    top: .6rem;
+  }
 }
 
 /* ── Print styles ─────────────────────────────────────────── */

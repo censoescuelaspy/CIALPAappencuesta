@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.0.0
+ * Version: 2.5.0
  */
 
 const MapModule = (() => {
@@ -18,6 +18,7 @@ const MapModule = (() => {
   let _routesVisible = true;
 
   const _PALETTE = ['#2b6cb0', '#2f855a', '#b7791f', '#805ad5', '#c05621', '#0f766e', '#b83280', '#4a5568', '#2563eb', '#16a34a'];
+  const _OSM_SUBDOMAINS = ['a', 'b', 'c'];
 
   // ── Icon factory ──────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ const MapModule = (() => {
 
     // Scale control
     L.control.scale({ imperial: false }).addTo(_map);
+    updateOfflineStatus();
 
     return _map;
   }
@@ -184,6 +186,7 @@ const MapModule = (() => {
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
     _renderRoutes(_escuelas);
+    updateOfflineStatus();
   }
 
   function _visibleForCurrentUser(e) {
@@ -426,6 +429,123 @@ const MapModule = (() => {
     if (_map) _map.invalidateSize();
   }
 
+  function _tileX(lng, zoom) {
+    return Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
+  }
+
+  function _tileY(lat, zoom) {
+    const safeLat = Math.max(-85.0511, Math.min(85.0511, lat));
+    const rad = safeLat * Math.PI / 180;
+    return Math.floor((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2 * Math.pow(2, zoom));
+  }
+
+  function _tileUrlsForBounds(bounds, zoom) {
+    const north = bounds.getNorth();
+    const south = bounds.getSouth();
+    const west = bounds.getWest();
+    const east = bounds.getEast();
+    const maxTile = Math.pow(2, zoom) - 1;
+    const xMin = Math.max(0, _tileX(west, zoom) - 1);
+    const xMax = Math.min(maxTile, _tileX(east, zoom) + 1);
+    const yMin = Math.max(0, _tileY(north, zoom) - 1);
+    const yMax = Math.min(maxTile, _tileY(south, zoom) + 1);
+    const urls = [];
+    for (let x = xMin; x <= xMax; x++) {
+      for (let y = yMin; y <= yMax; y++) {
+        const sub = _OSM_SUBDOMAINS[(x + y + zoom) % _OSM_SUBDOMAINS.length];
+        urls.push(`https://${sub}.tile.openstreetmap.org/${zoom}/${x}/${y}.png`);
+        urls.push(`https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${x}/${y}.png`);
+      }
+    }
+    return urls;
+  }
+
+  function _visibleTileUrls() {
+    if (!_map) return [];
+    const currentZoom = Math.round(_map.getZoom());
+    const zooms = [...new Set([currentZoom, Math.min(APP_CONFIG.MAP_MAX_ZOOM, currentZoom + 1)])];
+    return [...new Set(zooms.flatMap(zoom => _tileUrlsForBounds(_map.getBounds(), zoom)))];
+  }
+
+  async function cacheVisibleMap() {
+    if (!_map) return;
+    if (!('caches' in window)) {
+      UI.showToast('Este navegador no permite guardar mapas offline.', 'warning');
+      return;
+    }
+
+    const urls = _visibleTileUrls();
+    const limit = Number(APP_CONFIG.MAP_TILE_CACHE_LIMIT || 260);
+    if (urls.length > limit) {
+      const ok = await UI.showConfirm('Guardar mapa offline', `La zona visible requiere ${urls.length} teselas. Para cuidar datos del celular se guardaran ${limit}. ¿Continuar?`);
+      if (!ok) return;
+    }
+
+    const selected = urls.slice(0, limit);
+    const cache = await caches.open(APP_CONFIG.MAP_TILE_CACHE_NAME || 'cialpa-map-tiles');
+    let saved = 0;
+    let failed = 0;
+    const state = document.getElementById('map-offline-state');
+    if (state) state.textContent = `Mapa offline: guardando 0/${selected.length}`;
+
+    for (let i = 0; i < selected.length; i++) {
+      const url = selected[i];
+      try {
+        const cached = await cache.match(url);
+        if (!cached) {
+          const response = await fetch(url, { mode: 'no-cors', cache: 'force-cache' });
+          await cache.put(url, response.clone());
+        }
+        saved++;
+      } catch {
+        failed++;
+      }
+      if (state && (i % 12 === 0 || i === selected.length - 1)) {
+        state.textContent = `Mapa offline: guardando ${i + 1}/${selected.length}`;
+      }
+    }
+
+    localStorage.setItem('cialpa_map_cache_last', JSON.stringify({
+      savedAt: new Date().toISOString(),
+      saved,
+      failed,
+      zoom: _map.getZoom(),
+      center: _map.getCenter(),
+    }));
+    await updateOfflineStatus();
+    UI.showToast(`Mapa offline guardado: ${saved} teselas${failed ? `, ${failed} fallidas` : ''}.`, failed ? 'warning' : 'success', 6500);
+  }
+
+  async function updateOfflineStatus() {
+    const state = document.getElementById('map-offline-state');
+    if (!state) return;
+    let tileCount = 0;
+    if ('caches' in window) {
+      try {
+        const cache = await caches.open(APP_CONFIG.MAP_TILE_CACHE_NAME || 'cialpa-map-tiles');
+        tileCount = (await cache.keys()).length;
+      } catch {
+        tileCount = 0;
+      }
+    }
+    let cachedSchools = 0;
+    if (typeof CialpaLocalStore !== 'undefined') {
+      try {
+        const cached = await CialpaLocalStore.getApi('getEscuelas', {});
+        cachedSchools = cached?.response?.data?.length || 0;
+      } catch {
+        cachedSchools = 0;
+      }
+    }
+    const last = (() => {
+      try { return JSON.parse(localStorage.getItem('cialpa_map_cache_last') || 'null'); }
+      catch { return null; }
+    })();
+    const lastText = last?.savedAt ? ` · ${new Date(last.savedAt).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' })}` : '';
+    state.textContent = `Mapa offline: ${tileCount} teselas · ${cachedSchools} escuelas cacheadas${lastText}`;
+    state.classList.toggle('map-offline-state--ready', tileCount > 0 || cachedSchools > 0);
+  }
+
   function getMap() {
     return _map;
   }
@@ -470,5 +590,7 @@ const MapModule = (() => {
     toggleRoutes,
     promptAutoAssign,
     autoAssignClusters,
+    cacheVisibleMap,
+    updateOfflineStatus,
   };
 })();

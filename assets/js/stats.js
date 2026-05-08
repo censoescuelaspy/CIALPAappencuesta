@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.4.0
+ * Version: 2.5.0
  */
 
 const StatsModule = (() => {
@@ -72,6 +72,7 @@ const StatsModule = (() => {
 
     _statsData = _normalizeStats(remoteStats);
     _renderOfflineDashboard(_localAnalytics);
+    _renderInfrastructureDashboard(_localAnalytics);
     _renderKPIs(_statsData);
     _renderCharts(_statsData);
     _renderEncuestadoresTable(_statsData.por_encuestador || []);
@@ -156,6 +157,46 @@ const StatsModule = (() => {
             </div>
             <small>Bueno ${mec.quality?.Bueno || 0} · Regular ${mec.quality?.Regular || 0} · Malo ${mec.quality?.Malo || 0} · Sin estado ${mec.quality?.['Sin estado'] || 0}</small>
           </article>
+        </div>
+      </section>`;
+  }
+
+  function _renderInfrastructureDashboard(local) {
+    const container = document.getElementById('infra-dashboard');
+    if (!container) return;
+    const mec = local?.mec || (typeof CialpaLocalStore !== 'undefined' ? CialpaLocalStore.mecMetrics() : null);
+    if (!mec || (!mec.blocks && !mec.classrooms && !mec.sanitaries && !mec.evidenceTotal)) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const rows = [
+      ['Bloques', mec.blocks || 0, 'Estructuras registradas'],
+      ['Aulas', mec.classrooms || 0, `${Number(mec.areaClassrooms || 0).toFixed(1)} m2`],
+      ['Sanitarios', mec.sanitaries || 0, `${Number(mec.areaSanitaries || 0).toFixed(1)} m2`],
+      ['Puertas', mec.doors || 0, 'Aberturas dibujadas'],
+      ['Ventanas', mec.windows || 0, 'Aberturas dibujadas'],
+      ['Tomas', mec.outlets || 0, 'Electricidad en croquis'],
+      ['Danos', mec.damages || 0, 'Alertas visibles'],
+      ['Escaleras', mec.stairs || 0, 'Circulacion vertical'],
+      ['Fotos de campos', mec.fieldEvidenceCount || 0, `${mec.evidencePending || 0} pendientes`],
+      ['Fotos de objetos', mec.objectEvidenceCount || 0, 'Puertas, ventanas, danos, etc.'],
+      ['Fotos sanitarias', mec.sanitaryEvidenceCount || 0, 'Banos y cabinas'],
+    ];
+
+    container.innerHTML = `
+      <section class="infra-panel">
+        <div class="card__header">
+          <h4 class="card__title">Reporte local de infraestructura</h4>
+          <span class="badge badge--info">${_escape(_formatDate(mec.savedAt) || 'Borrador local')}</span>
+        </div>
+        <div class="infra-grid">
+          ${rows.map(([label, value, note]) => `
+            <article class="infra-item">
+              <span>${_escape(label)}</span>
+              <strong>${_escape(value)}</strong>
+              <small>${_escape(note)}</small>
+            </article>`).join('')}
         </div>
       </section>`;
   }

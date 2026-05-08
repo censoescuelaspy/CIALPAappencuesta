@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.4.0';
+const CACHE_NAME = 'cialpa-app-v2.5.0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -49,7 +49,14 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
 
   if (url.origin !== self.location.origin) {
-    if (!['unpkg.com', 'cdn.jsdelivr.net', 'server.arcgisonline.com'].includes(url.hostname)) return;
+    const cacheableExternal = [
+      'unpkg.com',
+      'cdn.jsdelivr.net',
+      'server.arcgisonline.com',
+      'tile.openstreetmap.org',
+      'tile.openstreetmap.fr',
+    ].some(host => url.hostname === host || url.hostname.endsWith('.' + host));
+    if (!cacheableExternal) return;
     event.respondWith(
       caches.match(request).then(cached => cached || fetch(request).then(response => {
         const copy = response.clone();
