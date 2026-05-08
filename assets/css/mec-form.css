@@ -382,11 +382,20 @@
   background: #f7fbff;
 }
 
+.mec-option.mec-choice--success,
+.mec-option.mec-choice--warning,
+.mec-option.mec-choice--danger,
+.mec-option.mec-choice--muted {
+  border-color: var(--choice-border);
+  background: var(--choice-bg);
+  color: var(--choice-text);
+}
+
 .mec-option:has(input:checked) {
-  border-color: #2b6cb0;
-  background: #eaf4ff;
-  color: #173f68;
-  box-shadow: 0 0 0 2px rgba(43, 108, 176, .1);
+  border-color: var(--choice-active-border, #2b6cb0);
+  background: var(--choice-active-bg, #eaf4ff);
+  color: var(--choice-active-text, #173f68);
+  box-shadow: 0 0 0 2px var(--choice-ring, rgba(43, 108, 176, .1));
 }
 
 .mec-option input {
@@ -638,6 +647,86 @@
   color: #617083;
   font-size: .84rem;
   font-weight: 700;
+}
+
+.mec-repeat-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+
+.mec-repeat-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: .55rem;
+  margin-bottom: .9rem;
+}
+
+.mec-repeat-item {
+  min-height: 66px;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-repeat-item--active {
+  border-color: #2b6cb0;
+  background: #eef6ff;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, .12);
+}
+
+.mec-repeat-item strong,
+.mec-repeat-item span {
+  display: block;
+}
+
+.mec-repeat-item span {
+  margin-top: .18rem;
+  color: #667085;
+  font-size: .78rem;
+  line-height: 1.25;
+}
+
+.mec-sanitary-list {
+  display: grid;
+  gap: .85rem;
+}
+
+.mec-sanitary-card {
+  padding: .85rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-sanitary-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .8rem;
+}
+
+.mec-sanitary-card__header strong,
+.mec-sanitary-card__header span {
+  display: block;
+}
+
+.mec-sanitary-card__header span {
+  color: #667085;
+  font-size: .82rem;
+}
+
+.mec-sanitary-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: .75rem;
+  margin: .75rem 0;
 }
 
 .school-plan {

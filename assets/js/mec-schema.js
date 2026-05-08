@@ -152,8 +152,9 @@ const MEC_SCHEMA = {
     {
       id: 'sanitarios',
       title: 'Sanitarios',
-      description: 'Modulo repetible detectado. Implementacion detallada en desarrollo.',
+      description: 'Registro repetible de baterias sanitarias, artefactos, accesibilidad, estado y evidencias.',
       status: 'development',
+      kind: 'sanitaryList',
       sections: [],
     },
   ],

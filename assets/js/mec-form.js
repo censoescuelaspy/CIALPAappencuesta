@@ -12,6 +12,7 @@ const MecFormModule = (() => {
   let _activeModuleId = 'general';
   let _sketchTool = 'select';
   let _selectedSketchObjectId = null;
+  let _activeClassroomId = null;
 
   const SKETCH_TOOLS = [
     { id: 'select', label: 'Seleccionar' },
@@ -40,6 +41,7 @@ const MecFormModule = (() => {
   }
 
   function _saveDraft(showToast = false) {
+    if (_data.__classroomSketch && _data.__classrooms) _syncActiveClassroomFromSketch();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       savedAt: new Date().toISOString(),
       schemaVersion: MEC_SCHEMA.version,
@@ -51,6 +53,7 @@ const MecFormModule = (() => {
   function _setValue(moduleId, fieldId, value) {
     _data[moduleId] = _data[moduleId] || {};
     _data[moduleId][fieldId] = value;
+    if (moduleId === 'bloques') _syncActiveBlock();
     _saveDraft(false);
     _refreshDynamicState();
   }
@@ -196,8 +199,34 @@ const MecFormModule = (() => {
 
   function _renderActiveModule(module) {
     if (module.kind === 'classroomSketch') return _renderClassroomSketchModule();
+    if (module.kind === 'sanitaryList') return _renderSanitaryModule();
+    if (module.id === 'bloques') return _renderBlockModule(module);
     if (!module.sections?.length) return _renderDevelopmentModule(module);
     return module.sections.map(section => _renderSection(module, section)).join('');
+  }
+
+  function _renderBlockModule(module) {
+    _ensureBlocks();
+    return `
+      <section class="mec-section">
+        <div class="mec-section__header">
+          <h4>Bloques registrados</h4>
+          <p class="mec-hint">Guarde cada bloque como registro separado para poder volver, corregirlo o asociar aulas y sanitarios.</p>
+        </div>
+        <div class="mec-repeat-toolbar">
+          <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newBlock()">+ Nuevo bloque</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.saveCurrentBlock()">Guardar bloque actual</button>
+        </div>
+        <div class="mec-repeat-list">
+          ${(_data.__blocks || []).map(block => `
+            <button class="mec-repeat-item ${block.id === _data.__activeBlockId ? 'mec-repeat-item--active' : ''}" type="button"
+              onclick="MecFormModule.selectBlock('${_escape(block.id)}')">
+              <strong>${_escape(block.bloque_codigo || 'Bloque sin nombre')}</strong>
+              <span>${_escape(_blockSummary(block))}</span>
+            </button>`).join('')}
+        </div>
+      </section>
+      ${module.sections.map(section => _renderSection(module, section)).join('')}`;
   }
 
   function _renderPlannedModule(module) {
@@ -239,7 +268,7 @@ const MecFormModule = (() => {
       return _wrapField(moduleId, field, `
         <div class="mec-options">
           ${field.options.map(option => `
-            <label class="mec-option">
+            <label class="mec-option ${_choiceToneClass(option)}">
               <input type="radio" name="${id}" value="${_escape(option)}" ${value === option ? 'checked' : ''}>
               <span>${_escape(option)}</span>
             </label>`).join('')}
@@ -260,10 +289,13 @@ const MecFormModule = (() => {
 
     if (field.type === 'select') {
       return _wrapField(moduleId, field, `
-        <select id="${id}" class="form-control">
-          <option value="">Seleccione...</option>
-          ${field.options.map(option => `<option value="${_escape(option)}" ${value === option ? 'selected' : ''}>${_escape(option)}</option>`).join('')}
-        </select>${hint}`);
+        <input id="${id}" class="mec-choice-value" type="hidden" value="${_escape(value)}">
+        <div class="mec-choice-buttons">
+          ${field.options.map(option => `
+            <button class="mec-choice mec-schema-choice ${_choiceToneClass(option)} ${value === option ? 'mec-choice--active' : ''}" type="button" data-choice-value="${_escape(option)}">
+              ${_escape(option)}
+            </button>`).join('')}
+        </div>${hint}`);
     }
 
     if (field.type === 'textarea') {
@@ -363,15 +395,31 @@ const MecFormModule = (() => {
   }
 
   function _renderClassroomSketchModule() {
+    _ensureClassrooms();
     const sketch = _data.__classroomSketch || {};
+    const classrooms = _data.__classrooms || [];
     return `
       <section class="mec-section mec-sketch">
         <div class="mec-section__header">
-          <h4>Croquis dimensional del aula</h4>
-          <p class="mec-hint">En desarrollo: genere un aula base y agregue elementos simples que quedan guardados como datos editables.</p>
+          <h4>Aulas y croquis dimensionales</h4>
+          <p class="mec-hint">Cada aula queda guardada como registro independiente. Puede volver, seleccionar un aula cargada y editar su plano o sus elementos.</p>
+        </div>
+        <div class="mec-repeat-toolbar">
+          <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.saveCurrentClassroom()">Guardar aula actual</button>
+        </div>
+        <div class="mec-repeat-list">
+          ${classrooms.map((room, index) => `
+            <button class="mec-repeat-item ${room.id === _activeClassroomId ? 'mec-repeat-item--active' : ''}" type="button"
+              onclick="MecFormModule.selectClassroom('${_escape(room.id)}')">
+              <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
+              <span>${_escape(_classroomSummary(room))}</span>
+            </button>`).join('')}
         </div>
         <div class="mec-sketch__layout">
           <div class="mec-sketch__tools">
+            <label class="mec-label"><span>Nombre / codigo del aula</span></label>
+            <input class="form-control" type="text" value="${_escape(sketch.name || '')}" data-sketch-field="name" placeholder="Ej.: Aula 1, 2A, Inicial">
             <label class="mec-label"><span>Largo aproximado</span></label>
             <div class="mec-input-with-unit">
               <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.length || '')}" data-sketch-field="length">
@@ -416,6 +464,316 @@ const MecFormModule = (() => {
     return SKETCH_TOOLS.find(tool => tool.id === toolId)?.label || toolId;
   }
 
+  function _ensureClassrooms() {
+    _data.__classrooms = _data.__classrooms || [];
+    if (!_data.__classrooms.length) {
+      _data.__classroomSketch = _data.__classroomSketch || { name: 'Aula 1', objects: [] };
+      _activeClassroomId = _activeClassroomId || _data.__classroomSketch.id || `aula_${Date.now()}`;
+      _data.__classroomSketch.id = _activeClassroomId;
+      _data.__classroomSketch.name = _data.__classroomSketch.name || 'Aula 1';
+      _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
+    }
+    if (!_activeClassroomId || !_data.__classrooms.some(room => room.id === _activeClassroomId)) {
+      _activeClassroomId = _data.__classrooms[0].id;
+      _loadActiveClassroomIntoSketch();
+    }
+  }
+
+  function _cloneClassroom(sketch) {
+    return JSON.parse(JSON.stringify({
+      id: sketch.id || `aula_${Date.now()}`,
+      name: sketch.name || '',
+      length: sketch.length || '',
+      width: sketch.width || '',
+      openings: sketch.openings || '',
+      objects: sketch.objects || [],
+    }));
+  }
+
+  function _syncActiveClassroomFromSketch() {
+    _data.__classroomSketch = _data.__classroomSketch || {};
+    _data.__classrooms = _data.__classrooms || [];
+    _activeClassroomId = _activeClassroomId || _data.__classroomSketch.id || `aula_${Date.now()}`;
+    _data.__classroomSketch.id = _activeClassroomId;
+    const index = _data.__classrooms.findIndex(room => room.id === _activeClassroomId);
+    const snapshot = _cloneClassroom(_data.__classroomSketch);
+    if (index >= 0) _data.__classrooms[index] = snapshot;
+    else _data.__classrooms.push(snapshot);
+  }
+
+  function _loadActiveClassroomIntoSketch() {
+    const room = (_data.__classrooms || []).find(item => item.id === _activeClassroomId);
+    if (!room) return;
+    _data.__classroomSketch = _cloneClassroom(room);
+  }
+
+  function _classroomSummary(room) {
+    const objects = room.objects || [];
+    const parts = [];
+    if (room.length && room.width) parts.push(`${room.length} x ${room.width} m`);
+    parts.push(`${objects.filter(object => object.type === 'door').length} pta.`);
+    parts.push(`${objects.filter(object => object.type === 'window').length} vtna.`);
+    parts.push(`${objects.filter(object => object.type === 'outlet').length} TC`);
+    return parts.join(' · ');
+  }
+
+  function selectClassroom(id) {
+    _syncActiveClassroomFromSketch();
+    _activeClassroomId = id;
+    _loadActiveClassroomIntoSketch();
+    _selectedSketchObjectId = null;
+    _saveDraft(false);
+    _render();
+  }
+
+  function newClassroom() {
+    _syncActiveClassroomFromSketch();
+    const nextNumber = (_data.__classrooms || []).length + 1;
+    _activeClassroomId = `aula_${Date.now()}`;
+    _data.__classroomSketch = {
+      id: _activeClassroomId,
+      name: `Aula ${nextNumber}`,
+      length: '',
+      width: '',
+      openings: '',
+      objects: [],
+    };
+    _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
+    _selectedSketchObjectId = null;
+    _saveDraft(false);
+    _render();
+    UI.showToast('Nueva aula lista para cargar.', 'success');
+  }
+
+  function saveCurrentClassroom() {
+    _syncActiveClassroomFromSketch();
+    _saveDraft(true);
+    renderSchoolPlan();
+  }
+
+  function _ensureBlocks() {
+    _data.__blocks = _data.__blocks || [];
+    _data.bloques = _data.bloques || {};
+    if (!_data.__activeBlockId) _data.__activeBlockId = _data.__blocks[0]?.id || `bloque_${Date.now()}`;
+    if (!_data.__blocks.length) {
+      _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+    }
+  }
+
+  function _syncActiveBlock() {
+    _ensureBlocks();
+    const block = { id: _data.__activeBlockId, ...(_data.bloques || {}) };
+    const index = _data.__blocks.findIndex(item => item.id === block.id);
+    if (index >= 0) _data.__blocks[index] = block;
+    else _data.__blocks.push(block);
+  }
+
+  function _blockSummary(block) {
+    return [
+      block.cantidad_plantas ? `${block.cantidad_plantas} planta(s)` : '',
+      block.tipo_circulacion || '',
+    ].filter(Boolean).join(' · ') || 'Pendiente de completar';
+  }
+
+  function selectBlock(id) {
+    _syncActiveBlock();
+    const block = (_data.__blocks || []).find(item => item.id === id);
+    if (!block) return;
+    _data.__activeBlockId = id;
+    const { id: _id, ...values } = block;
+    _data.bloques = values;
+    _saveDraft(false);
+    _render();
+  }
+
+  function newBlock() {
+    _syncActiveBlock();
+    const next = (_data.__blocks || []).length + 1;
+    _data.__activeBlockId = `bloque_${Date.now()}`;
+    _data.bloques = { bloque_codigo: `Bloque ${next}`, cantidad_plantas: '1' };
+    _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+    _saveDraft(false);
+    _render();
+    UI.showToast('Nuevo bloque listo para cargar.', 'success');
+  }
+
+  function saveCurrentBlock() {
+    _syncActiveBlock();
+    _saveDraft(true);
+    _render();
+  }
+
+  function _ensureSanitaries() {
+    _data.__sanitaries = _data.__sanitaries || [];
+  }
+
+  function _sanitaryTemplate(index = 1) {
+    return {
+      id: `san_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      codigo: `Sanitario ${index}`,
+      bloque: '',
+      planta: 'PB',
+      tipo: 'Bateria sanitaria',
+      uso: 'Estudiantes',
+      genero: 'Mixto',
+      inodoros: '',
+      lavamanos: '',
+      urinarios: '',
+      duchas: '',
+      accesible: 'No',
+      agua: 'Si',
+      desague: '',
+      ventilacion: 'Natural',
+      iluminacion: 'Natural',
+      estado: '',
+      limpieza: '',
+      privacidad: '',
+      observacion: '',
+      evidencias: [],
+    };
+  }
+
+  function _renderSanitaryChoice(name, id, options, selected) {
+    return `
+      <div class="mec-choice-buttons">
+        ${options.map(option => `
+          <button class="mec-choice ${_choiceToneClass(option)} ${selected === option ? 'mec-choice--active' : ''}" type="button"
+            onclick="MecFormModule.setSanitaryValue('${_escape(id)}', '${_escape(name)}', '${_escape(option)}')">
+            ${_escape(option)}
+          </button>`).join('')}
+      </div>`;
+  }
+
+  function _renderSanitaryModule() {
+    _ensureSanitaries();
+    const items = _data.__sanitaries;
+    return `
+      <section class="mec-section mec-sanitary">
+        <div class="mec-section__header">
+          <h4>Sanitarios y saneamiento</h4>
+          <p class="mec-hint">Registre cada bano, bateria sanitaria o sanitario accesible como elemento independiente, con cantidades, estado y evidencia.</p>
+        </div>
+        <div class="mec-repeat-toolbar">
+          <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.addSanitary()">+ Agregar sanitario</button>
+        </div>
+        <div class="mec-sanitary-list">
+          ${items.length ? items.map(_renderSanitaryCard).join('') : '<p class="text-muted">Todavia no hay sanitarios cargados.</p>'}
+        </div>
+      </section>`;
+  }
+
+  function _renderSanitaryCard(item, index) {
+    const evidenceId = `sanitary-photo-${_escape(item.id)}`;
+    return `
+      <article class="mec-sanitary-card">
+        <div class="mec-sanitary-card__header">
+          <div>
+            <strong>${_escape(item.codigo || `Sanitario ${index + 1}`)}</strong>
+            <span>${_escape([item.bloque, item.planta, item.uso, item.genero].filter(Boolean).join(' · '))}</span>
+          </div>
+          <button class="btn btn-xs btn-danger" type="button" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')">Eliminar</button>
+        </div>
+
+        <div class="form-grid">
+          ${_sanitaryInput(item, 'codigo', 'Codigo / nombre', 'text')}
+          ${_sanitaryInput(item, 'bloque', 'Bloque', 'text')}
+          ${_sanitaryInput(item, 'planta', 'Planta', 'text')}
+          ${_sanitaryInput(item, 'tipo', 'Tipo', 'text')}
+          ${_sanitaryInput(item, 'inodoros', 'Inodoros', 'number')}
+          ${_sanitaryInput(item, 'lavamanos', 'Lavamanos', 'number')}
+          ${_sanitaryInput(item, 'urinarios', 'Urinarios', 'number')}
+          ${_sanitaryInput(item, 'duchas', 'Duchas', 'number')}
+        </div>
+
+        <div class="mec-sanitary-groups">
+          <div>
+            <label class="mec-label"><span>Uso principal</span></label>
+            ${_renderSanitaryChoice('uso', item.id, ['Estudiantes', 'Docentes', 'Administrativo', 'Publico', 'Otro'], item.uso)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Genero / destino</span></label>
+            ${_renderSanitaryChoice('genero', item.id, ['Mujeres', 'Varones', 'Mixto', 'Inclusivo', 'No definido'], item.genero)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Accesible</span></label>
+            ${_renderSanitaryChoice('accesible', item.id, ['Si, cumple', 'Si, parcial', 'No', 'No verificable'], item.accesible)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Cuenta con agua</span></label>
+            ${_renderSanitaryChoice('agua', item.id, ['Si', 'Intermitente', 'No'], item.agua)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Estado general</span></label>
+            ${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Limpieza</span></label>
+            ${_renderSanitaryChoice('limpieza', item.id, ['Buena', 'Regular', 'Mala', 'No verificable'], item.limpieza)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Privacidad</span></label>
+            ${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}
+          </div>
+          <div>
+            <label class="mec-label"><span>Desague</span></label>
+            ${_renderSanitaryChoice('desague', item.id, ['Red cloacal', 'Camara septica', 'Pozo ciego', 'Letrina', 'Otro', 'No verificable'], item.desague)}
+          </div>
+        </div>
+
+        <label class="mec-label"><span>Observacion</span></label>
+        <textarea class="form-control" rows="2" onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', 'observacion', this.value)">${_escape(item.observacion || '')}</textarea>
+
+        <div class="mec-object-evidence">
+          <input id="${evidenceId}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
+            onchange="MecFormModule.setSanitaryEvidence('${_escape(item.id)}', this)">
+          <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${evidenceId}')?.click()">Sacar foto</button>
+          <span>${(item.evidencias || []).length ? `${item.evidencias.length} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
+        </div>
+      </article>`;
+  }
+
+  function _sanitaryInput(item, key, label, type) {
+    return `
+      <div class="form-group">
+        <label>${_escape(label)}</label>
+        <input class="form-control" type="${_escape(type)}" min="0" step="1" value="${_escape(item[key] || '')}"
+          onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value)">
+      </div>`;
+  }
+
+  function addSanitary() {
+    _ensureSanitaries();
+    _data.__sanitaries.push(_sanitaryTemplate(_data.__sanitaries.length + 1));
+    _saveDraft(false);
+    _render();
+    UI.showToast('Sanitario agregado.', 'success');
+  }
+
+  function setSanitaryValue(id, key, value) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return;
+    item[key] = value;
+    _saveDraft(false);
+    _render();
+  }
+
+  async function setSanitaryEvidence(id, input) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return;
+    item.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file)));
+    _saveDraft(false);
+    _render();
+    UI.showToast('Foto asociada al sanitario.', 'success');
+  }
+
+  async function deleteSanitary(id) {
+    const confirmed = await UI.showConfirm('Eliminar sanitario', '¿Desea quitar este sanitario del relevamiento?');
+    if (!confirmed) return;
+    _data.__sanitaries = (_data.__sanitaries || []).filter(sanitary => sanitary.id !== id);
+    _saveDraft(false);
+    _render();
+  }
+
   function _bindInputs(root) {
     root.querySelectorAll('.mec-evidence-input').forEach(input => {
       input.addEventListener('change', () => _setEvidenceFiles(input.dataset.module, input.dataset.field, input.files || []));
@@ -426,6 +784,19 @@ const MecFormModule = (() => {
       const fieldId = fieldEl.dataset.field;
       const input = fieldEl.querySelector('input, select, textarea');
       if (!input) return;
+
+      const schemaChoices = fieldEl.querySelectorAll('.mec-schema-choice');
+      if (schemaChoices.length) {
+        schemaChoices.forEach(button => {
+          button.addEventListener('click', () => {
+            const value = button.dataset.choiceValue || '';
+            input.value = value;
+            schemaChoices.forEach(item => item.classList.toggle('mec-choice--active', item === button));
+            _setValue(moduleId, fieldId, value);
+          });
+        });
+        return;
+      }
 
       if (input.type === 'radio') {
         fieldEl.querySelectorAll('input[type="radio"]').forEach(radio => {
@@ -456,6 +827,7 @@ const MecFormModule = (() => {
       input.addEventListener('input', () => {
         _data.__classroomSketch = _data.__classroomSketch || {};
         _data.__classroomSketch[input.dataset.sketchField] = input.value;
+        _syncActiveClassroomFromSketch();
         _saveDraft(false);
       });
     });
@@ -1015,9 +1387,9 @@ const MecFormModule = (() => {
   function _choiceToneClass(value) {
     const text = String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (text.includes('no existe') || text.includes('no aplica') || text === 'no') return 'mec-choice--muted';
-    if (text.includes('malo') || text.includes('dano') || text.includes('no cumple') || text.includes('sin ') || text.includes('no verificable')) return 'mec-choice--danger';
-    if (text.includes('regular') || text.includes('intermitente') || text.includes('incompleto')) return 'mec-choice--warning';
-    if (text.includes('bueno') || /\bsi\b/.test(text) || text.includes('cumple') || text.includes('completo')) return 'mec-choice--success';
+    if (text.includes('malo') || text.includes('mala') || text.includes('dano') || text.includes('deficiente') || text.includes('fuera') || text.includes('expuesto') || text.includes('riesgo') || text.includes('urgente') || text.includes('no cumple') || text.includes('sin ') || text.includes('no verificable')) return 'mec-choice--danger';
+    if (text.includes('regular') || text.includes('intermitente') || text.includes('incompleto') || text.includes('parcial') || text.includes('flojo') || text.includes('moderado')) return 'mec-choice--warning';
+    if (text.includes('bueno') || text.includes('buena') || text.includes('adecuada') || text.includes('seguro') || /\bsi\b/.test(text) || text.includes('cumple') || text.includes('completo')) return 'mec-choice--success';
     return 'mec-choice--neutral';
   }
 
@@ -1408,7 +1780,8 @@ const MecFormModule = (() => {
     const root = document.getElementById('school-plan-root');
     if (!root) return;
     const sketch = _data.__classroomSketch || {};
-    const objects = sketch.objects || [];
+    _ensureClassrooms();
+    const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
 
     root.innerHTML = `
@@ -1416,6 +1789,8 @@ const MecFormModule = (() => {
         <section class="school-plan__kpis">
           ${_planKpi('Area construida relevada', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
           ${_planKpi('Aulas cargadas', metrics.rooms, 'Ambientes dibujados')}
+          ${_planKpi('Bloques', metrics.blocks, 'Bloques registrados')}
+          ${_planKpi('Sanitarios', metrics.sanitaries, 'Baterias o banos cargados')}
           ${_planKpi('Puertas', metrics.doors, _stateSummaryText(metrics.states.door))}
           ${_planKpi('Ventanas', metrics.windows, _stateSummaryText(metrics.states.window))}
           ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
@@ -1455,21 +1830,20 @@ const MecFormModule = (() => {
   }
 
   function _renderPlanObjectRow(object) {
-    const label = object.ficha?.codigo || _sketchLabel(object.type);
+    const label = object.ficha?.codigo || object.classroomName || _sketchLabel(object.type);
     const state = object.ficha?.estado || 'Sin estado';
     const dims = _sketchDimensionsText(object);
     return `
-      <button class="school-plan-object" type="button" onclick="MecFormModule.editPlanObject('${_escape(object.id)}')">
+      <button class="school-plan-object" type="button" onclick="MecFormModule.editPlanObject('${_escape(object.planId || object.id)}')">
         <span class="school-plan-object__type">${_escape(_sketchLabel(object.type))}</span>
         <strong>${_escape(label)}</strong>
-        <small>${_escape([state, dims].filter(Boolean).join(' · '))}</small>
+        <small>${_escape([object.classroomName, state, dims].filter(Boolean).join(' · '))}</small>
       </button>`;
   }
 
   function _schoolPlanMetrics(sketch, objects) {
-    const length = Number(sketch.length || 0);
-    const width = Number(sketch.width || 0);
-    const roomCount = objects.filter(object => object.type === 'room').length || (length && width ? 1 : 0);
+    const classrooms = _data.__classrooms || [];
+    const areaTotal = classrooms.reduce((sum, room) => sum + (Number(room.length || 0) * Number(room.width || 0)), 0);
     const states = { door: {}, window: {}, outlet: {}, damage: {} };
     objects.forEach(object => {
       if (states[object.type]) {
@@ -1478,14 +1852,27 @@ const MecFormModule = (() => {
       }
     });
     return {
-      areaTotal: length && width ? length * width : 0,
-      rooms: roomCount,
+      areaTotal,
+      rooms: classrooms.length,
+      blocks: (_data.__blocks || []).length,
+      sanitaries: (_data.__sanitaries || []).length,
       doors: objects.filter(object => object.type === 'door').length,
       windows: objects.filter(object => object.type === 'window').length,
       outlets: objects.filter(object => object.type === 'outlet').length,
-      alerts: objects.filter(object => _isPlanAlert(object)).length,
+      alerts: objects.filter(object => _isPlanAlert(object)).length + (_data.__sanitaries || []).filter(item => _isPlanAlert({ ficha: item })).length,
       states,
     };
+  }
+
+  function _schoolPlanObjects() {
+    return (_data.__classrooms || []).flatMap((room, roomIndex) =>
+      (room.objects || []).map(object => ({
+        ...object,
+        classroomId: room.id,
+        classroomName: room.name || `Aula ${roomIndex + 1}`,
+        planId: `${room.id}::${object.id}`,
+      }))
+    );
   }
 
   function _isPlanAlert(object) {
@@ -1508,7 +1895,8 @@ const MecFormModule = (() => {
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const objects = _data.__classroomSketch.objects || [];
+    const rooms = _data.__classrooms || [];
+    const objects = _schoolPlanObjects();
     if (!objects.length) {
       ctx.fillStyle = '#667085';
       ctx.font = '700 18px system-ui, sans-serif';
@@ -1517,19 +1905,33 @@ const MecFormModule = (() => {
       return;
     }
 
-    ctx.save();
-    ctx.translate(44, 46);
-    ctx.scale(1.04, 1.04);
-    objects.forEach(object => _drawSketchObject(ctx, object));
-    ctx.restore();
+    rooms.forEach((room, index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      ctx.save();
+      ctx.translate(34 + col * 420, 40 + row * 250);
+      ctx.scale(.58, .58);
+      (room.objects || []).forEach(object => _drawSketchObject(ctx, { ...object, classroomName: room.name }));
+      ctx.restore();
+      ctx.fillStyle = '#172033';
+      ctx.font = '800 14px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(room.name || `Aula ${index + 1}`, 34 + col * 420, 28 + row * 250);
+    });
   }
 
-  function editPlanObject(id) {
-    _selectedSketchObjectId = id;
-    const object = _findSketchObjectById(id);
+  function editPlanObject(planId) {
+    const [classroomId, objectId] = String(planId).includes('::') ? String(planId).split('::') : [_activeClassroomId, planId];
+    if (classroomId && classroomId !== _activeClassroomId) {
+      _syncActiveClassroomFromSketch();
+      _activeClassroomId = classroomId;
+      _loadActiveClassroomIntoSketch();
+    }
+    _selectedSketchObjectId = objectId;
+    const object = _findSketchObjectById(objectId);
     if (!object) return;
     if (_hasSketchFicha(object)) {
-      openSketchObjectFicha(id);
+      openSketchObjectFicha(objectId);
       return;
     }
     UI.showToast('Este elemento se edita desde el croquis del aula.', 'info');
@@ -1582,6 +1984,16 @@ const MecFormModule = (() => {
     exportJson,
     toggleModule,
     setSketchTool,
+    selectBlock,
+    newBlock,
+    saveCurrentBlock,
+    selectClassroom,
+    newClassroom,
+    saveCurrentClassroom,
+    addSanitary,
+    setSanitaryValue,
+    setSanitaryEvidence,
+    deleteSanitary,
     editSelectedSketchObject,
     openSketchObjectFicha,
     closeSketchObjectFicha,
