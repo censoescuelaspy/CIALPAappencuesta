@@ -667,6 +667,27 @@ td {
 
 #map-container { width: 100%; height: 100%; }
 
+.map-fallback {
+  min-height: 100%;
+  display: grid;
+  place-content: center;
+  gap: .5rem;
+  padding: 2rem;
+  text-align: center;
+  background: #eef3f7;
+  color: var(--color-secondary);
+}
+
+.map-fallback h3 {
+  font-size: 1.1rem;
+}
+
+.map-fallback p {
+  max-width: 520px;
+  color: var(--color-text-muted);
+  font-size: .9rem;
+}
+
 .map-offline-state {
   position: absolute;
   top: .75rem;

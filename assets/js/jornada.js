@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * jornada.js — Personal dashboard (Mi Jornada)
- * Version: 2.5.1
+ * Version: 2.5.2
  */
 
 const JornadaModule = (() => {

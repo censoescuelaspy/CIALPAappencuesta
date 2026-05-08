@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.1
+ * Version: 2.5.2
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -367,11 +367,11 @@ const AppController = (() => {
     const bar = document.getElementById('user-bar');
     if (bar) {
       bar.innerHTML = `
-        <span class="app-edition-badge">${APP_CONFIG.EDITION_LABEL || `v${APP_CONFIG.VERSION}`}</span>
+        <span class="app-edition-badge">${_escapeHtml(APP_CONFIG.EDITION_LABEL || `v${APP_CONFIG.VERSION}`)}</span>
         <button id="install-app-btn-header" class="btn btn-sm btn-primary" onclick="AppController.installApp()">Instalar</button>
         <button class="btn btn-sm btn-outline" onclick="AppController.updateApp()">Actualizar</button>
-        <span class="user-bar__name">${user.nombres} ${user.apellidos}</span>
-        <span class="user-bar__role badge badge--role">${_rolLabel(user.rol)}</span>
+        <span class="user-bar__name">${_escapeHtml(`${user.nombres || ''} ${user.apellidos || ''}`.trim())}</span>
+        <span class="user-bar__role badge badge--role">${_escapeHtml(_rolLabel(user.rol))}</span>
         <button class="btn btn-sm btn-outline" onclick="AppController.logout()">Salir</button>`;
     }
     _refreshInstallButtons();

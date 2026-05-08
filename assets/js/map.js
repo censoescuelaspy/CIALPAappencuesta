@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.5.1
+ * Version: 2.5.2
  */
 
 const MapModule = (() => {
@@ -103,6 +103,22 @@ const MapModule = (() => {
   // ── Map initialization ────────────────────────────────────────────────────
 
   function initMap(containerId = 'map-container') {
+    const container = document.getElementById(containerId);
+    if (!window.L) {
+      if (container) {
+        container.innerHTML = `
+          <div class="map-fallback">
+            <h3>Mapa no disponible sin libreria cartografica</h3>
+            <p>La lista de escuelas, filtros, asignaciones y datos cacheados siguen disponibles. Abra la app con conexion una vez para guardar librerias y teselas offline.</p>
+          </div>`;
+      }
+      _map = null;
+      _markerCluster = null;
+      _routeLayer = null;
+      updateOfflineStatus();
+      return null;
+    }
+
     if (_map) {
       _map.remove();
       _map = null;
@@ -142,21 +158,23 @@ const MapModule = (() => {
     ).addTo(_map);
 
     // Marker cluster group
-    _markerCluster = L.markerClusterGroup({
-      chunkedLoading: true,
-      maxClusterRadius: 60,
-      iconCreateFunction: cluster => {
-        const count = cluster.getChildCount();
-        let cls = 'cluster-small';
-        if (count > 50) cls = 'cluster-large';
-        else if (count > 10) cls = 'cluster-medium';
-        return L.divIcon({
-          html: `<div class="${cls}"><span>${count}</span></div>`,
-          className: 'marker-cluster',
-          iconSize: L.point(40, 40),
-        });
-      },
-    });
+    _markerCluster = typeof L.markerClusterGroup === 'function'
+      ? L.markerClusterGroup({
+          chunkedLoading: true,
+          maxClusterRadius: 60,
+          iconCreateFunction: cluster => {
+            const count = cluster.getChildCount();
+            let cls = 'cluster-small';
+            if (count > 50) cls = 'cluster-large';
+            else if (count > 10) cls = 'cluster-medium';
+            return L.divIcon({
+              html: `<div class="${cls}"><span>${count}</span></div>`,
+              className: 'marker-cluster',
+              iconSize: L.point(40, 40),
+            });
+          },
+        })
+      : L.layerGroup();
 
     _map.addLayer(_markerCluster);
     _routeLayer = L.layerGroup().addTo(_map);
@@ -175,9 +193,10 @@ const MapModule = (() => {
     _filteredEscuelas = [..._escuelas];
     _markers = {};
 
-    _markerCluster.clearLayers();
+    if (_markerCluster) _markerCluster.clearLayers();
 
     _escuelas.forEach(e => {
+      if (!_map || !window.L || !_markerCluster) return;
       const lat = parseFloat(e.latitud);
       const lng = parseFloat(e.longitud);
       if (isNaN(lat) || isNaN(lng)) return;
@@ -233,10 +252,10 @@ const MapModule = (() => {
     });
 
     // Toggle marker visibility via cluster
-    _markerCluster.clearLayers();
+    if (_markerCluster) _markerCluster.clearLayers();
     const filteredIds = new Set(_filteredEscuelas.map(e => e.id_escuela));
     Object.entries(_markers).forEach(([id, marker]) => {
-      if (filteredIds.has(id)) _markerCluster.addLayer(marker);
+      if (filteredIds.has(id) && _markerCluster) _markerCluster.addLayer(marker);
     });
 
     _renderList(_filteredEscuelas);
@@ -428,7 +447,13 @@ const MapModule = (() => {
 
   function flyTo(id) {
     const marker = _markers[id];
-    if (!marker) return;
+    if (!marker || !_map) {
+      _highlightListItem(id);
+      const escuela = _escuelas.find(e => e.id_escuela === id);
+      if (escuela) _updateInfoPanel(escuela);
+      if (!window.L) UI.showToast('Mapa grafico no disponible; se muestra la ficha en la lista.', 'info');
+      return;
+    }
     _map.flyTo(marker.getLatLng(), 14, { animate: true, duration: 0.8 });
     setTimeout(() => marker.openPopup(), 900);
     _highlightListItem(id);
@@ -484,7 +509,10 @@ const MapModule = (() => {
   }
 
   async function cacheVisibleMap() {
-    if (!_map) return;
+    if (!_map) {
+      UI.showToast('Abra la app con conexion para cargar el mapa antes de guardar teselas offline.', 'warning', 6500);
+      return;
+    }
     if (!('caches' in window)) {
       UI.showToast('Este navegador no permite guardar mapas offline.', 'warning');
       return;
