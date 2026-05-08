@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="CIALPA — Sistema de gestión del relevamiento escolar en Paraguay" />
+  <meta name="theme-color" content="#1F3864" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="CIALPA" />
   <title>CIALPA — Relevamiento Escolar</title>
 
   <!-- Leaflet CSS -->
@@ -18,6 +21,8 @@
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest" />
 </head>
 <body>
 
@@ -87,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      v2.0.0 &mdash; CIALPA &copy; 2025
+      Edición vigente <span class="app-version">v2.3.0</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -114,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      v2.0.0
+      Edición vigente<br><strong class="app-version">v2.3.0</strong>
     </div>
   </aside>
 
@@ -181,6 +186,20 @@
               <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">App, registros y evidencias</h4>
+              <span class="badge badge--role">Edición <span class="app-version">v2.3.0</span></span>
+            </div>
+            <div class="ops-actions">
+              <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
+              <button class="btn btn-outline" onclick="AppController.updateApp()">Actualizar app</button>
+              <button class="btn btn-outline" onclick="AppController.openWorkbook()">Libro en línea</button>
+              <button class="btn btn-outline" onclick="AppController.openEvidenceFolder()">Fotos y evidencias</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('plano')">Ver plano escuela</button>
             </div>
           </div>
 
@@ -297,7 +316,10 @@
             <h2>Plano escuela</h2>
             <p class="text-muted">Vista tecnica del plano general y resumen dimensional del relevamiento cargado.</p>
           </div>
-          <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mec')">Editar cuestionario</button>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="MecFormModule.printPlanPdf()">Imprimir PDF</button>
+            <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mec')">Editar cuestionario</button>
+          </div>
         </div>
         <div class="page-content">
           <div id="school-plan-root"></div>

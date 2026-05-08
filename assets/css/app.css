@@ -317,9 +317,22 @@ body.sidebar-auto-hidden #sidebar-hotzone {
   display: flex;
   align-items: center;
   gap: .75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .user-bar__name { font-size: .875rem; font-weight: 500; }
+
+.app-edition-badge {
+  padding: .22rem .5rem;
+  border: 1px solid rgba(31, 56, 100, .18);
+  border-radius: 999px;
+  background: #f1f7ff;
+  color: var(--color-secondary);
+  font-size: .72rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
 
 /* ── Content area ─────────────────────────────────────────── */
 #content-area {
@@ -383,6 +396,13 @@ body.sidebar-auto-hidden #sidebar-hotzone {
 }
 
 .card--dark .card__title { color: #fff; }
+
+.ops-actions {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
 
 /* ── KPI Cards ────────────────────────────────────────────── */
 .kpi-grid {
@@ -1251,6 +1271,11 @@ td {
   .modal__panel--drawer { max-width: 100%; border-radius: 0; }
   .manual-nav { display: none; }
   .login-card { padding: 1.75rem 1.25rem; }
+  #app-header { gap: .5rem; padding: 0 .75rem; }
+  #page-title { display: none; }
+  #user-bar { gap: .35rem; }
+  .app-edition-badge, .user-bar__name { display: none; }
+  .ops-actions .btn { flex: 1 1 100%; }
 }
 
 /* ── Print styles ─────────────────────────────────────────── */

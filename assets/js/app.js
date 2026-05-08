@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.0.0
+ * Version: 2.3.0
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -264,12 +264,17 @@ const AppController = (() => {
   let _currentModule = null;
   let _mapInitialized = false;
   let _sidebarHideTimer = null;
+  let _deferredInstallPrompt = null;
+  let _swRegistration = null;
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
   function init() {
     UI.init();
     ManualModule.renderModal();
+    _applyVersionLabels();
+    _bindPwaEvents();
+    _registerServiceWorker();
 
     if (Auth.resumeSession()) {
       showApp();
@@ -345,10 +350,14 @@ const AppController = (() => {
     const bar = document.getElementById('user-bar');
     if (bar) {
       bar.innerHTML = `
+        <span class="app-edition-badge">${APP_CONFIG.EDITION_LABEL || `v${APP_CONFIG.VERSION}`}</span>
+        <button id="install-app-btn-header" class="btn btn-sm btn-primary" onclick="AppController.installApp()">Instalar</button>
+        <button class="btn btn-sm btn-outline" onclick="AppController.updateApp()">Actualizar</button>
         <span class="user-bar__name">${user.nombres} ${user.apellidos}</span>
         <span class="user-bar__role badge badge--role">${_rolLabel(user.rol)}</span>
         <button class="btn btn-sm btn-outline" onclick="AppController.logout()">Salir</button>`;
     }
+    _refreshInstallButtons();
   }
 
   function _rolLabel(rol) {
@@ -380,6 +389,111 @@ const AppController = (() => {
       UI.showToast('Sin conexión a internet. Algunos funciones no están disponibles.', 'warning', 0));
     window.addEventListener('online', () =>
       UI.showToast('Conexión restaurada.', 'success'));
+  }
+
+  function _applyVersionLabels() {
+    document.querySelectorAll('.app-version').forEach(el => {
+      el.textContent = `v${APP_CONFIG.VERSION}`;
+    });
+  }
+
+  function _bindPwaEvents() {
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      _deferredInstallPrompt = event;
+      _refreshInstallButtons();
+    });
+    window.addEventListener('appinstalled', () => {
+      _deferredInstallPrompt = null;
+      _refreshInstallButtons();
+      UI.showToast('CIALPA quedó instalada en este dispositivo.', 'success');
+    });
+  }
+
+  async function _registerServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    try {
+      _swRegistration = await navigator.serviceWorker.register('./sw.js');
+      _swRegistration.addEventListener('updatefound', () => {
+        const worker = _swRegistration.installing;
+        if (!worker) return;
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            UI.showToast('Hay una actualización disponible. Pulse Actualizar app.', 'info', 7000);
+          }
+        });
+      });
+    } catch (err) {
+      console.warn('No se pudo registrar el service worker:', err);
+    }
+  }
+
+  function _isStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  }
+
+  function _refreshInstallButtons() {
+    const installed = _isStandalone();
+    ['install-app-btn-header', 'install-app-btn-home'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.disabled = installed;
+      btn.textContent = installed ? 'App instalada' : (id.includes('home') ? 'Instalar app en celular' : 'Instalar');
+      btn.title = installed ? 'La app ya está instalada en este dispositivo.' : 'Instalar CIALPA como app web en el celular.';
+    });
+  }
+
+  async function installApp() {
+    if (_isStandalone()) {
+      UI.showToast('La app ya está instalada en este dispositivo.', 'info');
+      return;
+    }
+    if (!_deferredInstallPrompt) {
+      UI.showToast('Si el navegador no muestra instalación automática, use el menú del navegador: Compartir/Agregar a pantalla de inicio.', 'info', 8000);
+      return;
+    }
+    _deferredInstallPrompt.prompt();
+    const choice = await _deferredInstallPrompt.userChoice;
+    _deferredInstallPrompt = null;
+    _refreshInstallButtons();
+    if (choice.outcome === 'accepted') UI.showToast('Instalación iniciada.', 'success');
+  }
+
+  async function updateApp() {
+    UI.showToast('Buscando la edición vigente y limpiando caché local...', 'info');
+    try {
+      if (_swRegistration) {
+        await _swRegistration.update();
+        const waiting = _swRegistration.waiting || _swRegistration.installing;
+        if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.filter(key => key.startsWith('cialpa-')).map(key => caches.delete(key)));
+      }
+    } catch (err) {
+      console.warn('Actualización manual incompleta:', err);
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', APP_CONFIG.VERSION);
+    url.searchParams.set('t', Date.now());
+    window.location.replace(url.toString());
+  }
+
+  function _openConfiguredUrl(url, label) {
+    if (!url) {
+      UI.showToast(`${label} todavía no está configurado.`, 'warning');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function openWorkbook() {
+    _openConfiguredUrl(APP_CONFIG.SPREADSHEET_URL, 'El libro en línea');
+  }
+
+  function openEvidenceFolder() {
+    _openConfiguredUrl(APP_CONFIG.EVIDENCE_FOLDER_URL, 'La carpeta de fotos y evidencias');
   }
 
   function _bindSidebarAutoPeek() {
@@ -555,6 +669,10 @@ const AppController = (() => {
     showLoginScreen,
     showApp,
     showModule,
+    installApp,
+    updateApp,
+    openWorkbook,
+    openEvidenceFolder,
     logout,
   };
 })();

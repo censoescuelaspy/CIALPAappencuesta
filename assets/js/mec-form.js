@@ -2462,6 +2462,7 @@ const MecFormModule = (() => {
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
+                <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.printPlanPdf()">PDF</button>
               </div>
             </div>
             <canvas id="school-plan-canvas" width="900" height="560" aria-label="Plano general de la escuela"></canvas>
@@ -3070,6 +3071,74 @@ const MecFormModule = (() => {
     });
   }
 
+  function printPlanPdf() {
+    const canvas = document.getElementById('school-plan-canvas');
+    if (!canvas) {
+      UI.showToast('Abra la vista Plano escuela para imprimir el plano.', 'warning');
+      return;
+    }
+    _drawSchoolPlan();
+    const image = canvas.toDataURL('image/png');
+    const model = _buildSchoolPlanModel();
+    const metrics = _schoolPlanMetrics(_data.__classroomSketch || {}, _schoolPlanObjects());
+    const version = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version;
+    const title = `Plano escuela CIALPA - ${new Date().toLocaleString('es-PY')}`;
+    const popup = window.open('', '_blank');
+    if (!popup) {
+      UI.showToast('El navegador bloqueo la ventana de impresion. Habilite ventanas emergentes para generar PDF.', 'warning', 7000);
+      return;
+    }
+    popup.document.write(`
+      <!doctype html>
+      <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>${_escape(title)}</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm; }
+          body { margin: 0; color: #172033; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+          header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #172033; padding-bottom: 8px; margin-bottom: 10px; }
+          h1 { margin: 0; font-size: 18px; }
+          small { color: #667085; }
+          .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
+          .kpi { border: 1px solid #dbe5f1; padding: 8px; border-radius: 6px; }
+          .kpi span { display: block; color: #667085; font-size: 10px; text-transform: uppercase; font-weight: 800; }
+          .kpi strong { display: block; font-size: 16px; }
+          img { width: 100%; height: auto; border: 1px solid #dbe5f1; }
+          footer { margin-top: 8px; color: #667085; font-size: 10px; display: flex; justify-content: space-between; }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div>
+            <h1>Plano escuela CIALPA</h1>
+            <small>Edicion vigente v${_escape(version)} · ${_escape(model.exportedAt)}</small>
+          </div>
+          <small>Exportacion para impresion / guardar como PDF</small>
+        </header>
+        <section class="kpis">
+          <div class="kpi"><span>Area relevada</span><strong>${metrics.areaTotal.toFixed(2)} m2</strong></div>
+          <div class="kpi"><span>Aulas</span><strong>${metrics.rooms}</strong></div>
+          <div class="kpi"><span>Bloques</span><strong>${metrics.blocks}</strong></div>
+          <div class="kpi"><span>Puertas</span><strong>${metrics.doors}</strong></div>
+          <div class="kpi"><span>Ventanas</span><strong>${metrics.windows}</strong></div>
+        </section>
+        <img src="${image}" alt="Plano general de la escuela">
+        <footer>
+          <span>CIALPA - Relevamiento Escolar</span>
+          <span>Fuente: datos cargados en el dispositivo / borrador local</span>
+        </footer>
+        <script>
+          window.onload = function () {
+            window.focus();
+            window.print();
+          };
+        </script>
+      </body>
+      </html>`);
+    popup.document.close();
+  }
+
   function exportJson() {
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -3139,6 +3208,7 @@ const MecFormModule = (() => {
     exportPlanJson,
     exportPlanSvg,
     exportPlanPng,
+    printPlanPdf,
     setSketchZoom,
     generateRoomSketch,
     undoSketchObject,
