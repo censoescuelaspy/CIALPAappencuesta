@@ -762,6 +762,8 @@ const MecFormModule = (() => {
       lavamanos: '',
       urinarios: '',
       duchas: '',
+      largo_m: '',
+      ancho_m: '',
       accesible: 'No',
       agua: 'Si',
       desague: '',
@@ -772,6 +774,7 @@ const MecFormModule = (() => {
       privacidad: '',
       observacion: '',
       evidencias: [],
+      plano: { cabinas: [] },
     };
   }
 
@@ -821,10 +824,27 @@ const MecFormModule = (() => {
           ${_sanitaryInput(item, 'bloque', 'Bloque', 'text')}
           ${_sanitaryInput(item, 'planta', 'Planta', 'text')}
           ${_sanitaryInput(item, 'tipo', 'Tipo', 'text')}
+          ${_sanitaryInput(item, 'largo_m', 'Largo del sanitario', 'number', '0.1')}
+          ${_sanitaryInput(item, 'ancho_m', 'Ancho del sanitario', 'number', '0.1')}
           ${_sanitaryInput(item, 'inodoros', 'Inodoros', 'number')}
           ${_sanitaryInput(item, 'lavamanos', 'Lavamanos', 'number')}
           ${_sanitaryInput(item, 'urinarios', 'Urinarios', 'number')}
           ${_sanitaryInput(item, 'duchas', 'Duchas', 'number')}
+        </div>
+
+        <div class="mec-sanitary-plan">
+          <div class="mec-sanitary-plan__header">
+            <div>
+              <strong>Croquis del sanitario</strong>
+              <span>Cabinas internas segun inodoros registrados</span>
+            </div>
+            <div>
+              <button class="btn btn-xs btn-outline" type="button" onclick="MecFormModule.regenerateSanitaryPlan('${_escape(item.id)}')">Regenerar</button>
+              <button class="btn btn-xs btn-outline" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')">+ Cabina</button>
+              <button class="btn btn-xs btn-danger" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cabina</button>
+            </div>
+          </div>
+          ${_renderSanitarySketch(item)}
         </div>
 
         <div class="mec-sanitary-groups">
@@ -863,7 +883,9 @@ const MecFormModule = (() => {
         </div>
 
         <label class="mec-label"><span>Observacion</span></label>
-        <textarea class="form-control" rows="2" onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', 'observacion', this.value)">${_escape(item.observacion || '')}</textarea>
+        <textarea class="form-control" rows="2"
+          oninput="MecFormModule.setSanitaryValue('${_escape(item.id)}', 'observacion', this.value, false)"
+          onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', 'observacion', this.value)">${_escape(item.observacion || '')}</textarea>
 
         <div class="mec-object-evidence">
           <input id="${evidenceId}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
@@ -874,27 +896,124 @@ const MecFormModule = (() => {
       </article>`;
   }
 
-  function _sanitaryInput(item, key, label, type) {
+  function _sanitaryInput(item, key, label, type, step = '1') {
     return `
       <div class="form-group">
         <label>${_escape(label)}</label>
-        <input class="form-control" type="${_escape(type)}" min="0" step="1" value="${_escape(item[key] || '')}"
+        <input class="form-control" type="${_escape(type)}" min="0" step="${_escape(step)}" value="${_escape(item[key] || '')}"
+          oninput="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value, false)"
           onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value)">
       </div>`;
   }
 
+  function _ensureSanitaryPlan(item, force = false) {
+    item.plano = item.plano || {};
+    item.plano.cabinas = Array.isArray(item.plano.cabinas) ? item.plano.cabinas : [];
+    const target = Math.max(0, Number(item.inodoros || 0));
+    if (force || item.plano.cabinas.length !== target) {
+      item.plano.cabinas = Array.from({ length: target }, (_, index) => ({
+        id: `cab_${index + 1}`,
+        label: `Cabina ${index + 1}`,
+        artefacto: 'Inodoro',
+        estado: item.estado || '',
+      }));
+    }
+    return item.plano;
+  }
+
+  function _renderSanitarySketch(item) {
+    const plan = _ensureSanitaryPlan(item);
+    const stalls = plan.cabinas || [];
+    const length = Number(item.largo_m || 0);
+    const width = Number(item.ancho_m || 0);
+    const count = stalls.length;
+    const innerX = 18;
+    const innerY = 34;
+    const innerW = 384;
+    const innerH = 142;
+    const stallW = count ? innerW / count : innerW;
+    const lavCount = Math.max(0, Number(item.lavamanos || 0));
+    const urinalCount = Math.max(0, Number(item.urinarios || 0));
+    return `
+      <svg class="mec-sanitary-svg" viewBox="0 0 420 220" role="img" aria-label="Croquis sanitario ${_escape(item.codigo || '')}">
+        <rect x="8" y="8" width="404" height="204" rx="4" fill="#fbfcfe" stroke="#172033" stroke-width="3"/>
+        <rect x="${innerX}" y="${innerY}" width="${innerW}" height="${innerH}" fill="rgba(43,108,176,.05)" stroke="#8db8e8" stroke-width="1.5"/>
+        <text x="18" y="24" font-size="12" font-weight="800" fill="#172033">${_escape(item.codigo || 'Sanitario')}</text>
+        <text x="402" y="24" text-anchor="end" font-size="10" font-weight="800" fill="#667085">${length && width ? `${length} x ${width} m` : 'Sin medidas'}</text>
+        ${count ? stalls.map((stall, index) => {
+          const x = innerX + index * stallW;
+          const w = Math.max(18, stallW);
+          return `
+            <rect x="${x}" y="${innerY}" width="${w}" height="${innerH}" fill="rgba(232,76,34,.07)" stroke="#d98b73" stroke-width="1.5"/>
+            <line x1="${x + w - 14}" y1="${innerY + innerH}" x2="${x + w - 14}" y2="${innerY + innerH - 32}" stroke="#2f855a" stroke-width="2"/>
+            <path d="M ${x + w - 14} ${innerY + innerH} A 28 28 0 0 0 ${x + w - 42} ${innerY + innerH - 28}" fill="none" stroke="#2f855a" stroke-dasharray="3 3" stroke-width="1.5"/>
+            <ellipse cx="${x + w / 2}" cy="${innerY + 46}" rx="${Math.min(18, w / 4)}" ry="13" fill="#fff" stroke="#475467" stroke-width="1.5"/>
+            <text x="${x + w / 2}" y="${innerY + 92}" text-anchor="middle" font-size="9" font-weight="800" fill="#475467">${_escape(stall.label || `Cabina ${index + 1}`)}</text>`;
+        }).join('') : `
+          <text x="210" y="104" text-anchor="middle" font-size="13" font-weight="800" fill="#667085">Indique cantidad de inodoros para generar cabinas</text>`}
+        ${Array.from({ length: lavCount }).map((_, index) => {
+          const x = 36 + index * 30;
+          return `<rect x="${x}" y="184" width="20" height="14" rx="3" fill="#fff" stroke="#2b6cb0" stroke-width="1.5"/>`;
+        }).join('')}
+        ${Array.from({ length: urinalCount }).map((_, index) => {
+          const x = 286 + index * 24;
+          return `<path d="M ${x} 184 h16 v18 q-8 8 -16 0 z" fill="#fff" stroke="#805ad5" stroke-width="1.5"/>`;
+        }).join('')}
+        <text x="18" y="204" font-size="9" font-weight="800" fill="#667085">Lavamanos: ${lavCount} · Urinarios: ${urinalCount} · Accesible: ${_escape(item.accesible || 'No')}</text>
+      </svg>`;
+  }
+
   function addSanitary() {
     _ensureSanitaries();
-    _data.__sanitaries.push(_sanitaryTemplate(_data.__sanitaries.length + 1));
+    const item = _sanitaryTemplate(_data.__sanitaries.length + 1);
+    _ensureSanitaryPlan(item, true);
+    _data.__sanitaries.push(item);
     _saveDraft(false);
     _render();
     UI.showToast('Sanitario agregado.', 'success');
   }
 
-  function setSanitaryValue(id, key, value) {
+  function setSanitaryValue(id, key, value, rerender = true) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
     item[key] = value;
+    if (rerender && ['inodoros', 'estado'].includes(key)) _ensureSanitaryPlan(item, true);
+    _saveDraft(false);
+    if (rerender) _render();
+  }
+
+  function regenerateSanitaryPlan(id) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return;
+    _ensureSanitaryPlan(item, true);
+    _saveDraft(false);
+    _render();
+    UI.showToast('Croquis sanitario regenerado segun inodoros.', 'success');
+  }
+
+  function addSanitaryStall(id) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return;
+    _ensureSanitaryPlan(item);
+    const next = item.plano.cabinas.length + 1;
+    item.plano.cabinas.push({ id: `cab_${Date.now()}`, label: `Cabina ${next}`, artefacto: 'Inodoro', estado: item.estado || '' });
+    item.inodoros = String(Math.max(Number(item.inodoros || 0), item.plano.cabinas.length));
+    _saveDraft(false);
+    _render();
+  }
+
+  async function deleteSanitaryStall(id) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return;
+    _ensureSanitaryPlan(item);
+    if (!item.plano.cabinas.length) {
+      UI.showToast('No hay cabinas para eliminar.', 'info');
+      return;
+    }
+    const confirmed = await UI.showConfirm('Eliminar cabina', '¿Confirma eliminar la ultima cabina del croquis sanitario?');
+    if (!confirmed) return;
+    item.plano.cabinas.pop();
+    item.inodoros = String(item.plano.cabinas.length);
     _saveDraft(false);
     _render();
   }
@@ -3344,6 +3463,9 @@ const MecFormModule = (() => {
     newClassroom,
     saveCurrentClassroom,
     addSanitary,
+    regenerateSanitaryPlan,
+    addSanitaryStall,
+    deleteSanitaryStall,
     setSanitaryValue,
     setSanitaryEvidence,
     deleteSanitary,
