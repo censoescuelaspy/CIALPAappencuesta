@@ -362,7 +362,7 @@ const MecFormModule = (() => {
 
   function _sketchStatusText(sketch) {
     const count = (sketch.objects || []).length;
-    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Seleccione un elemento para borrarlo o moverlo.`;
+    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Doble clic o doble toque para agregar; clic simple selecciona y mueve.`;
   }
 
   function _sketchToolLabel(toolId) {
@@ -419,9 +419,10 @@ const MecFormModule = (() => {
     let movingObject = null;
     let resizingObject = null;
     let moveOffset = null;
+    let lastTap = { time: 0, point: null };
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
-      const source = event.touches?.[0] || event;
+      const source = event.touches?.[0] || event.changedTouches?.[0] || event;
       return {
         x: Math.round((source.clientX - rect.left) * (canvas.width / rect.width)),
         y: Math.round((source.clientY - rect.top) * (canvas.height / rect.height)),
@@ -432,23 +433,17 @@ const MecFormModule = (() => {
       _ensureSketchObjects();
       const point = pointFromEvent(event);
 
-      if (_sketchTool === 'select') {
-        const handleHit = _findResizeHandleAt(point);
-        const selected = handleHit?.object || _findSketchObjectAt(point);
-        _selectedSketchObjectId = selected?.id || null;
-        if (handleHit) {
-          resizingObject = handleHit;
-        } else if (selected) {
-          movingObject = selected;
-          moveOffset = _moveOffsetForObject(selected, point);
-        }
-        _drawSketch(ctx, canvas);
-        _updateSketchStatus();
-        return;
+      const handleHit = _findResizeHandleAt(point);
+      const selected = handleHit?.object || _findSketchObjectAt(point);
+      _selectedSketchObjectId = selected?.id || null;
+      if (handleHit) {
+        resizingObject = handleHit;
+      } else if (selected) {
+        movingObject = selected;
+        moveOffset = _moveOffsetForObject(selected, point);
       }
-
-      drawing = true;
-      draftObject = _newSketchObject(_sketchTool, point, point);
+      _drawSketch(ctx, canvas);
+      _updateSketchStatus();
     };
     const move = event => {
       event.preventDefault();
@@ -497,13 +492,38 @@ const MecFormModule = (() => {
       const created = _findSketchObjectById(createdId);
       if (created && _hasSketchFicha(created)) setTimeout(() => openSketchObjectFicha(created.id), 120);
     };
+    const createAt = event => {
+      event.preventDefault();
+      if (_sketchTool === 'select') return;
+      const point = pointFromEvent(event);
+      _createSketchObjectAt(point);
+      _drawSketch(ctx, canvas);
+      _updateSketchStatus();
+    };
+    const touchEnd = event => {
+      const now = Date.now();
+      const point = pointFromEvent(event);
+      const isDoubleTap = lastTap.point &&
+        now - lastTap.time < 340 &&
+        Math.hypot(point.x - lastTap.point.x, point.y - lastTap.point.y) < 28;
+      end(event);
+      if (isDoubleTap) {
+        _createSketchObjectAt(point);
+        _drawSketch(ctx, canvas);
+        _updateSketchStatus();
+        lastTap = { time: 0, point: null };
+        return;
+      }
+      lastTap = { time: now, point };
+    };
 
     canvas.addEventListener('mousedown', begin);
     canvas.addEventListener('mousemove', move);
     window.addEventListener('mouseup', end);
+    canvas.addEventListener('dblclick', createAt);
     canvas.addEventListener('touchstart', begin, { passive: false });
     canvas.addEventListener('touchmove', move, { passive: false });
-    canvas.addEventListener('touchend', end, { passive: false });
+    canvas.addEventListener('touchend', touchEnd, { passive: false });
     _drawSketch(ctx, canvas);
   }
 
@@ -549,6 +569,43 @@ const MecFormModule = (() => {
       return { id, type, start, x: end.x, y: end.y, r: 13, ficha: {} };
     }
     return { id, type, start, x, y, w, h, ficha: {} };
+  }
+
+  function _createSketchObjectAt(point) {
+    if (_sketchTool === 'select') return;
+    _ensureSketchObjects();
+    const id = `sk_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    let object;
+    if (_sketchTool === 'wall') {
+      object = { id, type: 'wall', x1: point.x - 42, y1: point.y, x2: point.x + 42, y2: point.y };
+    } else if (_sketchTool === 'outlet' || _sketchTool === 'photo') {
+      object = { id, type: _sketchTool, x: point.x, y: point.y, r: 13, ficha: {} };
+    } else {
+      const size = _defaultSketchSize(_sketchTool);
+      object = {
+        id,
+        type: _sketchTool,
+        x: Math.round(point.x - size.w / 2),
+        y: Math.round(point.y - size.h / 2),
+        w: size.w,
+        h: size.h,
+        ficha: {},
+      };
+    }
+    _data.__classroomSketch.objects.push(object);
+    _selectedSketchObjectId = object.id;
+    _saveDraft(false);
+    if (_hasSketchFicha(object)) setTimeout(() => openSketchObjectFicha(object.id), 120);
+  }
+
+  function _defaultSketchSize(type) {
+    return {
+      door: { w: 56, h: 18 },
+      window: { w: 86, h: 18 },
+      board: { w: 112, h: 34 },
+      damage: { w: 58, h: 38 },
+      room: { w: 240, h: 160 },
+    }[type] || { w: 54, h: 28 };
   }
 
   function _normalizeSketchObject(object) {
