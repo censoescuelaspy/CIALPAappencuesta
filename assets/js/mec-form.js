@@ -345,6 +345,7 @@ const MecFormModule = (() => {
             </div>
             <div class="mec-sketch__actions">
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()">Generar aula base</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.editSelectedSketchObject()">Editar ficha</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
@@ -488,10 +489,13 @@ const MecFormModule = (() => {
       _ensureSketchObjects();
       _data.__classroomSketch.objects.push(_normalizeSketchObject(draftObject));
       _selectedSketchObjectId = draftObject.id;
+      const createdId = draftObject.id;
       draftObject = null;
       _saveDraft(false);
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
+      const created = _findSketchObjectById(createdId);
+      if (created && _hasSketchFicha(created)) setTimeout(() => openSketchObjectFicha(created.id), 120);
     };
 
     canvas.addEventListener('mousedown', begin);
@@ -542,9 +546,9 @@ const MecFormModule = (() => {
     const w = Math.max(24, Math.abs(end.x - start.x));
     const h = Math.max(18, Math.abs(end.y - start.y));
     if (type === 'outlet' || type === 'photo') {
-      return { id, type, start, x: end.x, y: end.y, r: 13 };
+      return { id, type, start, x: end.x, y: end.y, r: 13, ficha: {} };
     }
-    return { id, type, start, x, y, w, h };
+    return { id, type, start, x, y, w, h, ficha: {} };
   }
 
   function _normalizeSketchObject(object) {
@@ -616,7 +620,7 @@ const MecFormModule = (() => {
   }
 
   function _sketchObjectLabel(object) {
-    const base = object.label || _sketchLabel(object.type);
+    const base = object.ficha?.codigo || object.label || _sketchLabel(object.type);
     const dimensions = _sketchDimensionsText(object);
     return dimensions ? `${base} ${dimensions}` : base;
   }
@@ -688,6 +692,15 @@ const MecFormModule = (() => {
     return [..._data.__classroomSketch.objects]
       .reverse()
       .find(object => _sketchObjectContains(object, point));
+  }
+
+  function _findSketchObjectById(id) {
+    _ensureSketchObjects();
+    return _data.__classroomSketch.objects.find(object => object.id === id) || null;
+  }
+
+  function _hasSketchFicha(object) {
+    return object && !['room', 'wall'].includes(object.type);
   }
 
   function _findResizeHandleAt(point) {
@@ -780,6 +793,213 @@ const MecFormModule = (() => {
   function _updateSketchStatus() {
     const status = document.getElementById('mec-sketch-status');
     if (status) status.textContent = _sketchStatusText(_data.__classroomSketch || {});
+  }
+
+  function _fieldValueForObjectMeters(object, axis) {
+    const scale = _sketchScale();
+    if (!scale || !object || object.w === undefined) return '';
+    const value = axis === 'w' ? object.w * scale.x : object.h * scale.y;
+    return value ? value.toFixed(2) : '';
+  }
+
+  function _applyObjectMeters(object, widthM, heightM) {
+    const scale = _sketchScale();
+    if (!scale || !object || object.w === undefined) return;
+    const width = Number(widthM);
+    const height = Number(heightM);
+    if (width > 0) object.w = Math.max(8, Math.round(width / scale.x));
+    if (height > 0) object.h = Math.max(8, Math.round(height / scale.y));
+  }
+
+  function _sketchFichaFields(type) {
+    const common = {
+      estados: ['Bueno', 'Regular', 'Malo', 'No funciona', 'No verificable'],
+      materiales: ['Madera', 'Metal', 'Aluminio', 'Vidrio', 'Mamposteria', 'Plastico/PVC', 'Mixto', 'Otro'],
+    };
+    return {
+      window: {
+        title: 'Ficha de ventana',
+        typeOptions: ['Corrediza', 'Batiente', 'Fija', 'Persiana', 'Basculante', 'Otro'],
+        extra: [
+          { key: 'tiene_reja', label: 'Tiene reja', options: ['Si', 'No', 'No verificable'] },
+          { key: 'ventila', label: 'Permite ventilacion', options: ['Si', 'Parcial', 'No'] },
+        ],
+        ...common,
+      },
+      door: {
+        title: 'Ficha de puerta',
+        typeOptions: ['Madera', 'Metal', 'Vidrio', 'Reja', 'Mixta', 'Otro'],
+        extra: [
+          { key: 'cerradura', label: 'Cerradura', options: ['Funciona', 'Regular', 'No funciona', 'No tiene'] },
+          { key: 'abre_hacia', label: 'Apertura', options: ['Interior', 'Exterior', 'Corrediza', 'No verificable'] },
+        ],
+        ...common,
+      },
+      board: {
+        title: 'Ficha de pizarron',
+        typeOptions: ['Tiza', 'Acrilico', 'Digital', 'Mixto', 'Otro'],
+        extra: [],
+        ...common,
+      },
+      outlet: {
+        title: 'Ficha de toma electrica',
+        typeOptions: ['Simple', 'Doble', 'Multiple', 'No verificable'],
+        extra: [{ key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Flojo', 'Expuesto', 'No funciona'] }],
+        ...common,
+      },
+      damage: {
+        title: 'Ficha de dano',
+        typeOptions: ['Humedad', 'Fisura', 'Rotura', 'Desprendimiento', 'Instalacion expuesta', 'Otro'],
+        estados: ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'],
+        materiales: common.materiales,
+        extra: [{ key: 'prioridad', label: 'Prioridad', options: ['Baja', 'Media', 'Alta', 'Urgente'] }],
+      },
+      photo: {
+        title: 'Ficha de evidencia',
+        typeOptions: ['General', 'Detalle', 'Riesgo', 'Mantenimiento', 'Otro'],
+        extra: [],
+        ...common,
+      },
+    }[type] || {
+      title: 'Ficha del objeto',
+      typeOptions: ['General', 'Otro'],
+      extra: [],
+      ...common,
+    };
+  }
+
+  function _optionTags(options, selected) {
+    return options.map(option => `<option value="${_escape(option)}" ${selected === option ? 'selected' : ''}>${_escape(option)}</option>`).join('');
+  }
+
+  function openSketchObjectFicha(id) {
+    const object = _findSketchObjectById(id || _selectedSketchObjectId);
+    if (!object || !_hasSketchFicha(object)) {
+      UI.showToast('Seleccione una puerta, ventana u otro objeto con ficha.', 'warning');
+      return;
+    }
+    _selectedSketchObjectId = object.id;
+    object.ficha = object.ficha || {};
+    const cfg = _sketchFichaFields(object.type);
+    const modalId = 'modal-sketch-object-ficha';
+    document.getElementById(modalId)?.remove();
+    const widthM = object.ficha.ancho_m || _fieldValueForObjectMeters(object, 'w');
+    const heightM = object.ficha.alto_m || _fieldValueForObjectMeters(object, 'h');
+    const evidenceCount = (object.ficha.evidencias || []).length;
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeSketchObjectFicha()"></div>
+      <div class="modal__panel modal__panel--wide">
+        <div class="modal__header">
+          <h3>${_escape(cfg.title)} · ${_escape(_sketchLabel(object.type))}</h3>
+          <button class="modal__close" onclick="MecFormModule.closeSketchObjectFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          <form id="form-sketch-object-ficha" class="mec-object-form">
+            <input type="hidden" name="object_id" value="${_escape(object.id)}">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Codigo corto</label>
+                <input class="form-control" name="codigo" value="${_escape(object.ficha.codigo || _sketchLabel(object.type))}" maxlength="16">
+              </div>
+              <div class="form-group">
+                <label>Tipo</label>
+                <select class="form-control" name="subtipo">
+                  <option value="">Seleccione...</option>
+                  ${_optionTags(cfg.typeOptions, object.ficha.subtipo || '')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Estado</label>
+                <select class="form-control" name="estado">
+                  <option value="">Seleccione...</option>
+                  ${_optionTags(cfg.estados, object.ficha.estado || '')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Material</label>
+                <select class="form-control" name="material">
+                  <option value="">Seleccione...</option>
+                  ${_optionTags(cfg.materiales, object.ficha.material || '')}
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Ancho</label>
+                <div class="mec-input-with-unit">
+                  <input class="form-control" name="ancho_m" type="number" min="0" step="0.01" value="${_escape(widthM)}">
+                  <span class="mec-unit">m</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Alto</label>
+                <div class="mec-input-with-unit">
+                  <input class="form-control" name="alto_m" type="number" min="0" step="0.01" value="${_escape(heightM)}">
+                  <span class="mec-unit">m</span>
+                </div>
+              </div>
+              ${cfg.extra.map(field => `
+                <div class="form-group">
+                  <label>${_escape(field.label)}</label>
+                  <select class="form-control" name="${_escape(field.key)}">
+                    <option value="">Seleccione...</option>
+                    ${_optionTags(field.options, object.ficha[field.key] || '')}
+                  </select>
+                </div>`).join('')}
+            </div>
+            <div class="form-group">
+              <label>Observacion</label>
+              <textarea class="form-control" name="observacion" rows="3">${_escape(object.ficha.observacion || '')}</textarea>
+            </div>
+            <div class="mec-object-evidence">
+              <input id="sketch-object-photo" type="file" accept="image/*" capture="environment" multiple style="display:none;">
+              <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sketch-object-photo')?.click()">Sacar foto</button>
+              <span id="sketch-object-photo-count">${evidenceCount ? `${evidenceCount} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
+            </div>
+          </form>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-outline" onclick="MecFormModule.closeSketchObjectFicha()">Cancelar</button>
+          <button class="btn btn-primary" onclick="MecFormModule.saveSketchObjectFicha()">Guardar ficha</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const input = modal.querySelector('#sketch-object-photo');
+    input.addEventListener('change', async () => {
+      object.ficha.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file)));
+      const count = modal.querySelector('#sketch-object-photo-count');
+      if (count) count.textContent = `${object.ficha.evidencias.length} foto(s) asociada(s)`;
+      _saveDraft(false);
+    });
+    UI.openModal(modalId);
+  }
+
+  function closeSketchObjectFicha() {
+    const modal = document.getElementById('modal-sketch-object-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 250);
+  }
+
+  function saveSketchObjectFicha() {
+    const form = document.getElementById('form-sketch-object-ficha');
+    if (!form) return;
+    const data = new FormData(form);
+    const object = _findSketchObjectById(data.get('object_id'));
+    if (!object) return;
+    object.ficha = object.ficha || {};
+    ['codigo', 'subtipo', 'estado', 'material', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'seguridad', 'prioridad', 'observacion']
+      .forEach(key => {
+        if (data.has(key)) object.ficha[key] = String(data.get(key) || '').trim();
+      });
+    _applyObjectMeters(object, object.ficha.ancho_m, object.ficha.alto_m);
+    _saveDraft(false);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
+    closeSketchObjectFicha();
+    UI.showToast('Ficha del objeto guardada.', 'success');
   }
 
   function _refreshDynamicState() {
@@ -959,6 +1179,10 @@ const MecFormModule = (() => {
     _updateSketchStatus();
   }
 
+  function editSelectedSketchObject() {
+    openSketchObjectFicha(_selectedSketchObjectId);
+  }
+
   function generateRoomSketch() {
     _ensureSketchObjects();
     const length = Number(_data.__classroomSketch.length || 7);
@@ -1072,6 +1296,10 @@ const MecFormModule = (() => {
     exportJson,
     toggleModule,
     setSketchTool,
+    editSelectedSketchObject,
+    openSketchObjectFicha,
+    closeSketchObjectFicha,
+    saveSketchObjectFicha,
     generateRoomSketch,
     undoSketchObject,
     deleteSelectedSketchObject,

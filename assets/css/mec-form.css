@@ -511,6 +511,30 @@
   font-size: .76rem;
 }
 
+.mec-object-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: .75rem;
+}
+
+.mec-object-evidence {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-top: .85rem;
+  padding: .75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.mec-object-evidence span {
+  color: #617083;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
 @media (max-width: 1040px) {
   .mec-command {
     flex-direction: column;
