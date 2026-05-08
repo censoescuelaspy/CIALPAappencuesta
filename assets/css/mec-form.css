@@ -469,6 +469,27 @@
   gap: .45rem;
 }
 
+.mec-sketch-toolset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .4rem;
+  padding: .55rem;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.mec-sketch-toolset .btn {
+  min-height: 34px;
+}
+
+.mec-sketch-tool--active {
+  border-color: #2b6cb0 !important;
+  background: #eaf4ff !important;
+  color: #173f68 !important;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, .12);
+}
+
 .mec-sketch__board {
   min-width: 0;
 }

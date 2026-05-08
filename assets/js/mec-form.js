@@ -10,6 +10,19 @@ const MecFormModule = (() => {
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
+  let _sketchTool = 'select';
+  let _selectedSketchObjectId = null;
+
+  const SKETCH_TOOLS = [
+    { id: 'select', label: 'Seleccionar' },
+    { id: 'wall', label: 'Pared' },
+    { id: 'door', label: 'Puerta' },
+    { id: 'window', label: 'Ventana' },
+    { id: 'board', label: 'Pizarron' },
+    { id: 'outlet', label: 'Toma' },
+    { id: 'damage', label: 'Dano' },
+    { id: 'photo', label: 'Foto' },
+  ];
 
   function init() {
     _loadDraft();
@@ -308,7 +321,7 @@ const MecFormModule = (() => {
       <section class="mec-section mec-sketch">
         <div class="mec-section__header">
           <h4>Croquis dimensional del aula</h4>
-          <p class="mec-hint">En desarrollo: permite esbozar lineas, aberturas y dimensiones basicas para asociarlas luego al aula relevada.</p>
+          <p class="mec-hint">En desarrollo: genere un aula base y agregue elementos simples que quedan guardados como datos editables.</p>
         </div>
         <div class="mec-sketch__layout">
           <div class="mec-sketch__tools">
@@ -324,17 +337,35 @@ const MecFormModule = (() => {
             </div>
             <label class="mec-label"><span>Aberturas / observaciones</span></label>
             <textarea class="form-control" rows="4" data-sketch-field="openings">${_escape(sketch.openings || '')}</textarea>
+            <div class="mec-sketch-toolset" aria-label="Herramientas de croquis">
+              ${SKETCH_TOOLS.map(tool => `
+                <button class="btn btn-outline btn-sm ${_sketchTool === tool.id ? 'mec-sketch-tool--active' : ''}"
+                  type="button" data-sketch-tool="${_escape(tool.id)}"
+                  onclick="MecFormModule.setSketchTool('${_escape(tool.id)}')">${_escape(tool.label)}</button>`).join('')}
+            </div>
             <div class="mec-sketch__actions">
+              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()">Generar aula base</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.saveNow()">Guardar croquis</button>
             </div>
           </div>
           <div class="mec-sketch__board">
             <canvas id="mec-classroom-canvas" width="760" height="460" aria-label="Croquis manual del aula"></canvas>
-            <small>Dibuje con el mouse o el dedo. Use lineas simples para paredes, puertas, ventanas y medidas.</small>
+            <small id="mec-sketch-status">${_escape(_sketchStatusText(sketch))}</small>
           </div>
         </div>
       </section>`;
+  }
+
+  function _sketchStatusText(sketch) {
+    const count = (sketch.objects || []).length;
+    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Seleccione un elemento para borrarlo o moverlo.`;
+  }
+
+  function _sketchToolLabel(toolId) {
+    return SKETCH_TOOLS.find(tool => tool.id === toolId)?.label || toolId;
   }
 
   function _bindInputs(root) {
@@ -383,7 +414,9 @@ const MecFormModule = (() => {
 
     const ctx = canvas.getContext('2d');
     let drawing = false;
-    let stroke = [];
+    let draftObject = null;
+    let movingObject = null;
+    let moveOffset = null;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
       const source = event.touches?.[0] || event;
@@ -394,22 +427,54 @@ const MecFormModule = (() => {
     };
     const begin = event => {
       event.preventDefault();
+      _ensureSketchObjects();
+      const point = pointFromEvent(event);
+
+      if (_sketchTool === 'select') {
+        const selected = _findSketchObjectAt(point);
+        _selectedSketchObjectId = selected?.id || null;
+        if (selected) {
+          movingObject = selected;
+          moveOffset = _moveOffsetForObject(selected, point);
+        }
+        _drawSketch(ctx, canvas);
+        _updateSketchStatus();
+        return;
+      }
+
       drawing = true;
-      stroke = [pointFromEvent(event)];
+      draftObject = _newSketchObject(_sketchTool, point, point);
     };
     const move = event => {
-      if (!drawing) return;
       event.preventDefault();
-      stroke.push(pointFromEvent(event));
-      _drawSketch(ctx, canvas, [...(_data.__classroomSketch?.strokes || []), stroke]);
+      const point = pointFromEvent(event);
+      if (movingObject) {
+        _moveSketchObject(movingObject, point, moveOffset);
+        _drawSketch(ctx, canvas);
+        return;
+      }
+      if (!drawing || !draftObject) return;
+      draftObject = _newSketchObject(_sketchTool, draftObject.start, point, draftObject.id);
+      _drawSketch(ctx, canvas, draftObject);
     };
     const end = event => {
-      if (!drawing) return;
       event.preventDefault();
+      if (movingObject) {
+        movingObject = null;
+        moveOffset = null;
+        _saveDraft(false);
+        _updateSketchStatus();
+        return;
+      }
+      if (!drawing || !draftObject) return;
       drawing = false;
-      _data.__classroomSketch = _data.__classroomSketch || {};
-      _data.__classroomSketch.strokes = [...(_data.__classroomSketch.strokes || []), stroke];
+      _ensureSketchObjects();
+      _data.__classroomSketch.objects.push(_normalizeSketchObject(draftObject));
+      _selectedSketchObjectId = draftObject.id;
+      draftObject = null;
       _saveDraft(false);
+      _drawSketch(ctx, canvas);
+      _updateSketchStatus();
     };
 
     canvas.addEventListener('mousedown', begin);
@@ -418,10 +483,11 @@ const MecFormModule = (() => {
     canvas.addEventListener('touchstart', begin, { passive: false });
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', end, { passive: false });
-    _drawSketch(ctx, canvas, _data.__classroomSketch?.strokes || []);
+    _drawSketch(ctx, canvas);
   }
 
-  function _drawSketch(ctx, canvas, strokes) {
+  function _drawSketch(ctx, canvas, draftObject = null) {
+    _ensureSketchObjects();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#fbfcfe';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -439,16 +505,172 @@ const MecFormModule = (() => {
       ctx.lineTo(canvas.width, y);
       ctx.stroke();
     }
-    ctx.strokeStyle = '#1f5d99';
-    ctx.lineWidth = 4;
+
+    _data.__classroomSketch.objects.forEach(object => _drawSketchObject(ctx, object));
+    if (draftObject) _drawSketchObject(ctx, draftObject, true);
+  }
+
+  function _ensureSketchObjects() {
+    _data.__classroomSketch = _data.__classroomSketch || {};
+    _data.__classroomSketch.objects = _data.__classroomSketch.objects || [];
+  }
+
+  function _newSketchObject(type, start, end, existingId = null) {
+    const id = existingId || `sk_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    if (type === 'wall') {
+      return { id, type, start, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+    }
+    const x = Math.min(start.x, end.x);
+    const y = Math.min(start.y, end.y);
+    const w = Math.max(24, Math.abs(end.x - start.x));
+    const h = Math.max(18, Math.abs(end.y - start.y));
+    if (type === 'outlet' || type === 'photo') {
+      return { id, type, start, x: end.x, y: end.y, r: 13 };
+    }
+    return { id, type, start, x, y, w, h };
+  }
+
+  function _normalizeSketchObject(object) {
+    const normalized = { ...object };
+    delete normalized.start;
+    return normalized;
+  }
+
+  function _drawSketchObject(ctx, object, isDraft = false) {
+    const selected = object.id === _selectedSketchObjectId;
+    const style = _sketchStyle(object.type);
+    ctx.save();
+    ctx.globalAlpha = isDraft ? .62 : 1;
+    ctx.lineWidth = selected ? 4 : style.lineWidth;
+    ctx.strokeStyle = selected ? '#111827' : style.stroke;
+    ctx.fillStyle = style.fill;
     ctx.lineCap = 'round';
-    strokes.forEach(points => {
-      if (!points.length) return;
+
+    if (object.type === 'wall') {
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
-      points.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+      ctx.moveTo(object.x1, object.y1);
+      ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
-    });
+      _labelSketchObject(ctx, object, 'Pared', (object.x1 + object.x2) / 2, (object.y1 + object.y2) / 2);
+      ctx.restore();
+      return;
+    }
+
+    if (object.type === 'outlet' || object.type === 'photo') {
+      ctx.beginPath();
+      ctx.arc(object.x, object.y, object.r || 13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      _labelSketchObject(ctx, object, object.type === 'photo' ? 'Foto' : 'Toma', object.x, object.y + 26);
+      ctx.restore();
+      return;
+    }
+
+    ctx.beginPath();
+    ctx.rect(object.x, object.y, object.w, object.h);
+    ctx.fill();
+    ctx.stroke();
+    _labelSketchObject(ctx, object, _sketchLabel(object.type), object.x + object.w / 2, object.y + object.h / 2);
+    ctx.restore();
+  }
+
+  function _sketchStyle(type) {
+    return {
+      room: { stroke: '#172033', fill: 'rgba(226,232,240,.28)', lineWidth: 4 },
+      wall: { stroke: '#172033', fill: 'transparent', lineWidth: 5 },
+      door: { stroke: '#2f855a', fill: 'rgba(47,133,90,.16)', lineWidth: 3 },
+      window: { stroke: '#2b6cb0', fill: 'rgba(43,108,176,.14)', lineWidth: 3 },
+      board: { stroke: '#4a5568', fill: 'rgba(74,85,104,.16)', lineWidth: 3 },
+      outlet: { stroke: '#b7791f', fill: 'rgba(183,121,31,.18)', lineWidth: 3 },
+      damage: { stroke: '#c53030', fill: 'rgba(197,48,48,.18)', lineWidth: 3 },
+      photo: { stroke: '#805ad5', fill: 'rgba(128,90,213,.18)', lineWidth: 3 },
+    }[type] || { stroke: '#1f5d99', fill: 'rgba(31,93,153,.14)', lineWidth: 3 };
+  }
+
+  function _sketchLabel(type) {
+    return {
+      room: 'Aula',
+      door: 'Puerta',
+      window: 'Ventana',
+      board: 'Pizarron',
+      damage: 'Dano',
+    }[type] || type;
+  }
+
+  function _labelSketchObject(ctx, object, label, x, y) {
+    ctx.font = '700 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const text = object.label || label;
+    const width = ctx.measureText(text).width + 12;
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.fillRect(x - width / 2, y - 10, width, 20);
+    ctx.fillStyle = '#172033';
+    ctx.fillText(text, x, y);
+  }
+
+  function _findSketchObjectAt(point) {
+    _ensureSketchObjects();
+    return [..._data.__classroomSketch.objects]
+      .reverse()
+      .find(object => _sketchObjectContains(object, point));
+  }
+
+  function _sketchObjectContains(object, point) {
+    if (object.type === 'wall') {
+      return _distanceToSegment(point, { x: object.x1, y: object.y1 }, { x: object.x2, y: object.y2 }) < 12;
+    }
+    if (object.type === 'outlet' || object.type === 'photo') {
+      const dx = point.x - object.x;
+      const dy = point.y - object.y;
+      return Math.sqrt(dx * dx + dy * dy) <= (object.r || 13) + 8;
+    }
+    return point.x >= object.x && point.x <= object.x + object.w && point.y >= object.y && point.y <= object.y + object.h;
+  }
+
+  function _distanceToSegment(point, a, b) {
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (dx === 0 && dy === 0) return Math.hypot(point.x - a.x, point.y - a.y);
+    const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
+  }
+
+  function _moveOffsetForObject(object, point) {
+    if (object.type === 'wall') {
+      return { x1: point.x - object.x1, y1: point.y - object.y1, x2: point.x - object.x2, y2: point.y - object.y2 };
+    }
+    if (object.type === 'outlet' || object.type === 'photo') {
+      return { x: point.x - object.x, y: point.y - object.y };
+    }
+    return { x: point.x - object.x, y: point.y - object.y };
+  }
+
+  function _moveSketchObject(object, point, offset) {
+    if (object.type === 'wall') {
+      object.x1 = point.x - offset.x1;
+      object.y1 = point.y - offset.y1;
+      object.x2 = point.x - offset.x2;
+      object.y2 = point.y - offset.y2;
+      return;
+    }
+    if (object.type === 'outlet' || object.type === 'photo') {
+      object.x = point.x - offset.x;
+      object.y = point.y - offset.y;
+      return;
+    }
+    object.x = point.x - offset.x;
+    object.y = point.y - offset.y;
+  }
+
+  function _redrawSketchCanvas() {
+    const canvas = document.getElementById('mec-classroom-canvas');
+    if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
+  }
+
+  function _updateSketchStatus() {
+    const status = document.getElementById('mec-sketch-status');
+    if (status) status.textContent = _sketchStatusText(_data.__classroomSketch || {});
   }
 
   function _refreshDynamicState() {
@@ -609,14 +831,79 @@ const MecFormModule = (() => {
     UI.showToast('Borrador MEC limpiado.', 'success');
   }
 
+  function setSketchTool(tool) {
+    if (!SKETCH_TOOLS.some(item => item.id === tool)) return;
+    _sketchTool = tool;
+    document.querySelectorAll('[data-sketch-tool]').forEach(button => {
+      button.classList.toggle('mec-sketch-tool--active', button.dataset.sketchTool === tool);
+    });
+    _updateSketchStatus();
+  }
+
+  function generateRoomSketch() {
+    _ensureSketchObjects();
+    const length = Number(_data.__classroomSketch.length || 7);
+    const width = Number(_data.__classroomSketch.width || 5);
+    const maxW = 560;
+    const maxH = 320;
+    const ratio = Math.max(length, width, 1);
+    const roomW = Math.max(220, Math.round((length / ratio) * maxW));
+    const roomH = Math.max(150, Math.round((width / ratio) * maxH));
+    const room = {
+      id: `room_${Date.now()}`,
+      type: 'room',
+      x: Math.round((760 - roomW) / 2),
+      y: Math.round((460 - roomH) / 2),
+      w: roomW,
+      h: roomH,
+      label: `${length || '?'}m x ${width || '?'}m`,
+    };
+    _data.__classroomSketch.objects = [
+      room,
+      ..._data.__classroomSketch.objects.filter(object => object.type !== 'room'),
+    ];
+    _selectedSketchObjectId = room.id;
+    _saveDraft(false);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
+    UI.showToast('Aula base generada con dimensiones aproximadas.', 'success');
+  }
+
+  function undoSketchObject() {
+    _ensureSketchObjects();
+    const removed = _data.__classroomSketch.objects.pop();
+    if (!removed) {
+      UI.showToast('No hay elementos para deshacer.', 'info');
+      return;
+    }
+    if (_selectedSketchObjectId === removed.id) _selectedSketchObjectId = null;
+    _saveDraft(false);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
+  }
+
+  function deleteSelectedSketchObject() {
+    if (!_selectedSketchObjectId) {
+      UI.showToast('Seleccione un elemento del plano para borrarlo.', 'warning');
+      return;
+    }
+    _ensureSketchObjects();
+    _data.__classroomSketch.objects = _data.__classroomSketch.objects.filter(object => object.id !== _selectedSketchObjectId);
+    _selectedSketchObjectId = null;
+    _saveDraft(false);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
+  }
+
   function clearSketch() {
     _data.__classroomSketch = {
       ...(_data.__classroomSketch || {}),
-      strokes: [],
+      objects: [],
     };
+    _selectedSketchObjectId = null;
     _saveDraft(false);
-    const canvas = document.getElementById('mec-classroom-canvas');
-    if (canvas) _drawSketch(canvas.getContext('2d'), canvas, []);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
     UI.showToast('Croquis limpiado.', 'success');
   }
 
@@ -664,6 +951,10 @@ const MecFormModule = (() => {
     resetDraft,
     exportJson,
     toggleModule,
+    setSketchTool,
+    generateRoomSketch,
+    undoSketchObject,
+    deleteSelectedSketchObject,
     clearSketch,
   };
 })();
