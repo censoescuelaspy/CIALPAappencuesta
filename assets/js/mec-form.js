@@ -196,6 +196,7 @@ const MecFormModule = (() => {
 
   function _renderActiveModule(module) {
     if (module.kind === 'classroomSketch') return _renderClassroomSketchModule();
+    if (!module.sections?.length) return _renderDevelopmentModule(module);
     return module.sections.map(section => _renderSection(module, section)).join('');
   }
 
@@ -204,6 +205,14 @@ const MecFormModule = (() => {
       <div class="mec-planned">
         <p>Este modulo ya esta identificado en el manual y se incorporara en la siguiente iteracion del esquema.</p>
         <p class="text-muted">La primera prueba funcional cubre General y Servicios para validar motor, saltos, guardado y exportacion.</p>
+      </div>`;
+  }
+
+  function _renderDevelopmentModule(module) {
+    return `
+      <div class="mec-planned">
+        <p><strong>${_escape(module.title)} en desarrollo.</strong></p>
+        <p class="text-muted">Esta etapa ya queda accesible en el recorrido para probar la navegacion completa desde celular. En la siguiente iteracion se incorporan sus campos, fotos y registros repetibles.</p>
       </div>`;
   }
 
@@ -975,10 +984,19 @@ const MecFormModule = (() => {
       <input type="hidden" name="${_escape(name)}" value="${_escape(selected || '')}">
       <div class="mec-choice-buttons" data-choice-name="${_escape(name)}">
         ${options.map(option => `
-          <button class="mec-choice ${selected === option ? 'mec-choice--active' : ''}" type="button" data-choice-value="${_escape(option)}">
+          <button class="mec-choice ${_choiceToneClass(option)} ${selected === option ? 'mec-choice--active' : ''}" type="button" data-choice-value="${_escape(option)}">
             ${_escape(option)}
           </button>`).join('')}
       </div>`;
+  }
+
+  function _choiceToneClass(value) {
+    const text = String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (text.includes('no existe') || text.includes('no aplica') || text === 'no') return 'mec-choice--muted';
+    if (text.includes('malo') || text.includes('dano') || text.includes('no cumple') || text.includes('sin ') || text.includes('no verificable')) return 'mec-choice--danger';
+    if (text.includes('regular') || text.includes('intermitente') || text.includes('incompleto')) return 'mec-choice--warning';
+    if (text.includes('bueno') || /\bsi\b/.test(text) || text.includes('cumple') || text.includes('completo')) return 'mec-choice--success';
+    return 'mec-choice--neutral';
   }
 
   function openSketchObjectFicha(id) {

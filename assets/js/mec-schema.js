@@ -152,8 +152,8 @@ const MEC_SCHEMA = {
     {
       id: 'sanitarios',
       title: 'Sanitarios',
-      description: 'Modulo repetible detectado. Implementacion detallada pendiente.',
-      status: 'planned',
+      description: 'Modulo repetible detectado. Implementacion detallada en desarrollo.',
+      status: 'development',
       sections: [],
     },
   ],
