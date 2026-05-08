@@ -1,7 +1,7 @@
 /* ============================================================
    CIALPA — Relevamiento Escolar
    app.css — Complete application styles
-   Version: 2.1.0
+   Version: 2.5.3
    ============================================================ */
 
 /* ── CSS Custom Properties ────────────────────────────────── */
@@ -1727,4 +1727,628 @@ td {
 .btn-sm {
   padding: .45rem .7rem;
   font-size: .8rem;
+}
+
+/* ── Densidad móvil/tablet, v2.5.3 ────────────────────────── */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 232px;
+    --header-height: 52px;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  #app-shell,
+  #sidebar {
+    height: 100dvh;
+  }
+
+  #sidebar {
+    max-width: 82vw;
+  }
+
+  .sidebar__logo {
+    min-height: var(--header-height);
+    padding: .75rem .85rem;
+    gap: .55rem;
+  }
+
+  .sidebar__logo img {
+    height: 30px;
+  }
+
+  .sidebar__logo-text {
+    font-size: .84rem;
+  }
+
+  .nav-item > a {
+    gap: .55rem;
+    padding: .55rem .75rem;
+    font-size: .82rem;
+  }
+
+  .nav-icon {
+    font-size: 1rem;
+    min-width: 1.15rem;
+  }
+
+  #app-header {
+    padding: 0 .9rem;
+    gap: .65rem;
+  }
+
+  #sidebar-toggle {
+    min-width: 38px;
+    min-height: 38px;
+    font-size: 1.12rem;
+  }
+
+  .page-header {
+    padding: .85rem 1rem .6rem;
+    gap: .6rem;
+  }
+
+  .page-header h2 {
+    font-size: 1.08rem;
+  }
+
+  .page-content {
+    padding: 1rem;
+  }
+
+  .card,
+  .chart-card {
+    padding: .9rem;
+  }
+
+  .card__header {
+    gap: .55rem;
+    margin-bottom: .75rem;
+    flex-wrap: wrap;
+  }
+
+  .kpi-grid,
+  .stats-grid,
+  .inicio-grid {
+    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+    gap: .65rem;
+  }
+
+  .kpi-card {
+    padding: .8rem;
+  }
+
+  .kpi-value {
+    font-size: 1.45rem;
+  }
+
+  .kpi-label {
+    font-size: .74rem;
+  }
+
+  .btn {
+    min-height: 36px;
+    padding: .42rem .72rem;
+    border-width: 1px;
+    font-size: .82rem;
+    line-height: 1.15;
+    white-space: normal;
+  }
+
+  .btn-sm {
+    min-height: 32px;
+    padding: .3rem .52rem;
+    font-size: .74rem;
+  }
+
+  .btn-lg {
+    min-height: 40px;
+    padding: .52rem .82rem;
+    font-size: .88rem;
+  }
+
+  .form-row {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .65rem;
+  }
+
+  .form-group {
+    margin-bottom: .75rem;
+  }
+
+  .form-group label {
+    font-size: .8rem;
+  }
+
+  .form-control {
+    min-height: 36px;
+    padding: .42rem .58rem;
+    font-size: .84rem;
+  }
+
+  table {
+    font-size: .8rem;
+  }
+
+  thead th,
+  td {
+    padding: .45rem .55rem;
+  }
+
+  .module-tracker {
+    margin-top: .85rem;
+    padding: .75rem;
+  }
+
+  .module-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .55rem;
+  }
+
+  .module-card {
+    min-height: 104px;
+    padding: .65rem;
+  }
+
+  .module-card__title {
+    margin-bottom: .5rem;
+    font-size: .86rem;
+  }
+
+  .survey-card {
+    max-width: 100%;
+    padding: 1rem;
+  }
+
+  .survey-empty {
+    padding: 2.75rem 1rem;
+  }
+
+  .survey-timer-section {
+    margin: .9rem 0;
+    padding: .75rem;
+  }
+
+  .survey-timer__display {
+    font-size: 1.75rem;
+  }
+
+  .inicio-hero {
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .inicio-hero h2 {
+    font-size: 1.15rem;
+  }
+
+  .manual-modal__panel,
+  .modal__panel {
+    max-height: calc(100dvh - 1rem);
+  }
+
+  #manual-fab {
+    left: 1rem;
+    bottom: 1rem;
+    width: 42px;
+    height: 42px;
+    font-size: 1rem;
+  }
+
+  .map-layout {
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .map-main {
+    order: 1;
+    min-height: 48dvh;
+    flex: 1 1 48dvh;
+  }
+
+  .map-sidebar {
+    order: 2;
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    max-height: 34dvh;
+    border-top: 1px solid var(--color-border);
+    border-right: 0;
+  }
+
+  .map-sidebar__filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .4rem;
+    padding: .5rem;
+  }
+
+  .map-sidebar__filters .form-control {
+    margin-bottom: 0;
+  }
+
+  .map-sidebar__filter-btns {
+    gap: .35rem;
+  }
+
+  .map-sidebar__counts {
+    gap: .3rem;
+    padding: .35rem .5rem;
+  }
+
+  .map-list-item {
+    gap: .45rem;
+    padding: .45rem .55rem;
+  }
+
+  .map-list-item__info strong {
+    font-size: .78rem;
+  }
+
+  .map-list-item__info small {
+    font-size: .68rem;
+  }
+
+  .map-list-item__badge {
+    font-size: .62rem;
+  }
+
+  .map-info-panel {
+    right: .5rem;
+    bottom: .75rem;
+    width: min(270px, calc(100% - 1rem));
+  }
+}
+
+@media (max-width: 720px) {
+  :root {
+    --sidebar-width: min(232px, 82vw);
+    --header-height: 48px;
+  }
+
+  #app-header {
+    padding: 0 .55rem;
+    gap: .4rem;
+  }
+
+  #sidebar-toggle {
+    min-width: 34px;
+    min-height: 34px;
+    padding: .12rem .35rem;
+    font-size: 1.05rem;
+  }
+
+  #page-title {
+    display: none;
+  }
+
+  #user-bar {
+    max-width: calc(100vw - 48px);
+    gap: .28rem;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .app-edition-badge,
+  .user-bar__name {
+    display: none;
+  }
+
+  .sidebar__footer {
+    padding: .65rem;
+  }
+
+  .page-header {
+    padding: .6rem .7rem .5rem;
+  }
+
+  .page-header h2 {
+    font-size: 1rem;
+  }
+
+  .page-content {
+    padding: .65rem;
+  }
+
+  .card,
+  .chart-card {
+    padding: .72rem;
+    border-radius: 7px;
+  }
+
+  .kpi-grid,
+  .stats-grid,
+  .inicio-grid,
+  .offline-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .5rem;
+  }
+
+  .kpi-card {
+    padding: .58rem;
+    border-top-width: 3px;
+  }
+
+  .kpi-value {
+    font-size: 1.2rem;
+  }
+
+  .kpi-label {
+    font-size: .68rem;
+    line-height: 1.2;
+  }
+
+  .btn {
+    min-height: 34px;
+    padding: .36rem .55rem;
+    font-size: .76rem;
+  }
+
+  .btn-sm,
+  .btn-xs {
+    min-height: 30px;
+    padding: .26rem .42rem;
+    font-size: .7rem;
+  }
+
+  .btn-lg {
+    min-height: 38px;
+    padding: .46rem .65rem;
+    font-size: .82rem;
+  }
+
+  .ops-actions {
+    gap: .4rem;
+  }
+
+  .ops-actions .btn,
+  .survey-actions .btn {
+    flex: 1 1 calc(50% - .4rem);
+  }
+
+  .form-group {
+    margin-bottom: .65rem;
+  }
+
+  .form-group label {
+    font-size: .76rem;
+  }
+
+  .form-control,
+  .form-control-sm,
+  select.form-control,
+  textarea.form-control {
+    min-height: 34px;
+    padding: .36rem .5rem;
+    font-size: 16px;
+  }
+
+  textarea.form-control {
+    min-height: 64px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+  }
+
+  .table-wrapper {
+    margin-inline: -.65rem;
+    border-radius: 0;
+  }
+
+  table {
+    font-size: .74rem;
+  }
+
+  thead th,
+  td {
+    padding: .36rem .42rem;
+  }
+
+  .badge {
+    padding: .16em .42em;
+    font-size: .68rem;
+  }
+
+  .login-card {
+    max-width: 360px;
+    padding: 1.25rem .9rem;
+    border-radius: 10px;
+  }
+
+  .login-card__logo {
+    margin-bottom: .9rem;
+  }
+
+  .login-card__logo img,
+  .login-card__logo-placeholder {
+    width: 56px;
+    height: 56px;
+  }
+
+  .login-card__title {
+    font-size: 1.12rem;
+  }
+
+  .login-card__subtitle {
+    margin-bottom: 1.2rem;
+    font-size: .78rem;
+  }
+
+  .inicio-hero {
+    padding: 1rem;
+    margin-bottom: .85rem;
+    border-radius: 8px;
+  }
+
+  .inicio-hero h2 {
+    font-size: 1.05rem;
+  }
+
+  .inicio-hero p {
+    font-size: .82rem;
+  }
+
+  .module-tracker__header {
+    gap: .45rem;
+    margin-bottom: .65rem;
+    flex-direction: column;
+  }
+
+  .module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+  }
+
+  .module-card {
+    min-height: 92px;
+    padding: .52rem;
+  }
+
+  .module-card__top {
+    margin-bottom: .3rem;
+  }
+
+  .module-card__order {
+    width: 1.35rem;
+    height: 1.35rem;
+    font-size: .68rem;
+  }
+
+  .module-card__status {
+    font-size: .6rem;
+  }
+
+  .module-card__title {
+    font-size: .76rem;
+  }
+
+  .survey-actions {
+    gap: .45rem;
+    margin-top: .75rem;
+  }
+
+  .survey-empty {
+    padding: 2rem .75rem;
+  }
+
+  .survey-empty__icon {
+    font-size: 2rem;
+  }
+
+  .survey-timer-section {
+    padding: .6rem;
+  }
+
+  .survey-timer__display {
+    font-size: 1.45rem;
+  }
+
+  .map-main {
+    min-height: 54dvh;
+    flex-basis: 54dvh;
+  }
+
+  .map-sidebar {
+    max-height: 32dvh;
+  }
+
+  .map-sidebar__filters {
+    grid-template-columns: 1fr;
+    padding: .45rem;
+  }
+
+  .map-sidebar__filter-btns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .map-offline-state {
+    top: .45rem;
+    left: .45rem;
+    right: .45rem;
+    max-width: none;
+    padding: .28rem .45rem;
+    font-size: .68rem;
+  }
+
+  .map-info-panel {
+    right: .45rem;
+    bottom: .45rem;
+    left: .45rem;
+    width: auto;
+  }
+
+  .map-info-card {
+    padding: .65rem;
+  }
+
+  .map-popup {
+    min-width: 180px;
+  }
+
+  .leaflet-control-zoom a {
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+  }
+
+  .manual-modal__panel,
+  .modal__panel {
+    width: calc(100vw - 1rem);
+    max-height: calc(100dvh - 1rem);
+  }
+
+  .modal__header,
+  .modal__body,
+  .modal__footer {
+    padding: .75rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ops-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ops-actions .btn,
+  .survey-actions .btn {
+    width: 100%;
+    flex: none;
+  }
+
+  .map-main {
+    min-height: 50dvh;
+  }
+
+  .map-sidebar {
+    max-height: 36dvh;
+  }
+
+  .chart-card canvas {
+    max-height: 220px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 1024px) {
+  #content-area,
+  #sidebar,
+  #map-school-list {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .btn,
+  .nav-item > a,
+  .map-list-item {
+    touch-action: manipulation;
+  }
 }

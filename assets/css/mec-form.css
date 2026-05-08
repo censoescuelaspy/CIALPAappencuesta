@@ -1167,3 +1167,677 @@
     flex-direction: column;
   }
 }
+
+/* ── Densidad móvil/tablet para carga de campo, v2.5.3 ────── */
+@media (max-width: 1024px) {
+  .mec-header-actions {
+    gap: .35rem;
+  }
+
+  .mec-command {
+    gap: .75rem;
+    margin-bottom: .75rem;
+    padding: .8rem;
+  }
+
+  .mec-command h3 {
+    font-size: 1.05rem;
+  }
+
+  .mec-command p {
+    font-size: .84rem;
+  }
+
+  .mec-command__stats {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+  }
+
+  .mec-command__stats div {
+    min-height: 58px;
+    padding: .55rem;
+  }
+
+  .mec-command__stats span {
+    font-size: .66rem;
+  }
+
+  .mec-command__stats strong {
+    font-size: .9rem;
+  }
+
+  .mec-shell {
+    gap: .75rem;
+  }
+
+  .mec-stepper {
+    gap: .45rem;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  }
+
+  .mec-step {
+    min-height: 52px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: .45rem;
+    padding: .48rem;
+  }
+
+  .mec-step__number {
+    width: 28px;
+    height: 28px;
+    font-size: .78rem;
+  }
+
+  .mec-step__text strong {
+    font-size: .82rem;
+  }
+
+  .mec-step__text small {
+    margin-top: .1rem;
+    font-size: .68rem;
+  }
+
+  .mec-rail__actions {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: .4rem;
+  }
+
+  .mec-autosave-pill {
+    min-height: 28px;
+    padding: .25rem .5rem;
+    font-size: .72rem;
+  }
+
+  .mec-stage-toolbar {
+    gap: .45rem;
+    padding: .5rem .6rem;
+  }
+
+  .mec-stage-toolbar span {
+    font-size: .76rem;
+  }
+
+  .mec-module__header {
+    gap: .6rem;
+    padding: .75rem;
+  }
+
+  .mec-module__header h3 {
+    font-size: 1.02rem;
+  }
+
+  .mec-module__header p:not(.mec-eyebrow) {
+    font-size: .82rem;
+  }
+
+  .mec-module__badge {
+    min-width: 0;
+    padding: .32rem .55rem;
+    font-size: .7rem;
+  }
+
+  .mec-module__body {
+    padding: .7rem;
+  }
+
+  .mec-section {
+    margin-bottom: .65rem;
+    padding: .7rem;
+  }
+
+  .mec-section__header {
+    margin-bottom: .55rem;
+  }
+
+  .mec-section__header h4 {
+    font-size: .88rem;
+  }
+
+  .mec-field-grid {
+    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+    gap: .55rem;
+  }
+
+  .mec-field {
+    padding: .55rem;
+  }
+
+  .mec-label {
+    min-height: 0;
+    margin-bottom: .32rem;
+    font-size: .78rem;
+  }
+
+  .mec-info-btn {
+    width: 18px;
+    height: 18px;
+    font-size: .66rem;
+  }
+
+  .mec-options {
+    grid-template-columns: repeat(auto-fit, minmax(98px, 1fr));
+    gap: .32rem;
+  }
+
+  .mec-options--columns {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  }
+
+  .mec-option {
+    min-height: 36px;
+    padding: .36rem .44rem;
+    font-size: .78rem;
+  }
+
+  .mec-option input {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mec-input-with-unit {
+    gap: .32rem;
+  }
+
+  .mec-unit {
+    min-width: 1.5rem;
+    font-size: .74rem;
+  }
+
+  .mec-hint,
+  .mec-error,
+  .mec-evidence__state {
+    font-size: .68rem;
+  }
+
+  .mec-evidence {
+    gap: .3rem .4rem;
+    margin-top: .45rem;
+    padding-top: .45rem;
+  }
+
+  .mec-repeat-toolbar {
+    gap: .35rem;
+    margin-bottom: .5rem;
+  }
+
+  .mec-repeat-list {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: .4rem;
+    margin-bottom: .6rem;
+  }
+
+  .mec-repeat-item {
+    min-height: 52px;
+    padding: .48rem;
+  }
+
+  .mec-block-tabs {
+    gap: .35rem;
+    margin-bottom: .5rem;
+    padding-bottom: .45rem;
+  }
+
+  .mec-block-tab {
+    min-width: 112px;
+    padding: .45rem .55rem;
+  }
+
+  .mec-sanitary-card {
+    padding: .65rem;
+  }
+
+  .mec-sanitary-groups {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .5rem;
+  }
+
+  .mec-sanitary-plan {
+    margin: .65rem 0;
+    padding: .58rem;
+  }
+
+  .mec-sketch__layout {
+    gap: .7rem;
+  }
+
+  .mec-sketch__tools {
+    gap: .45rem;
+  }
+
+  .mec-sketch__actions {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: .35rem;
+  }
+
+  .mec-sketch-toolset {
+    grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+    gap: .3rem;
+    margin-top: .45rem;
+    padding: .4rem;
+  }
+
+  .mec-sketch-tool {
+    min-height: 50px;
+    padding: .32rem .22rem;
+    font-size: .66rem;
+  }
+
+  .mec-sketch-tool__icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 1rem;
+  }
+
+  .mec-sketch-zoom {
+    flex-wrap: wrap;
+    margin-bottom: .35rem;
+    font-size: .72rem;
+  }
+
+  .mec-sketch__board small {
+    font-size: .68rem;
+  }
+
+  .mec-object-form .form-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .5rem;
+  }
+
+  .mec-choice-buttons {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: .35rem;
+  }
+
+  .mec-choice {
+    min-height: 38px;
+    padding: .42rem .5rem;
+    border-width: 1px;
+    font-size: .78rem;
+  }
+
+  .mec-object-evidence {
+    gap: .45rem;
+    margin-top: .55rem;
+    padding: .55rem;
+  }
+
+  .school-plan {
+    gap: .7rem;
+  }
+
+  .school-plan__kpis {
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: .45rem;
+  }
+
+  .school-plan-kpi {
+    min-height: 74px;
+    padding: .55rem;
+  }
+
+  .school-plan-kpi span {
+    font-size: .66rem;
+  }
+
+  .school-plan-kpi strong {
+    font-size: 1.08rem;
+  }
+
+  .school-plan__layout {
+    gap: .7rem;
+  }
+
+  .school-plan__board,
+  .school-plan__side {
+    border-radius: 6px;
+  }
+
+  .school-plan__board,
+  .school-plan__side {
+    padding: .6rem;
+  }
+
+  .school-plan__toolbar {
+    gap: .45rem;
+    margin-bottom: .5rem;
+  }
+
+  .school-plan__layers label {
+    min-height: 28px;
+    padding: .22rem .38rem;
+    font-size: .68rem;
+  }
+
+  .school-plan-object {
+    min-height: 48px;
+    padding: .48rem;
+  }
+
+  .school-plan-object--child {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 700px) {
+  .mec-command {
+    margin-bottom: .55rem;
+    padding: .6rem;
+  }
+
+  .mec-command__stats div {
+    min-height: 50px;
+    padding: .42rem;
+  }
+
+  .mec-command__stats span {
+    font-size: .6rem;
+  }
+
+  .mec-command__stats strong {
+    margin-top: .18rem;
+    font-size: .82rem;
+  }
+
+  .mec-stepper {
+    display: flex;
+    gap: .35rem;
+    overflow-x: auto;
+    padding-bottom: .25rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mec-step {
+    min-width: 126px;
+    min-height: 44px;
+    grid-template-columns: 24px minmax(0, 1fr);
+    padding: .36rem;
+    scroll-snap-align: start;
+  }
+
+  .mec-step__number {
+    width: 24px;
+    height: 24px;
+    font-size: .7rem;
+  }
+
+  .mec-step__text strong {
+    font-size: .74rem;
+  }
+
+  .mec-step__text small {
+    display: none;
+  }
+
+  .mec-rail__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-stage-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin: 0 0 .5rem;
+    padding: .42rem;
+    border-radius: 6px;
+  }
+
+  .mec-stage-toolbar .btn {
+    flex: 1 1 calc(50% - .3rem);
+  }
+
+  .mec-stage-toolbar span {
+    flex: 1 1 100%;
+    font-size: .68rem;
+  }
+
+  .mec-module__header {
+    flex-direction: column;
+    padding: .58rem;
+  }
+
+  .mec-module__header h3 {
+    font-size: .92rem;
+  }
+
+  .mec-module__header p:not(.mec-eyebrow) {
+    font-size: .76rem;
+  }
+
+  .mec-module__badge {
+    align-self: flex-start;
+    padding: .28rem .45rem;
+    font-size: .64rem;
+  }
+
+  .mec-module__body {
+    padding: .5rem;
+  }
+
+  .mec-section {
+    margin-bottom: .5rem;
+    padding: .55rem;
+  }
+
+  .mec-section__header h4 {
+    font-size: .8rem;
+  }
+
+  .mec-field-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+  }
+
+  .mec-field {
+    padding: .42rem;
+  }
+
+  .mec-label {
+    font-size: .72rem;
+  }
+
+  .mec-label > span:last-child:not(:first-child) {
+    font-size: .58rem;
+  }
+
+  .mec-options,
+  .mec-options--columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-option {
+    min-height: 34px;
+    padding: .32rem .36rem;
+    font-size: .72rem;
+  }
+
+  .mec-evidence {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-evidence__label,
+  .mec-evidence__state {
+    font-size: .68rem;
+  }
+
+  .mec-repeat-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-repeat-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-repeat-item {
+    min-height: 46px;
+    padding: .4rem;
+  }
+
+  .mec-repeat-item strong {
+    font-size: .74rem;
+  }
+
+  .mec-repeat-item span {
+    font-size: .66rem;
+  }
+
+  .mec-sketch-toolset {
+    grid-template-columns: repeat(5, minmax(42px, 1fr));
+    margin-top: .35rem;
+  }
+
+  .mec-sketch-tool {
+    min-height: 44px;
+    font-size: .6rem;
+  }
+
+  .mec-sketch-tool__icon {
+    width: 24px;
+    height: 24px;
+    font-size: .95rem;
+  }
+
+  .mec-sketch__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-sketch-canvas-wrap {
+    max-height: 54dvh;
+  }
+
+  .mec-choice-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-choice {
+    min-height: 36px;
+    padding: .36rem .4rem;
+    font-size: .72rem;
+  }
+
+  .mec-sanitary-card__header {
+    flex-direction: column;
+    margin-bottom: .5rem;
+  }
+
+  .mec-sanitary-groups {
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+  }
+
+  .mec-sanitary-plan {
+    margin: .55rem 0;
+    padding: .5rem;
+  }
+
+  .mec-sanitary-svg {
+    max-height: 210px;
+  }
+
+  .school-plan__kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .school-plan-kpi {
+    min-height: 64px;
+    padding: .45rem;
+  }
+
+  .school-plan-kpi strong {
+    font-size: .96rem;
+  }
+
+  .school-plan__toolbar {
+    gap: .4rem;
+    margin-bottom: .45rem;
+  }
+
+  .school-plan__layers,
+  .school-plan__exports {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .35rem;
+  }
+
+  .school-plan__layers label {
+    justify-content: center;
+  }
+
+  .school-plan__board canvas {
+    min-height: 220px;
+  }
+
+  .school-plan__legend {
+    gap: .25rem .45rem;
+    font-size: .68rem;
+  }
+
+  .school-plan-object {
+    min-height: 42px;
+    padding: .4rem;
+  }
+
+  .school-plan-object__type {
+    font-size: .58rem;
+  }
+
+  .school-plan-object strong {
+    font-size: .74rem;
+  }
+
+  .school-plan-object small {
+    font-size: .64rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .mec-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-options,
+  .mec-options--columns,
+  .mec-choice-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-stage-toolbar .btn,
+  .mec-rail__actions .btn,
+  .mec-repeat-toolbar .btn,
+  .mec-sketch__actions .btn {
+    min-width: 0;
+  }
+
+  .mec-sketch-toolset {
+    grid-template-columns: repeat(4, minmax(42px, 1fr));
+  }
+
+  .school-plan__layers,
+  .school-plan__exports {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (pointer: coarse) and (max-width: 1024px) {
+  .mec-stepper,
+  .mec-block-tabs,
+  .mec-sketch-canvas-wrap,
+  .school-plan__list {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mec-step,
+  .mec-option,
+  .mec-choice,
+  .mec-sketch-tool,
+  .school-plan-object {
+    touch-action: manipulation;
+  }
+}
