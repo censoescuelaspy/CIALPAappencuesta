@@ -262,6 +262,7 @@ const AppController = (() => {
 
   let _currentModule = null;
   let _mapInitialized = false;
+  let _sidebarHideTimer = null;
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -358,9 +359,16 @@ const AppController = (() => {
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
-        document.getElementById('sidebar').classList.toggle('sidebar--open');
+        if (window.matchMedia('(max-width: 768px)').matches) {
+          document.getElementById('sidebar').classList.toggle('sidebar--open');
+        } else {
+          document.body.classList.toggle('sidebar-auto-hidden');
+          document.body.classList.remove('sidebar-peek');
+        }
       });
     }
+
+    _bindSidebarAutoPeek();
 
     // Manual FAB
     const fab = document.getElementById('manual-fab');
@@ -371,6 +379,30 @@ const AppController = (() => {
       UI.showToast('Sin conexión a internet. Algunos funciones no están disponibles.', 'warning', 0));
     window.addEventListener('online', () =>
       UI.showToast('Conexión restaurada.', 'success'));
+  }
+
+  function _bindSidebarAutoPeek() {
+    const sidebar = document.getElementById('sidebar');
+    const hotzone = document.getElementById('sidebar-hotzone');
+    if (!sidebar || !hotzone || sidebar.dataset.autoPeekBound === 'true') return;
+    sidebar.dataset.autoPeekBound = 'true';
+
+    const show = () => {
+      if (!document.body.classList.contains('sidebar-auto-hidden')) return;
+      clearTimeout(_sidebarHideTimer);
+      document.body.classList.add('sidebar-peek');
+    };
+    const scheduleHide = () => {
+      if (!document.body.classList.contains('sidebar-auto-hidden')) return;
+      clearTimeout(_sidebarHideTimer);
+      _sidebarHideTimer = setTimeout(() => document.body.classList.remove('sidebar-peek'), 350);
+    };
+
+    hotzone.addEventListener('mouseenter', show);
+    hotzone.addEventListener('touchstart', show, { passive: true });
+    sidebar.addEventListener('mouseenter', show);
+    sidebar.addEventListener('mouseleave', scheduleHide);
+    sidebar.addEventListener('touchend', scheduleHide, { passive: true });
   }
 
   // ── Module router ──────────────────────────────────────────────────────────

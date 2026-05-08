@@ -633,6 +633,9 @@ const MecFormModule = (() => {
       const px = Math.hypot(object.x2 - object.x1, object.y2 - object.y1);
       return `${(px * scale.avg).toFixed(2)}m`;
     }
+    if (object.type === 'window') {
+      return `L${(object.w * scale.x).toFixed(2)} A${(object.h * scale.y).toFixed(2)}m`;
+    }
     return `${(object.w * scale.x).toFixed(2)} x ${(object.h * scale.y).toFixed(2)}m`;
   }
 
@@ -883,8 +886,10 @@ const MecFormModule = (() => {
     const cfg = _sketchFichaFields(object.type);
     const modalId = 'modal-sketch-object-ficha';
     document.getElementById(modalId)?.remove();
-    const widthM = object.ficha.ancho_m || _fieldValueForObjectMeters(object, 'w');
+    const lengthM = object.ficha.largo_m || object.ficha.ancho_m || _fieldValueForObjectMeters(object, 'w');
     const heightM = object.ficha.alto_m || _fieldValueForObjectMeters(object, 'h');
+    const primaryMeasureLabel = object.type === 'window' ? 'Largo' : 'Ancho';
+    const primaryMeasureName = object.type === 'window' ? 'largo_m' : 'ancho_m';
     const evidenceCount = (object.ficha.evidencias || []).length;
     const modal = document.createElement('div');
     modal.id = modalId;
@@ -927,9 +932,9 @@ const MecFormModule = (() => {
                 </select>
               </div>
               <div class="form-group">
-                <label>Ancho</label>
+                <label>${primaryMeasureLabel}</label>
                 <div class="mec-input-with-unit">
-                  <input class="form-control" name="ancho_m" type="number" min="0" step="0.01" value="${_escape(widthM)}">
+                  <input class="form-control" name="${primaryMeasureName}" type="number" min="0" step="0.01" value="${_escape(lengthM)}">
                   <span class="mec-unit">m</span>
                 </div>
               </div>
@@ -990,11 +995,11 @@ const MecFormModule = (() => {
     const object = _findSketchObjectById(data.get('object_id'));
     if (!object) return;
     object.ficha = object.ficha || {};
-    ['codigo', 'subtipo', 'estado', 'material', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'seguridad', 'prioridad', 'observacion']
+    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'seguridad', 'prioridad', 'observacion']
       .forEach(key => {
         if (data.has(key)) object.ficha[key] = String(data.get(key) || '').trim();
       });
-    _applyObjectMeters(object, object.ficha.ancho_m, object.ficha.alto_m);
+    _applyObjectMeters(object, object.ficha.largo_m || object.ficha.ancho_m, object.ficha.alto_m);
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
