@@ -50,7 +50,7 @@
       <strong>Modo DEMO</strong> — Backend no configurado.<br>
       Credenciales de prueba:<br>
       &nbsp;• <code>admin</code> / <code>admin123</code><br>
-      &nbsp;• <code>encuestador</code> / <code>enc123</code>
+      &nbsp;• Primer acceso: <code>nombre.apellido</code> / clave numérica de 6 dígitos
     </div>
 
     <form id="login-form" autocomplete="on" novalidate>
@@ -61,7 +61,7 @@
           type="text"
           class="form-control"
           name="usuario"
-          placeholder="Tu usuario"
+          placeholder="nombre.apellido"
           autocomplete="username"
           required
           autofocus
@@ -74,7 +74,9 @@
           type="password"
           class="form-control"
           name="password"
-          placeholder="Tu contraseña"
+          placeholder="6 dígitos en el primer acceso"
+          inputmode="numeric"
+          minlength="6"
           autocomplete="current-password"
           required
         />

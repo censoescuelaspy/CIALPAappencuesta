@@ -11,10 +11,10 @@ const API = (() => {
 
   const _DEMO_USERS = [
     { usuario: 'admin', password: 'admin123', nombres: 'Admin', apellidos: 'Sistema', rol: 'admin', id_usuario: 'u_admin' },
-    { usuario: 'diego.meza', password: 'admin123', nombres: 'Diego', apellidos: 'Meza', rol: 'admin', id_usuario: 'u_diego' },
-    { usuario: 'noelia.mendoza', password: 'admin123', nombres: 'Noelia', apellidos: 'Mendoza', rol: 'admin', id_usuario: 'u_noelia' },
-    { usuario: 'latiffi.chelala', password: 'admin123', nombres: 'Latiffi', apellidos: 'Chelala', rol: 'admin', id_usuario: 'u_latiffi' },
-    { usuario: 'encuestador', password: 'enc123', nombres: 'Juan', apellidos: 'Pérez', rol: 'encuestador', id_usuario: 'u_enc1' },
+    { usuario: 'diego.meza', password: '', firstAccess: true, nombres: 'Diego', apellidos: 'Meza', rol: 'admin', id_usuario: 'u_diego' },
+    { usuario: 'noelia.mendoza', password: '', firstAccess: true, nombres: 'Noelia', apellidos: 'Mendoza', rol: 'admin', id_usuario: 'u_noelia' },
+    { usuario: 'latiffi.chelala', password: '', firstAccess: true, nombres: 'Latiffi', apellidos: 'Chelala', rol: 'admin', id_usuario: 'u_latiffi' },
+    { usuario: 'juan.perez', password: '', firstAccess: true, nombres: 'Juan', apellidos: 'Pérez', rol: 'encuestador', id_usuario: 'u_enc1' },
     { usuario: 'supervisor', password: 'sup123', nombres: 'María', apellidos: 'González', rol: 'supervisor', id_usuario: 'u_sup1' },
   ];
 
@@ -49,7 +49,7 @@ const API = (() => {
   };
 
   const _DEMO_ENCUESTADORES = [
-    { id_encuestador: 'u_enc1', nombres: 'Juan', apellidos: 'Pérez', usuario: 'encuestador', activo: true, zona_asignada: 'Capital', rol: 'encuestador' },
+    { id_encuestador: 'u_enc1', nombres: 'Juan', apellidos: 'Pérez', usuario: 'juan.perez', activo: true, zona_asignada: 'Capital', rol: 'encuestador' },
     { id_encuestador: 'u_sup1', nombres: 'María', apellidos: 'González', usuario: 'supervisor', activo: true, zona_asignada: 'Capital', rol: 'supervisor' },
   ];
 
@@ -71,12 +71,21 @@ const API = (() => {
   function _demoDispatch(endpoint, data) {
     switch (endpoint) {
       case 'login': {
-        const u = _DEMO_USERS.find(x => x.usuario === data.usuario && x.password === data.password);
+        const u = _DEMO_USERS.find(x => x.usuario.toLowerCase() === String(data.usuario || '').toLowerCase());
         if (u) {
-          const { password: _, ...safeUser } = u;
-          return { status: 'ok', data: { token: 'demo_' + Date.now(), ...safeUser } };
+          if (u.firstAccess) {
+            if (!/^\d{6}$/.test(String(data.password || ''))) {
+              return { status: 'error', message: 'Primer acceso: use una contraseña numérica de 6 dígitos.' };
+            }
+            u.password = data.password;
+            u.firstAccess = false;
+          }
+          if (u.password === data.password) {
+            const { password: _, firstAccess: __, ...safeUser } = u;
+            return { status: 'ok', data: { token: 'demo_' + Date.now(), ...safeUser } };
+          }
         }
-        return { status: 'error', message: 'Credenciales inválidas. Modo DEMO: admin/admin123, encuestador/enc123 o supervisor/sup123.' };
+        return { status: 'error', message: 'Credenciales inválidas. Primer acceso: usuario nombre.apellido y clave numérica de 6 dígitos.' };
       }
       case 'logout': return { status: 'ok' };
       case 'getEscuelas': return { status: 'ok', data: _DEMO_ESCUELAS };

@@ -32,18 +32,23 @@ const AuthService = (() => {
   // ── Login ────────────────────────────────────────────────────────────────
 
   function login(params) {
-    const { usuario, password } = params;
+    const usuario = _normalizeUsuario(params.usuario);
+    const { password } = params;
 
     if (!usuario || !password) {
       return { status: 'error', message: 'Usuario y contraseña son requeridos.' };
     }
 
     const usuarios = _sheetToObjects(SHEET_NAMES.USUARIOS);
-    const user = usuarios.find(u => String(u.usuario).toLowerCase() === String(usuario).toLowerCase());
+    let user = usuarios.find(u => _normalizeUsuario(u.usuario) === usuario);
 
     if (!user) {
-      AuditService.log('LOGIN_FALLIDO', usuario, 'Usuario no encontrado');
-      return { status: 'error', message: 'Credenciales inválidas.' };
+      const created = _activateFromEncuestador(usuario, password);
+      if (created.status !== 'ok') {
+        AuditService.log('LOGIN_FALLIDO', usuario, created.message || 'Usuario no encontrado');
+        return created;
+      }
+      user = created.user;
     }
 
     if (String(user.activo).toLowerCase() !== 'true') {
@@ -52,6 +57,16 @@ const AuthService = (() => {
     }
 
     const passwordHash = _hashPassword(password);
+    if (!String(user.password_hash || '').trim()) {
+      if (!_isSixDigitPassword(password)) {
+        AuditService.log('LOGIN_FALLIDO', usuario, 'Primer acceso con contraseña inválida');
+        return { status: 'error', message: 'Primer acceso: use una contraseña numérica de 6 dígitos.' };
+      }
+      _setInitialPassword(user.id_usuario, passwordHash);
+      user.password_hash = passwordHash;
+      AuditService.log('PASSWORD_INICIAL', usuario, 'Contraseña inicial configurada por el usuario.');
+    }
+
     if (user.password_hash !== passwordHash) {
       AuditService.log('LOGIN_FALLIDO', usuario, 'Contraseña incorrecta');
       return { status: 'error', message: 'Credenciales inválidas.' };
@@ -79,6 +94,87 @@ const AuthService = (() => {
         expiry: expiry.toISOString(),
       },
     };
+  }
+
+  function _normalizeUsuario(usuario) {
+    return String(usuario || '').trim().toLowerCase();
+  }
+
+  function _isSixDigitPassword(password) {
+    return /^\d{6}$/.test(String(password || ''));
+  }
+
+  function _activateFromEncuestador(usuario, password) {
+    if (!_isSixDigitPassword(password)) {
+      return { status: 'error', message: 'Primer acceso: use usuario nombre.apellido y una contraseña numérica de 6 dígitos.' };
+    }
+
+    const encuestadores = _sheetToObjects(SHEET_NAMES.ENCUESTADORES);
+    const enc = encuestadores.find(e =>
+      String(e.activo).toLowerCase() !== 'false' &&
+      _normalizeUsuario(e.usuario || _usuarioFromName(e.nombres, e.apellidos)) === usuario
+    );
+
+    if (!enc) return { status: 'error', message: 'Usuario no encontrado. Verifique el formato nombre.apellido o contacte al administrador.' };
+
+    _ensureUserColumns();
+    const sheet = _getSheet(SHEET_NAMES.USUARIOS);
+    const id = _genId('USR');
+    const user = {
+      id_usuario: id,
+      usuario,
+      password_hash: _hashPassword(password),
+      nombres: enc.nombres || '',
+      apellidos: enc.apellidos || '',
+      rol: enc.rol || 'encuestador',
+      activo: 'true',
+      fecha_alta: _today(),
+      ultimo_acceso: '',
+      token_actual: '',
+      token_expiry: '',
+    };
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    sheet.appendRow(headers.map(h => user[h] !== undefined ? user[h] : ''));
+    AuditService.log('USUARIO_ACTIVADO', usuario, 'Usuario creado desde encuestadores en primer acceso.');
+    return { status: 'ok', user };
+  }
+
+  function _usuarioFromName(nombres, apellidos) {
+    const first = String(nombres || '').trim().split(/\s+/)[0] || '';
+    const last = String(apellidos || '').trim().split(/\s+/)[0] || '';
+    return `${first}.${last}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  }
+
+  function _setInitialPassword(id_usuario, passwordHash) {
+    _ensureUserColumns();
+    const sheet = _getSheet(SHEET_NAMES.USUARIOS);
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim());
+    const idCol = headers.indexOf('id_usuario');
+    const passCol = headers.indexOf('password_hash');
+    if (idCol === -1 || passCol === -1) return;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) === String(id_usuario)) {
+        sheet.getRange(i + 1, passCol + 1).setValue(passwordHash);
+        break;
+      }
+    }
+  }
+
+  function _ensureUserColumns() {
+    const sheet = _getSheet(SHEET_NAMES.USUARIOS);
+    const expected = ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual','token_expiry'];
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    const headers = sheet.getLastRow() ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim()) : [];
+    if (!headers.length || headers.every(h => !h)) {
+      sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+      return;
+    }
+    expected.forEach(header => {
+      if (!headers.includes(header)) {
+        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
+      }
+    });
   }
 
   function _updateUserToken(id_usuario, token, expiry) {

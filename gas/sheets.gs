@@ -352,7 +352,7 @@ const SheetsService = (() => {
         id_encuestador: newId, usuario, nombres, apellidos: apellidos || '', documento: documento || '', telefono: telefono || '', correo: correo || '', zona_asignada: zona_asignada || '', rol: rol || 'encuestador', foto_url: '', activo: activo === false ? 'false' : 'true', fecha_alta: _today(), fecha_actualizacion: _today()
       });
       _appendObject(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual'], {
-        id_usuario: _genId('USR'), usuario, password_hash: password ? AuthService._hashPassword(password) : AuthService._hashPassword('cialpa2025'), nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activo === false ? 'false' : 'true', fecha_alta: _today(), ultimo_acceso: '', token_actual: ''
+        id_usuario: _genId('USR'), usuario, password_hash: password ? AuthService._hashPassword(password) : '', nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activo === false ? 'false' : 'true', fecha_alta: _today(), ultimo_acceso: '', token_actual: ''
       });
       AuditService.log('CREATE_ENCUESTADOR', session.usuario, `usuario: ${usuario}`);
       return { status: 'ok', message: 'Encuestador creado.', data: { id_encuestador: newId } };

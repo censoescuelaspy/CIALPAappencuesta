@@ -124,7 +124,7 @@ const AdminModule = (() => {
 
     if (!rows.length) {
       bodies.forEach(tbody => {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay encuestadores registrados. Los usuarios se administran en la hoja USUARIOS o mediante la función saveUser(). Cambie las credenciales iniciales por seguridad.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay encuestadores registrados. Los usuarios se administran en la hoja usuarios/encuestadores o desde este panel. Primer acceso: nombre.apellido y contraseña numérica de 6 dígitos.</td></tr>';
       });
       return;
     }
