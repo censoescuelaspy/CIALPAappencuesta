@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.1.0
+ * Version: 2.5.1
  */
 
 const SurveyModule = (() => {
@@ -82,7 +82,7 @@ const SurveyModule = (() => {
     if (_launchConfig) return _launchConfig;
     try {
       const result = await API.getConfig();
-      const data = result.status === 'ok' ? (result.data || {}) : {};
+      const data = _configRowsToObject(result.status === 'ok' ? result.data : {});
       _launchConfig = {
         mode: data.FORM_LAUNCH_MODE || data.form_launch_mode || 'web',
         webUrl: data.FORM_URL || APP_CONFIG.FORM_URL,
@@ -94,6 +94,15 @@ const SurveyModule = (() => {
       _launchConfig = { mode: 'web', webUrl: APP_CONFIG.FORM_URL, androidIntentUrl: '', customSchemeUrl: '', fallbackSeconds: 2 };
     }
     return _launchConfig;
+  }
+
+  function _configRowsToObject(config) {
+    if (!Array.isArray(config)) return config || {};
+    return config.reduce((acc, row) => {
+      const key = row.clave || row.key || row.nombre;
+      if (key) acc[key] = row.valor ?? row.value ?? '';
+      return acc;
+    }, {});
   }
 
   function _deviceDescription() {

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.0.0
+ * Version: 2.5.1
  */
 
 const AdminModule = (() => {
@@ -26,6 +26,8 @@ const AdminModule = (() => {
 
   function _bindTabEvents() {
     document.querySelectorAll('[data-admin-tab]').forEach(tab => {
+      if (tab.dataset.bound === 'true') return;
+      tab.dataset.bound = 'true';
       tab.addEventListener('click', () => {
         const target = tab.dataset.adminTab;
         _switchTab(target);
@@ -73,19 +75,19 @@ const AdminModule = (() => {
     }
 
     container.innerHTML = editableConfigs.map(c => `
-      <div class="config-item" data-clave="${c.clave}">
+      <div class="config-item" data-clave="${_escapeHtml(c.clave)}">
         <div class="config-item__info">
-          <label class="config-item__key">${c.clave}</label>
-          <small class="config-item__desc">${c.descripcion || ''}</small>
+          <label class="config-item__key">${_escapeHtml(c.clave)}</label>
+          <small class="config-item__desc">${_escapeHtml(c.descripcion || '')}</small>
         </div>
         <div class="config-item__edit">
           <input class="form-control form-control-sm config-input"
             type="text"
             value="${_escapeHtml(c.valor || '')}"
-            data-clave="${c.clave}"
+            data-clave="${_escapeHtml(c.clave)}"
             placeholder="Valor..."
           />
-          <button class="btn btn-sm btn-primary" onclick="AdminModule.saveConfigItem('${c.clave}')">Guardar</button>
+          <button class="btn btn-sm btn-primary" onclick='AdminModule.saveConfigItem(${_jsString(c.clave)})'>Guardar</button>
         </div>
       </div>`).join('');
   }
@@ -131,20 +133,20 @@ const AdminModule = (() => {
 
     const html = rows.map(r => `
       <tr>
-        <td>${r.id_encuestador}</td>
-        <td>${r.usuario}</td>
-        <td>${r.nombres} ${r.apellidos}</td>
-        <td>${r.documento || '—'}</td>
-        <td>${r.telefono || '—'}</td>
-        <td>${r.zona_asignada || '—'}</td>
+        <td>${_escapeHtml(r.id_encuestador)}</td>
+        <td>${_escapeHtml(r.usuario)}</td>
+        <td>${_escapeHtml(`${r.nombres || ''} ${r.apellidos || ''}`.trim())}</td>
+        <td>${_escapeHtml(r.documento || '—')}</td>
+        <td>${_escapeHtml(r.telefono || '—')}</td>
+        <td>${_escapeHtml(r.zona_asignada || '—')}</td>
         <td>
           <span class="badge ${r.activo === 'true' || r.activo === true ? 'badge--success' : 'badge--danger'}">
             ${r.activo === 'true' || r.activo === true ? 'Activo' : 'Inactivo'}
           </span>
         </td>
         <td>
-          <button class="btn btn-xs btn-outline" onclick="AdminModule.editEncuestador('${r.id_encuestador}')">Editar</button>
-          <button class="btn btn-xs btn-danger" onclick="AdminModule.deleteEncuestador('${r.id_encuestador}', '${r.usuario}')">Eliminar</button>
+          <button class="btn btn-xs btn-outline" onclick='AdminModule.editEncuestador(${_jsString(r.id_encuestador)})'>Editar</button>
+          <button class="btn btn-xs btn-danger" onclick='AdminModule.deleteEncuestador(${_jsString(r.id_encuestador)}, ${_jsString(r.usuario)})'>Eliminar</button>
         </td>
       </tr>`).join('');
     bodies.forEach(tbody => { tbody.innerHTML = html; });
@@ -246,36 +248,46 @@ const AdminModule = (() => {
   }
 
   function _renderAuditoriaTable(rows) {
-    const tbody = document.getElementById('audit-tbody');
-    if (!tbody) return;
+    const bodies = ['audit-tbody', 'audit-tbody-standalone']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    if (!bodies.length) return;
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin registros.</td></tr>';
+      bodies.forEach(tbody => {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin registros.</td></tr>';
+      });
       return;
     }
-    tbody.innerHTML = rows.map(r => `
+    const html = rows.map(r => `
       <tr>
-        <td>${r.id_registro}</td>
-        <td>${r.fecha_hora}</td>
-        <td>${r.usuario}</td>
-        <td><span class="badge badge--info">${r.accion}</span></td>
-        <td>${r.detalle || '—'}</td>
-        <td>${r.ip_aproximada || '—'}</td>
+        <td>${_escapeHtml(r.id_registro)}</td>
+        <td>${_escapeHtml(r.fecha_hora)}</td>
+        <td>${_escapeHtml(r.usuario)}</td>
+        <td><span class="badge badge--info">${_escapeHtml(r.accion)}</span></td>
+        <td>${_escapeHtml(r.detalle || '—')}</td>
+        <td>${_escapeHtml(r.ip_aproximada || '—')}</td>
       </tr>`).join('');
+    bodies.forEach(tbody => { tbody.innerHTML = html; });
   }
 
   function _renderPagination(pagination, currentPage) {
-    const container = document.getElementById('audit-pagination');
-    if (!container || !pagination) return;
+    const containers = ['audit-pagination', 'audit-pagination-standalone']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    if (!containers.length || !pagination) return;
     const { total_pages = 1 } = pagination;
     const pages = [];
     for (let p = 1; p <= total_pages; p++) {
       pages.push(`<button class="btn btn-xs ${p === currentPage ? 'btn-primary' : 'btn-outline'}" onclick="AdminModule.loadAuditoria(${p})">${p}</button>`);
     }
-    container.innerHTML = pages.join(' ');
+    containers.forEach(container => { container.innerHTML = pages.join(' '); });
   }
 
   function applyAuditFilters() {
-    const form = document.getElementById('audit-filter-form');
+    const activeStandalone = document.getElementById('module-auditoria')?.classList.contains('module-panel--active');
+    const form = document.getElementById(activeStandalone ? 'audit-filter-form-standalone' : 'audit-filter-form') ||
+      document.getElementById('audit-filter-form') ||
+      document.getElementById('audit-filter-form-standalone');
     if (!form) return;
     const data = new FormData(form);
     _auditFilters = Object.fromEntries([...data.entries()].filter(([, v]) => v));
@@ -283,7 +295,11 @@ const AdminModule = (() => {
   }
 
   function _escapeHtml(str) {
-    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+  }
+
+  function _jsString(value) {
+    return JSON.stringify(String(value ?? '')).replace(/</g, '\\u003c');
   }
 
   return {

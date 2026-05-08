@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.0
+ * Version: 2.5.1
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -28,10 +28,18 @@ const UI = (() => {
     if (!_toastContainer) return;
     const toast = document.createElement('div');
     toast.className = `toast toast--${type}`;
-    toast.innerHTML = `
-      <span class="toast__icon">${_toastIcon(type)}</span>
-      <span class="toast__message">${message}</span>
-      <button class="toast__close" onclick="this.parentElement.remove()">&times;</button>`;
+    const icon = document.createElement('span');
+    icon.className = 'toast__icon';
+    icon.textContent = _toastIcon(type);
+    const text = document.createElement('span');
+    text.className = 'toast__message';
+    text.textContent = String(message || '');
+    const close = document.createElement('button');
+    close.className = 'toast__close';
+    close.type = 'button';
+    close.textContent = '×';
+    close.addEventListener('click', () => toast.remove());
+    toast.append(icon, text, close);
     _toastContainer.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('toast--visible'));
     if (duration > 0) {
@@ -49,7 +57,7 @@ const UI = (() => {
 
   function showAlert(title, message, type = 'info') {
     return new Promise(resolve => {
-      const modal = _createSimpleModal(title, message, type, [
+      const modal = _createSimpleModal(title, `<p>${_escapeHtml(message)}</p>`, type, [
         { label: 'Aceptar', class: 'btn-primary', value: true },
       ], resolve);
       document.body.appendChild(modal);
@@ -59,7 +67,7 @@ const UI = (() => {
 
   function showConfirm(title, message, type = 'question') {
     return new Promise(resolve => {
-      const modal = _createSimpleModal(title, message, type, [
+      const modal = _createSimpleModal(title, `<p>${_escapeHtml(message)}</p>`, type, [
         { label: 'Cancelar', class: 'btn-outline', value: false },
         { label: 'Confirmar', class: 'btn-primary', value: true },
       ], resolve);
@@ -72,7 +80,7 @@ const UI = (() => {
     return new Promise(resolve => {
       const id = 'prompt-input-' + Date.now();
       const modal = _createSimpleModal('Ingresá un valor', `
-        <label for="${id}">${label}</label>
+        <label for="${id}">${_escapeHtml(label)}</label>
         <input id="${id}" type="text" class="form-control mt-1" value="${_escapeHtml(defaultValue)}" />
       `, 'question', [
         { label: 'Cancelar', class: 'btn-outline', value: null },
@@ -93,14 +101,14 @@ const UI = (() => {
     const modal = document.createElement('div');
     modal.className = 'modal modal--dialog';
     modal.innerHTML = `
-      <div class="modal__overlay"></div>
-      <div class="modal__panel modal__panel--dialog">
-        <div class="modal__header">
-          <h3>${title}</h3>
+        <div class="modal__overlay"></div>
+        <div class="modal__panel modal__panel--dialog">
+          <div class="modal__header">
+          <h3>${_escapeHtml(title)}</h3>
         </div>
         <div class="modal__body">${content}</div>
         <div class="modal__footer">
-          ${buttons.map((b, i) => `<button class="btn ${b.class}" data-btn-index="${i}">${b.label}</button>`).join('')}
+          ${buttons.map((b, i) => `<button class="btn ${_escapeHtml(b.class)}" data-btn-index="${i}">${_escapeHtml(b.label)}</button>`).join('')}
         </div>
       </div>`;
 
@@ -133,7 +141,7 @@ const UI = (() => {
   }
 
   function _escapeHtml(str) {
-    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    return String(str ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   }
 
   return {
@@ -211,15 +219,15 @@ const IncidenciasModule = (() => {
     }
     tbody.innerHTML = items.map(i => `
       <tr>
-        <td>${i.fecha_hora || '—'}</td>
-        <td>${i.nombre_escuela || i.id_escuela}</td>
-        <td>${i.usuario}</td>
-        <td>${i.tipo_incidencia}</td>
-        <td><span class="badge badge--${i.prioridad || 'media'}">${i.prioridad || '—'}</span></td>
-        <td><span class="badge badge--${i.estado_resolucion === 'resuelto' ? 'success' : 'danger'}">${i.estado_resolucion || 'pendiente'}</span></td>
+        <td>${_escapeHtml(i.fecha_hora || '—')}</td>
+        <td>${_escapeHtml(i.nombre_escuela || i.id_escuela)}</td>
+        <td>${_escapeHtml(i.usuario)}</td>
+        <td>${_escapeHtml(i.tipo_incidencia)}</td>
+        <td><span class="badge badge--${_safeClass(i.prioridad || 'media')}">${_escapeHtml(i.prioridad || '—')}</span></td>
+        <td><span class="badge badge--${i.estado_resolucion === 'resuelto' ? 'success' : 'danger'}">${_escapeHtml(i.estado_resolucion || 'pendiente')}</span></td>
         <td>
           ${Auth.canAccess('supervisor') && i.estado_resolucion !== 'resuelto'
-        ? `<button class="btn btn-xs btn-success" onclick="IncidenciasModule.resolver('${i.id_incidencia}')">Resolver</button>`
+        ? `<button class="btn btn-xs btn-success" onclick='IncidenciasModule.resolver(${_jsString(i.id_incidencia)})'>Resolver</button>`
         : ''}
         </td>
       </tr>`).join('');
@@ -236,6 +244,14 @@ const IncidenciasModule = (() => {
     } catch (err) {
       UI.showToast('Error: ' + err.message, 'error');
     }
+  }
+
+  function _safeClass(value) {
+    return String(value || '').replace(/[^a-z0-9_-]/gi, '') || 'media';
+  }
+
+  function _jsString(value) {
+    return JSON.stringify(String(value ?? '')).replace(/</g, '\\u003c');
   }
 
   return { openNew, save, loadList, resolver };
@@ -461,7 +477,7 @@ const AppController = (() => {
   }
 
   async function updateApp() {
-    UI.showToast('Buscando la edición vigente y limpiando caché local...', 'info');
+    UI.showToast('Buscando la edición vigente y actualizando caché de la app...', 'info');
     try {
       if (_swRegistration) {
         await _swRegistration.update();
@@ -470,7 +486,9 @@ const AppController = (() => {
       }
       if ('caches' in window) {
         const keys = await caches.keys();
-        await Promise.all(keys.filter(key => key.startsWith('cialpa-')).map(key => caches.delete(key)));
+        await Promise.all(keys
+          .filter(key => key.startsWith('cialpa-') && !key.startsWith('cialpa-map-tiles'))
+          .map(key => caches.delete(key)));
       }
     } catch (err) {
       console.warn('Actualización manual incompleta:', err);
@@ -628,7 +646,8 @@ const AppController = (() => {
 
   function _bindMapFilters() {
     const applyBtn = document.getElementById('map-filter-apply');
-    if (applyBtn) {
+    if (applyBtn && applyBtn.dataset.bound !== 'true') {
+      applyBtn.dataset.bound = 'true';
       applyBtn.addEventListener('click', () => {
         const filters = {
           departamento: document.getElementById('filter-departamento')?.value || '',
@@ -642,7 +661,8 @@ const AppController = (() => {
     }
 
     const clearBtn = document.getElementById('map-filter-clear');
-    if (clearBtn) {
+    if (clearBtn && clearBtn.dataset.bound !== 'true') {
+      clearBtn.dataset.bound = 'true';
       clearBtn.addEventListener('click', () => {
         document.getElementById('map-filter-form')?.reset();
         MapModule.clearFilters();
@@ -650,7 +670,8 @@ const AppController = (() => {
     }
 
     const searchInput = document.getElementById('filter-search');
-    if (searchInput) {
+    if (searchInput && searchInput.dataset.bound !== 'true') {
+      searchInput.dataset.bound = 'true';
       searchInput.addEventListener('input', () => {
         document.getElementById('map-filter-apply')?.click();
       });

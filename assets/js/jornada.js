@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * jornada.js — Personal dashboard (Mi Jornada)
- * Version: 2.0.0
+ * Version: 2.5.1
  */
 
 const JornadaModule = (() => {
@@ -19,7 +19,10 @@ const JornadaModule = (() => {
 
   function _bindRefreshEvent() {
     const btn = document.getElementById('jornada-refresh');
-    if (btn) btn.addEventListener('click', loadMisSesiones);
+    if (btn && btn.dataset.bound !== 'true') {
+      btn.dataset.bound = 'true';
+      btn.addEventListener('click', loadMisSesiones);
+    }
   }
 
   // ── Load sessions ─────────────────────────────────────────────────────────
@@ -54,15 +57,15 @@ const JornadaModule = (() => {
     const enCurso = sessions.find(s => s.estado === 'en_curso');
 
     card.innerHTML = `
-      <div class="user-card">
-        <div class="user-card__avatar">${_initials(user.nombres, user.apellidos)}</div>
+        <div class="user-card">
+        <div class="user-card__avatar">${_escape(_initials(user.nombres, user.apellidos))}</div>
         <div class="user-card__info">
-          <h3>${user.nombres} ${user.apellidos}</h3>
-          <p>${_rolLabel(user.rol)} &bull; <small>${today}</small></p>
+          <h3>${_escape(`${user.nombres || ''} ${user.apellidos || ''}`.trim())}</h3>
+          <p>${_escape(_rolLabel(user.rol))} &bull; <small>${_escape(today)}</small></p>
         </div>
         <div class="user-card__status">
           ${enCurso
-        ? `<span class="badge badge--in-progress">En campo: ${enCurso.nombre_escuela || enCurso.id_escuela}</span>`
+        ? `<span class="badge badge--in-progress">En campo: ${_escape(enCurso.nombre_escuela || enCurso.id_escuela)}</span>`
         : `<span class="badge badge--success">${finalizadas} relevamientos hoy</span>`}
         </div>
       </div>`;
@@ -98,15 +101,16 @@ const JornadaModule = (() => {
     tbody.innerHTML = sessions.map(s => {
       const estadoColor = APP_CONFIG.STATE_COLORS[s.estado] || '#6c757d';
       const estadoLabel = APP_CONFIG.STATE_LABELS[s.estado] || s.estado;
+      const horaFin = s.hora_fin ? _escape(s.hora_fin) : (s.estado === 'en_curso' ? '<em>En curso</em>' : '—');
       return `
         <tr>
-          <td>${s.fecha_inicio || '—'}</td>
-          <td>${s.hora_inicio || '—'}</td>
-          <td>${s.nombre_escuela || s.id_escuela}</td>
-          <td>${s.hora_fin || (s.estado === 'en_curso' ? '<em>En curso</em>' : '—')}</td>
-          <td>${s.duracion_minutos ? s.duracion_minutos + ' min' : '—'}</td>
-          <td><span class="badge" style="background:${estadoColor}">${estadoLabel}</span></td>
-          <td>${s.observacion_cierre || '—'}</td>
+          <td>${_escape(s.fecha_inicio || '—')}</td>
+          <td>${_escape(s.hora_inicio || '—')}</td>
+          <td>${_escape(s.nombre_escuela || s.id_escuela)}</td>
+          <td>${horaFin}</td>
+          <td>${s.duracion_minutos ? `${_escape(s.duracion_minutos)} min` : '—'}</td>
+          <td><span class="badge" style="background:${_escape(estadoColor)}">${_escape(estadoLabel)}</span></td>
+          <td>${_escape(s.observacion_cierre || '—')}</td>
         </tr>`;
     }).join('');
   }
@@ -122,13 +126,13 @@ const JornadaModule = (() => {
     }
 
     container.innerHTML = incidencias.map(s => `
-      <div class="incidencia-item incidencia-item--${s.prioridad || 'media'}">
+      <div class="incidencia-item incidencia-item--${_safeClass(s.prioridad || 'media')}">
         <div class="incidencia-item__header">
-          <strong>${s.nombre_escuela || s.id_escuela}</strong>
-          <span class="badge badge--danger">${s.tipo_incidencia || 'Incidencia'}</span>
+          <strong>${_escape(s.nombre_escuela || s.id_escuela)}</strong>
+          <span class="badge badge--danger">${_escape(s.tipo_incidencia || 'Incidencia')}</span>
         </div>
-        <p>${s.observacion_cierre || '—'}</p>
-        <small>${s.fecha_inicio} ${s.hora_inicio}</small>
+        <p>${_escape(s.observacion_cierre || '—')}</p>
+        <small>${_escape(`${s.fecha_inicio || ''} ${s.hora_inicio || ''}`.trim())}</small>
       </div>`).join('');
   }
 
@@ -143,6 +147,14 @@ const JornadaModule = (() => {
   function _rolLabel(rol) {
     const labels = { admin: 'Administrador', supervisor: 'Supervisor', encuestador: 'Encuestador' };
     return labels[rol] || rol;
+  }
+
+  function _escape(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+  }
+
+  function _safeClass(value) {
+    return String(value || '').replace(/[^a-z0-9_-]/gi, '') || 'media';
   }
 
   return {

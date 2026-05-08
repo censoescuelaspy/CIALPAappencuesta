@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.5.0
+ * Version: 2.5.1
  */
 
 const MapModule = (() => {
@@ -35,6 +35,18 @@ const MapModule = (() => {
     return _PALETTE[_hash(name) % _PALETTE.length];
   }
 
+  function _escape(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+  }
+
+  function _jsString(value) {
+    return JSON.stringify(String(value ?? '')).replace(/</g, '\\u003c');
+  }
+
+  function _safeState(value) {
+    return String(value || 'pendiente').replace(/[^a-z0-9_-]/gi, '') || 'pendiente';
+  }
+
   function _isClosed(e) {
     return ['finalizada', 'cerrada', 'completada'].includes(String(e.estado_relevamiento || '').toLowerCase());
   }
@@ -63,26 +75,27 @@ const MapModule = (() => {
     const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
     const estadoColor = APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d';
     const canSurvey = Auth.canAccess('encuestador');
+    const idArg = _jsString(e.id_escuela);
 
     return `
       <div class="map-popup">
         <div class="map-popup__header">
-          <strong>${e.nombre}</strong>
-          <span class="badge" style="background:${estadoColor}">${estadoLabel}</span>
+          <strong>${_escape(e.nombre)}</strong>
+          <span class="badge" style="background:${_escape(estadoColor)}">${_escape(estadoLabel)}</span>
         </div>
         <div class="map-popup__body">
-          <p><b>Código:</b> ${e.codigo_local || '—'}</p>
-          <p><b>Departamento:</b> ${e.departamento || '—'}</p>
-          <p><b>Distrito:</b> ${e.distrito || '—'}</p>
-          <p><b>Localidad:</b> ${e.localidad || '—'}</p>
-          <p><b>Zona:</b> ${e.zona || '—'}</p>
-          <p><b>Encuestador:</b> ${e.encuestador_asignado || 'No asignado'}</p>
-          ${e.fecha_ultimo_evento ? `<p><b>Último evento:</b> ${e.fecha_ultimo_evento}</p>` : ''}
-          ${e.observaciones ? `<p><b>Observaciones:</b> ${e.observaciones}</p>` : ''}
+          <p><b>Código:</b> ${_escape(e.codigo_local || '—')}</p>
+          <p><b>Departamento:</b> ${_escape(e.departamento || '—')}</p>
+          <p><b>Distrito:</b> ${_escape(e.distrito || '—')}</p>
+          <p><b>Localidad:</b> ${_escape(e.localidad || '—')}</p>
+          <p><b>Zona:</b> ${_escape(e.zona || '—')}</p>
+          <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
+          ${e.fecha_ultimo_evento ? `<p><b>Último evento:</b> ${_escape(e.fecha_ultimo_evento)}</p>` : ''}
+          ${e.observaciones ? `<p><b>Observaciones:</b> ${_escape(e.observaciones)}</p>` : ''}
         </div>
         <div class="map-popup__actions">
-          ${canSurvey ? `<button class="btn btn-primary btn-sm" onclick="SurveyModule.selectEscuela('${e.id_escuela}')">Migrar datos al RUE-MEC</button>` : ''}
-          <button class="btn btn-outline btn-sm" onclick="MapModule.focusListItem('${e.id_escuela}')">Ver en lista</button>
+          ${canSurvey ? `<button class="btn btn-primary btn-sm" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
+          <button class="btn btn-outline btn-sm" onclick='MapModule.focusListItem(${idArg})'>Ver en lista</button>
         </div>
       </div>`;
   }
@@ -251,14 +264,15 @@ const MapModule = (() => {
       const estadoColor = _surveyorColor(_surveyorName(e));
       const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
       const strength = _isClosed(e) ? 'cerrada' : 'pendiente';
+      const idArg = _jsString(e.id_escuela);
       return `
-        <div class="map-list-item" data-id="${e.id_escuela}" onclick="MapModule.flyTo('${e.id_escuela}')">
-          <span class="map-list-item__dot map-list-item__dot--${strength}" style="background:${estadoColor}"></span>
+        <div class="map-list-item" data-id="${_escape(e.id_escuela)}" onclick='MapModule.flyTo(${idArg})'>
+          <span class="map-list-item__dot map-list-item__dot--${strength}" style="background:${_escape(estadoColor)}"></span>
           <div class="map-list-item__info">
-            <strong>${e.nombre}</strong>
-            <small>${e.distrito || ''} · ${e.encuestador_asignado || 'Sin asignar'} · ${_estimateMinutes(e)} min</small>
+            <strong>${_escape(e.nombre)}</strong>
+            <small>${_escape(e.distrito || '')} · ${_escape(e.encuestador_asignado || 'Sin asignar')} · ${_estimateMinutes(e)} min</small>
           </div>
-          <span class="map-list-item__badge" style="background:${APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d'}">${estadoLabel}</span>
+          <span class="map-list-item__badge" style="background:${_escape(APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d')}">${_escape(estadoLabel)}</span>
         </div>`;
     }).join('');
   }
@@ -274,17 +288,19 @@ const MapModule = (() => {
   function _updateInfoPanel(e) {
     const panel = document.getElementById('map-info-panel');
     if (!panel) return;
+    const state = _safeState(e.estado_relevamiento);
+    const idArg = _jsString(e.id_escuela);
     panel.innerHTML = `
       <div class="map-info-card">
-        <h4>${e.nombre}</h4>
-        <p><b>Código:</b> ${e.codigo_local || '—'}</p>
-        <p><b>Departamento:</b> ${e.departamento || '—'}</p>
-        <p><b>Distrito:</b> ${e.distrito || '—'}</p>
-        <p><b>Zona:</b> ${e.zona || '—'}</p>
-        <p><b>Encuestador:</b> ${e.encuestador_asignado || 'No asignado'}</p>
+        <h4>${_escape(e.nombre)}</h4>
+        <p><b>Código:</b> ${_escape(e.codigo_local || '—')}</p>
+        <p><b>Departamento:</b> ${_escape(e.departamento || '—')}</p>
+        <p><b>Distrito:</b> ${_escape(e.distrito || '—')}</p>
+        <p><b>Zona:</b> ${_escape(e.zona || '—')}</p>
+        <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
         <p><b>Tiempo estimado:</b> ${_estimateMinutes(e)} min</p>
-        <p><b>Estado:</b> <span class="badge badge--${e.estado_relevamiento}">${APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento}</span></p>
-        ${Auth.canAccess('encuestador') ? `<button class="btn btn-primary btn-block mt-2" onclick="SurveyModule.selectEscuela('${e.id_escuela}')">Migrar datos al RUE-MEC</button>` : ''}
+        <p><b>Estado:</b> <span class="badge badge--${state}">${_escape(APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento)}</span></p>
+        ${Auth.canAccess('encuestador') ? `<button class="btn btn-primary btn-block mt-2" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
       </div>`;
     panel.classList.add('map-info-panel--visible');
   }
@@ -571,8 +587,8 @@ const MapModule = (() => {
   function _populateSelect(id, options, placeholder) {
     const el = document.getElementById(id);
     if (!el) return;
-    el.innerHTML = `<option value="">${placeholder}</option>` +
-      options.map(o => `<option value="${o}">${o}</option>`).join('');
+    el.innerHTML = `<option value="">${_escape(placeholder)}</option>` +
+      options.map(o => `<option value="${_escape(o)}">${_escape(o)}</option>`).join('');
   }
 
   return {
