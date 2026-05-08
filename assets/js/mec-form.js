@@ -13,6 +13,9 @@ const MecFormModule = (() => {
   let _sketchTool = 'select';
   let _selectedSketchObjectId = null;
   let _activeClassroomId = null;
+  let _sketchZoom = 1;
+  let _selectedPlanId = null;
+  let _planHitAreas = [];
   const _planLayers = {
     aulas: true,
     aberturas: true,
@@ -26,6 +29,7 @@ const MecFormModule = (() => {
     { id: 'wall', label: 'Pared' },
     { id: 'door', label: 'Puerta' },
     { id: 'window', label: 'Ventana' },
+    { id: 'stair', label: 'Escalera' },
     { id: 'board', label: 'Pizarron' },
     { id: 'outlet', label: 'Toma' },
     { id: 'damage', label: 'Dano' },
@@ -460,8 +464,19 @@ const MecFormModule = (() => {
             </div>
           </div>
           <div class="mec-sketch__board">
-            <canvas id="mec-classroom-canvas" width="760" height="460" aria-label="Croquis manual del aula"></canvas>
+            <div class="mec-sketch-zoom">
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSketchZoom(-0.15)">-</button>
+              <span>${Math.round(_sketchZoom * 100)}%</span>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSketchZoom(0.15)">+</button>
+            </div>
+            <div class="mec-sketch-canvas-wrap">
+              <canvas id="mec-classroom-canvas" width="760" height="460" style="transform:scale(${_sketchZoom});" aria-label="Croquis manual del aula"></canvas>
+            </div>
             <small id="mec-sketch-status">${_escape(_sketchStatusText(sketch))}</small>
+            <div class="mec-block-preview">
+              <strong>Ubicacion en bloque</strong>
+              <canvas id="mec-block-preview-canvas" width="420" height="180" aria-label="Vista del aula dentro del bloque"></canvas>
+            </div>
           </div>
         </div>
       </section>`;
@@ -1016,6 +1031,7 @@ const MecFormModule = (() => {
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', touchEnd, { passive: false });
     _drawSketch(ctx, canvas);
+    _drawBlockPreview();
   }
 
   function _drawSketch(ctx, canvas, draftObject = null) {
@@ -1095,6 +1111,7 @@ const MecFormModule = (() => {
     return {
       door: { w: 56, h: 8 },
       window: { w: 86, h: 18 },
+      stair: { w: 90, h: 54 },
       board: { w: 112, h: 34 },
       damage: { w: 58, h: 38 },
       room: { w: 240, h: 160 },
@@ -1135,6 +1152,13 @@ const MecFormModule = (() => {
 
     if (object.type === 'door') {
       _drawDoorObject(ctx, object, selected);
+      if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
+      ctx.restore();
+      return;
+    }
+
+    if (object.type === 'stair') {
+      _drawStairObject(ctx, object, selected);
       if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
       ctx.restore();
       return;
@@ -1190,6 +1214,12 @@ const MecFormModule = (() => {
     ctx.strokeRect(object.x, object.y, object.w, thickness);
     ctx.beginPath();
     ctx.moveTo(hingeX, hingeY);
+    ctx.arc(hingeX, hingeY, radius, 0, swing > 0 ? Math.PI / 2 : -Math.PI / 2, swing < 0);
+    ctx.closePath();
+    ctx.fillStyle = selected ? 'rgba(47,133,90,.16)' : 'rgba(47,133,90,.09)';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(hingeX, hingeY);
     ctx.lineTo(hingeX + radius, hingeY);
     ctx.stroke();
     ctx.beginPath();
@@ -1203,12 +1233,41 @@ const MecFormModule = (() => {
     if (selected) _drawOpeningCornerGuides(ctx, object);
   }
 
+  function _drawStairObject(ctx, object, selected) {
+    const steps = Math.max(4, Math.round(object.w / 14));
+    const stepW = object.w / steps;
+    ctx.fillStyle = selected ? 'rgba(74,85,104,.22)' : 'rgba(74,85,104,.14)';
+    ctx.strokeStyle = selected ? '#111827' : '#4a5568';
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    ctx.lineWidth = 1.5;
+    for (let i = 1; i < steps; i += 1) {
+      const x = object.x + i * stepW;
+      ctx.beginPath();
+      ctx.moveTo(x, object.y);
+      ctx.lineTo(x, object.y + object.h);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(object.x + 8, object.y + object.h - 10);
+    ctx.lineTo(object.x + object.w - 10, object.y + 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(object.x + object.w - 18, object.y + 10);
+    ctx.lineTo(object.x + object.w - 10, object.y + 10);
+    ctx.lineTo(object.x + object.w - 10, object.y + 18);
+    ctx.stroke();
+    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+  }
+
   function _sketchStyle(type) {
     return {
       room: { stroke: '#172033', fill: 'rgba(226,232,240,.28)', lineWidth: 4 },
       wall: { stroke: '#172033', fill: 'transparent', lineWidth: 5 },
       door: { stroke: '#2f855a', fill: 'rgba(47,133,90,.16)', lineWidth: 3 },
       window: { stroke: '#2b6cb0', fill: 'rgba(43,108,176,.14)', lineWidth: 3 },
+      stair: { stroke: '#4a5568', fill: 'rgba(74,85,104,.14)', lineWidth: 3 },
       board: { stroke: '#4a5568', fill: 'rgba(74,85,104,.16)', lineWidth: 3 },
       outlet: { stroke: '#b7791f', fill: 'rgba(183,121,31,.18)', lineWidth: 3 },
       damage: { stroke: '#c53030', fill: 'rgba(197,48,48,.18)', lineWidth: 3 },
@@ -1225,6 +1284,7 @@ const MecFormModule = (() => {
       room: 'Aula',
       door: 'Pta',
       window: 'Vtna',
+      stair: 'Esc',
       board: 'Piz',
       damage: 'Dano',
     }[type] || type;
@@ -1473,6 +1533,26 @@ const MecFormModule = (() => {
       object.y = point.y - offset.y;
       return;
     }
+    if (object.type === 'room') {
+      const prevX = object.x;
+      const prevY = object.y;
+      object.x = point.x - offset.x;
+      object.y = point.y - offset.y;
+      const dx = object.x - prevX;
+      const dy = object.y - prevY;
+      (_data.__classroomSketch.objects || []).forEach(item => {
+        if (item.id === object.id) return;
+        if (item.type === 'wall') {
+          item.x1 += dx; item.x2 += dx; item.y1 += dy; item.y2 += dy;
+          return;
+        }
+        if (item.x !== undefined) {
+          item.x += dx;
+          item.y += dy;
+        }
+      });
+      return;
+    }
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
     _clampOpeningToRoom(object);
@@ -1502,6 +1582,7 @@ const MecFormModule = (() => {
       object.h = Math.max(minH, Math.round(point.y - object.y));
     }
     if (object.type === 'door') object.h = 8;
+    if (object.type === 'room') _reflowAttachedOpenings(object);
     _clampOpeningToRoom(object);
   }
 
@@ -1523,18 +1604,87 @@ const MecFormModule = (() => {
       if (nearest.side === 'bottom') object.y = room.y + room.h - object.h;
       if (nearest.side === 'left') object.x = room.x;
       if (nearest.side === 'right') object.x = room.x + room.w - object.w;
+      object.attached = _openingAttachment(object, room, nearest.side);
     }
     return object;
+  }
+
+  function _openingAttachment(object, room, side) {
+    if (side === 'top' || side === 'bottom') {
+      return { target: room.id, side, ratio: (object.x - room.x) / Math.max(1, room.w - object.w) };
+    }
+    return { target: room.id, side, ratio: (object.y - room.y) / Math.max(1, room.h - object.h) };
+  }
+
+  function _reflowAttachedOpenings(room) {
+    (_data.__classroomSketch.objects || [])
+      .filter(object => ['door', 'window'].includes(object.type) && object.attached?.target === room.id)
+      .forEach(object => {
+        const ratio = Math.max(0, Math.min(1, Number(object.attached.ratio || 0)));
+        if (object.attached.side === 'top') {
+          object.y = room.y;
+          object.x = room.x + ratio * Math.max(1, room.w - object.w);
+        }
+        if (object.attached.side === 'bottom') {
+          object.y = room.y + room.h - object.h;
+          object.x = room.x + ratio * Math.max(1, room.w - object.w);
+        }
+        if (object.attached.side === 'left') {
+          object.x = room.x;
+          object.y = room.y + ratio * Math.max(1, room.h - object.h);
+        }
+        if (object.attached.side === 'right') {
+          object.x = room.x + room.w - object.w;
+          object.y = room.y + ratio * Math.max(1, room.h - object.h);
+        }
+      });
   }
 
   function _redrawSketchCanvas() {
     const canvas = document.getElementById('mec-classroom-canvas');
     if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
+    _drawBlockPreview();
   }
 
   function _updateSketchStatus() {
     const status = document.getElementById('mec-sketch-status');
     if (status) status.textContent = _sketchStatusText(_data.__classroomSketch || {});
+  }
+
+  function setSketchZoom(delta) {
+    _sketchZoom = Math.max(.65, Math.min(1.8, _sketchZoom + delta));
+    const canvas = document.getElementById('mec-classroom-canvas');
+    if (canvas) canvas.style.transform = `scale(${_sketchZoom})`;
+    const zoom = document.querySelector('.mec-sketch-zoom span');
+    if (zoom) zoom.textContent = `${Math.round(_sketchZoom * 100)}%`;
+  }
+
+  function _drawBlockPreview() {
+    const canvas = document.getElementById('mec-block-preview-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const block = _activeClassroomBlock();
+    const rooms = (_data.__classrooms || []).filter(room => room.blockId === (block?.id || _data.__classroomSketch?.blockId));
+    ctx.strokeStyle = '#172033';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(14, 22, 392, 120);
+    ctx.fillStyle = '#172033';
+    ctx.font = '800 12px system-ui, sans-serif';
+    ctx.fillText(block?.bloque_codigo || 'Bloque actual', 16, 16);
+    _layoutPlanRooms(rooms.length ? rooms : [_data.__classroomSketch], 18, 34, 384, 92).forEach(item => {
+      const active = item.room.id === _activeClassroomId;
+      ctx.fillStyle = active ? 'rgba(232,76,34,.16)' : 'rgba(43,108,176,.08)';
+      ctx.strokeStyle = active ? '#e84c22' : '#2b6cb0';
+      ctx.lineWidth = active ? 3 : 2;
+      ctx.fillRect(item.x, item.y, item.w, item.h);
+      ctx.strokeRect(item.x, item.y, item.w, item.h);
+      ctx.fillStyle = active ? '#9a3412' : '#173f68';
+      ctx.font = '800 10px system-ui, sans-serif';
+      ctx.fillText(item.room.name || 'Aula', item.x + 5, item.y + 14);
+    });
   }
 
   function _fieldValueForObjectMeters(object, axis) {
@@ -1581,6 +1731,15 @@ const MecFormModule = (() => {
         title: 'Ficha de pizarron',
         typeOptions: ['Tiza', 'Acrilico', 'Digital', 'Mixto', 'Otro'],
         extra: [],
+        ...common,
+      },
+      stair: {
+        title: 'Ficha de escalera',
+        typeOptions: ['Recta', 'En L', 'En U', 'Caracol', 'Rampa-escalera', 'Otro'],
+        extra: [
+          { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Riesgo', 'No verificable'] },
+          { key: 'pasamanos', label: 'Pasamanos', options: ['Ambos lados', 'Un lado', 'No tiene', 'No verificable'] },
+        ],
         ...common,
       },
       outlet: {
@@ -1751,7 +1910,7 @@ const MecFormModule = (() => {
     const object = _findSketchObjectById(data.get('object_id'));
     if (!object) return;
     object.ficha = object.ficha || {};
-    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'seguridad', 'prioridad', 'observacion']
+    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'seguridad', 'pasamanos', 'prioridad', 'observacion']
       .forEach(key => {
         if (data.has(key)) object.ficha[key] = String(data.get(key) || '').trim();
       });
@@ -2089,6 +2248,7 @@ const MecFormModule = (() => {
       </div>`;
 
     _drawSchoolPlan();
+    _bindSchoolPlanCanvas();
   }
 
   function _planKpi(label, value, note) {
@@ -2121,7 +2281,9 @@ const MecFormModule = (() => {
     const state = object.ficha?.estado || 'Sin estado';
     const dims = _sketchDimensionsText(object);
     return `
-      <button class="school-plan-object" type="button" onclick="MecFormModule.editPlanObject('${_escape(object.planId || object.id)}')">
+      <button class="school-plan-object ${_selectedPlanId === (object.planId || object.id) ? 'school-plan-object--active' : ''}" type="button"
+        ondblclick="MecFormModule.editPlanObject('${_escape(object.planId || object.id)}')"
+        onclick="MecFormModule.selectPlanItem('${_escape(object.planId || object.id)}')">
         <span class="school-plan-object__type">${_escape(_sketchLabel(object.type))}</span>
         <strong>${_escape(label)}</strong>
         <small>${_escape([object.classroomName, state, dims].filter(Boolean).join(' · '))}</small>
@@ -2131,7 +2293,9 @@ const MecFormModule = (() => {
   function _renderPlanClassroomRow(room, index) {
     const block = _blockById(room.blockId);
     return `
-      <button class="school-plan-object school-plan-object--room" type="button" onclick="MecFormModule.editPlanClassroom('${_escape(room.id)}')">
+      <button class="school-plan-object school-plan-object--room ${_selectedPlanId === `room::${room.id}` ? 'school-plan-object--active' : ''}" type="button"
+        ondblclick="MecFormModule.editPlanClassroom('${_escape(room.id)}')"
+        onclick="MecFormModule.selectPlanItem('room::${_escape(room.id)}')">
         <span class="school-plan-object__type">Aula</span>
         <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
         <small>${_escape([block?.bloque_codigo, room.floor, room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin dimensiones'].filter(Boolean).join(' · '))}</small>
@@ -2188,6 +2352,7 @@ const MecFormModule = (() => {
     if (!canvas) return;
     _ensureSketchObjects();
     const ctx = canvas.getContext('2d');
+    _planHitAreas = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2272,6 +2437,7 @@ const MecFormModule = (() => {
   }
 
   function _drawPlanClassroom(ctx, room, x, y, w, h) {
+    _planHitAreas.push({ id: `room::${room.id}`, type: 'room', roomId: room.id, x, y, w, h });
     ctx.strokeStyle = '#2b6cb0';
     ctx.fillStyle = 'rgba(43,108,176,.08)';
     ctx.lineWidth = 2;
@@ -2303,6 +2469,7 @@ const MecFormModule = (() => {
         const oy = y + (object.y - roomObject.y) * sy;
         if (object.type === 'door') {
           const ow = Math.max(12, object.w * sx);
+          _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 4, y: oy - 8, w: ow + 8, h: 18 });
           ctx.strokeStyle = '#2f855a';
           ctx.lineWidth = 2;
           ctx.beginPath();
@@ -2317,6 +2484,7 @@ const MecFormModule = (() => {
           return;
         }
         if (object.type === 'window') {
+          _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 4, y: oy - 8, w: Math.max(12, object.w * sx) + 8, h: 18 });
           ctx.strokeStyle = '#2b6cb0';
           ctx.lineWidth = 3;
           ctx.beginPath();
@@ -2326,6 +2494,7 @@ const MecFormModule = (() => {
           return;
         }
         ctx.fillStyle = '#b7791f';
+        _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: 16, h: 16 });
         ctx.beginPath();
         ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
         ctx.fill();
@@ -2352,6 +2521,36 @@ const MecFormModule = (() => {
   function editPlanClassroom(id) {
     selectModule('aulas');
     selectClassroom(id);
+  }
+
+  function selectPlanItem(id) {
+    _selectedPlanId = id;
+    renderSchoolPlan();
+  }
+
+  function _bindSchoolPlanCanvas() {
+    const canvas = document.getElementById('school-plan-canvas');
+    if (!canvas) return;
+    const hit = event => {
+      const rect = canvas.getBoundingClientRect();
+      const point = {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height),
+      };
+      return [..._planHitAreas].reverse().find(area =>
+        point.x >= area.x && point.x <= area.x + area.w && point.y >= area.y && point.y <= area.y + area.h);
+    };
+    canvas.addEventListener('click', event => {
+      const area = hit(event);
+      if (!area) return;
+      selectPlanItem(area.id);
+    });
+    canvas.addEventListener('dblclick', event => {
+      const area = hit(event);
+      if (!area) return;
+      if (area.type === 'room') editPlanClassroom(area.roomId);
+      else editPlanObject(area.id);
+    });
   }
 
   function _buildSchoolPlanModel() {
@@ -2560,10 +2759,12 @@ const MecFormModule = (() => {
     renderSchoolPlan,
     editPlanObject,
     editPlanClassroom,
+    selectPlanItem,
     togglePlanLayer,
     exportPlanJson,
     exportPlanSvg,
     exportPlanPng,
+    setSketchZoom,
     generateRoomSketch,
     undoSketchObject,
     deleteSelectedSketchObject,

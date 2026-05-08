@@ -526,14 +526,31 @@
   min-width: 0;
 }
 
+.mec-sketch-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .5rem;
+  color: #617083;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.mec-sketch-canvas-wrap {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+}
+
 .mec-sketch__board canvas {
   width: 100%;
   aspect-ratio: 76 / 46;
   display: block;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-md);
   background: #fbfcfe;
   touch-action: none;
+  transform-origin: center center;
 }
 
 .mec-sketch__board small {
@@ -547,6 +564,28 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: .75rem;
+}
+
+.mec-block-preview {
+  margin-top: .75rem;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.mec-block-preview strong {
+  display: block;
+  margin-bottom: .35rem;
+  color: #27364a;
+  font-size: .82rem;
+}
+
+.mec-block-preview canvas {
+  width: 100%;
+  display: block;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
 }
 
 .mec-choice-buttons {
@@ -891,6 +930,12 @@
 .school-plan-object:hover {
   border-color: #8fb0d3;
   background: #f1f7ff;
+}
+
+.school-plan-object--active {
+  border-color: #e84c22;
+  background: #fff7ed;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .13);
 }
 
 .school-plan-object__type {
