@@ -54,7 +54,9 @@ const MecFormModule = (() => {
   }
 
   function _saveDraft(showToast = false) {
+    _normalizeNumberedNames();
     if (_data.__classroomSketch && _data.__classrooms) _syncActiveClassroomFromSketch();
+    _normalizeNumberedNames();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       savedAt: new Date().toISOString(),
       schemaVersion: MEC_SCHEMA.version,
@@ -113,9 +115,44 @@ const MecFormModule = (() => {
     return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   }
 
+  function _numberedLabel(prefix, index) {
+    return `${prefix} ${Number(index || 0) + 1}`;
+  }
+
+  function _normalizeFloor(value) {
+    const text = String(value || '').trim();
+    if (!text || text.toUpperCase() === 'PB') return 'Piso 1';
+    const number = text.match(/\d+/)?.[0];
+    if (number) return `Piso ${Number(number)}`;
+    return text.startsWith('Piso ') ? text : `Piso ${text}`;
+  }
+
+  function _normalizeNumberedNames() {
+    _data.__blocks = (_data.__blocks || []).map((block, index) => ({
+      ...block,
+      bloque_codigo: _numberedLabel('Bloque', index),
+    }));
+    _data.__classrooms = (_data.__classrooms || []).map((room, index) => ({
+      ...room,
+      name: _numberedLabel('Aula', index),
+      floor: _normalizeFloor(room.floor),
+    }));
+    if (_data.__classroomSketch) {
+      const roomIndex = (_data.__classrooms || []).findIndex(room => room.id === _data.__classroomSketch.id);
+      _data.__classroomSketch.name = _numberedLabel('Aula', roomIndex >= 0 ? roomIndex : 0);
+      _data.__classroomSketch.floor = _normalizeFloor(_data.__classroomSketch.floor);
+    }
+    _data.__sanitaries = (_data.__sanitaries || []).map((item, index) => ({
+      ...item,
+      codigo: _numberedLabel('Sanitario', index),
+      planta: _normalizeFloor(item.planta),
+    }));
+  }
+
   function _render() {
     const root = document.getElementById('mec-form-root');
     if (!root) return;
+    _normalizeNumberedNames();
 
     const saved = _readSavedMeta();
     const implemented = MEC_SCHEMA.modules.filter(module => module.status !== 'planned');
@@ -236,7 +273,7 @@ const MecFormModule = (() => {
           ${(_data.__blocks || []).map(block => `
             <button class="mec-repeat-item ${block.id === _data.__activeBlockId ? 'mec-repeat-item--active' : ''}" type="button"
               onclick="MecFormModule.selectBlock('${_escape(block.id)}')">
-              <strong>${_escape(block.bloque_codigo || 'Bloque sin nombre')}</strong>
+              <strong>${_escape(block.bloque_codigo || 'Bloque 1')}</strong>
               <span>${_escape(_blockSummary(block))}</span>
             </button>`).join('')}
         </div>
@@ -434,12 +471,12 @@ const MecFormModule = (() => {
         </div>
         <div class="mec-sketch__layout">
           <div class="mec-sketch__tools">
-            <label class="mec-label"><span>Nombre / codigo del aula</span></label>
-            <input class="form-control" type="text" value="${_escape(sketch.name || '')}" data-sketch-field="name" placeholder="Ej.: Aula 1, 2A, Inicial">
+            <label class="mec-label"><span>Aula</span></label>
+            <input class="form-control" type="text" value="${_escape(sketch.name || '')}" readonly aria-readonly="true">
             <label class="mec-label"><span>Bloque</span></label>
             ${_blockOptions(sketch.blockId || _data.__activeBlockId || '')}
-            <label class="mec-label"><span>Planta</span></label>
-            <input class="form-control" type="text" value="${_escape(sketch.floor || 'PB')}" data-sketch-field="floor" placeholder="PB, 1, 2">
+            <label class="mec-label"><span>Piso</span></label>
+            <input class="form-control" type="number" min="1" step="1" value="${_escape(String(sketch.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}" data-sketch-field="floorNumber">
             <label class="mec-label"><span>Largo aproximado</span></label>
             <div class="mec-input-with-unit">
               <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.length || '')}" data-sketch-field="length">
@@ -545,7 +582,7 @@ const MecFormModule = (() => {
           return `
             <button class="mec-block-tab ${block.id === _data.__activeBlockId ? 'mec-block-tab--active' : ''}" type="button"
               onclick="MecFormModule.selectBlockForClassrooms('${_escape(block.id)}')">
-              <strong>${_escape(block.bloque_codigo || 'Bloque sin nombre')}</strong>
+              <strong>${_escape(block.bloque_codigo || 'Bloque 1')}</strong>
               <span>${count} aula(s)</span>
             </button>`;
         }).join('')}
@@ -567,7 +604,7 @@ const MecFormModule = (() => {
       id: sketch.id || `aula_${Date.now()}`,
       name: sketch.name || '',
       blockId: sketch.blockId || _data.__activeBlockId || '',
-      floor: sketch.floor || 'PB',
+      floor: _normalizeFloor(sketch.floor),
       length: sketch.length || '',
       width: sketch.width || '',
       openings: sketch.openings || '',
@@ -636,7 +673,7 @@ const MecFormModule = (() => {
       id: _activeClassroomId,
       name: `Aula ${nextNumber}`,
       blockId: _data.__activeBlockId || '',
-      floor: 'PB',
+      floor: 'Piso 1',
       length: suggestedLength ? suggestedLength.toFixed(1) : '',
       width: suggestedWidth ? suggestedWidth.toFixed(1) : '',
       openings: '',
@@ -698,7 +735,7 @@ const MecFormModule = (() => {
     _ensureBlocks();
     return `
       <select class="form-control" data-sketch-field="blockId">
-        ${(_data.__blocks || []).map(block => `<option value="${_escape(block.id)}" ${block.id === selected ? 'selected' : ''}>${_escape(block.bloque_codigo || 'Bloque sin nombre')}</option>`).join('')}
+        ${(_data.__blocks || []).map((block, index) => `<option value="${_escape(block.id)}" ${block.id === selected ? 'selected' : ''}>${_escape(block.bloque_codigo || _numberedLabel('Bloque', index))}</option>`).join('')}
       </select>`;
   }
 
@@ -733,7 +770,7 @@ const MecFormModule = (() => {
     _syncActiveBlock();
     const next = (_data.__blocks || []).length + 1;
     _data.__activeBlockId = `bloque_${Date.now()}`;
-    _data.bloques = { bloque_codigo: `Bloque ${next}`, cantidad_plantas: '1' };
+    _data.bloques = { bloque_codigo: _numberedLabel('Bloque', next - 1), cantidad_plantas: '1' };
     _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
     _saveDraft(false);
     _render();
@@ -755,7 +792,7 @@ const MecFormModule = (() => {
       id: `san_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       codigo: `Sanitario ${index}`,
       bloque: '',
-      planta: 'PB',
+      planta: 'Piso 1',
       tipo: 'Bateria sanitaria',
       uso: 'Estudiantes',
       genero: 'Mixto',
@@ -821,9 +858,12 @@ const MecFormModule = (() => {
         </div>
 
         <div class="form-grid">
-          ${_sanitaryInput(item, 'codigo', 'Codigo / nombre', 'text')}
+          <div class="form-group">
+            <label>Sanitario</label>
+            <input class="form-control" type="text" value="${_escape(item.codigo || `Sanitario ${index + 1}`)}" readonly aria-readonly="true">
+          </div>
           ${_sanitaryInput(item, 'bloque', 'Bloque', 'text')}
-          ${_sanitaryInput(item, 'planta', 'Planta', 'text')}
+          ${_sanitaryInput(item, 'planta', 'Piso', 'number')}
           ${_sanitaryInput(item, 'tipo', 'Tipo', 'text')}
           ${_sanitaryInput(item, 'largo_m', 'Largo del sanitario', 'number', '0.1')}
           ${_sanitaryInput(item, 'ancho_m', 'Ancho del sanitario', 'number', '0.1')}
@@ -898,10 +938,11 @@ const MecFormModule = (() => {
   }
 
   function _sanitaryInput(item, key, label, type, step = '1') {
+    const value = key === 'planta' ? (String(item[key] || 'Piso 1').match(/\d+/)?.[0] || '1') : (item[key] || '');
     return `
       <div class="form-group">
         <label>${_escape(label)}</label>
-        <input class="form-control" type="${_escape(type)}" min="0" step="${_escape(step)}" value="${_escape(item[key] || '')}"
+        <input class="form-control" type="${_escape(type)}" min="${key === 'planta' ? '1' : '0'}" step="${_escape(step)}" value="${_escape(value)}"
           oninput="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value, false)"
           onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value)">
       </div>`;
@@ -977,7 +1018,7 @@ const MecFormModule = (() => {
   function setSanitaryValue(id, key, value, rerender = true) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
-    item[key] = value;
+    item[key] = key === 'planta' ? _normalizeFloor(value) : value;
     if (rerender && ['inodoros', 'estado'].includes(key)) _ensureSanitaryPlan(item, true);
     _saveDraft(false);
     if (rerender) _render();
@@ -1088,7 +1129,8 @@ const MecFormModule = (() => {
     root.querySelectorAll('[data-sketch-field]').forEach(input => {
       const persist = () => {
         _data.__classroomSketch = _data.__classroomSketch || {};
-        _data.__classroomSketch[input.dataset.sketchField] = input.value;
+        if (input.dataset.sketchField === 'floorNumber') _data.__classroomSketch.floor = _normalizeFloor(input.value);
+        else _data.__classroomSketch[input.dataset.sketchField] = input.value;
         _syncActiveClassroomFromSketch();
         _saveDraft(false);
         if (input.dataset.sketchField === 'blockId') {
@@ -2935,18 +2977,18 @@ const MecFormModule = (() => {
 
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
-      const floors = [...new Set(blockRooms.map(room => room.floor || 'PB'))];
+      const floors = [...new Set(blockRooms.map(room => _normalizeFloor(room.floor)))];
       if (!blockRooms.length && !blockSanitaries.length) {
         ctx.fillStyle = '#667085';
         ctx.font = '700 12px system-ui, sans-serif';
         ctx.fillText('Bloque sin aulas o sanitarios asociados', x + 12, y + 56);
       }
       floors.forEach((floor, floorIndex) => {
-        const floorRooms = blockRooms.filter(room => (room.floor || 'PB') === floor);
+        const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
         const bandY = y + 34 + floorIndex * Math.max(56, Math.min(82, (h - 72) / Math.max(1, floors.length + 1)));
         ctx.fillStyle = '#475467';
         ctx.font = '800 11px system-ui, sans-serif';
-        ctx.fillText(`Planta ${floor}`, x + 10, bandY + 12);
+        ctx.fillText(floor, x + 10, bandY + 12);
         const roomH = Math.max(34, Math.min(58, (h - 76) / Math.max(1, floors.length + 1)));
         const roomItems = _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, roomH);
         roomItems.forEach(item => {
@@ -3264,13 +3306,13 @@ const MecFormModule = (() => {
     const blocks = (_data.__blocks || []).map(block => {
       const floors = [...new Set((_data.__classrooms || [])
         .filter(room => room.blockId === block.id)
-        .map(room => room.floor || 'PB'))];
+        .map(room => _normalizeFloor(room.floor)))];
       return {
         ...block,
         floors: floors.map(floor => ({
           id: floor,
           classrooms: (_data.__classrooms || [])
-            .filter(room => room.blockId === block.id && (room.floor || 'PB') === floor)
+            .filter(room => room.blockId === block.id && _normalizeFloor(room.floor) === floor)
             .map(room => ({
               id: room.id,
               name: room.name,
@@ -3435,11 +3477,11 @@ const MecFormModule = (() => {
       parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#eef2f7" stroke="#172033" stroke-width="2"/>`);
       parts.push(`<text x="${x + 10}" y="${y + 20}" font-family="system-ui" font-size="15" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}</text>`);
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
-      const floors = [...new Set(blockRooms.map(room => room.floor || 'PB'))];
+      const floors = [...new Set(blockRooms.map(room => _normalizeFloor(room.floor)))];
       floors.forEach((floor, floorIndex) => {
-        const floorRooms = blockRooms.filter(room => (room.floor || 'PB') === floor);
+        const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
         const bandY = y + 34 + floorIndex * 82;
-        parts.push(`<text x="${x + 10}" y="${bandY + 12}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">Planta ${_escape(floor)}</text>`);
+        parts.push(`<text x="${x + 10}" y="${bandY + 12}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">${_escape(floor)}</text>`);
         _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58).forEach(item => {
           parts.push(`<rect x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" fill="#eaf4ff" stroke="#2b6cb0" stroke-width="2"/>`);
           parts.push(`<rect x="${item.x + 4}" y="${item.y + 4}" width="${Math.max(0, item.w - 8)}" height="${Math.max(0, item.h - 8)}" fill="none" stroke="#8db8e8" stroke-width="1"/>`);

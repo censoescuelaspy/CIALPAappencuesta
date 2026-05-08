@@ -133,7 +133,7 @@ const MEC_SCHEMA = {
           id: 'bloque_general',
           title: '1 - Identificacion del bloque',
           fields: [
-            { id: 'bloque_codigo', label: 'Codigo o nombre del bloque', type: 'text', required: true, hint: 'Ej.: Bloque A, Pabellon norte, Administracion.' },
+            { id: 'bloque_codigo', label: 'Bloque', type: 'text', required: true, hint: 'La app enumera automaticamente: Bloque 1, Bloque 2, etc.' },
             { id: 'cantidad_plantas', label: 'Cantidad de plantas', type: 'number', required: true, min: 1, step: 1 },
             { id: 'largo_m', label: 'Largo aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
