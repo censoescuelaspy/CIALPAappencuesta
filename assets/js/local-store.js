@@ -1,0 +1,397 @@
+/**
+ * CIALPA — local-store.js
+ * Almacen local offline-first para cache, cola de sincronizacion y analitica.
+ */
+
+const CialpaLocalStore = (() => {
+  'use strict';
+
+  const DB_NAME = 'cialpa_offline_store';
+  const DB_VERSION = 1;
+  const FALLBACK_PREFIX = 'cialpa_local_store_';
+  const MEC_DRAFT_KEY = 'cialpa_mec_form_draft_v1';
+  let _dbPromise = null;
+
+  function init() {
+    return _openDb().catch(() => null);
+  }
+
+  function _openDb() {
+    if (!('indexedDB' in window)) return Promise.reject(new Error('IndexedDB no disponible'));
+    if (_dbPromise) return _dbPromise;
+    _dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      request.onupgradeneeded = event => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('cache')) {
+          db.createObjectStore('cache', { keyPath: 'key' });
+        }
+        if (!db.objectStoreNames.contains('queue')) {
+          const queue = db.createObjectStore('queue', { keyPath: 'id' });
+          queue.createIndex('status', 'status', { unique: false });
+          queue.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('No se pudo abrir IndexedDB'));
+    });
+    return _dbPromise;
+  }
+
+  async function _storePut(storeName, record) {
+    try {
+      const db = await _openDb();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(record);
+        tx.oncomplete = () => resolve(record);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      localStorage.setItem(FALLBACK_PREFIX + storeName + '_' + record.key, JSON.stringify(record));
+      return record;
+    }
+  }
+
+  async function _storeGet(storeName, key) {
+    try {
+      const db = await _openDb();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const request = tx.objectStore(storeName).get(key);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch {
+      try {
+        return JSON.parse(localStorage.getItem(FALLBACK_PREFIX + storeName + '_' + key) || 'null');
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  async function _storeAll(storeName) {
+    try {
+      const db = await _openDb();
+      return await new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readonly');
+        const request = tx.objectStore(storeName).getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+    } catch {
+      const prefix = FALLBACK_PREFIX + storeName + '_';
+      const records = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key || !key.startsWith(prefix)) continue;
+        records.push(key);
+      }
+      return records.map(key => {
+          try { return JSON.parse(localStorage.getItem(key) || 'null'); }
+          catch { return null; }
+        })
+        .filter(Boolean);
+    }
+  }
+
+  function _stableStringify(value) {
+    if (value === null || value === undefined) return '';
+    if (typeof value !== 'object') return String(value);
+    if (Array.isArray(value)) return `[${value.map(_stableStringify).join(',')}]`;
+    return `{${Object.keys(value).sort().map(key => `${key}:${_stableStringify(value[key])}`).join(',')}}`;
+  }
+
+  function apiKey(endpoint, request = {}) {
+    return `api:${endpoint}:${_stableStringify(request)}`;
+  }
+
+  async function rememberApi(endpoint, method, request, response) {
+    if (!response || response.status !== 'ok') return null;
+    const record = {
+      key: apiKey(endpoint, request || {}),
+      endpoint,
+      method,
+      request: request || {},
+      response,
+      savedAt: new Date().toISOString(),
+    };
+    await _storePut('cache', record);
+    await _storePut('cache', { ...record, key: `api:${endpoint}:latest` });
+    return record;
+  }
+
+  async function getApi(endpoint, request = {}) {
+    return (await _storeGet('cache', apiKey(endpoint, request))) ||
+      (await _storeGet('cache', `api:${endpoint}:latest`));
+  }
+
+  async function enqueue(endpoint, method, data, reason = '') {
+    const record = {
+      id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      endpoint,
+      method,
+      data: data || {},
+      reason,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      attempts: 0,
+    };
+    try {
+      const db = await _openDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('queue', 'readwrite');
+        tx.objectStore('queue').put(record);
+        tx.oncomplete = () => resolve(record);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      localStorage.setItem(FALLBACK_PREFIX + 'queue_' + record.id, JSON.stringify(record));
+    }
+    return record;
+  }
+
+  async function getQueue() {
+    return (await _storeAll('queue')).sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  }
+
+  async function updateQueueStatus(id, status, extra = {}) {
+    const current = (await getQueue()).find(item => item.id === id);
+    if (!current) return null;
+    const record = {
+      ...current,
+      ...extra,
+      status,
+      updatedAt: new Date().toISOString(),
+      attempts: Number(current.attempts || 0) + (extra.bumpAttempt === false ? 0 : 1),
+    };
+    try {
+      const db = await _openDb();
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction('queue', 'readwrite');
+        tx.objectStore('queue').put(record);
+        tx.oncomplete = () => resolve(record);
+        tx.onerror = () => reject(tx.error);
+      });
+    } catch {
+      localStorage.setItem(FALLBACK_PREFIX + 'queue_' + record.id, JSON.stringify(record));
+    }
+    return record;
+  }
+
+  function getMecDraft() {
+    try {
+      return JSON.parse(localStorage.getItem(MEC_DRAFT_KEY) || 'null');
+    } catch {
+      return null;
+    }
+  }
+
+  function _normalState(value) {
+    const state = String(value || '').toLowerCase().trim();
+    if (['finalizada', 'finalizado', 'cerrada', 'completada'].includes(state)) return 'finalizada';
+    if (['en curso', 'en_curso', 'curso', 'iniciada'].includes(state)) return 'en_curso';
+    if (['incidencia', 'con incidencia'].includes(state)) return 'incidencia';
+    return 'pendiente';
+  }
+
+  function _pct(part, total) {
+    if (!total) return 0;
+    return Math.round((part / total) * 100);
+  }
+
+  function _blankStats() {
+    return {
+      total: 0,
+      finalizadas: 0,
+      en_curso: 0,
+      pendientes: 0,
+      con_incidencia: 0,
+      pct_avance: 0,
+      por_departamento: [],
+      por_encuestador: [],
+      por_dia: [],
+      actividad_reciente: [],
+    };
+  }
+
+  function normalizeStats(raw = {}) {
+    const total = Number(raw.total || 0);
+    const finalizadas = Number(raw.finalizadas ?? raw.finalizada ?? 0);
+    const enCurso = Number(raw.en_curso ?? raw.enCurso ?? 0);
+    const pendientes = Number(raw.pendientes ?? raw.pendiente ?? Math.max(0, total - finalizadas - enCurso));
+    const incidencias = Number(raw.con_incidencia ?? raw.incidencias ?? raw.incidencia ?? 0);
+    return {
+      ..._blankStats(),
+      ...raw,
+      total,
+      finalizadas,
+      en_curso: enCurso,
+      pendientes,
+      con_incidencia: incidencias,
+      pct_avance: Number(raw.pct_avance ?? raw.porcentaje_avance ?? _pct(finalizadas, total)),
+      por_departamento: (raw.por_departamento || []).map(row => ({
+        departamento: row.departamento || 'Sin dato',
+        total: Number(row.total || 0),
+        finalizadas: Number(row.finalizadas ?? row.finalizada ?? 0),
+        en_curso: Number(row.en_curso ?? 0),
+        pendientes: Number(row.pendientes ?? row.pendiente ?? 0),
+        incidencias: Number(row.incidencias ?? row.con_incidencia ?? row.incidencia ?? 0),
+      })),
+      por_encuestador: (raw.por_encuestador || []).map(row => ({
+        encuestador: row.encuestador || 'Sin asignar',
+        total_asignadas: Number(row.total_asignadas ?? row.asignadas ?? row.total ?? 0),
+        finalizadas: Number(row.finalizadas ?? row.finalizada ?? 0),
+        incidencias: Number(row.incidencias ?? row.con_incidencia ?? 0),
+        promedio_minutos: row.promedio_minutos || row.tiempo_promedio || '',
+      })),
+      por_dia: raw.por_dia || raw.historico || [],
+      actividad_reciente: raw.actividad_reciente || [],
+    };
+  }
+
+  function statsFromSchools(escuelas = []) {
+    const stats = _blankStats();
+    stats.total = escuelas.length;
+    const dep = {};
+    const enc = {};
+    escuelas.forEach(item => {
+      const state = _normalState(item.estado_relevamiento || item.estado);
+      if (state === 'finalizada') stats.finalizadas++;
+      else if (state === 'en_curso') stats.en_curso++;
+      else if (state === 'incidencia') stats.con_incidencia++;
+      else stats.pendientes++;
+
+      const depKey = item.departamento || 'Sin dato';
+      dep[depKey] = dep[depKey] || { departamento: depKey, total: 0, finalizadas: 0, en_curso: 0, pendientes: 0, incidencias: 0 };
+      dep[depKey].total++;
+      if (state === 'finalizada') dep[depKey].finalizadas++;
+      else if (state === 'en_curso') dep[depKey].en_curso++;
+      else if (state === 'incidencia') dep[depKey].incidencias++;
+      else dep[depKey].pendientes++;
+
+      const encKey = item.encuestador_asignado || 'Sin asignar';
+      enc[encKey] = enc[encKey] || { encuestador: encKey, total_asignadas: 0, finalizadas: 0, incidencias: 0, promedio_minutos: '' };
+      enc[encKey].total_asignadas++;
+      if (state === 'finalizada') enc[encKey].finalizadas++;
+      if (state === 'incidencia') enc[encKey].incidencias++;
+    });
+    stats.pct_avance = _pct(stats.finalizadas, stats.total);
+    stats.por_departamento = Object.values(dep).sort((a, b) => b.total - a.total);
+    stats.por_encuestador = Object.values(enc).sort((a, b) => b.finalizadas - a.finalizadas);
+    return stats;
+  }
+
+  function _schemaEvidenceFields(values) {
+    if (typeof MEC_SCHEMA === 'undefined') return [];
+    const fields = [];
+    MEC_SCHEMA.modules.forEach(module => {
+      (module.sections || []).forEach(section => {
+        (section.fields || []).forEach(field => {
+          if (!field.evidence || !_fieldVisible(field, values)) return;
+          fields.push({
+            key: `${module.id}.${field.id}`,
+            moduleId: module.id,
+            label: field.evidenceLabel || field.label || field.id,
+          });
+        });
+      });
+    });
+    return fields;
+  }
+
+  function _fieldVisible(field, values) {
+    if (!field.visibleWhen) return true;
+    const [moduleId, fieldId] = String(field.visibleWhen.field || '').split('.');
+    const current = values?.[moduleId]?.[fieldId];
+    if ('equals' in field.visibleWhen) return current === field.visibleWhen.equals;
+    if ('not' in field.visibleWhen) return current !== field.visibleWhen.not;
+    return true;
+  }
+
+  function mecMetrics(draft = getMecDraft()) {
+    const values = draft?.values || draft || {};
+    const classrooms = values.__classrooms || [];
+    const blocks = values.__blocks || [];
+    const sanitaries = values.__sanitaries || [];
+    const objects = classrooms.flatMap(room => (room.objects || []).map(object => ({ ...object, room })));
+    const evidence = values.__evidence || {};
+    const schemaEvidence = _schemaEvidenceFields(values);
+    const objectEvidenceCount = objects.reduce((sum, object) => sum + ((object.ficha?.evidencias || []).length), 0);
+    const sanitaryEvidenceCount = sanitaries.reduce((sum, item) => sum + ((item.evidencias || []).length), 0);
+    const fieldEvidenceCount = Object.values(evidence).reduce((sum, photos) => sum + (Array.isArray(photos) ? photos.length : 0), 0);
+    const areaClassrooms = classrooms.reduce((sum, room) => sum + (Number(room.length || 0) * Number(room.width || 0)), 0);
+    const areaSanitaries = sanitaries.reduce((sum, item) => sum + (Number(item.largo_m || 0) * Number(item.ancho_m || 0)), 0);
+    const evidenceCovered = schemaEvidence.filter(field => Array.isArray(evidence[field.key]) && evidence[field.key].length).length;
+
+    return {
+      savedAt: draft?.savedAt || null,
+      blocks: blocks.length,
+      classrooms: classrooms.length,
+      sanitaries: sanitaries.length,
+      areaClassrooms,
+      areaSanitaries,
+      areaTotal: areaClassrooms + areaSanitaries,
+      doors: objects.filter(object => object.type === 'door').length,
+      windows: objects.filter(object => object.type === 'window').length,
+      outlets: objects.filter(object => object.type === 'outlet').length,
+      damages: objects.filter(object => object.type === 'damage').length,
+      stairs: objects.filter(object => object.type === 'stair').length,
+      evidenceFields: schemaEvidence.length,
+      evidenceCovered,
+      evidencePending: Math.max(0, schemaEvidence.length - evidenceCovered),
+      evidenceTotal: fieldEvidenceCount + objectEvidenceCount + sanitaryEvidenceCount,
+      fieldEvidenceCount,
+      objectEvidenceCount,
+      sanitaryEvidenceCount,
+      quality: _qualityBuckets(objects, sanitaries),
+    };
+  }
+
+  function _qualityBuckets(objects, sanitaries) {
+    const buckets = { Bueno: 0, Regular: 0, Malo: 0, 'Sin estado': 0 };
+    [...objects.map(object => object.ficha || {}), ...sanitaries].forEach(item => {
+      const state = item.estado || item.estado_general || 'Sin estado';
+      const key = ['Bueno', 'Regular', 'Malo'].includes(state) ? state : 'Sin estado';
+      buckets[key]++;
+    });
+    return buckets;
+  }
+
+  async function buildLocalAnalytics(remoteStats = null) {
+    const [schoolsCache, queue] = await Promise.all([
+      getApi('getEscuelas', {}),
+      getQueue(),
+    ]);
+    const schools = schoolsCache?.response?.data || [];
+    const schoolStats = schools.length ? statsFromSchools(schools) : _blankStats();
+    const stats = normalizeStats(remoteStats || schoolStats);
+    return {
+      stats,
+      schoolsCachedAt: schoolsCache?.savedAt || null,
+      schoolsCount: schools.length,
+      queuePending: queue.filter(item => item.status === 'pending').length,
+      queue,
+      mec: mecMetrics(),
+      online: navigator.onLine,
+      generatedAt: new Date().toISOString(),
+      source: remoteStats ? 'Servidor + cache local' : (schools.length ? 'Cache local' : 'Borrador local'),
+    };
+  }
+
+  return {
+    init,
+    apiKey,
+    rememberApi,
+    getApi,
+    enqueue,
+    getQueue,
+    updateQueueStatus,
+    getMecDraft,
+    normalizeStats,
+    statsFromSchools,
+    mecMetrics,
+    buildLocalAnalytics,
+  };
+})();

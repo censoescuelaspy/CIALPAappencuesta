@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.3.0';
+const CACHE_NAME = 'cialpa-app-v2.4.0';
 const APP_SHELL = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const APP_SHELL = [
   './assets/css/app.css',
   './assets/css/mec-form.css',
   './assets/js/config.js',
+  './assets/js/local-store.js',
   './assets/js/api.js',
   './assets/js/auth.js',
   './assets/js/app.js',
@@ -46,7 +47,18 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+
+  if (url.origin !== self.location.origin) {
+    if (!['unpkg.com', 'cdn.jsdelivr.net', 'server.arcgisonline.com'].includes(url.hostname)) return;
+    event.respondWith(
+      caches.match(request).then(cached => cached || fetch(request).then(response => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        return response;
+      }))
+    );
+    return;
+  }
 
   event.respondWith(
     fetch(request)

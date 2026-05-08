@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.3.0
+ * Version: 2.4.0
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -271,6 +271,7 @@ const AppController = (() => {
 
   function init() {
     UI.init();
+    if (typeof CialpaLocalStore !== 'undefined') CialpaLocalStore.init();
     ManualModule.renderModal();
     _applyVersionLabels();
     _bindPwaEvents();

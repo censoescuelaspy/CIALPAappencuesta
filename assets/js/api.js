@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.1.0
+ * Version: 2.4.0
  */
 
 const API = (() => {
@@ -176,14 +176,120 @@ const API = (() => {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  async function _offlineGetFallback(endpoint, request = {}) {
+    if (typeof CialpaLocalStore === 'undefined') return null;
+
+    if (endpoint === 'getStats') {
+      const cachedStats = await CialpaLocalStore.getApi(endpoint, request).catch(() => null);
+      const analytics = await CialpaLocalStore.buildLocalAnalytics(cachedStats?.response?.data || null).catch(() => null);
+      if (!analytics) return null;
+      return {
+        status: 'ok',
+        data: analytics.stats,
+        offline: true,
+        cachedAt: cachedStats?.savedAt || analytics.schoolsCachedAt || null,
+        localAnalytics: analytics,
+        message: 'Estadisticas calculadas desde el cache local del dispositivo.',
+      };
+    }
+
+    const cached = await CialpaLocalStore.getApi(endpoint, request).catch(() => null);
+    if (!cached?.response) return null;
+    return {
+      ...cached.response,
+      offline: true,
+      cachedAt: cached.savedAt,
+      message: cached.response.message || 'Datos cargados desde el cache local del dispositivo.',
+    };
+  }
+
+  function _queueableEndpoint(endpoint) {
+    return new Set([
+      'updateEscuelaEstado',
+      'asignarEscuela',
+      'iniciarSesion',
+      'cerrarSesion',
+      'registrarEventoSesion',
+      'iniciarModulo',
+      'cerrarModulo',
+      'saveIncidencia',
+      'resolverIncidencia',
+    ]).has(endpoint);
+  }
+
+  async function _offlinePostQueue(endpoint, method, data, reason) {
+    if (method === 'GET' || !_queueableEndpoint(endpoint) || typeof CialpaLocalStore === 'undefined') return null;
+    const queued = await CialpaLocalStore.enqueue(endpoint, method, data, reason).catch(() => null);
+    if (!queued) return null;
+    if (typeof UI !== 'undefined') {
+      UI.showToast('Sin conexion: el registro quedo en cola local para sincronizar.', 'warning', 6500);
+    }
+    return {
+      status: 'ok',
+      queued: true,
+      data: _queuedResponseData(endpoint, data, queued),
+      message: 'Operacion guardada localmente; queda pendiente de sincronizacion.',
+    };
+  }
+
+  function _queuedResponseData(endpoint, data, queued) {
+    const now = new Date();
+    const iso = now.toISOString();
+    const time = now.toTimeString().slice(0, 8);
+    if (endpoint === 'iniciarSesion') {
+      return {
+        id_sesion: queued.id,
+        id_escuela: data.id_escuela || '',
+        inicio_iso: iso,
+        fecha_inicio: iso.slice(0, 10),
+        hora_inicio: time,
+        estado: 'en_curso',
+        url_formulario_usada: data.launch_url || APP_CONFIG.FORM_URL,
+        launch_mode: data.launch_mode || 'offline',
+        total_modulos: 9,
+        modulos_completados: 0,
+        offline: true,
+      };
+    }
+    if (endpoint === 'iniciarModulo') {
+      return {
+        id_modulo: queued.id,
+        id_sesion: data.id_sesion || '',
+        id_escuela: data.id_escuela || '',
+        modulo: data.modulo || '',
+        modulo_nombre: data.modulo_nombre || data.modulo || '',
+        orden: data.orden || '',
+        inicio_iso: iso,
+        estado: 'en_curso',
+        offline: true,
+      };
+    }
+    if (endpoint === 'cerrarModulo') {
+      return { ...data, fin_iso: iso, duracion_minutos: data.duracion_minutos || 0, offline: true };
+    }
+    if (endpoint === 'cerrarSesion') {
+      return { duracion_minutos: data.duracion_minutos || 0, offline: true };
+    }
+    if (endpoint === 'saveIncidencia') return { id_incidencia: queued.id, offline: true };
+    return { id_offline_queue: queued.id, offline: true };
+  }
+
   async function call(endpoint, method = 'GET', data = {}, options = {}) {
-    const { skipAuth = false, skipLoading = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS } = options;
+    const { skipAuth = false, skipLoading = false, skipQueue = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS } = options;
     if (!skipLoading) _incrementLoading();
 
     if (_IS_DEMO) {
       const result = await _demoCall(endpoint, data);
       if (!skipLoading) _decrementLoading();
       return result;
+    }
+
+    if (method === 'GET' && typeof navigator !== 'undefined' && !navigator.onLine) {
+      const fallback = await _offlineGetFallback(endpoint, data);
+      if (fallback) {
+        if (!skipLoading) _decrementLoading();
+        return fallback;
+      }
     }
 
     const token = Auth.getToken ? Auth.getToken() : null;
@@ -211,6 +317,11 @@ const API = (() => {
         } catch {
           throw new Error('Respuesta inválida del servidor, no es JSON.');
         }
+        if (method === 'GET' && typeof CialpaLocalStore !== 'undefined') {
+          CialpaLocalStore.rememberApi(endpoint, method, data, json).catch(err =>
+            console.warn('[API] No se pudo cachear respuesta local:', err)
+          );
+        }
         if (!skipLoading) _decrementLoading();
         return json;
       } catch (err) {
@@ -221,6 +332,15 @@ const API = (() => {
 
     if (!skipLoading) _decrementLoading();
     const msg = lastError?.message || 'Error de conexión con el servidor.';
+
+    if (method === 'GET') {
+      const fallback = await _offlineGetFallback(endpoint, data);
+      if (fallback) return fallback;
+    }
+
+    const queued = skipQueue ? null : await _offlinePostQueue(endpoint, method, data, msg);
+    if (queued) return queued;
+
     console.error(`[API] Error en endpoint "${endpoint}":`, lastError);
     throw new Error(msg);
   }
@@ -251,7 +371,7 @@ const API = (() => {
   async function getConfig() { return call('getConfig', 'GET', {}, { skipLoading: true }); }
   async function setConfig(clave, valor) { return call('setConfig', 'POST', { clave, valor }); }
 
-  async function getStats(filters = {}) { return call('getStats', 'GET', filters, { skipLoading: true }); }
+  async function getStats(filters = {}, options = {}) { return call('getStats', 'GET', filters, { skipLoading: true, ...options }); }
   async function getResumenOperativo(filters = {}) { return call('getResumenOperativo', 'GET', filters, { skipLoading: true }); }
   async function getAuditoria(filters = {}) { return call('getAuditoria', 'GET', filters, { skipLoading: true }); }
   async function getCatalogos(tipo) { return call('getCatalogos', 'GET', { tipo }, { skipLoading: true }); }
