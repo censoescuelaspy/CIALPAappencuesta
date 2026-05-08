@@ -348,7 +348,7 @@ const MecFormModule = (() => {
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
-              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.saveNow()">Guardar croquis</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.saveSketchAndNext()">Guardar y continuar</button>
             </div>
           </div>
           <div class="mec-sketch__board">
@@ -416,6 +416,7 @@ const MecFormModule = (() => {
     let drawing = false;
     let draftObject = null;
     let movingObject = null;
+    let resizingObject = null;
     let moveOffset = null;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
@@ -431,9 +432,12 @@ const MecFormModule = (() => {
       const point = pointFromEvent(event);
 
       if (_sketchTool === 'select') {
-        const selected = _findSketchObjectAt(point);
+        const handleObject = _findResizeHandleAt(point);
+        const selected = handleObject || _findSketchObjectAt(point);
         _selectedSketchObjectId = selected?.id || null;
-        if (selected) {
+        if (handleObject) {
+          resizingObject = handleObject;
+        } else if (selected) {
           movingObject = selected;
           moveOffset = _moveOffsetForObject(selected, point);
         }
@@ -448,9 +452,16 @@ const MecFormModule = (() => {
     const move = event => {
       event.preventDefault();
       const point = pointFromEvent(event);
+      if (resizingObject) {
+        _resizeSketchObject(resizingObject, point);
+        _drawSketch(ctx, canvas);
+        _updateSketchStatus();
+        return;
+      }
       if (movingObject) {
         _moveSketchObject(movingObject, point, moveOffset);
         _drawSketch(ctx, canvas);
+        _updateSketchStatus();
         return;
       }
       if (!drawing || !draftObject) return;
@@ -459,6 +470,12 @@ const MecFormModule = (() => {
     };
     const end = event => {
       event.preventDefault();
+      if (resizingObject) {
+        resizingObject = null;
+        _saveDraft(false);
+        _updateSketchStatus();
+        return;
+      }
       if (movingObject) {
         movingObject = null;
         moveOffset = null;
@@ -551,7 +568,7 @@ const MecFormModule = (() => {
       ctx.moveTo(object.x1, object.y1);
       ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
-      _labelSketchObject(ctx, object, 'Pared', (object.x1 + object.x2) / 2, (object.y1 + object.y2) / 2);
+      _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, (object.y1 + object.y2) / 2);
       ctx.restore();
       return;
     }
@@ -570,7 +587,8 @@ const MecFormModule = (() => {
     ctx.rect(object.x, object.y, object.w, object.h);
     ctx.fill();
     ctx.stroke();
-    _labelSketchObject(ctx, object, _sketchLabel(object.type), object.x + object.w / 2, object.y + object.h / 2);
+    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y + object.h / 2);
+    if (selected && _isResizableSketchObject(object)) _drawResizeHandle(ctx, object);
     ctx.restore();
   }
 
@@ -597,6 +615,55 @@ const MecFormModule = (() => {
     }[type] || type;
   }
 
+  function _sketchObjectLabel(object) {
+    const base = object.label || _sketchLabel(object.type);
+    const dimensions = _sketchDimensionsText(object);
+    return dimensions ? `${base} ${dimensions}` : base;
+  }
+
+  function _sketchDimensionsText(object) {
+    if (object.type === 'outlet' || object.type === 'photo') return '';
+    const scale = _sketchScale();
+    if (!scale) return '';
+    if (object.type === 'wall') {
+      const px = Math.hypot(object.x2 - object.x1, object.y2 - object.y1);
+      return `${(px * scale.avg).toFixed(2)}m`;
+    }
+    return `${(object.w * scale.x).toFixed(2)} x ${(object.h * scale.y).toFixed(2)}m`;
+  }
+
+  function _sketchScale() {
+    const sketch = _data.__classroomSketch || {};
+    const room = (sketch.objects || []).find(object => object.type === 'room');
+    const length = Number(sketch.length || 0);
+    const width = Number(sketch.width || 0);
+    if (!room || !length || !width || !room.w || !room.h) return null;
+    const x = length / room.w;
+    const y = width / room.h;
+    return { x, y, avg: (x + y) / 2 };
+  }
+
+  function _isResizableSketchObject(object) {
+    return object && !['wall', 'outlet', 'photo'].includes(object.type);
+  }
+
+  function _resizeHandle(object) {
+    return { x: object.x + object.w, y: object.y + object.h, size: 18 };
+  }
+
+  function _drawResizeHandle(ctx, object) {
+    const handle = _resizeHandle(object);
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#111827';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.rect(handle.x - handle.size / 2, handle.y - handle.size / 2, handle.size, handle.size);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function _labelSketchObject(ctx, object, label, x, y) {
     ctx.font = '700 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
@@ -614,6 +681,17 @@ const MecFormModule = (() => {
     return [..._data.__classroomSketch.objects]
       .reverse()
       .find(object => _sketchObjectContains(object, point));
+  }
+
+  function _findResizeHandleAt(point) {
+    _ensureSketchObjects();
+    return [..._data.__classroomSketch.objects]
+      .reverse()
+      .find(object => {
+        if (!_isResizableSketchObject(object)) return false;
+        const handle = _resizeHandle(object);
+        return Math.abs(point.x - handle.x) <= handle.size && Math.abs(point.y - handle.y) <= handle.size;
+      });
   }
 
   function _sketchObjectContains(object, point) {
@@ -661,6 +739,12 @@ const MecFormModule = (() => {
     }
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
+  }
+
+  function _resizeSketchObject(object, point) {
+    if (!_isResizableSketchObject(object)) return;
+    object.w = Math.max(18, Math.round(point.x - object.x));
+    object.h = Math.max(12, Math.round(point.y - object.y));
   }
 
   function _redrawSketchCanvas() {
@@ -806,7 +890,11 @@ const MecFormModule = (() => {
   function nextModule() {
     const modules = _implementedModules();
     const index = modules.findIndex(module => module.id === _activeModuleId);
-    const next = modules[Math.min(modules.length - 1, index + 1)];
+    if (index >= modules.length - 1) {
+      UI.showToast('No hay más etapas activas por ahora. El croquis quedó guardado.', 'info');
+      return;
+    }
+    const next = modules[index + 1];
     if (next) selectModule(next.id);
   }
 
@@ -820,6 +908,12 @@ const MecFormModule = (() => {
   function saveNow() {
     _saveDraft(true);
     _updateProgress();
+  }
+
+  function saveSketchAndNext() {
+    _saveDraft(true);
+    _updateProgress();
+    nextModule();
   }
 
   async function resetDraft() {
@@ -948,6 +1042,7 @@ const MecFormModule = (() => {
     previousModule,
     validate,
     saveNow,
+    saveSketchAndNext,
     resetDraft,
     exportJson,
     toggleModule,
