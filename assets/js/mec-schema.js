@@ -127,9 +127,19 @@ const MEC_SCHEMA = {
     {
       id: 'bloques',
       title: 'Bloques y Plantas',
-      description: 'Modulo repetible detectado. Implementacion detallada pendiente.',
-      status: 'planned',
-      sections: [],
+      description: 'Registro basico del bloque, cantidad de plantas y circulacion.',
+      sections: [
+        {
+          id: 'bloque_general',
+          title: '1 - Identificacion del bloque',
+          fields: [
+            { id: 'bloque_codigo', label: 'Codigo o nombre del bloque', type: 'text', required: true, hint: 'Ej.: Bloque A, Pabellon norte, Administracion.' },
+            { id: 'cantidad_plantas', label: 'Cantidad de plantas', type: 'number', required: true, min: 1, step: 1 },
+            { id: 'tipo_circulacion', label: 'Circulacion vertical principal', type: 'radio', options: ['Escalera', 'Rampa', 'Ambas', 'No aplica'] },
+            { id: 'bloque_observacion', label: 'Observaciones del bloque', type: 'textarea' },
+          ],
+        },
+      ],
     },
     {
       id: 'aulas',

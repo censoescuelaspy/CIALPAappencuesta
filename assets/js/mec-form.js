@@ -432,11 +432,11 @@ const MecFormModule = (() => {
       const point = pointFromEvent(event);
 
       if (_sketchTool === 'select') {
-        const handleObject = _findResizeHandleAt(point);
-        const selected = handleObject || _findSketchObjectAt(point);
+        const handleHit = _findResizeHandleAt(point);
+        const selected = handleHit?.object || _findSketchObjectAt(point);
         _selectedSketchObjectId = selected?.id || null;
-        if (handleObject) {
-          resizingObject = handleObject;
+        if (handleHit) {
+          resizingObject = handleHit;
         } else if (selected) {
           movingObject = selected;
           moveOffset = _moveOffsetForObject(selected, point);
@@ -453,7 +453,7 @@ const MecFormModule = (() => {
       event.preventDefault();
       const point = pointFromEvent(event);
       if (resizingObject) {
-        _resizeSketchObject(resizingObject, point);
+        _resizeSketchObject(resizingObject.object, point, resizingObject.handle);
         _drawSketch(ctx, canvas);
         _updateSketchStatus();
         return;
@@ -568,7 +568,7 @@ const MecFormModule = (() => {
       ctx.moveTo(object.x1, object.y1);
       ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
-      _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, (object.y1 + object.y2) / 2);
+      _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 18);
       ctx.restore();
       return;
     }
@@ -578,7 +578,7 @@ const MecFormModule = (() => {
       ctx.arc(object.x, object.y, object.r || 13, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      _labelSketchObject(ctx, object, object.type === 'photo' ? 'Foto' : 'Toma', object.x, object.y + 26);
+      _labelSketchObject(ctx, object, object.type === 'photo' ? 'Foto' : 'Toma', object.x, object.y + 30);
       ctx.restore();
       return;
     }
@@ -587,8 +587,8 @@ const MecFormModule = (() => {
     ctx.rect(object.x, object.y, object.w, object.h);
     ctx.fill();
     ctx.stroke();
-    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y + object.h / 2);
-    if (selected && _isResizableSketchObject(object)) _drawResizeHandle(ctx, object);
+    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+    if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     ctx.restore();
   }
 
@@ -608,9 +608,9 @@ const MecFormModule = (() => {
   function _sketchLabel(type) {
     return {
       room: 'Aula',
-      door: 'Puerta',
-      window: 'Ventana',
-      board: 'Pizarron',
+      door: 'Pta',
+      window: 'Vtna',
+      board: 'Piz',
       damage: 'Dano',
     }[type] || type;
   }
@@ -647,20 +647,27 @@ const MecFormModule = (() => {
     return object && !['wall', 'outlet', 'photo'].includes(object.type);
   }
 
-  function _resizeHandle(object) {
-    return { x: object.x + object.w, y: object.y + object.h, size: 18 };
+  function _resizeHandles(object) {
+    const size = 14;
+    return [
+      { name: 'nw', x: object.x, y: object.y, size },
+      { name: 'ne', x: object.x + object.w, y: object.y, size },
+      { name: 'sw', x: object.x, y: object.y + object.h, size },
+      { name: 'se', x: object.x + object.w, y: object.y + object.h, size },
+    ];
   }
 
-  function _drawResizeHandle(ctx, object) {
-    const handle = _resizeHandle(object);
+  function _drawResizeHandles(ctx, object, selected) {
     ctx.save();
-    ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#111827';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.rect(handle.x - handle.size / 2, handle.y - handle.size / 2, handle.size, handle.size);
-    ctx.fill();
-    ctx.stroke();
+    _resizeHandles(object).forEach(handle => {
+      ctx.fillStyle = selected ? '#ffffff' : 'rgba(255,255,255,.86)';
+      ctx.strokeStyle = selected ? '#111827' : 'rgba(17,24,39,.55)';
+      ctx.lineWidth = selected ? 2 : 1;
+      ctx.beginPath();
+      ctx.arc(handle.x, handle.y, handle.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
     ctx.restore();
   }
 
@@ -685,13 +692,12 @@ const MecFormModule = (() => {
 
   function _findResizeHandleAt(point) {
     _ensureSketchObjects();
-    return [..._data.__classroomSketch.objects]
-      .reverse()
-      .find(object => {
-        if (!_isResizableSketchObject(object)) return false;
-        const handle = _resizeHandle(object);
-        return Math.abs(point.x - handle.x) <= handle.size && Math.abs(point.y - handle.y) <= handle.size;
-      });
+    for (const object of [..._data.__classroomSketch.objects].reverse()) {
+      if (!_isResizableSketchObject(object)) continue;
+      const handle = _resizeHandles(object).find(item => Math.hypot(point.x - item.x, point.y - item.y) <= item.size);
+      if (handle) return { object, handle };
+    }
+    return null;
   }
 
   function _sketchObjectContains(object, point) {
@@ -741,10 +747,29 @@ const MecFormModule = (() => {
     object.y = point.y - offset.y;
   }
 
-  function _resizeSketchObject(object, point) {
+  function _resizeSketchObject(object, point, handle) {
     if (!_isResizableSketchObject(object)) return;
-    object.w = Math.max(18, Math.round(point.x - object.x));
-    object.h = Math.max(12, Math.round(point.y - object.y));
+    const minW = 18;
+    const minH = 12;
+    const right = object.x + object.w;
+    const bottom = object.y + object.h;
+
+    if (handle.name.includes('w')) {
+      const newX = Math.min(point.x, right - minW);
+      object.w = Math.round(right - newX);
+      object.x = Math.round(newX);
+    }
+    if (handle.name.includes('e')) {
+      object.w = Math.max(minW, Math.round(point.x - object.x));
+    }
+    if (handle.name.includes('n')) {
+      const newY = Math.min(point.y, bottom - minH);
+      object.h = Math.round(bottom - newY);
+      object.y = Math.round(newY);
+    }
+    if (handle.name.includes('s')) {
+      object.h = Math.max(minH, Math.round(point.y - object.y));
+    }
   }
 
   function _redrawSketchCanvas() {
