@@ -788,6 +788,41 @@
   padding: .75rem;
 }
 
+.school-plan__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .65rem;
+  flex-wrap: wrap;
+}
+
+.school-plan__layers,
+.school-plan__exports {
+  display: flex;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+
+.school-plan__layers label {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .3rem .5rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #415068;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.school-plan__layers input {
+  width: 14px;
+  height: 14px;
+}
+
 .school-plan__board canvas {
   width: 100%;
   aspect-ratio: 90 / 56;
@@ -936,5 +971,12 @@
     min-height: 50px;
     padding: .72rem .58rem;
     font-size: .86rem;
+  }
+
+  .school-plan__toolbar,
+  .school-plan__layers,
+  .school-plan__exports {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

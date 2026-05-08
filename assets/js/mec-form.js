@@ -13,6 +13,13 @@ const MecFormModule = (() => {
   let _sketchTool = 'select';
   let _selectedSketchObjectId = null;
   let _activeClassroomId = null;
+  const _planLayers = {
+    aulas: true,
+    aberturas: true,
+    electricidad: true,
+    danos: true,
+    etiquetas: true,
+  };
 
   const SKETCH_TOOLS = [
     { id: 'select', label: 'Seleccionar' },
@@ -448,6 +455,7 @@ const MecFormModule = (() => {
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">Exportar modelo JSON</button>
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.saveSketchAndNext()">Guardar y continuar</button>
             </div>
           </div>
@@ -2047,6 +2055,20 @@ const MecFormModule = (() => {
 
         <section class="school-plan__layout">
           <div class="school-plan__board">
+            <div class="school-plan__toolbar">
+              <div class="school-plan__layers">
+                ${Object.entries(_planLayers).map(([key, enabled]) => `
+                  <label>
+                    <input type="checkbox" ${enabled ? 'checked' : ''} onchange="MecFormModule.togglePlanLayer('${_escape(key)}', this.checked)">
+                    <span>${_escape(_planLayerLabel(key))}</span>
+                  </label>`).join('')}
+              </div>
+              <div class="school-plan__exports">
+                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
+              </div>
+            </div>
             <canvas id="school-plan-canvas" width="900" height="560" aria-label="Plano general de la escuela"></canvas>
           </div>
           <aside class="school-plan__side">
@@ -2076,6 +2098,22 @@ const MecFormModule = (() => {
         <strong>${_escape(value)}</strong>
         <small>${_escape(note || '')}</small>
       </article>`;
+  }
+
+  function _planLayerLabel(key) {
+    return {
+      aulas: 'Aulas',
+      aberturas: 'Puertas/Ventanas',
+      electricidad: 'Tomas',
+      danos: 'Danos',
+      etiquetas: 'Etiquetas',
+    }[key] || key;
+  }
+
+  function togglePlanLayer(key, enabled) {
+    if (!(key in _planLayers)) return;
+    _planLayers[key] = Boolean(enabled);
+    _drawSchoolPlan();
   }
 
   function _renderPlanObjectRow(object) {
@@ -2192,7 +2230,7 @@ const MecFormModule = (() => {
         ctx.font = '800 11px system-ui, sans-serif';
         ctx.fillText(`Planta ${floor}`, x + 10, bandY + 12);
         _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58).forEach(item => {
-          _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
+          if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
         });
         _drawSharedWallTicks(ctx, _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58));
       });
@@ -2242,10 +2280,12 @@ const MecFormModule = (() => {
     ctx.strokeStyle = 'rgba(43,108,176,.5)';
     ctx.lineWidth = 1;
     ctx.strokeRect(x + 4, y + 4, Math.max(0, w - 8), Math.max(0, h - 8));
-    ctx.fillStyle = '#173f68';
-    ctx.font = '800 10px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(room.name || 'Aula', x + 6, y + 14);
+    if (_planLayers.etiquetas) {
+      ctx.fillStyle = '#173f68';
+      ctx.font = '800 10px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(room.name || 'Aula', x + 6, y + 14);
+    }
     _drawPlanOpenings(ctx, room, x, y, w, h);
   }
 
@@ -2257,6 +2297,8 @@ const MecFormModule = (() => {
     (room.objects || [])
       .filter(object => ['door', 'window', 'outlet'].includes(object.type))
       .forEach(object => {
+        if (['door', 'window'].includes(object.type) && !_planLayers.aberturas) return;
+        if (object.type === 'outlet' && !_planLayers.electricidad) return;
         const ox = x + (object.x - roomObject.x) * sx;
         const oy = y + (object.y - roomObject.y) * sy;
         if (object.type === 'door') {
@@ -2310,6 +2352,148 @@ const MecFormModule = (() => {
   function editPlanClassroom(id) {
     selectModule('aulas');
     selectClassroom(id);
+  }
+
+  function _buildSchoolPlanModel() {
+    _syncActiveClassroomFromSketch();
+    _syncActiveBlock();
+    const blocks = (_data.__blocks || []).map(block => {
+      const floors = [...new Set((_data.__classrooms || [])
+        .filter(room => room.blockId === block.id)
+        .map(room => room.floor || 'PB'))];
+      return {
+        ...block,
+        floors: floors.map(floor => ({
+          id: floor,
+          classrooms: (_data.__classrooms || [])
+            .filter(room => room.blockId === block.id && (room.floor || 'PB') === floor)
+            .map(room => ({
+              id: room.id,
+              name: room.name,
+              dimensions: {
+                length_m: Number(room.length || 0),
+                width_m: Number(room.width || 0),
+                area_m2: Number(room.length || 0) * Number(room.width || 0),
+              },
+              openings: room.openings || '',
+              objects: (room.objects || []).map(object => ({
+                id: object.id,
+                type: object.type,
+                geometry: _objectGeometryForExport(room, object),
+                ficha: object.ficha || {},
+              })),
+            })),
+        })),
+      };
+    });
+    return {
+      exportedAt: new Date().toISOString(),
+      schemaVersion: MEC_SCHEMA.version,
+      source: 'CIALPA plano escolar',
+      blocks,
+      classroomsWithoutBlock: (_data.__classrooms || []).filter(room => !room.blockId),
+      sanitaries: _data.__sanitaries || [],
+      evidenceIndex: _buildEvidenceIndex(),
+    };
+  }
+
+  function _objectGeometryForExport(room, object) {
+    const roomObject = (room.objects || []).find(item => item.type === 'room');
+    if (!roomObject) return { ...object };
+    const scaleX = Number(room.length || 0) / roomObject.w || 0;
+    const scaleY = Number(room.width || 0) / roomObject.h || 0;
+    if (object.type === 'wall') {
+      return {
+        x1_m: (object.x1 - roomObject.x) * scaleX,
+        y1_m: (object.y1 - roomObject.y) * scaleY,
+        x2_m: (object.x2 - roomObject.x) * scaleX,
+        y2_m: (object.y2 - roomObject.y) * scaleY,
+      };
+    }
+    if (object.x !== undefined) {
+      return {
+        x_m: (object.x - roomObject.x) * scaleX,
+        y_m: (object.y - roomObject.y) * scaleY,
+        length_m: object.w ? object.w * scaleX : undefined,
+        width_m: object.h ? object.h * scaleY : undefined,
+      };
+    }
+    return { ...object };
+  }
+
+  function _downloadTextFile(filename, mime, content) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  function exportPlanJson() {
+    const model = _buildSchoolPlanModel();
+    _downloadTextFile(`cialpa-plano-${Date.now()}.json`, 'application/json', JSON.stringify(model, null, 2));
+    UI.showToast('Modelo JSON del plano descargado.', 'success');
+  }
+
+  function _planSvgMarkup() {
+    const rooms = _data.__classrooms || [];
+    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const parts = [
+      '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">',
+      '<rect width="900" height="560" fill="#f8fafc"/>',
+    ];
+    blocks.forEach((block, blockIndex) => {
+      const col = blockIndex % 2;
+      const row = Math.floor(blockIndex / 2);
+      const x = 28 + col * 430;
+      const y = 36 + row * 250;
+      const w = 392;
+      const h = 210;
+      parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#eef2f7" stroke="#172033" stroke-width="2"/>`);
+      parts.push(`<text x="${x + 10}" y="${y + 20}" font-family="system-ui" font-size="15" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}</text>`);
+      const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+      const floors = [...new Set(blockRooms.map(room => room.floor || 'PB'))];
+      floors.forEach((floor, floorIndex) => {
+        const floorRooms = blockRooms.filter(room => (room.floor || 'PB') === floor);
+        const bandY = y + 34 + floorIndex * 82;
+        parts.push(`<text x="${x + 10}" y="${bandY + 12}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">Planta ${_escape(floor)}</text>`);
+        _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58).forEach(item => {
+          parts.push(`<rect x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" fill="#eaf4ff" stroke="#2b6cb0" stroke-width="2"/>`);
+          parts.push(`<rect x="${item.x + 4}" y="${item.y + 4}" width="${Math.max(0, item.w - 8)}" height="${Math.max(0, item.h - 8)}" fill="none" stroke="#8db8e8" stroke-width="1"/>`);
+          parts.push(`<text x="${item.x + 6}" y="${item.y + 14}" font-family="system-ui" font-size="10" font-weight="800" fill="#173f68">${_escape(item.room.name || 'Aula')}</text>`);
+        });
+      });
+    });
+    parts.push('</svg>');
+    return parts.join('');
+  }
+
+  function exportPlanSvg() {
+    _downloadTextFile(`cialpa-plano-${Date.now()}.svg`, 'image/svg+xml', _planSvgMarkup());
+    UI.showToast('SVG del plano descargado.', 'success');
+  }
+
+  function exportPlanPng() {
+    const canvas = document.getElementById('school-plan-canvas');
+    if (!canvas) {
+      UI.showToast('Abra la vista Plano escuela para exportar PNG.', 'warning');
+      return;
+    }
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cialpa-plano-${Date.now()}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 500);
+    });
   }
 
   function exportJson() {
@@ -2376,6 +2560,10 @@ const MecFormModule = (() => {
     renderSchoolPlan,
     editPlanObject,
     editPlanClassroom,
+    togglePlanLayer,
+    exportPlanJson,
+    exportPlanSvg,
+    exportPlanPng,
     generateRoomSketch,
     undoSketchObject,
     deleteSelectedSketchObject,
