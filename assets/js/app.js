@@ -250,6 +250,7 @@ const AppController = (() => {
     inicio: { label: 'Inicio', icon: '🏠', minRole: 'encuestador' },
     mapa: { label: 'Mapa', icon: '🗺️', minRole: 'encuestador' },
     encuesta: { label: 'Aplicar Encuesta', icon: '📋', minRole: 'encuestador' },
+    mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
     encuestadores: { label: 'Encuestadores', icon: '👥', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
     incidencias: { label: 'Incidencias', icon: '⚠️', minRole: 'encuestador' },
@@ -417,6 +418,9 @@ const AppController = (() => {
         break;
       case 'encuesta':
         // survey panel re-renders itself on selectEscuela
+        break;
+      case 'mec':
+        MecFormModule.init();
         break;
       case 'incidencias':
         IncidenciasModule.loadList();

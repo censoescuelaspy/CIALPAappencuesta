@@ -14,6 +14,7 @@
 
   <!-- App CSS -->
   <link rel="stylesheet" href="assets/css/app.css" />
+  <link rel="stylesheet" href="assets/css/mec-form.css" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
@@ -174,6 +175,7 @@
             <div style="display:flex;gap:1rem;flex-wrap:wrap;">
               <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ver Mapa</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Aplicar Encuesta</button>
+              <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
             </div>
@@ -262,6 +264,25 @@
               <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ir al mapa</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: CUESTIONARIO MEC
+           ====================================================== -->
+      <div id="module-mec" class="module-panel">
+        <div class="page-header">
+          <div>
+            <h2>Cuestionario MEC</h2>
+            <p class="text-muted">Replica operativa inicial del formulario RUE/MEC para carga estable en CIALPA.</p>
+          </div>
+          <div class="mec-header-actions">
+            <button class="btn btn-outline btn-sm" onclick="MecFormModule.exportJson()">Exportar JSON</button>
+            <button class="btn btn-outline btn-sm" onclick="MecFormModule.resetDraft()">Limpiar borrador</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="mec-form-root"></div>
         </div>
       </div>
 
@@ -812,6 +833,8 @@
 <script src="assets/js/auth.js"></script>
 <script src="assets/js/map.js"></script>
 <script src="assets/js/survey.js"></script>
+<script src="assets/js/mec-schema.js"></script>
+<script src="assets/js/mec-form.js"></script>
 <script src="assets/js/stats.js"></script>
 <script src="assets/js/admin.js"></script>
 <script src="assets/js/jornada.js"></script>

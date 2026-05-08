@@ -1,0 +1,276 @@
+/* CIALPA — Replica inicial del cuestionario MEC */
+
+.mec-header-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.mec-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.mec-summary {
+  position: sticky;
+  top: calc(var(--header-height) + 1rem);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+}
+
+.mec-summary__block {
+  padding-bottom: .85rem;
+  margin-bottom: .85rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mec-summary__block span {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: .15rem;
+}
+
+.mec-summary__block strong {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 1rem;
+}
+
+.mec-summary__actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.mec-validation-summary {
+  font-size: .84rem;
+  color: var(--color-danger);
+  line-height: 1.4;
+}
+
+.mec-validation-summary ul {
+  list-style: disc;
+  padding-left: 1.1rem;
+  margin-top: .4rem;
+}
+
+.mec-validation-summary--ok {
+  color: var(--color-success);
+}
+
+.mec-questionnaire {
+  display: flex;
+  flex-direction: column;
+  gap: .85rem;
+}
+
+.mec-module {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.mec-module__toggle {
+  width: 100%;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 0;
+  background: #fff;
+  padding: 1rem 1.1rem;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-module__toggle:hover {
+  background: #f7f9fb;
+}
+
+.mec-module__toggle strong,
+.mec-module__toggle small {
+  display: block;
+}
+
+.mec-module__toggle strong {
+  font-size: 1rem;
+}
+
+.mec-module__toggle small {
+  margin-top: .2rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+.mec-module__badge {
+  min-width: 4rem;
+  padding: .3rem .55rem;
+  border-radius: var(--radius-full);
+  background: #eef2f7;
+  color: var(--color-secondary);
+  font-size: .78rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mec-module__body {
+  border-top: 1px solid var(--color-border);
+  padding: 1.1rem;
+}
+
+.mec-module--collapsed .mec-module__body {
+  display: none;
+}
+
+.mec-section {
+  padding: .4rem 0 1.1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px dashed #b8c0ca;
+}
+
+.mec-section:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+}
+
+.mec-section h3 {
+  color: #2754c5;
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: .85rem;
+}
+
+.mec-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: .9rem 1rem;
+}
+
+.mec-field {
+  min-width: 0;
+}
+
+.mec-field--hidden {
+  display: none;
+}
+
+.mec-label {
+  display: block;
+  font-size: .86rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: .35rem;
+}
+
+.mec-required {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+
+.mec-options {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding-top: .15rem;
+}
+
+.mec-options--columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.mec-option {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 28px;
+  font-size: .9rem;
+}
+
+.mec-option input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.mec-input-with-unit {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.mec-input-with-unit .form-control {
+  min-width: 0;
+}
+
+.mec-unit {
+  color: var(--color-text-muted);
+  font-size: .85rem;
+  min-width: 2rem;
+}
+
+.mec-hint {
+  display: block;
+  margin-top: .28rem;
+  color: var(--color-text-muted);
+  font-size: .78rem;
+}
+
+.mec-error {
+  min-height: 1rem;
+  margin-top: .25rem;
+  color: var(--color-danger);
+  font-size: .78rem;
+}
+
+.mec-field--invalid .form-control,
+.mec-field--invalid .mec-options {
+  outline: 2px solid rgba(220, 53, 69, .2);
+  border-radius: var(--radius-sm);
+}
+
+.mec-planned {
+  background: #f8f9fa;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.mec-planned p + p {
+  margin-top: .35rem;
+}
+
+@media (max-width: 900px) {
+  .mec-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-summary {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .mec-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-module__toggle {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
