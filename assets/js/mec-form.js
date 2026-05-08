@@ -1135,6 +1135,7 @@ const MecFormModule = (() => {
     ctx.stroke();
     _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
     if (object.type === 'window') _labelSketchObject(ctx, object, _openingDistanceText(object), object.x + object.w / 2, object.y + object.h + 16, true);
+    if (object.type === 'window' && selected) _drawOpeningCornerGuides(ctx, object);
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     ctx.restore();
   }
@@ -1167,7 +1168,7 @@ const MecFormModule = (() => {
     ctx.strokeRect(object.x, object.y, object.w, thickness);
     ctx.beginPath();
     ctx.moveTo(hingeX, hingeY);
-    ctx.lineTo(hingeX + object.w, hingeY + swing * object.w);
+    ctx.lineTo(hingeX + radius, hingeY);
     ctx.stroke();
     ctx.beginPath();
     ctx.arc(hingeX, hingeY, radius, 0, swing > 0 ? Math.PI / 2 : -Math.PI / 2, swing < 0);
@@ -1177,6 +1178,7 @@ const MecFormModule = (() => {
     ctx.setLineDash([]);
     _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
     _labelSketchObject(ctx, object, _openingDistanceText(object), object.x + object.w / 2, object.y + thickness + 18, true);
+    if (selected) _drawOpeningCornerGuides(ctx, object);
   }
 
   function _sketchStyle(type) {
@@ -1245,6 +1247,55 @@ const MecFormModule = (() => {
         return `${corner.key} ${meters.toFixed(1)}m`;
       })
       .join(' · ');
+  }
+
+  function _openingCornerDistances(object) {
+    if (!['door', 'window'].includes(object.type)) return [];
+    const room = (_data.__classroomSketch?.objects || []).find(item => item.type === 'room');
+    const scale = _sketchScale();
+    if (!room || !scale) return [];
+    const cx = object.x + (object.w || 0) / 2;
+    const cy = object.y + (object.h || 0) / 2;
+    return [
+      { key: 'C1', x: room.x, y: room.y },
+      { key: 'C2', x: room.x + room.w, y: room.y },
+      { key: 'C3', x: room.x + room.w, y: room.y + room.h },
+      { key: 'C4', x: room.x, y: room.y + room.h },
+    ].map(corner => ({
+      ...corner,
+      from: { x: cx, y: cy },
+      meters: Math.hypot((cx - corner.x) * scale.x, (cy - corner.y) * scale.y),
+    }));
+  }
+
+  function _drawOpeningCornerGuides(ctx, object) {
+    const distances = _openingCornerDistances(object);
+    if (!distances.length) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,76,34,.5)';
+    ctx.fillStyle = '#9a3412';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 4]);
+    distances.forEach(item => {
+      ctx.beginPath();
+      ctx.moveTo(item.from.x, item.from.y);
+      ctx.lineTo(item.x, item.y);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    distances.forEach(item => {
+      const tx = item.from.x + (item.x - item.from.x) * .22;
+      const ty = item.from.y + (item.y - item.from.y) * .22;
+      const text = `${item.key} ${item.meters.toFixed(1)}m`;
+      const width = ctx.measureText(text).width + 8;
+      ctx.fillStyle = 'rgba(255,247,237,.92)';
+      ctx.fillRect(tx - width / 2, ty - 8, width, 16);
+      ctx.fillStyle = '#9a3412';
+      ctx.fillText(text, tx, ty);
+    });
+    ctx.restore();
   }
 
   function _sketchScale() {
@@ -2074,29 +2125,90 @@ const MecFormModule = (() => {
       ctx.fillText(`${block.bloque_codigo || 'Bloque'}${block.largo_m && block.ancho_m ? ` · ${block.largo_m} x ${block.ancho_m} m` : ''}`, x + 10, y + 20);
 
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
-      blockRooms.forEach((room, index) => {
-        const roomCol = index % 2;
-        const roomRow = Math.floor(index / 2);
-        const rx = x + 14 + roomCol * 185;
-        const ry = y + 36 + roomRow * 78;
-        const rw = 170;
-        const rh = 62;
-        ctx.strokeStyle = '#2b6cb0';
-        ctx.fillStyle = 'rgba(43,108,176,.08)';
-        ctx.lineWidth = 2;
-        ctx.fillRect(rx, ry, rw, rh);
-        ctx.strokeRect(rx, ry, rw, rh);
-        ctx.strokeStyle = 'rgba(43,108,176,.5)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(rx + 5, ry + 5, rw - 10, rh - 10);
-        ctx.fillStyle = '#173f68';
-        ctx.font = '800 12px system-ui, sans-serif';
-        ctx.fillText(room.name || `Aula ${index + 1}`, rx + 8, ry + 18);
-        ctx.font = '700 10px system-ui, sans-serif';
-        ctx.fillText([room.floor || 'PB', room.length && room.width ? `${room.length}x${room.width}m` : ''].filter(Boolean).join(' · '), rx + 8, ry + 34);
+      const floors = [...new Set(blockRooms.map(room => room.floor || 'PB'))];
+      floors.forEach((floor, floorIndex) => {
+        const floorRooms = blockRooms.filter(room => (room.floor || 'PB') === floor);
+        const bandY = y + 34 + floorIndex * 82;
+        ctx.fillStyle = '#475467';
+        ctx.font = '800 11px system-ui, sans-serif';
+        ctx.fillText(`Planta ${floor}`, x + 10, bandY + 12);
+        _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58).forEach(item => {
+          _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
+        });
       });
       ctx.restore();
     });
+  }
+
+  function _layoutPlanRooms(rooms, x, y, w, h) {
+    const total = rooms.reduce((sum, room) => sum + Math.max(1, Number(room.length || 1)), 0) || 1;
+    let cursor = x;
+    return rooms.map(room => {
+      const share = Math.max(54, (Number(room.length || 1) / total) * w);
+      const roomWidth = Math.min(share, x + w - cursor);
+      const aspect = Number(room.length || 1) / Math.max(1, Number(room.width || 1));
+      const roomHeight = Math.max(34, Math.min(h, roomWidth / Math.max(.8, aspect)));
+      const item = { room, x: cursor, y: y + Math.max(0, (h - roomHeight) / 2), w: Math.max(42, roomWidth - 5), h: roomHeight };
+      cursor += roomWidth;
+      return item;
+    });
+  }
+
+  function _drawPlanClassroom(ctx, room, x, y, w, h) {
+    ctx.strokeStyle = '#2b6cb0';
+    ctx.fillStyle = 'rgba(43,108,176,.08)';
+    ctx.lineWidth = 2;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(43,108,176,.5)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 4, y + 4, Math.max(0, w - 8), Math.max(0, h - 8));
+    ctx.fillStyle = '#173f68';
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(room.name || 'Aula', x + 6, y + 14);
+    _drawPlanOpenings(ctx, room, x, y, w, h);
+  }
+
+  function _drawPlanOpenings(ctx, room, x, y, w, h) {
+    const roomObject = (room.objects || []).find(object => object.type === 'room');
+    if (!roomObject) return;
+    const sx = w / roomObject.w;
+    const sy = h / roomObject.h;
+    (room.objects || [])
+      .filter(object => ['door', 'window', 'outlet'].includes(object.type))
+      .forEach(object => {
+        const ox = x + (object.x - roomObject.x) * sx;
+        const oy = y + (object.y - roomObject.y) * sy;
+        if (object.type === 'door') {
+          const ow = Math.max(12, object.w * sx);
+          ctx.strokeStyle = '#2f855a';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(ox + ow, oy);
+          ctx.stroke();
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.arc(ox, oy, ow, 0, Math.PI / 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          return;
+        }
+        if (object.type === 'window') {
+          ctx.strokeStyle = '#2b6cb0';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(ox + Math.max(12, object.w * sx), oy);
+          ctx.stroke();
+          return;
+        }
+        ctx.fillStyle = '#b7791f';
+        ctx.beginPath();
+        ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
   }
 
   function editPlanObject(planId) {
