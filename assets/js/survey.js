@@ -427,10 +427,7 @@ const SurveyModule = (() => {
     if (!_currentEscuela) {
       container.innerHTML = `
         <div class="survey-empty">
-          <div class="survey-empty__icon">🏫</div>
-          <h3>Seleccione una escuela</h3>
-          <p>Use el mapa o la lista para seleccionar el local escolar que será relevado.</p>
-          <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ir al mapa</button>
+          <h3>En desarrollo</h3>
         </div>`;
       return;
     }

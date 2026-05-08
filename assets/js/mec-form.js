@@ -42,6 +42,29 @@ const MecFormModule = (() => {
     _refreshDynamicState();
   }
 
+  async function _setEvidenceFiles(moduleId, fieldId, files) {
+    const key = `${moduleId}.${fieldId}`;
+    _data.__evidence = _data.__evidence || {};
+    _data.__evidence[key] = await Promise.all([...files].map(file => _readEvidenceFile(file)));
+    _saveDraft(false);
+    _refreshEvidenceState(key);
+    UI.showToast('Foto asociada a la respuesta.', 'success');
+  }
+
+  function _readEvidenceFile(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        capturedAt: new Date().toISOString(),
+        dataUrl: reader.result,
+      });
+      reader.readAsDataURL(file);
+    });
+  }
+
   function _getValue(path) {
     const [moduleId, fieldId] = path.split('.');
     return _data[moduleId]?.[fieldId];
@@ -107,6 +130,7 @@ const MecFormModule = (() => {
       </div>`;
 
     _bindInputs(root);
+    _bindSketch(root);
     _refreshDynamicState();
   }
 
@@ -152,9 +176,14 @@ const MecFormModule = (() => {
           <span class="mec-module__badge" data-module-progress="${_escape(module.id)}">${planned ? 'Planificado' : '0/0'}</span>
         </header>
         <div class="mec-module__body ${planned ? 'mec-module__body--planned' : ''}">
-          ${planned ? _renderPlannedModule(module) : module.sections.map(section => _renderSection(module, section)).join('')}
+          ${planned ? _renderPlannedModule(module) : _renderActiveModule(module)}
         </div>
       </article>`;
+  }
+
+  function _renderActiveModule(module) {
+    if (module.kind === 'classroomSketch') return _renderClassroomSketchModule();
+    return module.sections.map(section => _renderSection(module, section)).join('');
   }
 
   function _renderPlannedModule(module) {
@@ -232,6 +261,7 @@ const MecFormModule = (() => {
 
   function _wrapField(moduleId, field, controlHtml) {
     const optional = field.required ? '' : '<span>Opcional</span>';
+    const evidence = field.evidence ? _renderEvidenceControl(moduleId, field) : '';
     return `
       <div class="mec-field" data-module="${_escape(moduleId)}" data-field="${_escape(field.id)}">
         <label class="mec-label">
@@ -239,11 +269,79 @@ const MecFormModule = (() => {
           ${optional}
         </label>
         ${controlHtml}
+        ${evidence}
         <div class="mec-error" data-error-for="${_escape(moduleId)}.${_escape(field.id)}"></div>
       </div>`;
   }
 
+  function _renderEvidenceControl(moduleId, field) {
+    const key = `${moduleId}.${field.id}`;
+    const photos = _data.__evidence?.[key] || [];
+    const inputId = `mec_photo_${moduleId}_${field.id}`;
+    return `
+      <div class="mec-evidence" data-evidence-key="${_escape(key)}">
+        <input id="${_escape(inputId)}" class="mec-evidence-input" type="file" accept="image/*" capture="environment" multiple
+          data-module="${_escape(moduleId)}" data-field="${_escape(field.id)}">
+        <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${_escape(inputId)}')?.click()">
+          Sacar foto
+        </button>
+        <span class="mec-evidence__label">${_escape(field.evidenceLabel || 'Foto de respaldo')}</span>
+        <small class="mec-evidence__state" data-evidence-state="${_escape(key)}">${_evidenceLabel(photos)}</small>
+      </div>`;
+  }
+
+  function _evidenceLabel(photos) {
+    if (!photos.length) return 'Sin foto asociada';
+    if (photos.length === 1) return `1 foto: ${photos[0].name || 'evidencia'}`;
+    return `${photos.length} fotos asociadas`;
+  }
+
+  function _refreshEvidenceState(key) {
+    const state = document.querySelector(`[data-evidence-state="${key}"]`);
+    if (!state) return;
+    state.textContent = _evidenceLabel(_data.__evidence?.[key] || []);
+  }
+
+  function _renderClassroomSketchModule() {
+    const sketch = _data.__classroomSketch || {};
+    return `
+      <section class="mec-section mec-sketch">
+        <div class="mec-section__header">
+          <h4>Croquis dimensional del aula</h4>
+          <p class="mec-hint">En desarrollo: permite esbozar lineas, aberturas y dimensiones basicas para asociarlas luego al aula relevada.</p>
+        </div>
+        <div class="mec-sketch__layout">
+          <div class="mec-sketch__tools">
+            <label class="mec-label"><span>Largo aproximado</span></label>
+            <div class="mec-input-with-unit">
+              <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.length || '')}" data-sketch-field="length">
+              <span class="mec-unit">m</span>
+            </div>
+            <label class="mec-label"><span>Ancho aproximado</span></label>
+            <div class="mec-input-with-unit">
+              <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.width || '')}" data-sketch-field="width">
+              <span class="mec-unit">m</span>
+            </div>
+            <label class="mec-label"><span>Aberturas / observaciones</span></label>
+            <textarea class="form-control" rows="4" data-sketch-field="openings">${_escape(sketch.openings || '')}</textarea>
+            <div class="mec-sketch__actions">
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.saveNow()">Guardar croquis</button>
+            </div>
+          </div>
+          <div class="mec-sketch__board">
+            <canvas id="mec-classroom-canvas" width="760" height="460" aria-label="Croquis manual del aula"></canvas>
+            <small>Dibuje con el mouse o el dedo. Use lineas simples para paredes, puertas, ventanas y medidas.</small>
+          </div>
+        </div>
+      </section>`;
+  }
+
   function _bindInputs(root) {
+    root.querySelectorAll('.mec-evidence-input').forEach(input => {
+      input.addEventListener('change', () => _setEvidenceFiles(input.dataset.module, input.dataset.field, input.files || []));
+    });
+
     root.querySelectorAll('.mec-field').forEach(fieldEl => {
       const moduleId = fieldEl.dataset.module;
       const fieldId = fieldEl.dataset.field;
@@ -268,6 +366,88 @@ const MecFormModule = (() => {
       }
 
       input.addEventListener('input', () => _setValue(moduleId, fieldId, input.value));
+    });
+  }
+
+  function _bindSketch(root) {
+    const canvas = root.querySelector('#mec-classroom-canvas');
+    if (!canvas) return;
+
+    root.querySelectorAll('[data-sketch-field]').forEach(input => {
+      input.addEventListener('input', () => {
+        _data.__classroomSketch = _data.__classroomSketch || {};
+        _data.__classroomSketch[input.dataset.sketchField] = input.value;
+        _saveDraft(false);
+      });
+    });
+
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let stroke = [];
+    const pointFromEvent = event => {
+      const rect = canvas.getBoundingClientRect();
+      const source = event.touches?.[0] || event;
+      return {
+        x: Math.round((source.clientX - rect.left) * (canvas.width / rect.width)),
+        y: Math.round((source.clientY - rect.top) * (canvas.height / rect.height)),
+      };
+    };
+    const begin = event => {
+      event.preventDefault();
+      drawing = true;
+      stroke = [pointFromEvent(event)];
+    };
+    const move = event => {
+      if (!drawing) return;
+      event.preventDefault();
+      stroke.push(pointFromEvent(event));
+      _drawSketch(ctx, canvas, [...(_data.__classroomSketch?.strokes || []), stroke]);
+    };
+    const end = event => {
+      if (!drawing) return;
+      event.preventDefault();
+      drawing = false;
+      _data.__classroomSketch = _data.__classroomSketch || {};
+      _data.__classroomSketch.strokes = [...(_data.__classroomSketch.strokes || []), stroke];
+      _saveDraft(false);
+    };
+
+    canvas.addEventListener('mousedown', begin);
+    canvas.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', end);
+    canvas.addEventListener('touchstart', begin, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end, { passive: false });
+    _drawSketch(ctx, canvas, _data.__classroomSketch?.strokes || []);
+  }
+
+  function _drawSketch(ctx, canvas, strokes) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#fbfcfe';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    for (let x = 20; x < canvas.width; x += 20) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 20; y < canvas.height; y += 20) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = '#1f5d99';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    strokes.forEach(points => {
+      if (!points.length) return;
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+      ctx.stroke();
     });
   }
 
@@ -429,11 +609,23 @@ const MecFormModule = (() => {
     UI.showToast('Borrador MEC limpiado.', 'success');
   }
 
+  function clearSketch() {
+    _data.__classroomSketch = {
+      ...(_data.__classroomSketch || {}),
+      strokes: [],
+    };
+    _saveDraft(false);
+    const canvas = document.getElementById('mec-classroom-canvas');
+    if (canvas) _drawSketch(canvas.getContext('2d'), canvas, []);
+    UI.showToast('Croquis limpiado.', 'success');
+  }
+
   function exportJson() {
     const payload = {
       exportedAt: new Date().toISOString(),
       schemaVersion: MEC_SCHEMA.version,
       values: _data,
+      evidenceIndex: _buildEvidenceIndex(),
     };
     const json = JSON.stringify(payload, null, 2);
     navigator.clipboard?.writeText(json).then(
@@ -442,6 +634,19 @@ const MecFormModule = (() => {
         console.log(json);
         UI.showToast('No se pudo copiar. El JSON fue enviado a la consola.', 'warning');
       }
+    );
+  }
+
+  function _buildEvidenceIndex() {
+    return Object.entries(_data.__evidence || {}).flatMap(([fieldPath, photos]) =>
+      photos.map((photo, index) => ({
+        fieldPath,
+        index: index + 1,
+        name: photo.name,
+        type: photo.type,
+        size: photo.size,
+        capturedAt: photo.capturedAt,
+      }))
     );
   }
 
@@ -459,5 +664,6 @@ const MecFormModule = (() => {
     resetDraft,
     exportJson,
     toggleModule,
+    clearSketch,
   };
 })();
