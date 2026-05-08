@@ -420,6 +420,10 @@ const MecFormModule = (() => {
           <div class="mec-sketch__tools">
             <label class="mec-label"><span>Nombre / codigo del aula</span></label>
             <input class="form-control" type="text" value="${_escape(sketch.name || '')}" data-sketch-field="name" placeholder="Ej.: Aula 1, 2A, Inicial">
+            <label class="mec-label"><span>Bloque</span></label>
+            ${_blockOptions(sketch.blockId || _data.__activeBlockId || '')}
+            <label class="mec-label"><span>Planta</span></label>
+            <input class="form-control" type="text" value="${_escape(sketch.floor || 'PB')}" data-sketch-field="floor" placeholder="PB, 1, 2">
             <label class="mec-label"><span>Largo aproximado</span></label>
             <div class="mec-input-with-unit">
               <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.length || '')}" data-sketch-field="length">
@@ -483,6 +487,8 @@ const MecFormModule = (() => {
     return JSON.parse(JSON.stringify({
       id: sketch.id || `aula_${Date.now()}`,
       name: sketch.name || '',
+      blockId: sketch.blockId || _data.__activeBlockId || '',
+      floor: sketch.floor || 'PB',
       length: sketch.length || '',
       width: sketch.width || '',
       openings: sketch.openings || '',
@@ -511,6 +517,9 @@ const MecFormModule = (() => {
     const objects = room.objects || [];
     const parts = [];
     if (room.length && room.width) parts.push(`${room.length} x ${room.width} m`);
+    const block = _blockById(room.blockId);
+    if (block?.bloque_codigo) parts.push(block.bloque_codigo);
+    if (room.floor) parts.push(room.floor);
     parts.push(`${objects.filter(object => object.type === 'door').length} pta.`);
     parts.push(`${objects.filter(object => object.type === 'window').length} vtna.`);
     parts.push(`${objects.filter(object => object.type === 'outlet').length} TC`);
@@ -533,6 +542,8 @@ const MecFormModule = (() => {
     _data.__classroomSketch = {
       id: _activeClassroomId,
       name: `Aula ${nextNumber}`,
+      blockId: _data.__activeBlockId || '',
+      floor: 'PB',
       length: '',
       width: '',
       openings: '',
@@ -571,8 +582,31 @@ const MecFormModule = (() => {
   function _blockSummary(block) {
     return [
       block.cantidad_plantas ? `${block.cantidad_plantas} planta(s)` : '',
+      block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : '',
       block.tipo_circulacion || '',
     ].filter(Boolean).join(' · ') || 'Pendiente de completar';
+  }
+
+  function _blockById(id) {
+    return (_data.__blocks || []).find(block => block.id === id) || null;
+  }
+
+  function _activeClassroomBlock() {
+    return _blockById(_data.__classroomSketch?.blockId || _data.__activeBlockId);
+  }
+
+  function _blockAreaUsed(blockId, exceptClassroomId = null) {
+    return (_data.__classrooms || [])
+      .filter(room => room.blockId === blockId && room.id !== exceptClassroomId)
+      .reduce((sum, room) => sum + Number(room.length || 0) * Number(room.width || 0), 0);
+  }
+
+  function _blockOptions(selected) {
+    _ensureBlocks();
+    return `
+      <select class="form-control" data-sketch-field="blockId">
+        ${(_data.__blocks || []).map(block => `<option value="${_escape(block.id)}" ${block.id === selected ? 'selected' : ''}>${_escape(block.bloque_codigo || 'Bloque sin nombre')}</option>`).join('')}
+      </select>`;
   }
 
   function selectBlock(id) {
@@ -1004,7 +1038,7 @@ const MecFormModule = (() => {
     if (type === 'outlet' || type === 'photo') {
       return { id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: {} };
     }
-    return { id, type, start, x, y, w, h, ficha: {} };
+    return _clampOpeningToRoom({ id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: {} });
   }
 
   function _createSketchObjectAt(point) {
@@ -1028,6 +1062,7 @@ const MecFormModule = (() => {
         ficha: {},
       };
     }
+    object = _clampOpeningToRoom(object);
     _data.__classroomSketch.objects.push(object);
     _selectedSketchObjectId = object.id;
     _saveDraft(false);
@@ -1036,7 +1071,7 @@ const MecFormModule = (() => {
 
   function _defaultSketchSize(type) {
     return {
-      door: { w: 56, h: 18 },
+      door: { w: 56, h: 8 },
       window: { w: 86, h: 18 },
       board: { w: 112, h: 34 },
       damage: { w: 58, h: 38 },
@@ -1070,6 +1105,19 @@ const MecFormModule = (() => {
       return;
     }
 
+    if (object.type === 'room') {
+      _drawRoomObject(ctx, object, selected);
+      ctx.restore();
+      return;
+    }
+
+    if (object.type === 'door') {
+      _drawDoorObject(ctx, object, selected);
+      if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
+      ctx.restore();
+      return;
+    }
+
     if (object.type === 'outlet' || object.type === 'photo') {
       const radius = _sketchPointRadius(object.type);
       ctx.beginPath();
@@ -1086,8 +1134,49 @@ const MecFormModule = (() => {
     ctx.fill();
     ctx.stroke();
     _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+    if (object.type === 'window') _labelSketchObject(ctx, object, _openingDistanceText(object), object.x + object.w / 2, object.y + object.h + 16, true);
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     ctx.restore();
+  }
+
+  function _drawRoomObject(ctx, object, selected) {
+    const style = _sketchStyle('room');
+    ctx.fillStyle = style.fill;
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeStyle = selected ? '#111827' : style.stroke;
+    ctx.lineWidth = selected ? 4 : style.lineWidth;
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    ctx.strokeStyle = 'rgba(23,32,51,.72)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(object.x + 7, object.y + 7, Math.max(0, object.w - 14), Math.max(0, object.h - 14));
+    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+    if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
+  }
+
+  function _drawDoorObject(ctx, object, selected) {
+    const swing = object.ficha?.abre_hacia === 'Exterior' ? -1 : 1;
+    const thickness = 8;
+    object.h = thickness;
+    const hingeX = object.x;
+    const hingeY = object.y + (swing > 0 ? thickness : 0);
+    const radius = Math.max(18, object.w);
+    ctx.fillStyle = selected ? 'rgba(47,133,90,.28)' : 'rgba(47,133,90,.16)';
+    ctx.strokeStyle = selected ? '#111827' : '#2f855a';
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.fillRect(object.x, object.y, object.w, thickness);
+    ctx.strokeRect(object.x, object.y, object.w, thickness);
+    ctx.beginPath();
+    ctx.moveTo(hingeX, hingeY);
+    ctx.lineTo(hingeX + object.w, hingeY + swing * object.w);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(hingeX, hingeY, radius, 0, swing > 0 ? Math.PI / 2 : -Math.PI / 2, swing < 0);
+    ctx.strokeStyle = selected ? '#111827' : 'rgba(47,133,90,.75)';
+    ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+    _labelSketchObject(ctx, object, _openingDistanceText(object), object.x + object.w / 2, object.y + thickness + 18, true);
   }
 
   function _sketchStyle(type) {
@@ -1137,6 +1226,27 @@ const MecFormModule = (() => {
     return `${(object.w * scale.x).toFixed(2)} x ${(object.h * scale.y).toFixed(2)}m`;
   }
 
+  function _openingDistanceText(object) {
+    if (!['door', 'window'].includes(object.type)) return '';
+    const room = (_data.__classroomSketch?.objects || []).find(item => item.type === 'room');
+    const scale = _sketchScale();
+    if (!room || !scale) return '';
+    const cx = object.x + (object.w || 0) / 2;
+    const cy = object.y + (object.h || 0) / 2;
+    const corners = [
+      { key: 'C1', x: room.x, y: room.y },
+      { key: 'C2', x: room.x + room.w, y: room.y },
+      { key: 'C3', x: room.x + room.w, y: room.y + room.h },
+      { key: 'C4', x: room.x, y: room.y + room.h },
+    ];
+    return corners
+      .map(corner => {
+        const meters = Math.hypot((cx - corner.x) * scale.x, (cy - corner.y) * scale.y);
+        return `${corner.key} ${meters.toFixed(1)}m`;
+      })
+      .join(' · ');
+  }
+
   function _sketchScale() {
     const sketch = _data.__classroomSketch || {};
     const room = (sketch.objects || []).find(object => object.type === 'room');
@@ -1177,6 +1287,7 @@ const MecFormModule = (() => {
   }
 
   function _labelSketchObject(ctx, object, label, x, y) {
+    if (!label) return;
     ctx.font = '700 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1259,6 +1370,7 @@ const MecFormModule = (() => {
     }
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
+    _clampOpeningToRoom(object);
   }
 
   function _resizeSketchObject(object, point, handle) {
@@ -1284,6 +1396,17 @@ const MecFormModule = (() => {
     if (handle.name.includes('s')) {
       object.h = Math.max(minH, Math.round(point.y - object.y));
     }
+    if (object.type === 'door') object.h = 8;
+    _clampOpeningToRoom(object);
+  }
+
+  function _clampOpeningToRoom(object) {
+    if (!object || !['door', 'window'].includes(object.type)) return object;
+    const room = (_data.__classroomSketch?.objects || []).find(item => item.type === 'room');
+    if (!room) return object;
+    object.x = Math.max(room.x, Math.min(object.x, room.x + room.w - object.w));
+    object.y = Math.max(room.y, Math.min(object.y, room.y + room.h - object.h));
+    return object;
   }
 
   function _redrawSketchCanvas() {
@@ -1706,8 +1829,23 @@ const MecFormModule = (() => {
 
   function generateRoomSketch() {
     _ensureSketchObjects();
-    const length = Number(_data.__classroomSketch.length || 7);
-    const width = Number(_data.__classroomSketch.width || 5);
+    const block = _activeClassroomBlock();
+    const blockLength = Number(block?.largo_m || 0);
+    const blockWidth = Number(block?.ancho_m || 0);
+    let length = Number(_data.__classroomSketch.length || 7);
+    let width = Number(_data.__classroomSketch.width || 5);
+    if (blockLength && length > blockLength) length = blockLength;
+    if (blockWidth && width > blockWidth) width = blockWidth;
+    if (blockLength && blockWidth) {
+      const remaining = Math.max(0, blockLength * blockWidth - _blockAreaUsed(block.id, _activeClassroomId));
+      if (length * width > remaining && remaining > 0) {
+        const ratio = Math.sqrt(remaining / (length * width));
+        length = Math.max(1, length * ratio);
+        width = Math.max(1, width * ratio);
+      }
+      _data.__classroomSketch.length = length.toFixed(1);
+      _data.__classroomSketch.width = width.toFixed(1);
+    }
     const maxW = 560;
     const maxH = 320;
     const ratio = Math.max(length, width, 1);
@@ -1731,7 +1869,7 @@ const MecFormModule = (() => {
     _redrawSketchCanvas();
     _updateSketchStatus();
     renderSchoolPlan();
-    UI.showToast('Aula base generada con dimensiones aproximadas.', 'success');
+    UI.showToast(blockLength && blockWidth ? 'Aula base generada dentro de las dimensiones disponibles del bloque.' : 'Aula base generada con dimensiones aproximadas.', 'success');
   }
 
   function undoSketchObject() {
@@ -1802,7 +1940,7 @@ const MecFormModule = (() => {
             <canvas id="school-plan-canvas" width="900" height="560" aria-label="Plano general de la escuela"></canvas>
           </div>
           <aside class="school-plan__side">
-            <h3>Elementos relevados</h3>
+            <h3>Aulas y elementos</h3>
             <div class="school-plan__legend">
               <span><i class="legend-room"></i>Aula</span>
               <span><i class="legend-door"></i>Puerta</span>
@@ -1811,6 +1949,7 @@ const MecFormModule = (() => {
               <span><i class="legend-damage"></i>Dano</span>
             </div>
             <div class="school-plan__list">
+              ${(_data.__classrooms || []).map(_renderPlanClassroomRow).join('')}
               ${objects.length ? objects.map(_renderPlanObjectRow).join('') : '<p class="text-muted">Todavia no hay elementos cargados. Genere el aula base desde el Cuestionario MEC.</p>'}
             </div>
           </aside>
@@ -1838,6 +1977,16 @@ const MecFormModule = (() => {
         <span class="school-plan-object__type">${_escape(_sketchLabel(object.type))}</span>
         <strong>${_escape(label)}</strong>
         <small>${_escape([object.classroomName, state, dims].filter(Boolean).join(' · '))}</small>
+      </button>`;
+  }
+
+  function _renderPlanClassroomRow(room, index) {
+    const block = _blockById(room.blockId);
+    return `
+      <button class="school-plan-object school-plan-object--room" type="button" onclick="MecFormModule.editPlanClassroom('${_escape(room.id)}')">
+        <span class="school-plan-object__type">Aula</span>
+        <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
+        <small>${_escape([block?.bloque_codigo, room.floor, room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin dimensiones'].filter(Boolean).join(' · '))}</small>
       </button>`;
   }
 
@@ -1897,7 +2046,7 @@ const MecFormModule = (() => {
 
     const rooms = _data.__classrooms || [];
     const objects = _schoolPlanObjects();
-    if (!objects.length) {
+    if (!rooms.length) {
       ctx.fillStyle = '#667085';
       ctx.font = '700 18px system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -1905,18 +2054,48 @@ const MecFormModule = (() => {
       return;
     }
 
-    rooms.forEach((room, index) => {
-      const col = index % 2;
-      const row = Math.floor(index / 2);
+    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque', largo_m: 0, ancho_m: 0 }];
+    blocks.forEach((block, blockIndex) => {
+      const col = blockIndex % 2;
+      const row = Math.floor(blockIndex / 2);
+      const x = 28 + col * 430;
+      const y = 36 + row * 250;
+      const w = 392;
+      const h = 210;
       ctx.save();
-      ctx.translate(34 + col * 420, 40 + row * 250);
-      ctx.scale(.58, .58);
-      (room.objects || []).forEach(object => _drawSketchObject(ctx, { ...object, classroomName: room.name }));
-      ctx.restore();
+      ctx.strokeStyle = '#172033';
+      ctx.lineWidth = 2;
+      ctx.fillStyle = 'rgba(226,232,240,.18)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = '#172033';
-      ctx.font = '800 14px system-ui, sans-serif';
+      ctx.font = '800 15px system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(room.name || `Aula ${index + 1}`, 34 + col * 420, 28 + row * 250);
+      ctx.fillText(`${block.bloque_codigo || 'Bloque'}${block.largo_m && block.ancho_m ? ` · ${block.largo_m} x ${block.ancho_m} m` : ''}`, x + 10, y + 20);
+
+      const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+      blockRooms.forEach((room, index) => {
+        const roomCol = index % 2;
+        const roomRow = Math.floor(index / 2);
+        const rx = x + 14 + roomCol * 185;
+        const ry = y + 36 + roomRow * 78;
+        const rw = 170;
+        const rh = 62;
+        ctx.strokeStyle = '#2b6cb0';
+        ctx.fillStyle = 'rgba(43,108,176,.08)';
+        ctx.lineWidth = 2;
+        ctx.fillRect(rx, ry, rw, rh);
+        ctx.strokeRect(rx, ry, rw, rh);
+        ctx.strokeStyle = 'rgba(43,108,176,.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(rx + 5, ry + 5, rw - 10, rh - 10);
+        ctx.fillStyle = '#173f68';
+        ctx.font = '800 12px system-ui, sans-serif';
+        ctx.fillText(room.name || `Aula ${index + 1}`, rx + 8, ry + 18);
+        ctx.font = '700 10px system-ui, sans-serif';
+        ctx.fillText([room.floor || 'PB', room.length && room.width ? `${room.length}x${room.width}m` : ''].filter(Boolean).join(' · '), rx + 8, ry + 34);
+      });
+      ctx.restore();
     });
   }
 
@@ -1935,6 +2114,11 @@ const MecFormModule = (() => {
       return;
     }
     UI.showToast('Este elemento se edita desde el croquis del aula.', 'info');
+  }
+
+  function editPlanClassroom(id) {
+    selectModule('aulas');
+    selectClassroom(id);
   }
 
   function exportJson() {
@@ -2000,6 +2184,7 @@ const MecFormModule = (() => {
     saveSketchObjectFicha,
     renderSchoolPlan,
     editPlanObject,
+    editPlanClassroom,
     generateRoomSketch,
     undoSketchObject,
     deleteSelectedSketchObject,

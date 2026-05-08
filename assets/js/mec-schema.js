@@ -135,6 +135,8 @@ const MEC_SCHEMA = {
           fields: [
             { id: 'bloque_codigo', label: 'Codigo o nombre del bloque', type: 'text', required: true, hint: 'Ej.: Bloque A, Pabellon norte, Administracion.' },
             { id: 'cantidad_plantas', label: 'Cantidad de plantas', type: 'number', required: true, min: 1, step: 1 },
+            { id: 'largo_m', label: 'Largo aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
+            { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'tipo_circulacion', label: 'Circulacion vertical principal', type: 'radio', options: ['Escalera', 'Rampa', 'Ambas', 'No aplica'] },
             { id: 'bloque_observacion', label: 'Observaciones del bloque', type: 'textarea' },
           ],
