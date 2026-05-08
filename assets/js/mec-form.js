@@ -541,8 +541,16 @@ const MecFormModule = (() => {
     };
     const createAt = event => {
       event.preventDefault();
-      if (_sketchTool === 'select') return;
       const point = pointFromEvent(event);
+      const selected = _findSketchObjectAt(point);
+      if (selected) {
+        _selectedSketchObjectId = selected.id;
+        _drawSketch(ctx, canvas);
+        _updateSketchStatus();
+        if (_hasSketchFicha(selected)) openSketchObjectFicha(selected.id);
+        return;
+      }
+      if (_sketchTool === 'select') return;
       _createSketchObjectAt(point);
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
@@ -555,6 +563,15 @@ const MecFormModule = (() => {
         Math.hypot(point.x - lastTap.point.x, point.y - lastTap.point.y) < 28;
       end(event);
       if (isDoubleTap) {
+        const selected = _findSketchObjectAt(point);
+        if (selected) {
+          _selectedSketchObjectId = selected.id;
+          _drawSketch(ctx, canvas);
+          _updateSketchStatus();
+          if (_hasSketchFicha(selected)) openSketchObjectFicha(selected.id);
+          lastTap = { time: 0, point: null };
+          return;
+        }
         _createSketchObjectAt(point);
         _drawSketch(ctx, canvas);
         _updateSketchStatus();
@@ -613,7 +630,7 @@ const MecFormModule = (() => {
     const w = Math.max(24, Math.abs(end.x - start.x));
     const h = Math.max(18, Math.abs(end.y - start.y));
     if (type === 'outlet' || type === 'photo') {
-      return { id, type, start, x: end.x, y: end.y, r: 13, ficha: {} };
+      return { id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: {} };
     }
     return { id, type, start, x, y, w, h, ficha: {} };
   }
@@ -626,7 +643,7 @@ const MecFormModule = (() => {
     if (_sketchTool === 'wall') {
       object = { id, type: 'wall', x1: point.x - 42, y1: point.y, x2: point.x + 42, y2: point.y };
     } else if (_sketchTool === 'outlet' || _sketchTool === 'photo') {
-      object = { id, type: _sketchTool, x: point.x, y: point.y, r: 13, ficha: {} };
+      object = { id, type: _sketchTool, x: point.x, y: point.y, r: _sketchPointRadius(_sketchTool), ficha: {} };
     } else {
       const size = _defaultSketchSize(_sketchTool);
       object = {
@@ -682,11 +699,12 @@ const MecFormModule = (() => {
     }
 
     if (object.type === 'outlet' || object.type === 'photo') {
+      const radius = _sketchPointRadius(object.type);
       ctx.beginPath();
-      ctx.arc(object.x, object.y, object.r || 13, 0, Math.PI * 2);
+      ctx.arc(object.x, object.y, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      _labelSketchObject(ctx, object, object.type === 'photo' ? 'Foto' : 'Toma', object.x, object.y + 30);
+      _labelSketchObject(ctx, object, object.type === 'photo' ? 'Foto' : 'TC', object.x, object.y + (object.type === 'outlet' ? 22 : 28));
       ctx.restore();
       return;
     }
@@ -711,6 +729,10 @@ const MecFormModule = (() => {
       damage: { stroke: '#c53030', fill: 'rgba(197,48,48,.18)', lineWidth: 3 },
       photo: { stroke: '#805ad5', fill: 'rgba(128,90,213,.18)', lineWidth: 3 },
     }[type] || { stroke: '#1f5d99', fill: 'rgba(31,93,153,.14)', lineWidth: 3 };
+  }
+
+  function _sketchPointRadius(type) {
+    return type === 'outlet' ? 7 : 10;
   }
 
   function _sketchLabel(type) {
@@ -827,7 +849,7 @@ const MecFormModule = (() => {
     if (object.type === 'outlet' || object.type === 'photo') {
       const dx = point.x - object.x;
       const dy = point.y - object.y;
-      return Math.sqrt(dx * dx + dy * dy) <= (object.r || 13) + 8;
+      return Math.sqrt(dx * dx + dy * dy) <= _sketchPointRadius(object.type) + 10;
     }
     return point.x >= object.x && point.x <= object.x + object.w && point.y >= object.y && point.y <= object.y + object.h;
   }
@@ -1124,6 +1146,7 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
+    renderSchoolPlan();
     closeSketchObjectFicha();
     UI.showToast('Ficha del objeto guardada.', 'success');
   }
@@ -1335,6 +1358,7 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
+    renderSchoolPlan();
     UI.showToast('Aula base generada con dimensiones aproximadas.', 'success');
   }
 
@@ -1349,6 +1373,7 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
+    renderSchoolPlan();
   }
 
   function deleteSelectedSketchObject() {
@@ -1362,6 +1387,7 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
+    renderSchoolPlan();
   }
 
   function clearSketch() {
@@ -1373,7 +1399,140 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
+    renderSchoolPlan();
     UI.showToast('Croquis limpiado.', 'success');
+  }
+
+  function renderSchoolPlan() {
+    _loadDraft();
+    const root = document.getElementById('school-plan-root');
+    if (!root) return;
+    const sketch = _data.__classroomSketch || {};
+    const objects = sketch.objects || [];
+    const metrics = _schoolPlanMetrics(sketch, objects);
+
+    root.innerHTML = `
+      <div class="school-plan">
+        <section class="school-plan__kpis">
+          ${_planKpi('Area construida relevada', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
+          ${_planKpi('Aulas cargadas', metrics.rooms, 'Ambientes dibujados')}
+          ${_planKpi('Puertas', metrics.doors, _stateSummaryText(metrics.states.door))}
+          ${_planKpi('Ventanas', metrics.windows, _stateSummaryText(metrics.states.window))}
+          ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
+          ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
+        </section>
+
+        <section class="school-plan__layout">
+          <div class="school-plan__board">
+            <canvas id="school-plan-canvas" width="900" height="560" aria-label="Plano general de la escuela"></canvas>
+          </div>
+          <aside class="school-plan__side">
+            <h3>Elementos relevados</h3>
+            <div class="school-plan__legend">
+              <span><i class="legend-room"></i>Aula</span>
+              <span><i class="legend-door"></i>Puerta</span>
+              <span><i class="legend-window"></i>Ventana</span>
+              <span><i class="legend-outlet"></i>Toma</span>
+              <span><i class="legend-damage"></i>Dano</span>
+            </div>
+            <div class="school-plan__list">
+              ${objects.length ? objects.map(_renderPlanObjectRow).join('') : '<p class="text-muted">Todavia no hay elementos cargados. Genere el aula base desde el Cuestionario MEC.</p>'}
+            </div>
+          </aside>
+        </section>
+      </div>`;
+
+    _drawSchoolPlan();
+  }
+
+  function _planKpi(label, value, note) {
+    return `
+      <article class="school-plan-kpi">
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note || '')}</small>
+      </article>`;
+  }
+
+  function _renderPlanObjectRow(object) {
+    const label = object.ficha?.codigo || _sketchLabel(object.type);
+    const state = object.ficha?.estado || 'Sin estado';
+    const dims = _sketchDimensionsText(object);
+    return `
+      <button class="school-plan-object" type="button" onclick="MecFormModule.editPlanObject('${_escape(object.id)}')">
+        <span class="school-plan-object__type">${_escape(_sketchLabel(object.type))}</span>
+        <strong>${_escape(label)}</strong>
+        <small>${_escape([state, dims].filter(Boolean).join(' · '))}</small>
+      </button>`;
+  }
+
+  function _schoolPlanMetrics(sketch, objects) {
+    const length = Number(sketch.length || 0);
+    const width = Number(sketch.width || 0);
+    const roomCount = objects.filter(object => object.type === 'room').length || (length && width ? 1 : 0);
+    const states = { door: {}, window: {}, outlet: {}, damage: {} };
+    objects.forEach(object => {
+      if (states[object.type]) {
+        const state = object.ficha?.estado || 'Sin estado';
+        states[object.type][state] = (states[object.type][state] || 0) + 1;
+      }
+    });
+    return {
+      areaTotal: length && width ? length * width : 0,
+      rooms: roomCount,
+      doors: objects.filter(object => object.type === 'door').length,
+      windows: objects.filter(object => object.type === 'window').length,
+      outlets: objects.filter(object => object.type === 'outlet').length,
+      alerts: objects.filter(object => _isPlanAlert(object)).length,
+      states,
+    };
+  }
+
+  function _isPlanAlert(object) {
+    const text = `${object.ficha?.estado || ''} ${object.ficha?.prioridad || ''}`.toLowerCase();
+    return ['malo', 'severo', 'riesgo', 'urgente', 'no funciona', 'expuesto'].some(term => text.includes(term));
+  }
+
+  function _stateSummaryText(states) {
+    const entries = Object.entries(states || {});
+    if (!entries.length) return 'Sin clasificar';
+    return entries.map(([state, count]) => `${count} ${state}`).join(', ');
+  }
+
+  function _drawSchoolPlan() {
+    const canvas = document.getElementById('school-plan-canvas');
+    if (!canvas) return;
+    _ensureSketchObjects();
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const objects = _data.__classroomSketch.objects || [];
+    if (!objects.length) {
+      ctx.fillStyle = '#667085';
+      ctx.font = '700 18px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Plano general en espera de datos cargados', canvas.width / 2, canvas.height / 2);
+      return;
+    }
+
+    ctx.save();
+    ctx.translate(44, 46);
+    ctx.scale(1.04, 1.04);
+    objects.forEach(object => _drawSketchObject(ctx, object));
+    ctx.restore();
+  }
+
+  function editPlanObject(id) {
+    _selectedSketchObjectId = id;
+    const object = _findSketchObjectById(id);
+    if (!object) return;
+    if (_hasSketchFicha(object)) {
+      openSketchObjectFicha(id);
+      return;
+    }
+    UI.showToast('Este elemento se edita desde el croquis del aula.', 'info');
   }
 
   function exportJson() {
@@ -1427,6 +1586,8 @@ const MecFormModule = (() => {
     openSketchObjectFicha,
     closeSketchObjectFicha,
     saveSketchObjectFicha,
+    renderSchoolPlan,
+    editPlanObject,
     generateRoomSketch,
     undoSketchObject,
     deleteSelectedSketchObject,

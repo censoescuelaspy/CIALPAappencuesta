@@ -251,6 +251,7 @@ const AppController = (() => {
     mapa: { label: 'Mapa', icon: '🗺️', minRole: 'encuestador' },
     encuesta: { label: 'Migrar RUE-MEC', icon: '⇄', minRole: 'encuestador' },
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
+    plano: { label: 'Plano escuela', icon: '▦', minRole: 'encuestador' },
     encuestadores: { label: 'Encuestadores', icon: '👥', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
     incidencias: { label: 'Incidencias', icon: '⚠️', minRole: 'encuestador' },
@@ -449,6 +450,9 @@ const AppController = (() => {
         break;
       case 'mec':
         MecFormModule.init();
+        break;
+      case 'plano':
+        MecFormModule.renderSchoolPlan();
         break;
       case 'incidencias':
         IncidenciasModule.loadList();
