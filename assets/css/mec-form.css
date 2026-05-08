@@ -915,6 +915,18 @@
   gap: .5rem;
 }
 
+.school-plan-group {
+  display: grid;
+  gap: .45rem;
+}
+
+.school-plan-group__children {
+  display: grid;
+  gap: .4rem;
+  padding-left: .75rem;
+  border-left: 2px solid rgba(43, 108, 176, .18);
+}
+
 .school-plan-object {
   width: 100%;
   min-height: 62px;
@@ -936,6 +948,11 @@
   border-color: #e84c22;
   background: #fff7ed;
   box-shadow: 0 0 0 2px rgba(232, 76, 34, .13);
+}
+
+.school-plan-object--child {
+  min-height: 54px;
+  background: #fbfdff;
 }
 
 .school-plan-object__type {
