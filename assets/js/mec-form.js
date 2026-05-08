@@ -452,19 +452,13 @@ const MecFormModule = (() => {
             </div>
             <label class="mec-label"><span>Aberturas / observaciones</span></label>
             <textarea class="form-control" rows="4" data-sketch-field="openings">${_escape(sketch.openings || '')}</textarea>
-            <div class="mec-sketch-toolset" aria-label="Herramientas de croquis">
-              ${SKETCH_TOOLS.map(tool => `
-                <button class="btn btn-outline btn-sm ${_sketchTool === tool.id ? 'mec-sketch-tool--active' : ''}"
-                  type="button" data-sketch-tool="${_escape(tool.id)}"
-                  onclick="MecFormModule.setSketchTool('${_escape(tool.id)}')">${_escape(tool.label)}</button>`).join('')}
-            </div>
             <div class="mec-sketch__actions">
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()">Generar aula base</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.editSelectedSketchObject()">Editar ficha</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer cambio</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
+              <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Eliminar seleccionado</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano completo</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">Exportar modelo JSON</button>
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.nextModule()">Continuar</button>
             </div>
@@ -477,6 +471,16 @@ const MecFormModule = (() => {
             </div>
             <div class="mec-sketch-canvas-wrap">
               <canvas id="mec-classroom-canvas" width="760" height="460" style="transform:scale(${_sketchZoom});" aria-label="Croquis manual del aula"></canvas>
+            </div>
+            <div class="mec-sketch-toolset" aria-label="Elementos para insertar en el croquis">
+              ${SKETCH_TOOLS.map(tool => `
+                <button class="mec-sketch-tool ${_sketchTool === tool.id ? 'mec-sketch-tool--active' : ''}"
+                  type="button" data-sketch-tool="${_escape(tool.id)}"
+                  title="${_escape(tool.label)}"
+                  onclick="MecFormModule.setSketchTool('${_escape(tool.id)}')">
+                  <span class="mec-sketch-tool__icon" aria-hidden="true">${_sketchToolIcon(tool.id)}</span>
+                  <span>${_escape(tool.label)}</span>
+                </button>`).join('')}
             </div>
             <small id="mec-sketch-status">${_escape(_sketchStatusText(sketch))}</small>
             <div class="mec-block-preview">
@@ -497,6 +501,20 @@ const MecFormModule = (() => {
 
   function _sketchToolLabel(toolId) {
     return SKETCH_TOOLS.find(tool => tool.id === toolId)?.label || toolId;
+  }
+
+  function _sketchToolIcon(toolId) {
+    return {
+      select: '&#x261D;',
+      wall: '&#x2501;',
+      door: '&#x25DC;',
+      window: '&#x25AD;',
+      stair: '&#x25EB;',
+      board: '&#x25AC;',
+      outlet: '&#x25C9;',
+      damage: '!',
+      photo: '&#x25C8;',
+    }[toolId] || '+';
   }
 
   function _ensureClassrooms() {
@@ -2480,12 +2498,16 @@ const MecFormModule = (() => {
     _restoreSketchState(_sketchRedo.pop());
   }
 
-  function deleteSelectedSketchObject() {
+  async function deleteSelectedSketchObject() {
     if (!_selectedSketchObjectId) {
       UI.showToast('Seleccione un elemento del plano para borrarlo.', 'warning');
       return;
     }
     _ensureSketchObjects();
+    const object = _findSketchObjectById(_selectedSketchObjectId);
+    const label = object ? _sketchObjectLabel(object) : 'elemento seleccionado';
+    const confirmed = await UI.showConfirm('Eliminar elemento', `¿Confirma eliminar ${_escape(label)} del croquis? Esta accion queda autoguardada.`);
+    if (!confirmed) return;
     _pushSketchHistory();
     _data.__classroomSketch.objects = _data.__classroomSketch.objects.filter(object => object.id !== _selectedSketchObjectId);
     _selectedSketchObjectId = null;
@@ -2493,9 +2515,12 @@ const MecFormModule = (() => {
     _redrawSketchCanvas();
     _updateSketchStatus();
     renderSchoolPlan();
+    UI.showToast('Elemento eliminado.', 'success');
   }
 
-  function clearSketch() {
+  async function clearSketch() {
+    const confirmed = await UI.showConfirm('Limpiar plano completo', '¿Confirma eliminar todos los elementos del croquis de esta aula? Esta accion queda autoguardada.');
+    if (!confirmed) return;
     _pushSketchHistory();
     _data.__classroomSketch = {
       ...(_data.__classroomSketch || {}),
@@ -2546,6 +2571,7 @@ const MecFormModule = (() => {
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
                 <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.printPlanPdf()">PDF</button>
+                <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
             <canvas id="school-plan-canvas" width="900" height="560" aria-label="Plano general de la escuela"></canvas>
@@ -2910,6 +2936,47 @@ const MecFormModule = (() => {
   function selectPlanItem(id) {
     _selectedPlanId = id;
     renderSchoolPlan();
+  }
+
+  async function deletePlanSelection() {
+    if (!_selectedPlanId) {
+      UI.showToast('Seleccione un aula o elemento en el plano general.', 'warning');
+      return;
+    }
+    if (String(_selectedPlanId).startsWith('room::')) {
+      const classroomId = String(_selectedPlanId).replace('room::', '');
+      const room = (_data.__classrooms || []).find(item => item.id === classroomId);
+      if (!room) return;
+      const confirmed = await UI.showConfirm('Eliminar aula', `¿Confirma eliminar ${_escape(room.name || 'esta aula')} y todos sus elementos?`);
+      if (!confirmed) return;
+      _data.__classrooms = (_data.__classrooms || []).filter(item => item.id !== classroomId);
+      if (_activeClassroomId === classroomId) {
+        _activeClassroomId = _data.__classrooms[0]?.id || null;
+        if (_activeClassroomId) _loadActiveClassroomIntoSketch();
+        else _data.__classroomSketch = { objects: [] };
+      }
+      _selectedPlanId = null;
+      _saveDraft(false);
+      renderSchoolPlan();
+      UI.showToast('Aula eliminada.', 'success');
+      return;
+    }
+    if (!String(_selectedPlanId).includes('::')) {
+      UI.showToast('Seleccione un elemento especifico para eliminar.', 'warning');
+      return;
+    }
+    const [classroomId, objectId] = String(_selectedPlanId).split('::');
+    const room = (_data.__classrooms || []).find(item => item.id === classroomId);
+    const object = (room?.objects || []).find(item => item.id === objectId);
+    if (!room || !object) return;
+    const confirmed = await UI.showConfirm('Eliminar elemento', `¿Confirma eliminar ${_escape(_sketchObjectLabel(object))} de ${_escape(room.name || 'esta aula')}?`);
+    if (!confirmed) return;
+    room.objects = (room.objects || []).filter(item => item.id !== objectId);
+    if (_activeClassroomId === classroomId) _loadActiveClassroomIntoSketch();
+    _selectedPlanId = null;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Elemento eliminado.', 'success');
   }
 
   function _bindSchoolPlanCanvas() {
@@ -3288,6 +3355,7 @@ const MecFormModule = (() => {
     editPlanObject,
     editPlanClassroom,
     selectPlanItem,
+    deletePlanSelection,
     togglePlanLayer,
     exportPlanJson,
     exportPlanSvg,
