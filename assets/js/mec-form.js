@@ -16,6 +16,8 @@ const MecFormModule = (() => {
   let _sketchZoom = 1;
   let _selectedPlanId = null;
   let _planHitAreas = [];
+  const _sketchHistory = [];
+  const _sketchRedo = [];
   const _planLayers = {
     aulas: true,
     aberturas: true,
@@ -456,7 +458,8 @@ const MecFormModule = (() => {
             <div class="mec-sketch__actions">
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()">Generar aula base</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.editSelectedSketchObject()">Editar ficha</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer cambio</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">Exportar modelo JSON</button>
@@ -903,6 +906,7 @@ const MecFormModule = (() => {
     let movingObject = null;
     let resizingObject = null;
     let moveOffset = null;
+    let mutationRecorded = false;
     let lastTap = { time: 0, point: null };
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
@@ -922,9 +926,11 @@ const MecFormModule = (() => {
       _selectedSketchObjectId = selected?.id || null;
       if (handleHit) {
         resizingObject = handleHit;
+        mutationRecorded = false;
       } else if (selected) {
         movingObject = selected;
         moveOffset = _moveOffsetForObject(selected, point);
+        mutationRecorded = false;
       }
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
@@ -933,12 +939,20 @@ const MecFormModule = (() => {
       event.preventDefault();
       const point = pointFromEvent(event);
       if (resizingObject) {
+        if (!mutationRecorded) {
+          _pushSketchHistory();
+          mutationRecorded = true;
+        }
         _resizeSketchObject(resizingObject.object, point, resizingObject.handle);
         _drawSketch(ctx, canvas);
         _updateSketchStatus();
         return;
       }
       if (movingObject) {
+        if (!mutationRecorded) {
+          _pushSketchHistory();
+          mutationRecorded = true;
+        }
         _moveSketchObject(movingObject, point, moveOffset);
         _drawSketch(ctx, canvas);
         _updateSketchStatus();
@@ -970,6 +984,7 @@ const MecFormModule = (() => {
       if (!drawing || !draftObject) return;
       drawing = false;
       _ensureSketchObjects();
+      _pushSketchHistory();
       _data.__classroomSketch.objects.push(_normalizeSketchObject(draftObject));
       _selectedSketchObjectId = draftObject.id;
       const createdId = draftObject.id;
@@ -993,6 +1008,7 @@ const MecFormModule = (() => {
         return;
       }
       if (_sketchTool === 'select') return;
+      _pushSketchHistory();
       _createSketchObjectAt(point);
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
@@ -1061,6 +1077,28 @@ const MecFormModule = (() => {
   function _ensureSketchObjects() {
     _data.__classroomSketch = _data.__classroomSketch || {};
     _data.__classroomSketch.objects = _data.__classroomSketch.objects || [];
+  }
+
+  function _cloneSketchState() {
+    return JSON.parse(JSON.stringify(_data.__classroomSketch || { objects: [] }));
+  }
+
+  function _pushSketchHistory() {
+    _ensureSketchObjects();
+    _sketchHistory.push(_cloneSketchState());
+    if (_sketchHistory.length > 40) _sketchHistory.shift();
+    _sketchRedo.length = 0;
+  }
+
+  function _restoreSketchState(snapshot) {
+    if (!snapshot) return;
+    _data.__classroomSketch = JSON.parse(JSON.stringify(snapshot));
+    _selectedSketchObjectId = null;
+    _syncActiveClassroomFromSketch();
+    _saveDraft(false);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
+    renderSchoolPlan();
   }
 
   function _newSketchObject(type, start, end, existingId = null) {
@@ -2106,6 +2144,7 @@ const MecFormModule = (() => {
 
   function generateRoomSketch() {
     _ensureSketchObjects();
+    _pushSketchHistory();
     const block = _activeClassroomBlock();
     const blockLength = Number(block?.largo_m || 0);
     const blockWidth = Number(block?.ancho_m || 0);
@@ -2150,17 +2189,21 @@ const MecFormModule = (() => {
   }
 
   function undoSketchObject() {
-    _ensureSketchObjects();
-    const removed = _data.__classroomSketch.objects.pop();
-    if (!removed) {
-      UI.showToast('No hay elementos para deshacer.', 'info');
+    if (!_sketchHistory.length) {
+      UI.showToast('No hay cambios para deshacer.', 'info');
       return;
     }
-    if (_selectedSketchObjectId === removed.id) _selectedSketchObjectId = null;
-    _saveDraft(false);
-    _redrawSketchCanvas();
-    _updateSketchStatus();
-    renderSchoolPlan();
+    _sketchRedo.push(_cloneSketchState());
+    _restoreSketchState(_sketchHistory.pop());
+  }
+
+  function redoSketchObject() {
+    if (!_sketchRedo.length) {
+      UI.showToast('No hay cambios para rehacer.', 'info');
+      return;
+    }
+    _sketchHistory.push(_cloneSketchState());
+    _restoreSketchState(_sketchRedo.pop());
   }
 
   function deleteSelectedSketchObject() {
@@ -2169,6 +2212,7 @@ const MecFormModule = (() => {
       return;
     }
     _ensureSketchObjects();
+    _pushSketchHistory();
     _data.__classroomSketch.objects = _data.__classroomSketch.objects.filter(object => object.id !== _selectedSketchObjectId);
     _selectedSketchObjectId = null;
     _saveDraft(false);
@@ -2178,6 +2222,7 @@ const MecFormModule = (() => {
   }
 
   function clearSketch() {
+    _pushSketchHistory();
     _data.__classroomSketch = {
       ...(_data.__classroomSketch || {}),
       objects: [],
@@ -2499,6 +2544,37 @@ const MecFormModule = (() => {
         ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
         ctx.fill();
       });
+    if (_planLayers.danos) {
+      (room.objects || []).filter(object => object.type === 'damage').forEach(object => {
+        const ox = x + (object.x - roomObject.x) * sx;
+        const oy = y + (object.y - roomObject.y) * sy;
+        _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 6, y: oy - 6, w: 18, h: 18 });
+        ctx.strokeStyle = '#c53030';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(ox + 10, oy + 10);
+        ctx.moveTo(ox + 10, oy);
+        ctx.lineTo(ox, oy + 10);
+        ctx.stroke();
+      });
+    }
+    (room.objects || []).filter(object => object.type === 'stair').forEach(object => {
+      const ox = x + (object.x - roomObject.x) * sx;
+      const oy = y + (object.y - roomObject.y) * sy;
+      const ow = Math.max(18, object.w * sx);
+      const oh = Math.max(12, object.h * sy);
+      _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+      ctx.strokeStyle = '#4a5568';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(ox, oy, ow, oh);
+      for (let i = 1; i < 5; i += 1) {
+        ctx.beginPath();
+        ctx.moveTo(ox + (ow / 5) * i, oy);
+        ctx.lineTo(ox + (ow / 5) * i, oy + oh);
+        ctx.stroke();
+      }
+    });
   }
 
   function editPlanObject(planId) {
@@ -2574,6 +2650,7 @@ const MecFormModule = (() => {
                 width_m: Number(room.width || 0),
                 area_m2: Number(room.length || 0) * Number(room.width || 0),
               },
+              geometryGraph: _geometryGraphForRoom(room),
               openings: room.openings || '',
               objects: (room.objects || []).map(object => ({
                 id: object.id,
@@ -2594,6 +2671,69 @@ const MecFormModule = (() => {
       sanitaries: _data.__sanitaries || [],
       evidenceIndex: _buildEvidenceIndex(),
     };
+  }
+
+  function _geometryGraphForRoom(room) {
+    const roomObject = (room.objects || []).find(item => item.type === 'room');
+    const length = Number(room.length || 0);
+    const width = Number(room.width || 0);
+    if (!roomObject || !length || !width) {
+      return { corners: [], walls: [], openings: [] };
+    }
+    const corners = [
+      { id: 'c1', label: 'C1', x_m: 0, y_m: 0 },
+      { id: 'c2', label: 'C2', x_m: length, y_m: 0 },
+      { id: 'c3', label: 'C3', x_m: length, y_m: width },
+      { id: 'c4', label: 'C4', x_m: 0, y_m: width },
+    ];
+    const walls = [
+      { id: 'w_top', label: 'Pared norte', side: 'top', from: 'c1', to: 'c2', length_m: length },
+      { id: 'w_right', label: 'Pared este', side: 'right', from: 'c2', to: 'c3', length_m: width },
+      { id: 'w_bottom', label: 'Pared sur', side: 'bottom', from: 'c4', to: 'c3', length_m: length },
+      { id: 'w_left', label: 'Pared oeste', side: 'left', from: 'c1', to: 'c4', length_m: width },
+    ];
+    const openings = (room.objects || [])
+      .filter(object => ['door', 'window'].includes(object.type))
+      .map(object => {
+        const side = object.attached?.side || _nearestRoomSide(roomObject, object);
+        return {
+          id: object.id,
+          type: object.type,
+          wallSide: side,
+          wallId: `w_${side}`,
+          offset_m: _openingOffsetMeters(room, object, side),
+          length_m: _openingLengthMeters(room, object, side),
+          ficha: object.ficha || {},
+        };
+      });
+    return { corners, walls, openings };
+  }
+
+  function _nearestRoomSide(roomObject, object) {
+    const distances = [
+      { side: 'top', value: Math.abs(object.y - roomObject.y) },
+      { side: 'bottom', value: Math.abs((object.y + object.h) - (roomObject.y + roomObject.h)) },
+      { side: 'left', value: Math.abs(object.x - roomObject.x) },
+      { side: 'right', value: Math.abs((object.x + object.w) - (roomObject.x + roomObject.w)) },
+    ].sort((a, b) => a.value - b.value);
+    return distances[0]?.side || 'top';
+  }
+
+  function _openingOffsetMeters(room, object, side) {
+    const roomObject = (room.objects || []).find(item => item.type === 'room');
+    if (!roomObject) return 0;
+    const scaleX = Number(room.length || 0) / roomObject.w || 0;
+    const scaleY = Number(room.width || 0) / roomObject.h || 0;
+    if (side === 'left' || side === 'right') return Math.max(0, (object.y - roomObject.y) * scaleY);
+    return Math.max(0, (object.x - roomObject.x) * scaleX);
+  }
+
+  function _openingLengthMeters(room, object, side) {
+    const roomObject = (room.objects || []).find(item => item.type === 'room');
+    if (!roomObject) return 0;
+    const scaleX = Number(room.length || 0) / roomObject.w || 0;
+    const scaleY = Number(room.width || 0) / roomObject.h || 0;
+    return (side === 'left' || side === 'right') ? object.h * scaleY : object.w * scaleX;
   }
 
   function _objectGeometryForExport(room, object) {
@@ -2767,6 +2907,7 @@ const MecFormModule = (() => {
     setSketchZoom,
     generateRoomSketch,
     undoSketchObject,
+    redoSketchObject,
     deleteSelectedSketchObject,
     clearSketch,
   };
