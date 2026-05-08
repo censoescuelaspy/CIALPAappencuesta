@@ -61,6 +61,8 @@ const MecFormModule = (() => {
       values: _data,
     }));
     if (showToast) UI.showToast('Borrador MEC guardado en este dispositivo.', 'success');
+    const state = document.getElementById('mec-save-state');
+    if (state) state.textContent = _formatSavedAt(new Date().toISOString());
   }
 
   function _setValue(moduleId, fieldId, value) {
@@ -143,7 +145,7 @@ const MecFormModule = (() => {
           </nav>
           <div class="mec-rail__actions">
             <button class="btn btn-primary btn-sm" onclick="MecFormModule.validate()">Validar etapa</button>
-            <button class="btn btn-outline btn-sm" onclick="MecFormModule.saveNow()">Guardar</button>
+            <span class="mec-autosave-pill">Autoguardado siempre activo</span>
           </div>
           <div id="mec-validation-summary" class="mec-validation-summary"></div>
         </aside>
@@ -224,11 +226,11 @@ const MecFormModule = (() => {
       <section class="mec-section">
         <div class="mec-section__header">
           <h4>Bloques registrados</h4>
-          <p class="mec-hint">Guarde cada bloque como registro separado para poder volver, corregirlo o asociar aulas y sanitarios.</p>
+          <p class="mec-hint">Cada cambio se guarda automaticamente. Puede cambiar de bloque, volver y seguir editando sin usar botones de guardado.</p>
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newBlock()">+ Nuevo bloque</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.saveCurrentBlock()">Guardar bloque actual</button>
+          <span class="mec-autosave-pill">Autoguardado</span>
         </div>
         <div class="mec-repeat-list">
           ${(_data.__blocks || []).map(block => `
@@ -415,14 +417,15 @@ const MecFormModule = (() => {
       <section class="mec-section mec-sketch">
         <div class="mec-section__header">
           <h4>Aulas y croquis dimensionales</h4>
-          <p class="mec-hint">Cada aula queda guardada como registro independiente. Puede volver, seleccionar un aula cargada y editar su plano o sus elementos.</p>
+          <p class="mec-hint">Cada aula queda guardada automaticamente como registro independiente. Al elegir un bloque puede ver y navegar sus aulas asociadas.</p>
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
-          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.saveCurrentClassroom()">Guardar aula actual</button>
+          <span class="mec-autosave-pill">Autoguardado</span>
         </div>
+        ${_renderClassroomBlockNavigator()}
         <div class="mec-repeat-list">
-          ${classrooms.map((room, index) => `
+          ${_orderedClassroomsForNavigator(classrooms).map((room, index) => `
             <button class="mec-repeat-item ${room.id === _activeClassroomId ? 'mec-repeat-item--active' : ''}" type="button"
               onclick="MecFormModule.selectClassroom('${_escape(room.id)}')">
               <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
@@ -463,7 +466,7 @@ const MecFormModule = (() => {
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Borrar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">Exportar modelo JSON</button>
-              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.saveSketchAndNext()">Guardar y continuar</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.nextModule()">Continuar</button>
             </div>
           </div>
           <div class="mec-sketch__board">
@@ -498,6 +501,7 @@ const MecFormModule = (() => {
 
   function _ensureClassrooms() {
     _data.__classrooms = _data.__classrooms || [];
+    _ensureBlocks();
     if (!_data.__classrooms.length) {
       _data.__classroomSketch = _data.__classroomSketch || { name: 'Aula 1', objects: [] };
       _activeClassroomId = _activeClassroomId || _data.__classroomSketch.id || `aula_${Date.now()}`;
@@ -509,6 +513,34 @@ const MecFormModule = (() => {
       _activeClassroomId = _data.__classrooms[0].id;
       _loadActiveClassroomIntoSketch();
     }
+  }
+
+  function _renderClassroomBlockNavigator() {
+    _ensureBlocks();
+    const blocks = _data.__blocks || [];
+    if (!blocks.length) return '';
+    return `
+      <div class="mec-block-tabs" aria-label="Navegacion de bloques para aulas">
+        ${blocks.map(block => {
+          const count = (_data.__classrooms || []).filter(room => room.blockId === block.id).length;
+          return `
+            <button class="mec-block-tab ${block.id === _data.__activeBlockId ? 'mec-block-tab--active' : ''}" type="button"
+              onclick="MecFormModule.selectBlockForClassrooms('${_escape(block.id)}')">
+              <strong>${_escape(block.bloque_codigo || 'Bloque sin nombre')}</strong>
+              <span>${count} aula(s)</span>
+            </button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function _orderedClassroomsForNavigator(classrooms) {
+    const activeBlockId = _data.__activeBlockId || '';
+    return [...(classrooms || [])].sort((a, b) => {
+      const aActive = a.blockId === activeBlockId ? 0 : 1;
+      const bActive = b.blockId === activeBlockId ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'es');
+    });
   }
 
   function _cloneClassroom(sketch) {
@@ -558,6 +590,14 @@ const MecFormModule = (() => {
     _syncActiveClassroomFromSketch();
     _activeClassroomId = id;
     _loadActiveClassroomIntoSketch();
+    if (_data.__classroomSketch?.blockId) {
+      _data.__activeBlockId = _data.__classroomSketch.blockId;
+      const block = _blockById(_data.__activeBlockId);
+      if (block) {
+        const { id: _id, ...values } = block;
+        _data.bloques = values;
+      }
+    }
     _selectedSketchObjectId = null;
     _saveDraft(false);
     _render();
@@ -650,6 +690,22 @@ const MecFormModule = (() => {
     _data.__activeBlockId = id;
     const { id: _id, ...values } = block;
     _data.bloques = values;
+    _saveDraft(false);
+    _render();
+  }
+
+  function selectBlockForClassrooms(id) {
+    _syncActiveClassroomFromSketch();
+    selectBlock(id);
+    const room = (_data.__classrooms || []).find(item => item.blockId === id);
+    if (!room) {
+      _selectedSketchObjectId = null;
+      UI.showToast('Bloque seleccionado. Pulse + Nueva aula para cargar su primera aula.', 'info');
+      return;
+    }
+    _activeClassroomId = room.id;
+    _loadActiveClassroomIntoSketch();
+    _selectedSketchObjectId = null;
     _saveDraft(false);
     _render();
   }
@@ -892,12 +948,24 @@ const MecFormModule = (() => {
     if (!canvas) return;
 
     root.querySelectorAll('[data-sketch-field]').forEach(input => {
-      input.addEventListener('input', () => {
+      const persist = () => {
         _data.__classroomSketch = _data.__classroomSketch || {};
         _data.__classroomSketch[input.dataset.sketchField] = input.value;
         _syncActiveClassroomFromSketch();
         _saveDraft(false);
-      });
+        if (input.dataset.sketchField === 'blockId') {
+          _data.__activeBlockId = input.value;
+          const block = _blockById(input.value);
+          if (block) {
+            const { id: _id, ...values } = block;
+            _data.bloques = values;
+          }
+        }
+        _updateSketchStatus();
+        renderSchoolPlan();
+      };
+      input.addEventListener('input', persist);
+      input.addEventListener('change', persist);
     });
 
     const ctx = canvas.getContext('2d');
@@ -2113,7 +2181,13 @@ const MecFormModule = (() => {
         if (!group || !input) return;
         input.value = button.dataset.choiceValue || '';
         group.querySelectorAll('.mec-choice').forEach(item => item.classList.toggle('mec-choice--active', item === button));
+        _persistSketchObjectFichaFromForm(false);
       });
+    });
+    modal.querySelectorAll('#form-sketch-object-ficha input, #form-sketch-object-ficha textarea').forEach(input => {
+      if (input.type === 'hidden' || input.type === 'file') return;
+      input.addEventListener('input', () => _persistSketchObjectFichaFromForm(false));
+      input.addEventListener('change', () => _persistSketchObjectFichaFromForm(false));
     });
     const input = modal.querySelector('#sketch-object-photo');
     input.addEventListener('change', async () => {
@@ -2133,11 +2207,16 @@ const MecFormModule = (() => {
   }
 
   function saveSketchObjectFicha() {
+    _persistSketchObjectFichaFromForm(true);
+    closeSketchObjectFicha();
+  }
+
+  function _persistSketchObjectFichaFromForm(showToast = false) {
     const form = document.getElementById('form-sketch-object-ficha');
-    if (!form) return;
+    if (!form) return false;
     const data = new FormData(form);
     const object = _findSketchObjectById(data.get('object_id'));
-    if (!object) return;
+    if (!object) return false;
     object.ficha = object.ficha || {};
     ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'seguridad', 'pasamanos', 'prioridad', 'observacion']
       .forEach(key => {
@@ -2148,8 +2227,8 @@ const MecFormModule = (() => {
     _redrawSketchCanvas();
     _updateSketchStatus();
     renderSchoolPlan();
-    closeSketchObjectFicha();
-    UI.showToast('Ficha del objeto guardada.', 'success');
+    if (showToast) UI.showToast('Ficha del objeto guardada.', 'success');
+    return true;
   }
 
   function _refreshDynamicState() {
@@ -2277,6 +2356,9 @@ const MecFormModule = (() => {
   function selectModule(moduleId) {
     const module = MEC_SCHEMA.modules.find(item => item.id === moduleId);
     if (!module || module.status === 'planned') return;
+    _syncActiveBlock();
+    if (_data.__classroomSketch && _data.__classrooms) _syncActiveClassroomFromSketch();
+    _saveDraft(false);
     _activeModuleId = moduleId;
     _refreshDynamicState();
     document.getElementById('mec-form-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -2301,12 +2383,13 @@ const MecFormModule = (() => {
   }
 
   function saveNow() {
-    _saveDraft(true);
+    _saveDraft(false);
     _updateProgress();
+    UI.showToast('Autoguardado activo: los cambios ya se guardan solos.', 'info');
   }
 
   function saveSketchAndNext() {
-    _saveDraft(true);
+    _saveDraft(false);
     _updateProgress();
     nextModule();
   }
@@ -3187,6 +3270,7 @@ const MecFormModule = (() => {
     toggleModule,
     setSketchTool,
     selectBlock,
+    selectBlockForClassrooms,
     newBlock,
     saveCurrentBlock,
     selectClassroom,

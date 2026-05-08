@@ -155,9 +155,23 @@
 
 .mec-rail__actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: .5rem;
   margin-bottom: .8rem;
+}
+
+.mec-autosave-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: .35rem .65rem;
+  border: 1px solid rgba(40, 167, 69, .24);
+  border-radius: 999px;
+  background: rgba(40, 167, 69, .09);
+  color: #146c2e;
+  font-size: .78rem;
+  font-weight: 900;
 }
 
 .mec-validation-summary {
@@ -700,6 +714,45 @@
   grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
   gap: .55rem;
   margin-bottom: .9rem;
+}
+
+.mec-block-tabs {
+  display: flex;
+  gap: .5rem;
+  overflow-x: auto;
+  padding: .15rem .05rem .65rem;
+  margin-bottom: .65rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mec-block-tab {
+  flex: 0 0 auto;
+  min-width: 132px;
+  padding: .55rem .7rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-block-tab--active {
+  border-color: #e84c22;
+  background: #fff7ed;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .12);
+}
+
+.mec-block-tab strong,
+.mec-block-tab span {
+  display: block;
+}
+
+.mec-block-tab span {
+  margin-top: .15rem;
+  color: #667085;
+  font-size: .76rem;
+  font-weight: 800;
 }
 
 .mec-repeat-item {
