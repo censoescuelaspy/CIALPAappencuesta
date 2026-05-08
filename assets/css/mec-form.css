@@ -1033,6 +1033,7 @@
 .legend-window { background: #2b6cb0; }
 .legend-outlet { background: #b7791f; }
 .legend-damage { background: #c53030; }
+.legend-sanitary { background: #805ad5; }
 
 .school-plan__list {
   display: grid;
