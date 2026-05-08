@@ -278,13 +278,51 @@ const MecFormModule = (() => {
     return `
       <div class="mec-field" data-module="${_escape(moduleId)}" data-field="${_escape(field.id)}">
         <label class="mec-label">
-          <span>${_escape(field.label)} ${field.required ? '<span class="mec-required">*</span>' : ''}</span>
+          <span>
+            ${_escape(field.label)} ${field.required ? '<span class="mec-required">*</span>' : ''}
+            <button class="mec-info-btn" type="button" title="Ver ayuda"
+              onclick="MecFormModule.showFieldInfo('${_escape(moduleId)}', '${_escape(field.id)}')">i</button>
+          </span>
           ${optional}
         </label>
         ${controlHtml}
         ${evidence}
         <div class="mec-error" data-error-for="${_escape(moduleId)}.${_escape(field.id)}"></div>
       </div>`;
+  }
+
+  function showFieldInfo(moduleId, fieldId) {
+    const field = _findSchemaField(moduleId, fieldId);
+    if (!field) return;
+    const html = `
+      <div class="mec-help-modal">
+        <p>${_escape(_fieldHelpText(field))}</p>
+        ${field.options ? `<p><strong>Opciones:</strong> ${field.options.map(_escape).join(', ')}</p>` : ''}
+        ${field.hint ? `<p><strong>Nota:</strong> ${_escape(field.hint)}</p>` : ''}
+        ${field.evidence ? `<p><strong>Evidencia:</strong> ${_escape(field.evidenceLabel || 'Se recomienda asociar foto.')}</p>` : ''}
+        ${field.required ? '<p><strong>Campo obligatorio.</strong></p>' : '<p>Campo opcional, registre el dato si puede verificarlo.</p>'}
+      </div>`;
+    UI.showAlert(field.label, html, 'info');
+  }
+
+  function _findSchemaField(moduleId, fieldId) {
+    const module = MEC_SCHEMA.modules.find(item => item.id === moduleId);
+    if (!module) return null;
+    for (const section of module.sections || []) {
+      const found = (section.fields || []).find(field => field.id === fieldId);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function _fieldHelpText(field) {
+    if (field.help) return field.help;
+    if (field.hint) return field.hint;
+    if (field.type === 'radio' || field.type === 'select') return 'Seleccione la opcion que mejor describa la condicion observada en campo. Si no puede verificar, use la opcion mas prudente o registre observacion.';
+    if (field.type === 'checkbox') return 'Marque todas las opciones presentes. Si ninguna aplica, deje sin marcar y agregue observacion si corresponde.';
+    if (field.type === 'number') return 'Registre solo numeros verificados. Use unidades indicadas por el formulario y evite estimaciones si no puede sustentarlas.';
+    if (field.type === 'textarea') return 'Use este espacio para aclaraciones breves, incidencias, referencias visibles o cualquier dato que ayude a revisar la respuesta.';
+    return 'Complete el dato tal como fue verificado en el local. Si hay duda, registre una observacion o evidencia.';
   }
 
   function _renderEvidenceControl(moduleId, field) {
@@ -932,6 +970,17 @@ const MecFormModule = (() => {
     return options.map(option => `<option value="${_escape(option)}" ${selected === option ? 'selected' : ''}>${_escape(option)}</option>`).join('');
   }
 
+  function _choiceButtons(name, options, selected) {
+    return `
+      <input type="hidden" name="${_escape(name)}" value="${_escape(selected || '')}">
+      <div class="mec-choice-buttons" data-choice-name="${_escape(name)}">
+        ${options.map(option => `
+          <button class="mec-choice ${selected === option ? 'mec-choice--active' : ''}" type="button" data-choice-value="${_escape(option)}">
+            ${_escape(option)}
+          </button>`).join('')}
+      </div>`;
+  }
+
   function openSketchObjectFicha(id) {
     const object = _findSketchObjectById(id || _selectedSketchObjectId);
     if (!object || !_hasSketchFicha(object)) {
@@ -969,24 +1018,15 @@ const MecFormModule = (() => {
               </div>
               <div class="form-group">
                 <label>Tipo</label>
-                <select class="form-control" name="subtipo">
-                  <option value="">Seleccione...</option>
-                  ${_optionTags(cfg.typeOptions, object.ficha.subtipo || '')}
-                </select>
+                ${_choiceButtons('subtipo', cfg.typeOptions, object.ficha.subtipo || '')}
               </div>
               <div class="form-group">
                 <label>Estado</label>
-                <select class="form-control" name="estado">
-                  <option value="">Seleccione...</option>
-                  ${_optionTags(cfg.estados, object.ficha.estado || '')}
-                </select>
+                ${_choiceButtons('estado', cfg.estados, object.ficha.estado || '')}
               </div>
               <div class="form-group">
                 <label>Material</label>
-                <select class="form-control" name="material">
-                  <option value="">Seleccione...</option>
-                  ${_optionTags(cfg.materiales, object.ficha.material || '')}
-                </select>
+                ${_choiceButtons('material', cfg.materiales, object.ficha.material || '')}
               </div>
               <div class="form-group">
                 <label>${primaryMeasureLabel}</label>
@@ -1005,10 +1045,7 @@ const MecFormModule = (() => {
               ${cfg.extra.map(field => `
                 <div class="form-group">
                   <label>${_escape(field.label)}</label>
-                  <select class="form-control" name="${_escape(field.key)}">
-                    <option value="">Seleccione...</option>
-                    ${_optionTags(field.options, object.ficha[field.key] || '')}
-                  </select>
+                  ${_choiceButtons(field.key, field.options, object.ficha[field.key] || '')}
                 </div>`).join('')}
             </div>
             <div class="form-group">
@@ -1028,6 +1065,15 @@ const MecFormModule = (() => {
         </div>
       </div>`;
     document.body.appendChild(modal);
+    modal.querySelectorAll('.mec-choice').forEach(button => {
+      button.addEventListener('click', () => {
+        const group = button.closest('.mec-choice-buttons');
+        const input = group?.previousElementSibling;
+        if (!group || !input) return;
+        input.value = button.dataset.choiceValue || '';
+        group.querySelectorAll('.mec-choice').forEach(item => item.classList.toggle('mec-choice--active', item === button));
+      });
+    });
     const input = modal.querySelector('#sketch-object-photo');
     input.addEventListener('change', async () => {
       object.ficha.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file)));
@@ -1348,6 +1394,7 @@ const MecFormModule = (() => {
 
   return {
     init,
+    showFieldInfo,
     selectModule,
     nextModule,
     previousModule,

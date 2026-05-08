@@ -328,6 +328,29 @@
   font-weight: 800;
 }
 
+.mec-info-btn {
+  width: 20px;
+  height: 20px;
+  margin-left: .35rem;
+  border: 1px solid #b8c6d8;
+  border-radius: 50%;
+  background: #fff;
+  color: #245a95;
+  font-size: .76rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mec-info-btn:hover {
+  border-color: #2b6cb0;
+  background: #eaf4ff;
+}
+
+.mec-help-modal p + p {
+  margin-top: .7rem;
+}
+
 .mec-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
@@ -515,6 +538,36 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: .75rem;
+}
+
+.mec-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.mec-choice {
+  min-height: 38px;
+  padding: .45rem .65rem;
+  border: 1px solid #d8e0ea;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #27364a;
+  font-size: .84rem;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.mec-choice:hover {
+  border-color: #8fb0d3;
+  background: #f7fbff;
+}
+
+.mec-choice--active {
+  border-color: #2b6cb0;
+  background: #eaf4ff;
+  color: #173f68;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, .1);
 }
 
 .mec-object-evidence {
