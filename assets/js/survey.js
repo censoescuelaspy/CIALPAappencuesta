@@ -221,7 +221,7 @@ const SurveyModule = (() => {
 
   async function openExternalSurveyApp() {
     if (!_currentSession) {
-      UI.showToast('Debe iniciar una sesión antes de abrir el aplicativo externo.', 'warning');
+      UI.showToast('Debe iniciar una sesión antes de preparar la migración.', 'warning');
       return;
     }
 
@@ -232,32 +232,14 @@ const SurveyModule = (() => {
       await API.registrarEventoSesion({
         id_sesion: _currentSession.id_sesion,
         id_escuela: _currentEscuela?.id_escuela || '',
-        tipo_evento: 'APERTURA_APP_EXTERNA',
-        detalle: `Modo: ${config.mode}; URL: ${targetUrl}`,
+        tipo_evento: 'MIGRACION_RUE_MEC_PREPARADA',
+        detalle: `Migracion en desarrollo; destino previsto: ${targetUrl}`,
       });
     } catch {
       // No bloqueante para trabajo de campo.
     }
 
-    if (config.mode === 'web' || /^https?:\/\//i.test(targetUrl)) {
-      _formWindow = window.open(targetUrl, 'cialpa_form_externo', 'width=1200,height=800,resizable=yes,scrollbars=yes');
-      _monitorExternalWindow();
-      return;
-    }
-
-    const startedAt = Date.now();
-    window.location.href = targetUrl;
-
-    if (config.webUrl && config.fallbackSeconds > 0) {
-      setTimeout(() => {
-        const elapsed = Date.now() - startedAt;
-        if (elapsed < (config.fallbackSeconds * 1000 + 900)) {
-          UI.showToast('Si el aplicativo externo no se abrió, use el acceso web de respaldo.', 'warning', 6000);
-          _formWindow = window.open(config.webUrl, 'cialpa_form_externo', 'width=1200,height=800,resizable=yes,scrollbars=yes');
-          _monitorExternalWindow();
-        }
-      }, config.fallbackSeconds * 1000);
-    }
+    UI.showToast('Migración al RUE-MEC en desarrollo. Por ahora se prepara el paquete de datos CIALPA y se conserva el registro local.', 'info', 7000);
   }
 
   function _monitorExternalWindow() {
@@ -346,7 +328,7 @@ const SurveyModule = (() => {
 
     const confirmed = await UI.showConfirm(
       withIncident ? 'Cerrar con incidencia' : 'Cerrar relevamiento',
-      withIncident ? '¿Desea cerrar la sesión y registrar una incidencia operativa?' : '¿Confirma que terminó el relevamiento en el aplicativo externo?'
+      withIncident ? '¿Desea cerrar la sesión y registrar una incidencia operativa?' : '¿Confirma que terminó la carga CIALPA y queda lista para migración?'
     );
     if (!confirmed) return;
 
@@ -359,8 +341,8 @@ const SurveyModule = (() => {
       observacion = await UI.showPrompt('Descripción de la incidencia:');
       if (observacion === null) return;
     } else {
-      folio = await UI.showPrompt('Folio, ID de envío o identificador externo del cuestionario (recomendado):') || '';
-      ultimoRegistro = await UI.showPrompt('Último registro, módulo o espacio físico cargado en la app externa (recomendado):') || '';
+      folio = await UI.showPrompt('ID de paquete CIALPA o identificador de migración (opcional):') || '';
+      ultimoRegistro = await UI.showPrompt('Último módulo o espacio físico cargado en CIALPA (recomendado):') || '';
       observacion = await UI.showPrompt('Observaciones de cierre (opcional):') || '';
       const partial = await UI.showConfirm('Calidad del cierre', '¿El relevamiento quedó completo en todos los módulos esperados?');
       estado = partial ? 'finalizada' : 'parcial';
@@ -412,7 +394,7 @@ const SurveyModule = (() => {
         <div class="module-tracker__header">
           <div>
             <h4>Control de módulos del relevamiento</h4>
-            <p>Use este control para medir tiempos parciales mientras trabaja en el aplicativo externo.</p>
+            <p>Use este control para medir tiempos parciales mientras carga el cuestionario CIALPA y prepara la migración al RUE-MEC.</p>
           </div>
           <button class="btn btn-outline btn-sm" onclick="SurveyModule.refreshModuleLogs()">Actualizar</button>
         </div>
@@ -464,7 +446,7 @@ const SurveyModule = (() => {
           <span class="survey-timer__label">Tiempo operativo transcurrido</span>
           <span class="survey-timer__display" id="survey-timer">${_formatDuration(_elapsedSeconds)}</span>
         </div>
-        <p class="survey-note">El tiempo se mide en esta app. El aplicativo externo no informa automáticamente su cierre interno, salvo que tenga integración por deep link, API o exportación.</p>
+        <p class="survey-note">El tiempo se mide en CIALPA. La migración al RUE-MEC queda preparada como paquete de datos y se habilitará cuando el canal de importación esté definido.</p>
       </div>` : '';
 
     const actions = (() => {
@@ -472,13 +454,13 @@ const SurveyModule = (() => {
         case STATE.IDLE:
           return `
             <div class="survey-actions">
-              <button class="btn btn-primary btn-lg" onclick="SurveyModule.startSurvey()">Iniciar relevamiento y abrir app externa</button>
+              <button class="btn btn-primary btn-lg" onclick="SurveyModule.startSurvey()">Preparar migración RUE-MEC</button>
               <button class="btn btn-outline" onclick="SurveyModule.clearSelection()">Cambiar escuela</button>
             </div>`;
         case STATE.IN_PROGRESS:
           return `
             <div class="survey-actions survey-actions--stacked">
-              <button class="btn btn-outline" onclick="SurveyModule.openExternalSurveyApp()">Abrir nuevamente la app de encuesta</button>
+              <button class="btn btn-outline" onclick="SurveyModule.openExternalSurveyApp()">Revisar paquete de migración</button>
               <button class="btn btn-success btn-lg" onclick="SurveyModule.endSurvey(false)">Cerrar relevamiento</button>
               <button class="btn btn-danger" onclick="SurveyModule.endSurvey(true)">Cerrar con incidencia</button>
             </div>`;

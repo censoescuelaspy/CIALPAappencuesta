@@ -11,6 +11,9 @@ const API = (() => {
 
   const _DEMO_USERS = [
     { usuario: 'admin', password: 'admin123', nombres: 'Admin', apellidos: 'Sistema', rol: 'admin', id_usuario: 'u_admin' },
+    { usuario: 'diego.meza', password: 'admin123', nombres: 'Diego', apellidos: 'Meza', rol: 'admin', id_usuario: 'u_diego' },
+    { usuario: 'noelia.mendoza', password: 'admin123', nombres: 'Noelia', apellidos: 'Mendoza', rol: 'admin', id_usuario: 'u_noelia' },
+    { usuario: 'latiffi.chelala', password: 'admin123', nombres: 'Latiffi', apellidos: 'Chelala', rol: 'admin', id_usuario: 'u_latiffi' },
     { usuario: 'encuestador', password: 'enc123', nombres: 'Juan', apellidos: 'Pérez', rol: 'encuestador', id_usuario: 'u_enc1' },
     { usuario: 'supervisor', password: 'sup123', nombres: 'María', apellidos: 'González', rol: 'supervisor', id_usuario: 'u_sup1' },
   ];
@@ -130,7 +133,7 @@ const API = (() => {
       case 'saveIncidencia': return { status: 'ok', data: { id_incidencia: 'INC_DEMO_' + Date.now() } };
       case 'getIncidencias': return { status: 'ok', data: [] };
       case 'resolverIncidencia': return { status: 'ok' };
-      case 'getConfig': return { status: 'ok', data: _DEMO_CONFIG };
+      case 'getConfig': return { status: 'ok', data: Object.entries(_DEMO_CONFIG).map(([clave, valor]) => ({ clave, valor, descripcion: 'Parametro demo', editable: 'true' })) };
       case 'setConfig': _DEMO_CONFIG[data.clave] = data.valor; return { status: 'ok' };
       case 'getCatalogos': return { status: 'ok', data: [] };
       case 'getAuditoria': return { status: 'ok', data: [] };

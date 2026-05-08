@@ -62,7 +62,15 @@ const AdminModule = (() => {
     const container = document.getElementById('admin-config-list');
     if (!container) return;
 
-    const editableConfigs = configs.filter(c => c.editable === 'true' || c.editable === true);
+    const rows = Array.isArray(configs)
+      ? configs
+      : Object.entries(configs || {}).map(([clave, valor]) => ({ clave, valor, descripcion: '', editable: true }));
+    const editableConfigs = rows.filter(c => c.editable === 'true' || c.editable === true);
+
+    if (!editableConfigs.length) {
+      container.innerHTML = '<p class="text-muted text-center" style="padding:2rem;">No hay parámetros editables configurados.</p>';
+      return;
+    }
 
     container.innerHTML = editableConfigs.map(c => `
       <div class="config-item" data-clave="${c.clave}">
@@ -109,15 +117,19 @@ const AdminModule = (() => {
   }
 
   function _renderEncuestadoresTable(rows) {
-    const tbody = document.getElementById('enc-tbody');
-    if (!tbody) return;
+    const bodies = ['enc-tbody', 'enc-tbody-admin']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    if (!bodies.length) return;
 
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay encuestadores registrados.</td></tr>';
+      bodies.forEach(tbody => {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay encuestadores registrados. Los usuarios se administran en la hoja USUARIOS o mediante la función saveUser(). Cambie las credenciales iniciales por seguridad.</td></tr>';
+      });
       return;
     }
 
-    tbody.innerHTML = rows.map(r => `
+    const html = rows.map(r => `
       <tr>
         <td>${r.id_encuestador}</td>
         <td>${r.usuario}</td>
@@ -135,6 +147,7 @@ const AdminModule = (() => {
           <button class="btn btn-xs btn-danger" onclick="AdminModule.deleteEncuestador('${r.id_encuestador}', '${r.usuario}')">Eliminar</button>
         </td>
       </tr>`).join('');
+    bodies.forEach(tbody => { tbody.innerHTML = html; });
   }
 
   function openNewEncuestador() {

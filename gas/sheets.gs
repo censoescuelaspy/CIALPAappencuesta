@@ -33,6 +33,18 @@ const SheetsService = (() => {
     let rows = rawRows.map((r, idx) => _normalizarEscuela(r, idx + 2)).filter(r => r.codigo_local || r.id_escuela || r.nombre);
 
     filters = filters || {};
+    const session = filters._session;
+    if (session && String(session.rol) === 'encuestador') {
+      const aliases = [
+        session.usuario,
+        `${session.nombres || ''} ${session.apellidos || ''}`.trim(),
+        session.id_usuario
+      ].filter(Boolean).map(v => String(v).toLowerCase());
+      rows = rows.filter(r => {
+        const assigned = String(r.encuestador_asignado || '').toLowerCase();
+        return aliases.some(alias => assigned === alias || assigned.includes(alias));
+      });
+    }
     if (filters.departamento) rows = rows.filter(r => _same(r.departamento, filters.departamento));
     if (filters.estado) rows = rows.filter(r => _same(r.estado_relevamiento, filters.estado));
     if (filters.encuestador) rows = rows.filter(r => _same(r.encuestador_asignado, filters.encuestador));
@@ -326,7 +338,7 @@ const SheetsService = (() => {
 
   function saveEncuestador(params) {
     const session = params._session;
-    if (session.rol !== 'admin') return { status: 'error', message: 'Solo administradores pueden gestionar usuarios.' };
+    if (!_isAuthorizedAdmin(session)) return { status: 'error', message: 'Solo administradores autorizados pueden gestionar usuarios.' };
     const { id_encuestador, usuario, nombres, apellidos, documento, telefono, correo, zona_asignada, rol, activo, password } = params;
     if (!usuario || !nombres) return { status: 'error', message: 'Usuario y nombres son requeridos.' };
     _ensureColumns(SHEET_NAMES.ENCUESTADORES, ['id_encuestador','usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol','foto_url','activo','fecha_alta','fecha_actualizacion']);
@@ -360,7 +372,7 @@ const SheetsService = (() => {
 
   function deleteEncuestador(params) {
     const session = params._session;
-    if (session.rol !== 'admin') return { status: 'error', message: 'Solo administradores pueden desactivar usuarios.' };
+    if (!_isAuthorizedAdmin(session)) return { status: 'error', message: 'Solo administradores autorizados pueden desactivar usuarios.' };
     const rowIdx = _findRowIndex(SHEET_NAMES.ENCUESTADORES, 'id_encuestador', params.id_encuestador);
     if (rowIdx === -1) return { status: 'error', message: 'Encuestador no encontrado.' };
     const sheet = _getSheet(SHEET_NAMES.ENCUESTADORES);
@@ -431,7 +443,7 @@ const SheetsService = (() => {
 
   function setConfig(params) {
     const session = params._session;
-    if (session.rol !== 'admin') return { status: 'error', message: 'Solo administradores pueden cambiar la configuración.' };
+    if (!_isAuthorizedAdmin(session)) return { status: 'error', message: 'Solo administradores autorizados pueden cambiar la configuración.' };
     const rowIdx = _findRowIndex(SHEET_NAMES.CONFIG, 'clave', params.clave);
     if (rowIdx === -1) return { status: 'error', message: `Clave de configuración "${params.clave}" no encontrada.` };
     const sheet = _getSheet(SHEET_NAMES.CONFIG);
@@ -498,7 +510,7 @@ const SheetsService = (() => {
 
   function getAuditoria(params) {
     const session = params._session;
-    if (session.rol !== 'admin') return { status: 'error', message: 'Acceso restringido a administradores.' };
+    if (!_isAuthorizedAdmin(session)) return { status: 'error', message: 'Acceso restringido a administradores autorizados.' };
     let rows = _sheetToObjects(SHEET_NAMES.AUDITORIA);
     if (params.usuario) rows = rows.filter(r => String(r.usuario).toLowerCase().includes(String(params.usuario).toLowerCase()));
     if (params.accion) rows = rows.filter(r => String(r.accion).toLowerCase().includes(String(params.accion).toLowerCase()));

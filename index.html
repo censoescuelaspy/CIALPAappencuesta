@@ -174,7 +174,7 @@
             </div>
             <div style="display:flex;gap:1rem;flex-wrap:wrap;">
               <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ver Mapa</button>
-              <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Aplicar Encuesta</button>
+              <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Migrar datos al RUE-MEC</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
@@ -196,6 +196,8 @@
             <span class="badge" style="background:var(--state-finalizada)">Final: <span id="map-count-finalizada">0</span></span>
             <span class="badge" style="background:var(--state-incidencia)">Inc: <span id="map-count-incidencia">0</span></span>
             <span class="badge" style="background:var(--color-secondary)">Total: <span id="map-count-total">0</span></span>
+            <button class="btn btn-sm btn-outline" onclick="MapModule.toggleRoutes()">Rutas</button>
+            <button class="btn btn-sm btn-primary" data-min-role="admin" onclick="MapModule.promptAutoAssign()">Asignar sectores</button>
           </div>
         </div>
 
@@ -246,11 +248,11 @@
       </div>
 
       <!-- ======================================================
-           MODULE: APLICAR ENCUESTA
+           MODULE: MIGRAR DATOS RUE-MEC
            ====================================================== -->
       <div id="module-encuesta" class="module-panel">
         <div class="page-header">
-          <h2>Aplicar Encuesta Externa y Medir Tiempos</h2>
+          <h2>Migrar datos al RUE-MEC</h2>
           <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mapa')">
             Seleccionar en mapa
           </button>
@@ -260,7 +262,7 @@
             <div class="survey-empty">
               <div class="survey-empty__icon">🏫</div>
               <h3>Seleccioná una escuela</h3>
-              <p>Use el mapa o la lista para seleccionar el local escolar. Esta app controla la operación, abre el aplicativo externo instalado y registra los tiempos del relevamiento.</p>
+              <p>Use el mapa o la lista para seleccionar el local escolar. La migración al RUE-MEC queda preparada como etapa de desarrollo; por ahora CIALPA conserva el dato maestro, el tiempo de carga y el estado de cierre.</p>
               <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ir al mapa</button>
             </div>
           </div>

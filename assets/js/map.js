@@ -14,14 +14,37 @@ const MapModule = (() => {
   let _filteredEscuelas = [];
   let _activeFilters = {};
   let _selectedEscuela = null;
+  let _routeLayer = null;
+  let _routesVisible = true;
+
+  const _PALETTE = ['#2b6cb0', '#2f855a', '#b7791f', '#805ad5', '#c05621', '#0f766e', '#b83280', '#4a5568', '#2563eb', '#16a34a'];
 
   // ── Icon factory ──────────────────────────────────────────────────────────
 
-  function _getIcon(estado) {
-    const colors = APP_CONFIG.STATE_COLORS;
-    const color = colors[estado] || colors.pendiente;
+  function _hash(str) {
+    return String(str || '').split('').reduce((acc, c) => ((acc << 5) - acc + c.charCodeAt(0)) >>> 0, 0);
+  }
+
+  function _surveyorName(e) {
+    return e.encuestador_asignado || 'Sin asignar';
+  }
+
+  function _surveyorColor(name) {
+    if (!name || name === 'Sin asignar') return '#94a3b8';
+    return _PALETTE[_hash(name) % _PALETTE.length];
+  }
+
+  function _isClosed(e) {
+    return ['finalizada', 'cerrada', 'completada'].includes(String(e.estado_relevamiento || '').toLowerCase());
+  }
+
+  function _getIcon(e) {
+    const name = _surveyorName(e);
+    const color = _surveyorColor(name);
+    const opacity = _isClosed(e) ? 1 : 0.38;
+    const stroke = _isClosed(e) ? '#172033' : '#ffffff';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
-      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" stroke="#fff" stroke-width="2"/>
+      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" fill-opacity="${opacity}" stroke="${stroke}" stroke-width="2"/>
       <circle cx="14" cy="14" r="6" fill="#fff" fill-opacity="0.85"/>
     </svg>`;
     return L.divIcon({
@@ -57,7 +80,7 @@ const MapModule = (() => {
           ${e.observaciones ? `<p><b>Observaciones:</b> ${e.observaciones}</p>` : ''}
         </div>
         <div class="map-popup__actions">
-          ${canSurvey ? `<button class="btn btn-primary btn-sm" onclick="SurveyModule.selectEscuela('${e.id_escuela}')">Aplicar Encuesta</button>` : ''}
+          ${canSurvey ? `<button class="btn btn-primary btn-sm" onclick="SurveyModule.selectEscuela('${e.id_escuela}')">Migrar datos al RUE-MEC</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick="MapModule.focusListItem('${e.id_escuela}')">Ver en lista</button>
         </div>
       </div>`;
@@ -79,13 +102,16 @@ const MapModule = (() => {
       zoomControl: true,
     });
 
-    // Base tile layer
-    L.tileLayer(APP_CONFIG.TILE_URL, {
+    const osm = L.tileLayer(APP_CONFIG.TILE_URL, {
       attribution: APP_CONFIG.TILE_ATTRIBUTION,
       maxZoom: APP_CONFIG.MAP_MAX_ZOOM,
     }).addTo(_map);
 
-    // Satellite layer option
+    const roads = L.tileLayer(
+      'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      { attribution: '&copy; OpenStreetMap contributors, HOT', maxZoom: 19 }
+    );
+
     const satellite = L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
       { attribution: 'Tiles &copy; Esri', maxZoom: 18 }
@@ -93,7 +119,8 @@ const MapModule = (() => {
 
     L.control.layers(
       {
-        'Mapa base (OSM)': L.tileLayer(APP_CONFIG.TILE_URL, { attribution: APP_CONFIG.TILE_ATTRIBUTION }),
+        'Mapa base (OSM)': osm,
+        'Caminos y accesos (OSM HOT)': roads,
         'Satélite (Esri)': satellite,
       },
       {},
@@ -118,6 +145,7 @@ const MapModule = (() => {
     });
 
     _map.addLayer(_markerCluster);
+    _routeLayer = L.layerGroup().addTo(_map);
 
     // Scale control
     L.control.scale({ imperial: false }).addTo(_map);
@@ -128,7 +156,7 @@ const MapModule = (() => {
   // ── Markers ───────────────────────────────────────────────────────────────
 
   function loadMarkers(escuelas) {
-    _escuelas = escuelas || [];
+    _escuelas = (escuelas || []).filter(_visibleForCurrentUser);
     _filteredEscuelas = [..._escuelas];
     _markers = {};
 
@@ -139,7 +167,7 @@ const MapModule = (() => {
       const lng = parseFloat(e.longitud);
       if (isNaN(lat) || isNaN(lng)) return;
 
-      const marker = L.marker([lat, lng], { icon: _getIcon(e.estado_relevamiento) });
+      const marker = L.marker([lat, lng], { icon: _getIcon(e) });
       marker.bindPopup(_buildPopup(e), { maxWidth: 300 });
       marker.escuelaId = e.id_escuela;
 
@@ -155,6 +183,19 @@ const MapModule = (() => {
 
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
+    _renderRoutes(_escuelas);
+  }
+
+  function _visibleForCurrentUser(e) {
+    if (Auth.canAccess('supervisor')) return true;
+    const user = Auth.getUserInfo?.();
+    if (!user) return false;
+    const assigned = String(e.encuestador_asignado || '').toLowerCase().trim();
+    if (!assigned) return false;
+    const aliases = [user.usuario, user.nombreCompleto, `${user.nombres} ${user.apellidos}`, user.id]
+      .filter(Boolean)
+      .map(v => String(v).toLowerCase().trim());
+    return aliases.some(alias => assigned === alias || assigned.includes(alias));
   }
 
   // ── Filtering ─────────────────────────────────────────────────────────────
@@ -184,6 +225,7 @@ const MapModule = (() => {
 
     _renderList(_filteredEscuelas);
     _updateSummaryBadges(_filteredEscuelas);
+    _renderRoutes(_filteredEscuelas);
   }
 
   function clearFilters() {
@@ -203,16 +245,17 @@ const MapModule = (() => {
     }
 
     container.innerHTML = escuelas.map(e => {
-      const estadoColor = APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d';
+      const estadoColor = _surveyorColor(_surveyorName(e));
       const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
+      const strength = _isClosed(e) ? 'cerrada' : 'pendiente';
       return `
         <div class="map-list-item" data-id="${e.id_escuela}" onclick="MapModule.flyTo('${e.id_escuela}')">
-          <span class="map-list-item__dot" style="background:${estadoColor}"></span>
+          <span class="map-list-item__dot map-list-item__dot--${strength}" style="background:${estadoColor}"></span>
           <div class="map-list-item__info">
             <strong>${e.nombre}</strong>
-            <small>${e.distrito || ''} · ${e.zona || ''}</small>
+            <small>${e.distrito || ''} · ${e.encuestador_asignado || 'Sin asignar'} · ${_estimateMinutes(e)} min</small>
           </div>
-          <span class="map-list-item__badge" style="background:${estadoColor}">${estadoLabel}</span>
+          <span class="map-list-item__badge" style="background:${APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d'}">${estadoLabel}</span>
         </div>`;
     }).join('');
   }
@@ -236,10 +279,117 @@ const MapModule = (() => {
         <p><b>Distrito:</b> ${e.distrito || '—'}</p>
         <p><b>Zona:</b> ${e.zona || '—'}</p>
         <p><b>Encuestador:</b> ${e.encuestador_asignado || 'No asignado'}</p>
+        <p><b>Tiempo estimado:</b> ${_estimateMinutes(e)} min</p>
         <p><b>Estado:</b> <span class="badge badge--${e.estado_relevamiento}">${APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento}</span></p>
-        ${Auth.canAccess('encuestador') ? `<button class="btn btn-primary btn-block mt-2" onclick="SurveyModule.selectEscuela('${e.id_escuela}')">Aplicar Encuesta</button>` : ''}
+        ${Auth.canAccess('encuestador') ? `<button class="btn btn-primary btn-block mt-2" onclick="SurveyModule.selectEscuela('${e.id_escuela}')">Migrar datos al RUE-MEC</button>` : ''}
       </div>`;
     panel.classList.add('map-info-panel--visible');
+  }
+
+  function _estimateMinutes(e) {
+    return parseInt(e.tiempo_estimado_min || e.tiempo_estimado || '45', 10) || 45;
+  }
+
+  function _validPoint(e) {
+    const lat = parseFloat(e.latitud);
+    const lng = parseFloat(e.longitud);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
+    return { lat, lng };
+  }
+
+  function _groupBySurveyor(escuelas) {
+    return escuelas.reduce((acc, e) => {
+      const key = _surveyorName(e);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(e);
+      return acc;
+    }, {});
+  }
+
+  function _distance(a, b) {
+    const pa = _validPoint(a);
+    const pb = _validPoint(b);
+    if (!pa || !pb) return Infinity;
+    const dx = pa.lat - pb.lat;
+    const dy = pa.lng - pb.lng;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function _nearestRoute(points) {
+    const remaining = points.filter(_validPoint);
+    if (remaining.length <= 2) return remaining;
+    const route = [remaining.shift()];
+    while (remaining.length) {
+      const last = route[route.length - 1];
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      remaining.forEach((candidate, idx) => {
+        const d = _distance(last, candidate);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = idx;
+        }
+      });
+      route.push(remaining.splice(bestIdx, 1)[0]);
+    }
+    return route;
+  }
+
+  function _renderRoutes(escuelas) {
+    if (!_routeLayer) return;
+    _routeLayer.clearLayers();
+    if (!_routesVisible) return;
+    const groups = _groupBySurveyor(escuelas.filter(e => e.encuestador_asignado));
+    Object.entries(groups).forEach(([name, rows]) => {
+      const route = _nearestRoute(rows);
+      const latlngs = route.map(_validPoint).filter(Boolean).map(p => [p.lat, p.lng]);
+      if (latlngs.length < 2) return;
+      L.polyline(latlngs, {
+        color: _surveyorColor(name),
+        weight: 3,
+        opacity: .55,
+        dashArray: '8 8',
+      }).bindTooltip(`${name}: ${route.length} puntos · ${route.reduce((s, e) => s + _estimateMinutes(e), 0)} min estimados`).addTo(_routeLayer);
+    });
+  }
+
+  function toggleRoutes() {
+    _routesVisible = !_routesVisible;
+    _renderRoutes(_filteredEscuelas);
+    UI.showToast(_routesVisible ? 'Rutas visibles.' : 'Rutas ocultas.', 'info');
+  }
+
+  async function promptAutoAssign() {
+    if (!Auth.canAccess('admin')) {
+      UI.showToast('Solo administradores autorizados pueden generar asignaciones.', 'warning');
+      return;
+    }
+    const value = await UI.showPrompt('Cantidad de encuestadores disponibles:', '4');
+    if (value === null) return;
+    const n = Math.max(1, parseInt(value, 10) || 1);
+    autoAssignClusters(n);
+  }
+
+  function autoAssignClusters(n) {
+    const rows = _escuelas.filter(_validPoint);
+    if (!rows.length) {
+      UI.showToast('No hay puntos con coordenadas para asignar.', 'warning');
+      return;
+    }
+    const names = Array.from({ length: n }, (_, i) => `Encuestador ${i + 1}`);
+    const sorted = [...rows].sort((a, b) => {
+      const pa = _validPoint(a);
+      const pb = _validPoint(b);
+      return (pa.lng - pb.lng) || (pa.lat - pb.lat);
+    });
+    sorted.forEach((row, idx) => {
+      row.encuestador_asignado = names[Math.min(n - 1, Math.floor(idx / Math.ceil(sorted.length / n)))];
+      row.orden_visita = String((idx % Math.ceil(sorted.length / n)) + 1);
+      row.tiempo_estimado_min = row.tiempo_estimado_min || '45';
+    });
+    loadMarkers(_escuelas);
+    populateFilterDropdowns();
+    UI.showToast(`Asignacion local generada en ${n} sectores. Pendiente persistir en Sheets.`, 'success', 6000);
   }
 
   function _updateSummaryBadges(escuelas) {
@@ -317,5 +467,8 @@ const MapModule = (() => {
     getEscuelas,
     getFiltered,
     populateFilterDropdowns,
+    toggleRoutes,
+    promptAutoAssign,
+    autoAssignClusters,
   };
 })();

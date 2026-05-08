@@ -46,6 +46,10 @@ const APP_CONFIG = {
     ENCUESTADOR: 'encuestador',
   },
 
+  // Usuarios con permisos administrativos reales. El rol admin en la hoja
+  // debe existir, pero la UI restringe herramientas sensibles a esta lista.
+  ADMIN_USERS: ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'],
+
   // Survey states
   STATES: {
     PENDIENTE: 'pendiente',

@@ -56,6 +56,10 @@ const Auth = (() => {
     const userLevel = hierarchy[role] || 0;
     document.querySelectorAll('[data-min-role]').forEach(el => {
       const minRole = el.dataset.minRole;
+      if (minRole === 'admin') {
+        el.style.display = isAdminUser() ? '' : 'none';
+        return;
+      }
       const minLevel = hierarchy[minRole] || 0;
       el.style.display = userLevel >= minLevel ? '' : 'none';
     });
@@ -157,6 +161,13 @@ const Auth = (() => {
     };
   }
 
+  function isAdminUser() {
+    const session = _getSession();
+    if (!session) return false;
+    const allowed = APP_CONFIG.ADMIN_USERS || [];
+    return String(session.rol) === 'admin' && allowed.includes(String(session.usuario).toLowerCase());
+  }
+
   function requireAuth() {
     if (!isLoggedIn()) {
       AppController.showLoginScreen();
@@ -172,6 +183,7 @@ const Auth = (() => {
 
   function canAccess(requiredRole) {
     const hierarchy = { admin: 3, supervisor: 2, encuestador: 1 };
+    if (requiredRole === 'admin') return isAdminUser();
     const userLevel = hierarchy[getRole()] || 0;
     const required = hierarchy[requiredRole] || 0;
     return userLevel >= required;
@@ -193,6 +205,7 @@ const Auth = (() => {
     getRole,
     getToken,
     getUserInfo,
+    isAdminUser,
     requireAuth,
     applyRoleVisibility,
     canAccess,

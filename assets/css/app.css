@@ -590,7 +590,11 @@ td {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.85);
 }
+
+.map-list-item__dot--pendiente { opacity: .45; }
+.map-list-item__dot--cerrada { opacity: 1; }
 
 .map-list-item__info { flex: 1; min-width: 0; }
 .map-list-item__info strong { display: block; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

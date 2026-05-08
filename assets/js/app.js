@@ -249,7 +249,7 @@ const AppController = (() => {
   const MODULES = {
     inicio: { label: 'Inicio', icon: '🏠', minRole: 'encuestador' },
     mapa: { label: 'Mapa', icon: '🗺️', minRole: 'encuestador' },
-    encuesta: { label: 'Aplicar Encuesta', icon: '📋', minRole: 'encuestador' },
+    encuesta: { label: 'Migrar RUE-MEC', icon: '⇄', minRole: 'encuestador' },
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
     encuestadores: { label: 'Encuestadores', icon: '👥', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
@@ -326,12 +326,8 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const role = Auth.getRole();
-    const hierarchy = { admin: 3, supervisor: 2, encuestador: 1 };
-    const userLevel = hierarchy[role] || 0;
-
     nav.innerHTML = Object.entries(MODULES)
-      .filter(([, mod]) => userLevel >= (hierarchy[mod.minRole] || 0))
+      .filter(([, mod]) => Auth.canAccess(mod.minRole))
       .map(([id, mod]) => `
         <li class="nav-item" data-module="${id}">
           <a href="#" onclick="AppController.showModule('${id}'); return false;">

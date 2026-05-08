@@ -26,6 +26,14 @@ const SHEET_NAMES = {
   CATALOGOS:    'catalogos',
 };
 
+const ADMIN_USERS = ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'];
+
+function _isAuthorizedAdmin(session) {
+  return session &&
+    String(session.rol).toLowerCase() === 'admin' &&
+    ADMIN_USERS.includes(String(session.usuario).toLowerCase());
+}
+
 // ── HTTP Entry Points ─────────────────────────────────────────────────────────
 
 /**
