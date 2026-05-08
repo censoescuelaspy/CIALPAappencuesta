@@ -34,6 +34,7 @@ Sistema web para la gestión del relevamiento de infraestructura y condiciones d
 ```
 06_APP/
 ├── index.html                     # SPA principal
+├── mec-jornada.html               # Inicio de jornada para doble guardado MEC
 ├── assets/
 │   ├── css/
 │   │   └── app.css                # Estilos completos
@@ -53,6 +54,7 @@ Sistema web para la gestión del relevamiento de infraestructura y condiciones d
 │       └── favicon.png            # Favicon (proveer)
 ├── manual/
 │   └── index.html                 # Manual completo standalone
+├── mec-capture-extension/         # Extensión Chrome/Edge para captura consentida en MEC
 ├── gas/
 │   ├── Code.gs                    # Entry point GAS
 │   ├── auth.gs                    # Servicio autenticación
@@ -61,6 +63,21 @@ Sistema web para la gestión del relevamiento de infraestructura y condiciones d
 │   └── setup.gs                   # Funciones de inicialización
 └── README.md                      # Este archivo
 ```
+
+---
+
+## Flujo de doble guardado CIALPA + MEC
+
+La pantalla `mec-jornada.html` permite iniciar una jornada CIALPA antes de abrir el módulo oficial del MEC.
+
+1. El encuestador se identifica en CIALPA.
+2. CIALPA genera un `cialpaSessionId` con encuestador, documento, equipo y local escolar.
+3. El botón **Abrir encuesta MEC** abre el sistema MEC en una pestaña separada.
+4. El encuestador se autentica y completa normalmente en MEC.
+5. La extensión `mec-capture-extension/`, instalada con permiso explícito del encuestador, registra cambios de campos, tiempos y envío del formulario.
+6. MEC guarda su registro oficial y CIALPA conserva un respaldo independiente de auditoría.
+
+La app del MEC no se embebe en iframe porque el servidor del MEC usa `X-Frame-Options: SAMEORIGIN`.
 
 ---
 

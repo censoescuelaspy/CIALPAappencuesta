@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "CIALPA Captura MEC",
+  "version": "0.1.0",
+  "description": "Prueba de captura consentida de selecciones realizadas en la app demo RUE/MEC.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://demo.mec.gov.py/demo_rue/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://demo.mec.gov.py/demo_rue/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "CIALPA Captura MEC",
+    "default_popup": "popup.html"
+  }
+}

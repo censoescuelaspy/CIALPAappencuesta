@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CIALPA - Jornada MEC</title>
+    <link rel="stylesheet" href="assets/css/mec-jornada.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="panel" id="loginPanel">
+        <header>
+          <p class="eyebrow">CIALPA</p>
+          <h1>Jornada de relevamiento MEC</h1>
+          <p class="muted">El encuestador inicia en CIALPA y luego abre el sistema MEC en una pestaña separada.</p>
+        </header>
+
+        <form id="cialpaLoginForm" class="form-grid">
+          <label>
+            Encuestador
+            <input id="surveyorName" name="surveyorName" autocomplete="name" required>
+          </label>
+
+          <label>
+            Documento
+            <input id="surveyorDocument" name="surveyorDocument" autocomplete="username" inputmode="numeric" required>
+          </label>
+
+          <label>
+            Equipo o zona
+            <input id="team" name="team" placeholder="Ej. Central - Equipo 2">
+          </label>
+
+          <label>
+            Local escolar / RUE
+            <input id="schoolCode" name="schoolCode" placeholder="Código o referencia">
+          </label>
+
+          <button type="submit" class="primary">Iniciar jornada</button>
+        </form>
+      </section>
+
+      <section class="panel hidden" id="sessionPanel">
+        <header>
+          <p class="eyebrow">Sesión activa</p>
+          <h2 id="sessionTitle">Jornada lista</h2>
+          <p class="muted" id="sessionMeta"></p>
+        </header>
+
+        <div class="status-grid">
+          <div>
+            <span>Inicio CIALPA</span>
+            <strong id="startedAt"></strong>
+          </div>
+          <div>
+            <span>Estado</span>
+            <strong id="sessionState">Preparada</strong>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="openMec" class="primary">Abrir encuesta MEC</button>
+          <button id="copyContext" class="secondary">Copiar contexto</button>
+          <button id="closeSession" class="danger">Cerrar jornada</button>
+        </div>
+
+        <div class="note">
+          La página del MEC se abre fuera de CIALPA. La extensión CIALPA Captura MEC debe estar instalada para registrar cambios, tiempos y envío.
+        </div>
+
+        <pre id="contextPreview"></pre>
+      </section>
+    </main>
+
+    <script src="assets/js/mec-jornada.js"></script>
+  </body>
+</html>
