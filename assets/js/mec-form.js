@@ -461,7 +461,9 @@ const MecFormModule = (() => {
 
   function _sketchStatusText(sketch) {
     const count = (sketch.objects || []).length;
-    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Doble clic o doble toque para agregar; clic simple selecciona y mueve.`;
+    const selected = _findSketchObjectById(_selectedSketchObjectId);
+    const distances = selected ? _openingDistanceText(selected) : '';
+    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Doble clic o doble toque para agregar; clic simple selecciona y mueve.${distances ? ` Distancias: ${distances}.` : ''}`;
   }
 
   function _sketchToolLabel(toolId) {
@@ -538,14 +540,20 @@ const MecFormModule = (() => {
   function newClassroom() {
     _syncActiveClassroomFromSketch();
     const nextNumber = (_data.__classrooms || []).length + 1;
+    const block = _blockById(_data.__activeBlockId);
+    const blockArea = Number(block?.largo_m || 0) * Number(block?.ancho_m || 0);
+    const usedArea = block ? _blockAreaUsed(block.id) : 0;
+    const remainingArea = Math.max(0, blockArea - usedArea);
+    const suggestedWidth = Number(block?.ancho_m || 0);
+    const suggestedLength = remainingArea && suggestedWidth ? remainingArea / suggestedWidth : '';
     _activeClassroomId = `aula_${Date.now()}`;
     _data.__classroomSketch = {
       id: _activeClassroomId,
       name: `Aula ${nextNumber}`,
       blockId: _data.__activeBlockId || '',
       floor: 'PB',
-      length: '',
-      width: '',
+      length: suggestedLength ? suggestedLength.toFixed(1) : '',
+      width: suggestedWidth ? suggestedWidth.toFixed(1) : '',
       openings: '',
       objects: [],
     };
@@ -553,7 +561,7 @@ const MecFormModule = (() => {
     _selectedSketchObjectId = null;
     _saveDraft(false);
     _render();
-    UI.showToast('Nueva aula lista para cargar.', 'success');
+    UI.showToast(remainingArea ? 'Nueva aula ubicada sobre el area restante estimada del bloque.' : 'Nueva aula lista para cargar.', 'success');
   }
 
   function saveCurrentClassroom() {
@@ -920,16 +928,20 @@ const MecFormModule = (() => {
     const end = event => {
       event.preventDefault();
       if (resizingObject) {
+        const changed = resizingObject.object;
         resizingObject = null;
         _saveDraft(false);
         _updateSketchStatus();
+        _announceOpeningDistances(changed);
         return;
       }
       if (movingObject) {
+        const changed = movingObject;
         movingObject = null;
         moveOffset = null;
         _saveDraft(false);
         _updateSketchStatus();
+        _announceOpeningDistances(changed);
         return;
       }
       if (!drawing || !draftObject) return;
@@ -943,7 +955,8 @@ const MecFormModule = (() => {
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
       const created = _findSketchObjectById(createdId);
-      if (created && _hasSketchFicha(created)) setTimeout(() => openSketchObjectFicha(created.id), 120);
+      _announceOpeningDistances(created);
+      if (created && _hasSketchFicha(created)) setTimeout(() => openSketchObjectFicha(created.id), 420);
     };
     const createAt = event => {
       event.preventDefault();
@@ -1066,7 +1079,8 @@ const MecFormModule = (() => {
     _data.__classroomSketch.objects.push(object);
     _selectedSketchObjectId = object.id;
     _saveDraft(false);
-    if (_hasSketchFicha(object)) setTimeout(() => openSketchObjectFicha(object.id), 120);
+    _announceOpeningDistances(object);
+    if (_hasSketchFicha(object)) setTimeout(() => openSketchObjectFicha(object.id), 420);
   }
 
   function _defaultSketchSize(type) {
@@ -1229,7 +1243,8 @@ const MecFormModule = (() => {
   }
 
   function _openingDistanceText(object) {
-    if (!['door', 'window'].includes(object.type)) return '';
+    const wall = _openingWallDistances(object);
+    if (wall) return wall;
     const room = (_data.__classroomSketch?.objects || []).find(item => item.type === 'room');
     const scale = _sketchScale();
     if (!room || !scale) return '';
@@ -1247,6 +1262,37 @@ const MecFormModule = (() => {
         return `${corner.key} ${meters.toFixed(1)}m`;
       })
       .join(' · ');
+  }
+
+  function _openingWallDistances(object) {
+    if (!['door', 'window'].includes(object?.type)) return '';
+    const room = (_data.__classroomSketch?.objects || []).find(item => item.type === 'room');
+    const scale = _sketchScale();
+    if (!room || !scale) return '';
+    const cx = object.x + object.w / 2;
+    const cy = object.y + object.h / 2;
+    const near = {
+      top: Math.abs(object.y - room.y),
+      bottom: Math.abs((object.y + object.h) - (room.y + room.h)),
+      left: Math.abs(object.x - room.x),
+      right: Math.abs((object.x + object.w) - (room.x + room.w)),
+    };
+    const side = Object.entries(near).sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (!side || near[side] > 16) return '';
+    if (side === 'top' || side === 'bottom') {
+      const left = Math.max(0, (object.x - room.x) * scale.x);
+      const right = Math.max(0, (room.x + room.w - (object.x + object.w)) * scale.x);
+      return `${side === 'top' ? 'Pared superior' : 'Pared inferior'} · C izq ${left.toFixed(2)}m · C der ${right.toFixed(2)}m`;
+    }
+    const top = Math.max(0, (object.y - room.y) * scale.y);
+    const bottom = Math.max(0, (room.y + room.h - (object.y + object.h)) * scale.y);
+    return `${side === 'left' ? 'Pared izquierda' : 'Pared derecha'} · C sup ${top.toFixed(2)}m · C inf ${bottom.toFixed(2)}m`;
+  }
+
+  function _announceOpeningDistances(object) {
+    if (!['door', 'window'].includes(object?.type)) return;
+    const text = _openingDistanceText(object);
+    if (text) UI.showToast(`Ubicacion de ${_sketchLabel(object.type)}: ${text}`, 'info', 7000);
   }
 
   function _openingCornerDistances(object) {
@@ -1457,6 +1503,19 @@ const MecFormModule = (() => {
     if (!room) return object;
     object.x = Math.max(room.x, Math.min(object.x, room.x + room.w - object.w));
     object.y = Math.max(room.y, Math.min(object.y, room.y + room.h - object.h));
+    const distances = [
+      { side: 'top', value: Math.abs(object.y - room.y) },
+      { side: 'bottom', value: Math.abs((object.y + object.h) - (room.y + room.h)) },
+      { side: 'left', value: Math.abs(object.x - room.x) },
+      { side: 'right', value: Math.abs((object.x + object.w) - (room.x + room.w)) },
+    ].sort((a, b) => a.value - b.value);
+    const nearest = distances[0];
+    if (nearest && nearest.value <= 28) {
+      if (nearest.side === 'top') object.y = room.y;
+      if (nearest.side === 'bottom') object.y = room.y + room.h - object.h;
+      if (nearest.side === 'left') object.x = room.x;
+      if (nearest.side === 'right') object.x = room.x + room.w - object.w;
+    }
     return object;
   }
 
@@ -2135,6 +2194,7 @@ const MecFormModule = (() => {
         _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58).forEach(item => {
           _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
         });
+        _drawSharedWallTicks(ctx, _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58));
       });
       ctx.restore();
     });
@@ -2148,10 +2208,29 @@ const MecFormModule = (() => {
       const roomWidth = Math.min(share, x + w - cursor);
       const aspect = Number(room.length || 1) / Math.max(1, Number(room.width || 1));
       const roomHeight = Math.max(34, Math.min(h, roomWidth / Math.max(.8, aspect)));
-      const item = { room, x: cursor, y: y + Math.max(0, (h - roomHeight) / 2), w: Math.max(42, roomWidth - 5), h: roomHeight };
+      const item = { room, x: cursor, y: y + Math.max(0, (h - roomHeight) / 2), w: Math.max(42, roomWidth), h: roomHeight };
       cursor += roomWidth;
       return item;
     });
+  }
+
+  function _drawSharedWallTicks(ctx, items) {
+    if (items.length < 2) return;
+    ctx.save();
+    ctx.strokeStyle = '#172033';
+    ctx.lineWidth = 2;
+    for (let i = 1; i < items.length; i += 1) {
+      const prev = items[i - 1];
+      const current = items[i];
+      const x = current.x;
+      const top = Math.min(prev.y, current.y);
+      const bottom = Math.max(prev.y + prev.h, current.y + current.h);
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function _drawPlanClassroom(ctx, room, x, y, w, h) {
