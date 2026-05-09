@@ -547,6 +547,27 @@
   text-transform: uppercase;
 }
 
+.mec-sketch-meta--summary {
+  display: block;
+}
+
+.mec-sketch-meta--summary strong,
+.mec-sketch-meta--summary span {
+  display: block;
+}
+
+.mec-sketch-meta--summary strong {
+  color: #172033;
+  font-size: .92rem;
+}
+
+.mec-sketch-meta--summary span {
+  margin-top: .18rem;
+  color: #667085;
+  font-size: .78rem;
+  line-height: 1.3;
+}
+
 .mec-sketch__actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -866,6 +887,28 @@
   margin: .75rem 0;
 }
 
+.mec-sanitary-details {
+  margin-top: .85rem;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.mec-sanitary-details summary {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #172033;
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.mec-sanitary-details[open] summary {
+  margin-bottom: .65rem;
+}
+
 .mec-sanitary-plan {
   margin: .9rem 0;
   padding: .75rem;
@@ -1043,7 +1086,7 @@
 
 .school-plan__board canvas {
   width: 100%;
-  aspect-ratio: 90 / 56;
+  height: auto;
   display: block;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
@@ -1224,7 +1267,7 @@
   }
 }
 
-/* ── Densidad móvil/tablet para carga de campo, v2.5.12 ───── */
+/* ── Densidad móvil/tablet para carga de campo, v2.5.13 ───── */
 @media (max-width: 1024px) {
   .mec-header-actions {
     gap: .35rem;
