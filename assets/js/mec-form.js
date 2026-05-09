@@ -18,6 +18,7 @@ const MecFormModule = (() => {
   let _pendingSketchCenter = false;
   let _selectedPlanId = null;
   let _planHitAreas = [];
+  let _activePlanDrag = null;
   const _sketchHistory = [];
   const _sketchRedo = [];
   const _planLayers = {
@@ -651,7 +652,7 @@ const MecFormModule = (() => {
           ${visibleClassrooms.length ? visibleClassrooms.map((room, index) => `
             <button class="mec-repeat-item ${room.id === _activeClassroomId ? 'mec-repeat-item--active' : ''}" type="button"
               onclick="MecFormModule.selectClassroom('${_escape(room.id)}')">
-              <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
+              <strong>${_escape(_classroomHierarchyLabel(room) || room.name || `Aula ${index + 1}`)}</strong>
               <span>${_escape(_classroomSummary(room))}</span>
             </button>`).join('') : '<p class="text-muted">Este bloque todavia no tiene aulas. Use + Nueva aula.</p>'}
         </div>
@@ -771,10 +772,47 @@ const MecFormModule = (() => {
       room.floor = _normalizeFloor(room.floor || 'Piso 1');
       room.objects = Array.isArray(room.objects) ? room.objects : [];
     });
+    _renumberClassroomsByBlockFloor();
     if (!_activeClassroomId || !_data.__classrooms.some(room => room.id === _activeClassroomId)) {
       _activeClassroomId = _data.__classrooms[0].id;
       _loadActiveClassroomIntoSketch();
     }
+  }
+
+  function _blockOrderIndex(blockId) {
+    const index = (_data.__blocks || []).findIndex(block => block.id === blockId);
+    return index >= 0 ? index : 9999;
+  }
+
+  function _floorNumberValue(floor) {
+    return Number(String(_normalizeFloor(floor || 'Piso 1')).match(/\d+/)?.[0] || 1);
+  }
+
+  function _classroomHierarchyLabel(room) {
+    const block = _blockById(room?.blockId);
+    return [block?.bloque_codigo, _normalizeFloor(room?.floor || 'Piso 1'), room?.name]
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  function _renumberClassroomsByBlockFloor() {
+    const groups = {};
+    [...(_data.__classrooms || [])]
+      .sort((a, b) => {
+        const blockDiff = _blockOrderIndex(a.blockId) - _blockOrderIndex(b.blockId);
+        if (blockDiff) return blockDiff;
+        const floorDiff = _floorNumberValue(a.floor) - _floorNumberValue(b.floor);
+        if (floorDiff) return floorDiff;
+        return String(a.id || '').localeCompare(String(b.id || ''), 'es');
+      })
+      .forEach(room => {
+        const key = `${room.blockId || 'sin_bloque'}::${_normalizeFloor(room.floor || 'Piso 1')}`;
+        groups[key] = (groups[key] || 0) + 1;
+        room.name = `Aula ${groups[key]}`;
+        if (room.id === _activeClassroomId && _data.__classroomSketch) {
+          _data.__classroomSketch.name = room.name;
+        }
+      });
   }
 
   function _renderClassroomBlockNavigator() {
@@ -797,6 +835,8 @@ const MecFormModule = (() => {
 
   function _orderedClassroomsForNavigator(classrooms) {
     return [...(classrooms || [])].sort((a, b) => {
+      const floorDiff = _floorNumberValue(a.floor) - _floorNumberValue(b.floor);
+      if (floorDiff) return floorDiff;
       return String(a.name || '').localeCompare(String(b.name || ''), 'es');
     });
   }
@@ -828,6 +868,7 @@ const MecFormModule = (() => {
     const snapshot = _cloneClassroom(_data.__classroomSketch);
     if (index >= 0) _data.__classrooms[index] = snapshot;
     else _data.__classrooms.push(snapshot);
+    _renumberClassroomsByBlockFloor();
   }
 
   function _loadActiveClassroomIntoSketch() {
@@ -1046,7 +1087,6 @@ const MecFormModule = (() => {
 
   function newClassroom() {
     _syncActiveClassroomFromSketch();
-    const nextNumber = (_data.__classrooms || []).length + 1;
     const block = _blockById(_data.__activeBlockId);
     const blockLength = Number(block?.largo_m || 0);
     const blockWidth = Number(block?.ancho_m || 0);
@@ -1054,12 +1094,17 @@ const MecFormModule = (() => {
     const referenceRoom = blockRooms[blockRooms.length - 1] || null;
     const suggestedLength = Number(referenceRoom?.length || 0) || (blockLength ? Math.min(7, blockLength) : 7);
     const suggestedWidth = Number(referenceRoom?.width || 0) || (blockWidth ? Math.min(5, blockWidth) : 5);
+    const floor = _normalizeFloor(_data.__classroomSketch?.floor || 'Piso 1');
+    const nextNumber = (_data.__classrooms || [])
+      .filter(room => room.blockId === (_data.__activeBlockId || ''))
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === floor)
+      .length + 1;
     _activeClassroomId = `aula_${Date.now()}`;
     _data.__classroomSketch = {
       id: _activeClassroomId,
       name: `Aula ${nextNumber}`,
       blockId: _data.__activeBlockId || '',
-      floor: 'Piso 1',
+      floor,
       length: suggestedLength ? suggestedLength.toFixed(1) : '',
       width: suggestedWidth ? suggestedWidth.toFixed(1) : '',
       openings: '',
@@ -1098,14 +1143,16 @@ const MecFormModule = (() => {
 
   function _syncActiveBlock() {
     _ensureBlocks();
-    const currentIndex = Math.max(0, (_data.__blocks || []).findIndex(item => item.id === _data.__activeBlockId));
+    const foundIndex = (_data.__blocks || []).findIndex(item => item.id === _data.__activeBlockId);
+    const currentIndex = foundIndex >= 0 ? foundIndex : (_data.__blocks || []).length;
+    const previousBlock = foundIndex >= 0 ? (_data.__blocks[foundIndex] || {}) : {};
     _data.bloques = {
       bloque_codigo: _numberedLabel('Bloque', currentIndex),
       cantidad_plantas: '1',
       ...(_data.bloques || {}),
     };
     _data.bloques.bloque_codigo = _numberedLabel('Bloque', currentIndex);
-    const block = { id: _data.__activeBlockId, ...(_data.bloques || {}) };
+    const block = { ...previousBlock, id: _data.__activeBlockId, ...(_data.bloques || {}) };
     const index = _data.__blocks.findIndex(item => item.id === block.id);
     if (index >= 0) _data.__blocks[index] = block;
     else _data.__blocks.push(block);
@@ -4165,7 +4212,7 @@ const MecFormModule = (() => {
           ondblclick="MecFormModule.editPlanClassroom('${_escape(room.id)}')"
           onclick="MecFormModule.selectPlanItem('room::${_escape(room.id)}')">
           <span class="school-plan-object__type">Aula</span>
-          <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
+          <strong>${_escape(_classroomHierarchyLabel(room) || room.name || `Aula ${index + 1}`)}</strong>
           <small>${_escape([block?.bloque_codigo, room.floor, room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin dimensiones'].filter(Boolean).join(' · '))}</small>
         </button>
         ${active ? `
@@ -4264,10 +4311,24 @@ const MecFormModule = (() => {
 
     const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque', largo_m: 0, ancho_m: 0 }];
     const layout = _planBlockLayout(blocks, canvas.width, canvas.height);
-    layout.forEach(({ block, x, y, w, h }) => {
+    const distanceItems = [];
+    layout.forEach(({ block, x, y, w, h, scale }) => {
+      const blockPlanId = `block::${block.id}`;
+      const blockSelected = _selectedPlanId === blockPlanId || _activePlanDrag?.blockId === block.id;
+      _planHitAreas.push({ id: blockPlanId, type: 'block', blockId: block.id, x, y, w, h });
+      distanceItems.push({
+        id: blockPlanId,
+        type: 'block',
+        label: block.bloque_codigo || 'Bloque',
+        x,
+        y,
+        w,
+        h,
+        metersPerPx: scale ? 1 / scale : 1,
+      });
       ctx.save();
-      ctx.strokeStyle = '#172033';
-      ctx.lineWidth = 3;
+      ctx.strokeStyle = blockSelected ? '#111827' : '#172033';
+      ctx.lineWidth = blockSelected ? 4 : 3;
       ctx.fillStyle = 'rgba(226,232,240,.32)';
       ctx.fillRect(x, y, w, h);
       ctx.strokeRect(x, y, w, h);
@@ -4277,9 +4338,14 @@ const MecFormModule = (() => {
       ctx.fillStyle = 'rgba(23,32,51,.06)';
       ctx.fillRect(x + 1, y + 1, w - 2, 30);
       ctx.fillStyle = '#172033';
-      ctx.font = '800 15px system-ui, sans-serif';
+      ctx.font = '800 12px system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`${block.bloque_codigo || 'Bloque'}${block.largo_m && block.ancho_m ? ` · ${block.largo_m} x ${block.ancho_m} m` : ''}`, x + 10, y + 20);
+      ctx.fillText(block.bloque_codigo || 'Bloque', x + 10, y + 14);
+      if (block.largo_m && block.ancho_m) {
+        ctx.font = '700 9px system-ui, sans-serif';
+        ctx.fillStyle = '#475467';
+        ctx.fillText(`${block.largo_m} x ${block.ancho_m} m`, x + 10, y + 26);
+      }
 
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
@@ -4304,6 +4370,27 @@ const MecFormModule = (() => {
         ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
         const roomItems = _planRoomItemsFromSketch(floorRooms, floorRect);
         const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorRect);
+        const floorMetersPerPx = _planFloorMetersPerPx(block, floorRect);
+        roomItems.forEach(item => distanceItems.push({
+          id: `room::${item.room.id}`,
+          type: 'room',
+          label: item.room.name || 'Aula',
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          metersPerPx: floorMetersPerPx,
+        }));
+        sanitaryItems.forEach(item => distanceItems.push({
+          id: `sanitary::${item.sanitary.id}`,
+          type: 'sanitary',
+          label: item.sanitary.codigo || 'Sanitario',
+          x: item.x,
+          y: item.y,
+          w: item.w,
+          h: item.h,
+          metersPerPx: floorMetersPerPx,
+        }));
         roomItems.forEach(item => {
           if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
         });
@@ -4312,6 +4399,7 @@ const MecFormModule = (() => {
       });
       ctx.restore();
     });
+    _drawPlanDistanceGuides(ctx, distanceItems);
   }
 
   function _planFloorRect(blockX, blockY, blockW, blockH, floorIndex, floorCount, hasSanitaries) {
@@ -4329,6 +4417,15 @@ const MecFormModule = (() => {
     };
   }
 
+  function _planFloorMetersPerPx(block, floorRect) {
+    const length = Number(block?.largo_m || 0);
+    const width = Number(block?.ancho_m || 0);
+    const x = length && floorRect.w ? length / floorRect.w : 0;
+    const y = width && floorRect.h ? width / floorRect.h : 0;
+    if (x && y) return (x + y) / 2;
+    return x || y || 1;
+  }
+
   function _planBlockLayout(blocks, canvasW, canvasH) {
     const maxLength = Math.max(...blocks.map(block => Number(block.largo_m || 0) || 30), 30);
     const maxWidth = Math.max(...blocks.map(block => Number(block.ancho_m || 0) || 20), 20);
@@ -4344,14 +4441,92 @@ const MecFormModule = (() => {
       const bh = Math.max(50, (Number(block.ancho_m || 0) || maxWidth * .7) * scale);
       const cellX = 28 + col * cellW;
       const cellY = 36 + row * cellH;
+      const autoX = cellX + Math.max(0, (cellW - bw) / 2);
+      const autoY = cellY + Math.max(0, (cellH - bh) / 2);
+      const saved = block.planPosition || block.plano_general || null;
+      const savedX = Number(saved?.xRatio);
+      const savedY = Number(saved?.yRatio);
+      const x = Number.isFinite(savedX) ? savedX * canvasW : autoX;
+      const y = Number.isFinite(savedY) ? savedY * canvasH : autoY;
+      const clamped = _clampPlanRect({ x, y, w: bw, h: bh }, canvasW, canvasH);
       return {
         block,
-        x: cellX + Math.max(0, (cellW - bw) / 2),
-        y: cellY + Math.max(0, (cellH - bh) / 2),
+        x: clamped.x,
+        y: clamped.y,
         w: bw,
         h: bh,
+        scale,
       };
     });
+  }
+
+  function _clampPlanRect(rect, canvasW, canvasH) {
+    const margin = 12;
+    return {
+      ...rect,
+      x: Math.max(margin, Math.min(rect.x, canvasW - rect.w - margin)),
+      y: Math.max(margin, Math.min(rect.y, canvasH - rect.h - margin)),
+    };
+  }
+
+  function _nearestPlanDistance(source, candidates) {
+    const sx = source.x + source.w / 2;
+    const sy = source.y + source.h / 2;
+    return candidates
+      .filter(item => item.id !== source.id)
+      .map(item => {
+        const leftGap = item.x - (source.x + source.w);
+        const rightGap = source.x - (item.x + item.w);
+        const topGap = item.y - (source.y + source.h);
+        const bottomGap = source.y - (item.y + item.h);
+        const dx = leftGap > 0 ? leftGap : (rightGap > 0 ? -rightGap : 0);
+        const dy = topGap > 0 ? topGap : (bottomGap > 0 ? -bottomGap : 0);
+        const tx = item.x + item.w / 2;
+        const ty = item.y + item.h / 2;
+        const distancePx = Math.hypot(dx, dy);
+        return {
+          item,
+          distancePx,
+          from: { x: sx, y: sy },
+          to: { x: tx, y: ty },
+          metersPerPx: (source.metersPerPx + item.metersPerPx) / 2 || source.metersPerPx || 1,
+        };
+      })
+      .sort((a, b) => a.distancePx - b.distancePx)[0] || null;
+  }
+
+  function _drawPlanDistanceGuides(ctx, items) {
+    const selectedId = _activePlanDrag?.id || _selectedPlanId;
+    if (!selectedId) return;
+    const source = items.find(item => item.id === selectedId);
+    if (!source) return;
+    const candidates = source.type === 'block'
+      ? items.filter(item => item.type === 'block')
+      : items.filter(item => item.type !== 'block');
+    const nearest = _nearestPlanDistance(source, candidates);
+    if (!nearest || !Number.isFinite(nearest.distancePx)) return;
+    const meters = nearest.distancePx * nearest.metersPerPx;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,76,34,.82)';
+    ctx.fillStyle = '#9a3412';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(nearest.from.x, nearest.from.y);
+    ctx.lineTo(nearest.to.x, nearest.to.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const label = `${meters.toFixed(2)} m`;
+    const x = (nearest.from.x + nearest.to.x) / 2;
+    const y = (nearest.from.y + nearest.to.y) / 2;
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    const width = ctx.measureText(label).width + 10;
+    ctx.fillStyle = 'rgba(255,247,237,.94)';
+    ctx.fillRect(x - width / 2, y - 9, width, 18);
+    ctx.fillStyle = '#9a3412';
+    ctx.fillText(label, x, y + 1);
+    ctx.restore();
   }
 
   function _layoutPlanRooms(rooms, x, y, w, h) {
@@ -4752,16 +4927,77 @@ const MecFormModule = (() => {
   function _bindSchoolPlanCanvas() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
-    const hit = event => {
+    if (canvas.dataset.planBound === 'true') return;
+    canvas.dataset.planBound = 'true';
+    let blockDrag = null;
+    let suppressClick = false;
+    const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
-      const point = {
+      return {
         x: (event.clientX - rect.left) * (canvas.width / rect.width),
         y: (event.clientY - rect.top) * (canvas.height / rect.height),
       };
+    };
+    const hit = event => {
+      const point = pointFromEvent(event);
       return [..._planHitAreas].reverse().find(area =>
         point.x >= area.x && point.x <= area.x + area.w && point.y >= area.y && point.y <= area.y + area.h);
     };
+    const updateBlockPlacement = event => {
+      if (!blockDrag) return;
+      const point = pointFromEvent(event);
+      const next = _clampPlanRect({
+        x: point.x - blockDrag.offsetX,
+        y: point.y - blockDrag.offsetY,
+        w: blockDrag.w,
+        h: blockDrag.h,
+      }, canvas.width, canvas.height);
+      const block = _blockById(blockDrag.blockId);
+      if (!block) return;
+      block.planPosition = {
+        xRatio: Number((next.x / canvas.width).toFixed(4)),
+        yRatio: Number((next.y / canvas.height).toFixed(4)),
+      };
+      if (block.id === _data.__activeBlockId) _data.bloques = { ...(_data.bloques || {}), planPosition: block.planPosition };
+      _activePlanDrag = { id: `block::${block.id}`, blockId: block.id };
+      suppressClick = true;
+      _drawSchoolPlan();
+    };
+    canvas.addEventListener('pointerdown', event => {
+      const area = hit(event);
+      if (!area || area.type !== 'block') return;
+      const point = pointFromEvent(event);
+      blockDrag = {
+        blockId: area.blockId,
+        offsetX: point.x - area.x,
+        offsetY: point.y - area.y,
+        w: area.w,
+        h: area.h,
+      };
+      _selectedPlanId = area.id;
+      _activePlanDrag = { id: area.id, blockId: area.blockId };
+      canvas.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      _drawSchoolPlan();
+    });
+    canvas.addEventListener('pointermove', event => {
+      if (!blockDrag) return;
+      updateBlockPlacement(event);
+      event.preventDefault();
+    });
+    const endDrag = event => {
+      if (!blockDrag) return;
+      updateBlockPlacement(event);
+      blockDrag = null;
+      _activePlanDrag = null;
+      _saveDraft(false);
+      renderSchoolPlan();
+      setTimeout(() => { suppressClick = false; }, 80);
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
     canvas.addEventListener('click', event => {
+      if (suppressClick) return;
       const area = hit(event);
       if (!area) return;
       selectPlanItem(area.id);
@@ -4945,7 +5181,8 @@ const MecFormModule = (() => {
     ];
     layout.forEach(({ block, x, y, w, h }) => {
       parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#eef2f7" stroke="#172033" stroke-width="2"/>`);
-      parts.push(`<text x="${x + 10}" y="${y + 20}" font-family="system-ui" font-size="15" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}${block.largo_m && block.ancho_m ? ` · ${_escape(block.largo_m)} x ${_escape(block.ancho_m)} m` : ''}</text>`);
+      parts.push(`<text x="${x + 10}" y="${y + 14}" font-family="system-ui" font-size="12" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}</text>`);
+      if (block.largo_m && block.ancho_m) parts.push(`<text x="${x + 10}" y="${y + 26}" font-family="system-ui" font-size="9" font-weight="700" fill="#475467">${_escape(block.largo_m)} x ${_escape(block.ancho_m)} m</text>`);
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
       const floors = [...new Set([
