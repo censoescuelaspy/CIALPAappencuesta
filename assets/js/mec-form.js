@@ -6392,6 +6392,529 @@ const MecFormModule = (() => {
     UI.showToast('Modelo JSON del plano descargado.', 'success');
   }
 
+  function _planPrintPageSpec() {
+    return {
+      width: 277,
+      height: 190,
+      planX: 18,
+      planY: 38,
+      planW: 240,
+      planH: 116,
+      footerY: 174,
+    };
+  }
+
+  function _planPrintPositiveNumber(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isFinite(number) && number > 0 ? number : fallback;
+  }
+
+  function _planPrintFmt(value, decimals = 2) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '0';
+    return number.toFixed(decimals).replace(/\.?0+$/, '');
+  }
+
+  function _planPrintCoord(value) {
+    return _planPrintFmt(value, 3);
+  }
+
+  function _planPrintBlockDimensions(block) {
+    const length = Number(block?.largo_m || 0);
+    const width = Number(block?.ancho_m || 0);
+    return {
+      length: length > 0 ? length : 30,
+      width: width > 0 ? width : 20,
+      measured: length > 0 && width > 0,
+    };
+  }
+
+  function _planPrintScaleForBlocks(blocks) {
+    const page = _planPrintPageSpec();
+    const dimensions = (blocks || []).map(_planPrintBlockDimensions);
+    const maxLength = Math.max(...dimensions.map(item => item.length), 30);
+    const maxWidth = Math.max(...dimensions.map(item => item.width), 20);
+    const mmPerMeter = Math.max(.1, Math.min(6, page.planW / maxLength, page.planH / maxWidth));
+    return {
+      mmPerMeter,
+      denominator: Math.max(1, Math.round(1000 / mmPerMeter)),
+    };
+  }
+
+  function _planPrintTruncate(value, maxChars) {
+    const text = String(value || '');
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, Math.max(1, maxChars - 3))}...`;
+  }
+
+  function _planPrintClampRect(rect, bounds) {
+    const w = Math.max(.8, Math.min(rect.w, bounds.w));
+    const h = Math.max(.8, Math.min(rect.h, bounds.h));
+    return {
+      ...rect,
+      w,
+      h,
+      x: Math.max(bounds.x, Math.min(rect.x, bounds.x + bounds.w - w)),
+      y: Math.max(bounds.y, Math.min(rect.y, bounds.y + bounds.h - h)),
+    };
+  }
+
+  function _planPrintPackFallbackItems(items, floorRect, blockDimensions, mmPerMeter, kind) {
+    const padding = 1.5;
+    let cursorX = floorRect.x + padding;
+    let cursorY = floorRect.y + padding;
+    let rowH = 0;
+    return (items || []).map((entity, index) => {
+      const fallbackLength = kind === 'sanitary'
+        ? Math.min(4, Math.max(2, blockDimensions.length / 6))
+        : Math.min(7, Math.max(3, blockDimensions.length / Math.max(1, items.length || 1)));
+      const fallbackWidth = kind === 'sanitary' ? 2.4 : Math.min(5, Math.max(3, blockDimensions.width * .42));
+      const lengthM = _planPrintPositiveNumber(kind === 'sanitary' ? entity.largo_m : entity.length, fallbackLength);
+      const widthM = _planPrintPositiveNumber(kind === 'sanitary' ? entity.ancho_m : entity.width, fallbackWidth);
+      const w = Math.min(Math.max(5, lengthM * mmPerMeter), Math.max(5, floorRect.w - padding * 2));
+      const h = Math.min(Math.max(4, widthM * mmPerMeter), Math.max(4, floorRect.h - padding * 2));
+      if (cursorX + w > floorRect.x + floorRect.w - padding && cursorX > floorRect.x + padding) {
+        cursorX = floorRect.x + padding;
+        cursorY += rowH;
+        rowH = 0;
+      }
+      if (cursorY + h > floorRect.y + floorRect.h - padding) {
+        cursorY = Math.max(floorRect.y + padding, floorRect.y + floorRect.h - padding - h);
+      }
+      const item = {
+        kind,
+        room: kind === 'room' ? entity : null,
+        sanitary: kind === 'sanitary' ? entity : null,
+        x: cursorX,
+        y: cursorY,
+        w,
+        h,
+        lengthM,
+        widthM,
+        fallback: true,
+        label: kind === 'sanitary' ? (entity.codigo || `Sanitario ${index + 1}`) : (entity.name || `Aula ${index + 1}`),
+      };
+      cursorX += w;
+      rowH = Math.max(rowH, h);
+      return item;
+    });
+  }
+
+  function _planPrintRoomItems(rooms, floorRect, blockDimensions, mmPerMeter) {
+    const source = _sketchBlockRect();
+    const mapped = [];
+    const fallback = [];
+    (rooms || []).forEach(room => {
+      const object = _roomObjectForClassroom(room);
+      if (!object) {
+        fallback.push(room);
+        return;
+      }
+      const rect = _planPrintClampRect({
+        x: floorRect.x + ((object.x - source.x) / source.w) * floorRect.w,
+        y: floorRect.y + ((object.y - source.y) / source.h) * floorRect.h,
+        w: Math.max(.8, (object.w / source.w) * floorRect.w),
+        h: Math.max(.8, (object.h / source.h) * floorRect.h),
+      }, floorRect);
+      mapped.push({
+        kind: 'room',
+        room,
+        object,
+        ...rect,
+        lengthM: rect.w / mmPerMeter,
+        widthM: rect.h / mmPerMeter,
+        label: room.name || 'Aula',
+      });
+    });
+    return [
+      ...mapped,
+      ..._planPrintPackFallbackItems(fallback, floorRect, blockDimensions, mmPerMeter, 'room'),
+    ];
+  }
+
+  function _planPrintSanitaryItems(items, floorRect, blockDimensions, mmPerMeter) {
+    const source = _sketchBlockRect();
+    const mapped = [];
+    const fallback = [];
+    (items || []).forEach(item => {
+      const object = _ensureSanitaryRoomObject(item);
+      if (!object) {
+        fallback.push(item);
+        return;
+      }
+      const rect = _planPrintClampRect({
+        x: floorRect.x + ((object.x - source.x) / source.w) * floorRect.w,
+        y: floorRect.y + ((object.y - source.y) / source.h) * floorRect.h,
+        w: Math.max(.8, (object.w / source.w) * floorRect.w),
+        h: Math.max(.8, (object.h / source.h) * floorRect.h),
+      }, floorRect);
+      mapped.push({
+        kind: 'sanitary',
+        sanitary: item,
+        object,
+        ...rect,
+        lengthM: rect.w / mmPerMeter,
+        widthM: rect.h / mmPerMeter,
+        label: item.codigo || 'Sanitario',
+      });
+    });
+    return [
+      ...mapped,
+      ..._planPrintPackFallbackItems(fallback, floorRect, blockDimensions, mmPerMeter, 'sanitary'),
+    ];
+  }
+
+  function _planPrintDimensionLine(x1, y1, x2, y2, label, vertical = false) {
+    const tick = 2;
+    if (vertical) {
+      const midY = (y1 + y2) / 2;
+      const labelX = x1 - 4.2;
+      return `
+        <line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2)}" class="dim-line"/>
+        <line x1="${_planPrintCoord(x1 - tick)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x1 + tick)}" y2="${_planPrintCoord(y1)}" class="dim-line"/>
+        <line x1="${_planPrintCoord(x2 - tick)}" y1="${_planPrintCoord(y2)}" x2="${_planPrintCoord(x2 + tick)}" y2="${_planPrintCoord(y2)}" class="dim-line"/>
+        <text x="${_planPrintCoord(labelX)}" y="${_planPrintCoord(midY)}" transform="rotate(-90 ${_planPrintCoord(labelX)} ${_planPrintCoord(midY)})" class="dim-text">${_escape(label)}</text>`;
+    }
+    const midX = (x1 + x2) / 2;
+    return `
+      <line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2)}" class="dim-line"/>
+      <line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1 - tick)}" x2="${_planPrintCoord(x1)}" y2="${_planPrintCoord(y1 + tick)}" class="dim-line"/>
+      <line x1="${_planPrintCoord(x2)}" y1="${_planPrintCoord(y2 - tick)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2 + tick)}" class="dim-line"/>
+      <text x="${_planPrintCoord(midX)}" y="${_planPrintCoord(y1 - 1.7)}" class="dim-text">${_escape(label)}</text>`;
+  }
+
+  function _planPrintScaleBar(scale) {
+    const page = _planPrintPageSpec();
+    const meters = scale.mmPerMeter >= 3 ? 10 : 20;
+    const half = meters / 2;
+    const x = 18;
+    const y = page.footerY - 4;
+    const w = meters * scale.mmPerMeter;
+    return `
+      <g class="scale-bar">
+        <line x1="${x}" y1="${y}" x2="${_planPrintCoord(x + w)}" y2="${y}" class="scale-line"/>
+        <line x1="${x}" y1="${_planPrintCoord(y - 2)}" x2="${x}" y2="${_planPrintCoord(y + 2)}" class="scale-line"/>
+        <line x1="${_planPrintCoord(x + half * scale.mmPerMeter)}" y1="${_planPrintCoord(y - 2)}" x2="${_planPrintCoord(x + half * scale.mmPerMeter)}" y2="${_planPrintCoord(y + 2)}" class="scale-line"/>
+        <line x1="${_planPrintCoord(x + w)}" y1="${_planPrintCoord(y - 2)}" x2="${_planPrintCoord(x + w)}" y2="${_planPrintCoord(y + 2)}" class="scale-line"/>
+        <text x="${x}" y="${_planPrintCoord(y + 6)}" class="scale-text">0</text>
+        <text x="${_planPrintCoord(x + half * scale.mmPerMeter)}" y="${_planPrintCoord(y + 6)}" class="scale-text">${_escape(`${half} m`)}</text>
+        <text x="${_planPrintCoord(x + w)}" y="${_planPrintCoord(y + 6)}" class="scale-text">${_escape(`${meters} m`)}</text>
+        <text x="${_planPrintCoord(x + w + 10)}" y="${_planPrintCoord(y + 1)}" class="scale-note">Escala grafica aprox. 1:${_escape(scale.denominator)}</text>
+      </g>`;
+  }
+
+  function _planPrintDoorArcPath(hinge, radius, angles) {
+    const start = {
+      x: hinge.x + Math.cos(angles.start) * radius,
+      y: hinge.y + Math.sin(angles.start) * radius,
+    };
+    const end = {
+      x: hinge.x + Math.cos(angles.end) * radius,
+      y: hinge.y + Math.sin(angles.end) * radius,
+    };
+    const largeArc = Math.abs(angles.delta || 0) > Math.PI ? 1 : 0;
+    const sweep = angles.ccw ? 0 : 1;
+    return [
+      `M ${_planPrintCoord(hinge.x)} ${_planPrintCoord(hinge.y)}`,
+      `L ${_planPrintCoord(start.x)} ${_planPrintCoord(start.y)}`,
+      `A ${_planPrintCoord(radius)} ${_planPrintCoord(radius)} 0 ${largeArc} ${sweep} ${_planPrintCoord(end.x)} ${_planPrintCoord(end.y)}`,
+      'Z',
+    ].join(' ');
+  }
+
+  function _planPrintOpeningVariantSvg(rect, object, variant) {
+    const side = _openingSide(object);
+    const vertical = ['left', 'right'].includes(side);
+    const x1 = vertical ? rect.x + rect.w / 2 : rect.x;
+    const y1 = vertical ? rect.y : rect.y + rect.h / 2;
+    const x2 = vertical ? rect.x + rect.w / 2 : rect.x + rect.w;
+    const y2 = vertical ? rect.y + rect.h : rect.y + rect.h / 2;
+    const cls = variant === 'curtain' ? 'opening-curtain' : 'opening-gap';
+    return `<line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2)}" class="${cls}"/>`;
+  }
+
+  function _planPrintMappedChildRect(parent, sourceObject, object) {
+    const sx = parent.w / sourceObject.w;
+    const sy = parent.h / sourceObject.h;
+    return {
+      x: parent.x + (object.x - sourceObject.x) * sx,
+      y: parent.y + (object.y - sourceObject.y) * sy,
+      w: Math.max(.75, (object.w || 0) * sx),
+      h: Math.max(.75, (object.h || 0) * sy),
+      sx,
+      sy,
+    };
+  }
+
+  function _planPrintChildObjectsSvg(parent, sourceObject, objects, mmPerMeter, options = {}) {
+    if (!sourceObject) return '';
+    const parts = [];
+    (objects || []).forEach(object => {
+      if (['room', 'sanitary-room'].includes(object.type)) return;
+      if (object.type === 'wall') {
+        const sx = parent.w / sourceObject.w;
+        const sy = parent.h / sourceObject.h;
+        const x1 = parent.x + (object.x1 - sourceObject.x) * sx;
+        const y1 = parent.y + (object.y1 - sourceObject.y) * sy;
+        const x2 = parent.x + (object.x2 - sourceObject.x) * sx;
+        const y2 = parent.y + (object.y2 - sourceObject.y) * sy;
+        const length = Math.hypot(x2 - x1, y2 - y1) / mmPerMeter;
+        parts.push(`<line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2)}" class="inner-wall"/>`);
+        parts.push(`<text x="${_planPrintCoord((x1 + x2) / 2)}" y="${_planPrintCoord((y1 + y2) / 2 - 1.5)}" class="tiny-label">${_escape(`Pared ${_planPrintFmt(length)} m`)}</text>`);
+        return;
+      }
+      if (object.type === 'pencil' && Array.isArray(object.points) && object.points.length) {
+        const sx = parent.w / sourceObject.w;
+        const sy = parent.h / sourceObject.h;
+        const points = object.points.map(point => `${_planPrintCoord(parent.x + (point.x - sourceObject.x) * sx)},${_planPrintCoord(parent.y + (point.y - sourceObject.y) * sy)}`).join(' ');
+        parts.push(`<polyline points="${points}" class="free-line"/>`);
+        return;
+      }
+      if (object.type === 'text') {
+        const rect = _planPrintMappedChildRect(parent, sourceObject, object);
+        const text = object.ficha?.observacion || object.text || 'Texto';
+        parts.push(`<text x="${_planPrintCoord(rect.x)}" y="${_planPrintCoord(rect.y + 3)}" class="free-text">${_escape(_planPrintTruncate(text, 24))}</text>`);
+        return;
+      }
+      if (!['door', 'window', 'outlet', 'light', 'photo', 'damage', 'stair', 'stall'].includes(object.type)) return;
+      const rect = _planPrintMappedChildRect(parent, sourceObject, object);
+      if (object.type === 'door') {
+        const variant = _doorVariant(object);
+        if (variant !== 'door') {
+          parts.push(_planPrintOpeningVariantSvg(rect, object, variant));
+          return;
+        }
+        const vertical = ['left', 'right'].includes(_openingSide(object));
+        const thickness = Math.max(.7, vertical ? rect.w : rect.h);
+        const opening = { ...object, x: rect.x, y: rect.y, w: vertical ? thickness : rect.w, h: vertical ? rect.h : thickness };
+        const radius = Math.max(3, vertical ? rect.h : rect.w);
+        const hinge = _doorHingePoint(opening, thickness);
+        const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
+        const leafX = hinge.x + Math.cos(angles.leaf) * radius;
+        const leafY = hinge.y + Math.sin(angles.leaf) * radius;
+        parts.push(`<rect x="${_planPrintCoord(opening.x)}" y="${_planPrintCoord(opening.y)}" width="${_planPrintCoord(opening.w)}" height="${_planPrintCoord(opening.h)}" class="door-slot"/>`);
+        parts.push(`<path d="${_planPrintDoorArcPath(hinge, radius, angles)}" class="door-swing"/>`);
+        parts.push(`<line x1="${_planPrintCoord(hinge.x)}" y1="${_planPrintCoord(hinge.y)}" x2="${_planPrintCoord(leafX)}" y2="${_planPrintCoord(leafY)}" class="door-leaf"/>`);
+        return;
+      }
+      if (object.type === 'window') {
+        const vertical = ['left', 'right'].includes(_openingSide(object));
+        const length = vertical ? rect.h : rect.w;
+        const label = `${_planPrintFmt(length / mmPerMeter)} x ${_escape(object.ficha?.alto_m ? _planPrintFmt(object.ficha.alto_m) : 's/d')} m`;
+        const x1 = vertical ? rect.x + rect.w / 2 : rect.x;
+        const y1 = vertical ? rect.y : rect.y + rect.h / 2;
+        const x2 = vertical ? rect.x + rect.w / 2 : rect.x + rect.w;
+        const y2 = vertical ? rect.y + rect.h : rect.y + rect.h / 2;
+        parts.push(`<line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2)}" class="window-line"/>`);
+        if (length > 8) parts.push(`<text x="${_planPrintCoord((x1 + x2) / 2)}" y="${_planPrintCoord((y1 + y2) / 2 - 1.4)}" class="tiny-label">${_escape(label)}</text>`);
+        return;
+      }
+      if (object.type === 'outlet') {
+        parts.push(`<rect x="${_planPrintCoord(rect.x - 1.1)}" y="${_planPrintCoord(rect.y - 1.1)}" width="2.2" height="2.2" class="outlet-symbol"/>`);
+        return;
+      }
+      if (['light', 'photo'].includes(object.type)) {
+        parts.push(`<circle cx="${_planPrintCoord(rect.x)}" cy="${_planPrintCoord(rect.y)}" r="1.4" class="light-symbol"/>`);
+        parts.push(`<line x1="${_planPrintCoord(rect.x - 2.2)}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(rect.x + 2.2)}" y2="${_planPrintCoord(rect.y)}" class="light-ray"/>`);
+        parts.push(`<line x1="${_planPrintCoord(rect.x)}" y1="${_planPrintCoord(rect.y - 2.2)}" x2="${_planPrintCoord(rect.x)}" y2="${_planPrintCoord(rect.y + 2.2)}" class="light-ray"/>`);
+        return;
+      }
+      if (object.type === 'damage') {
+        parts.push(`<line x1="${_planPrintCoord(rect.x)}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(rect.x + Math.max(2, rect.w))}" y2="${_planPrintCoord(rect.y + Math.max(2, rect.h))}" class="damage-symbol"/>`);
+        parts.push(`<line x1="${_planPrintCoord(rect.x + Math.max(2, rect.w))}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(rect.x)}" y2="${_planPrintCoord(rect.y + Math.max(2, rect.h))}" class="damage-symbol"/>`);
+        return;
+      }
+      if (object.type === 'stair') {
+        const steps = 5;
+        parts.push(`<rect x="${_planPrintCoord(rect.x)}" y="${_planPrintCoord(rect.y)}" width="${_planPrintCoord(rect.w)}" height="${_planPrintCoord(rect.h)}" class="stair-box"/>`);
+        for (let i = 1; i < steps; i += 1) {
+          const x = rect.x + (rect.w / steps) * i;
+          parts.push(`<line x1="${_planPrintCoord(x)}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(x)}" y2="${_planPrintCoord(rect.y + rect.h)}" class="stair-step"/>`);
+        }
+        return;
+      }
+      if (object.type === 'stall') {
+        const label = object.ficha?.codigo || 'Cbn';
+        parts.push(`<rect x="${_planPrintCoord(rect.x)}" y="${_planPrintCoord(rect.y)}" width="${_planPrintCoord(rect.w)}" height="${_planPrintCoord(rect.h)}" class="stall-box"/>`);
+        parts.push(`<text x="${_planPrintCoord(rect.x + rect.w / 2)}" y="${_planPrintCoord(rect.y + Math.min(rect.h - 1, 3.2))}" class="tiny-label">${_escape(_planPrintTruncate(label, 8))}</text>`);
+      }
+    });
+    return parts.join('');
+  }
+
+  function _planPrintSpaceSvg(item, mmPerMeter) {
+    const isSanitary = item.kind === 'sanitary';
+    const label = item.label || (isSanitary ? 'Sanitario' : 'Aula');
+    const dims = `${_planPrintFmt(item.lengthM)} x ${_planPrintFmt(item.widthM)} m`;
+    const area = `${_planPrintFmt(item.lengthM * item.widthM)} m2`;
+    const labelChars = Math.max(5, Math.floor(item.w / 1.15));
+    const details = item.h >= 12 ? `<text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + 7.5)}" class="space-detail">${_escape(dims)}</text>` : '';
+    const areaText = item.h >= 17 ? `<text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + 11.2)}" class="space-detail">${_escape(area)}</text>` : '';
+    const children = isSanitary
+      ? _planPrintChildObjectsSvg(item, item.object, item.sanitary?.objects || [], mmPerMeter, { sanitary: true })
+      : _planPrintChildObjectsSvg(item, item.object, item.room?.objects || [], mmPerMeter);
+    return `
+      <g>
+        <rect x="${_planPrintCoord(item.x)}" y="${_planPrintCoord(item.y)}" width="${_planPrintCoord(item.w)}" height="${_planPrintCoord(item.h)}" class="${isSanitary ? 'space sanitary' : 'space room'}"/>
+        <rect x="${_planPrintCoord(item.x + .9)}" y="${_planPrintCoord(item.y + .9)}" width="${_planPrintCoord(Math.max(.2, item.w - 1.8))}" height="${_planPrintCoord(Math.max(.2, item.h - 1.8))}" class="space-inner"/>
+        <text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + 3.9)}" class="${isSanitary ? 'space-label sanitary-label' : 'space-label'}">${_escape(_planPrintTruncate(label, labelChars))}</text>
+        ${details}
+        ${areaText}
+        ${item.fallback ? `<text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + Math.max(4, item.h - 1.8))}" class="fallback-note">sin geometria</text>` : ''}
+        ${children}
+      </g>`;
+  }
+
+  function _planPrintFloorSheet(block, floor, sheetIndex, totalSheets, scale, generatedAt) {
+    const page = _planPrintPageSpec();
+    const rooms = _data.__classrooms || [];
+    const sanitaries = _data.__sanitaries || [];
+    const blockDimensions = _planPrintBlockDimensions(block);
+    const planW = blockDimensions.length * scale.mmPerMeter;
+    const planH = blockDimensions.width * scale.mmPerMeter;
+    const floorRect = {
+      x: page.planX + Math.max(0, (page.planW - planW) / 2),
+      y: page.planY + Math.max(0, (page.planH - planH) / 2),
+      w: planW,
+      h: planH,
+    };
+    const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+    const blockSanitaries = _sanitariesForBlock(block);
+    const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor || 'Piso 1') === floor);
+    const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
+    const roomItems = _planPrintRoomItems(floorRooms, floorRect, blockDimensions, scale.mmPerMeter);
+    const sanitaryItems = _planPrintSanitaryItems(floorSanitaries, floorRect, blockDimensions, scale.mmPerMeter);
+    const dimensionsLabel = `${_planPrintFmt(blockDimensions.length)} x ${_planPrintFmt(blockDimensions.width)} m`;
+    const missingNote = blockDimensions.measured
+      ? 'Dimensiones tomadas del bloque cargado.'
+      : 'Bloque sin largo/ancho cargado: hoja referencial con 30 x 20 m.';
+    const emptyNote = !roomItems.length && !sanitaryItems.length
+      ? `<text x="${page.width / 2}" y="${page.height / 2}" class="empty-note">Piso sin aulas ni sanitarios asociados</text>`
+      : '';
+    return `
+      <section class="print-sheet">
+        <svg xmlns="http://www.w3.org/2000/svg" width="${page.width}mm" height="${page.height}mm" viewBox="0 0 ${page.width} ${page.height}" role="img" aria-label="Plano ${_escape(block.bloque_codigo || 'Bloque')} ${_escape(floor)}">
+          <defs>
+            <style>
+              .page-bg{fill:#ffffff}
+              .title{font:700 5.2px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033}
+              .meta{font:500 2.75px system-ui,-apple-system,Segoe UI,sans-serif;fill:#475467}
+              .note{font:700 2.55px system-ui,-apple-system,Segoe UI,sans-serif;fill:#7c2d12}
+              .block{fill:#f8fafc;stroke:#172033;stroke-width:.75}
+              .block-inner{fill:none;stroke:#172033;stroke-width:.22;opacity:.45}
+              .space{stroke-width:.42}
+              .room{fill:#eaf4ff;stroke:#2b6cb0}
+              .sanitary{fill:#f2ecff;stroke:#805ad5}
+              .space-inner{fill:none;stroke:#6b8fb9;stroke-width:.18;opacity:.6}
+              .space-label{font:800 2.45px system-ui,-apple-system,Segoe UI,sans-serif;fill:#173f68}
+              .sanitary-label{fill:#44337a}
+              .space-detail,.tiny-label{font:700 1.9px system-ui,-apple-system,Segoe UI,sans-serif;fill:#334155}
+              .fallback-note{font:700 1.65px system-ui,-apple-system,Segoe UI,sans-serif;fill:#9a3412}
+              .dim-line{stroke:#172033;stroke-width:.22;fill:none}
+              .dim-text{font:800 2.35px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033;text-anchor:middle}
+              .scale-line{stroke:#172033;stroke-width:.35}
+              .scale-text{font:700 2.1px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033;text-anchor:middle}
+              .scale-note{font:700 2.25px system-ui,-apple-system,Segoe UI,sans-serif;fill:#475467}
+              .door-slot{fill:#dff4e8;stroke:#2f855a;stroke-width:.25}
+              .door-swing{fill:#2f855a;fill-opacity:.1;stroke:#2f855a;stroke-width:.18;stroke-dasharray:1.4 1}
+              .door-leaf{stroke:#2f855a;stroke-width:.42}
+              .opening-gap{stroke:#667085;stroke-width:.45;stroke-dasharray:2 1.2}
+              .opening-curtain{stroke:#7c3aed;stroke-width:.42;stroke-dasharray:.9 1}
+              .window-line{stroke:#2b6cb0;stroke-width:.65;stroke-linecap:round}
+              .outlet-symbol{fill:#fff7ed;stroke:#b7791f;stroke-width:.32}
+              .light-symbol{fill:#fffbeb;stroke:#d69e2e;stroke-width:.32}
+              .light-ray{stroke:#d69e2e;stroke-width:.22}
+              .damage-symbol{stroke:#c53030;stroke-width:.42}
+              .inner-wall{stroke:#172033;stroke-width:1.2;stroke-linecap:round}
+              .free-line{fill:none;stroke:#7c2d12;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}
+              .free-text{font:700 2.1px system-ui,-apple-system,Segoe UI,sans-serif;fill:#7c2d12}
+              .stair-box,.stall-box{fill:#f8fafc;stroke:#4b5563;stroke-width:.32}
+              .stair-step{stroke:#4b5563;stroke-width:.22}
+              .empty-note{font:800 4px system-ui,-apple-system,Segoe UI,sans-serif;fill:#667085;text-anchor:middle}
+              .footer{font:600 2.25px system-ui,-apple-system,Segoe UI,sans-serif;fill:#667085}
+            </style>
+          </defs>
+          <rect width="${page.width}" height="${page.height}" class="page-bg"/>
+          <text x="12" y="12" class="title">${_escape(`${block.bloque_codigo || 'Bloque'} - ${floor}`)}</text>
+          <text x="12" y="18" class="meta">${_escape(`Plano CIALPA a escala grafica - Bloque ${dimensionsLabel}`)}</text>
+          <text x="12" y="23" class="${blockDimensions.measured ? 'meta' : 'note'}">${_escape(missingNote)}</text>
+          <text x="${page.width - 12}" y="12" class="meta" text-anchor="end">${_escape(`Hoja ${sheetIndex} de ${totalSheets}`)}</text>
+          <text x="${page.width - 12}" y="18" class="meta" text-anchor="end">${_escape(generatedAt)}</text>
+
+          ${_planPrintDimensionLine(floorRect.x, floorRect.y - 5.5, floorRect.x + floorRect.w, floorRect.y - 5.5, `${_planPrintFmt(blockDimensions.length)} m`)}
+          ${_planPrintDimensionLine(floorRect.x - 5.5, floorRect.y, floorRect.x - 5.5, floorRect.y + floorRect.h, `${_planPrintFmt(blockDimensions.width)} m`, true)}
+          <rect x="${_planPrintCoord(floorRect.x)}" y="${_planPrintCoord(floorRect.y)}" width="${_planPrintCoord(floorRect.w)}" height="${_planPrintCoord(floorRect.h)}" class="block"/>
+          <rect x="${_planPrintCoord(floorRect.x + 1.5)}" y="${_planPrintCoord(floorRect.y + 1.5)}" width="${_planPrintCoord(Math.max(.2, floorRect.w - 3))}" height="${_planPrintCoord(Math.max(.2, floorRect.h - 3))}" class="block-inner"/>
+          ${[...roomItems, ...sanitaryItems].map(item => _planPrintSpaceSvg(item, scale.mmPerMeter)).join('')}
+          ${emptyNote}
+          ${_planPrintScaleBar(scale)}
+          <text x="${page.width - 12}" y="${page.footerY + 8}" class="footer" text-anchor="end">CIALPA - Relevamiento Escolar</text>
+        </svg>
+      </section>`;
+  }
+
+  function _planPrintHtml() {
+    _syncActiveClassroomFromSketch();
+    _syncActiveBlock();
+    _ensureClassrooms();
+    _ensureSanitaries();
+    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque', largo_m: 30, ancho_m: 20 }];
+    const version = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version;
+    const generatedAt = new Date().toLocaleString('es-PY');
+    const scale = _planPrintScaleForBlocks(blocks);
+    const planPages = [];
+    blocks.forEach(block => {
+      _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []).forEach(floor => {
+        planPages.push({ block, floor });
+      });
+    });
+    const totalSheets = Math.max(1, planPages.length);
+    const sheets = planPages.length
+      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 1, totalSheets, scale, generatedAt)).join('')
+      : '<section class="print-sheet"><p class="print-empty">No hay plano cargado para imprimir.</p></section>';
+    return `
+      <!doctype html>
+      <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>${_escape(`Plano escuela CIALPA - ${generatedAt}`)}</title>
+        <style>
+          @page { size: A4 landscape; margin: 10mm; }
+          html, body { margin: 0; padding: 0; background: #e5e7eb; color: #172033; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
+          .print-actions { position: fixed; z-index: 10; right: 16px; top: 16px; display: flex; gap: 8px; }
+          .print-actions button { border: 0; border-radius: 6px; padding: 9px 12px; font-weight: 800; cursor: pointer; }
+          .print-actions button:first-child { background: #173f68; color: #fff; }
+          .print-actions button:last-child { background: #fff; color: #172033; border: 1px solid #cbd5e1; }
+          .print-sheet { width: 277mm; height: 190mm; margin: 14px auto; background: #fff; box-shadow: 0 14px 35px rgba(15, 23, 42, .18); break-after: page; page-break-after: always; overflow: hidden; }
+          .print-sheet:last-child { break-after: auto; page-break-after: auto; }
+          .print-empty { padding: 28mm; font-size: 18px; font-weight: 800; }
+          svg { width: 100%; height: 100%; display: block; }
+          @media print {
+            html, body { background: #fff; }
+            .print-actions { display: none; }
+            .print-sheet { margin: 0; box-shadow: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="print-actions">
+          <button type="button" onclick="window.print()">Imprimir / guardar PDF</button>
+          <button type="button" onclick="window.close()">Cerrar</button>
+        </div>
+        ${sheets}
+        <script>
+          window.addEventListener('load', function () {
+            document.title = ${JSON.stringify(`Plano escuela CIALPA v${version} - ${generatedAt}`)};
+            setTimeout(function () {
+              window.focus();
+              window.print();
+            }, 350);
+          });
+        </script>
+      </body>
+      </html>`;
+  }
+
   function _planSvgMarkup() {
     const rooms = _data.__classrooms || [];
     const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
@@ -6457,70 +6980,19 @@ const MecFormModule = (() => {
   }
 
   function printPlanPdf() {
-    const canvas = _activeSchoolPlanCanvas();
-    if (!canvas) {
-      UI.showToast('Abra la vista Plano escuela para imprimir el plano.', 'warning');
+    _syncActiveClassroomFromSketch();
+    _syncActiveBlock();
+    const hasPlanData = (_data.__classrooms || []).length || (_data.__sanitaries || []).length || (_data.__blocks || []).length;
+    if (!hasPlanData) {
+      UI.showToast('Cargue al menos un bloque, aula o sanitario antes de imprimir el plano.', 'warning');
       return;
     }
-    _drawSchoolPlan();
-    const image = canvas.toDataURL('image/png');
-    const model = _buildSchoolPlanModel();
-    const metrics = _schoolPlanMetrics(_data.__classroomSketch || {}, _schoolPlanObjects());
-    const version = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version;
-    const title = `Plano escuela CIALPA - ${new Date().toLocaleString('es-PY')}`;
     const popup = window.open('', '_blank');
     if (!popup) {
       UI.showToast('El navegador bloqueo la ventana de impresion. Habilite ventanas emergentes para generar PDF.', 'warning', 7000);
       return;
     }
-    popup.document.write(`
-      <!doctype html>
-      <html lang="es">
-      <head>
-        <meta charset="utf-8">
-        <title>${_escape(title)}</title>
-        <style>
-          @page { size: A4 landscape; margin: 12mm; }
-          body { margin: 0; color: #172033; font-family: system-ui, -apple-system, Segoe UI, sans-serif; }
-          header { display: flex; justify-content: space-between; gap: 16px; border-bottom: 2px solid #172033; padding-bottom: 8px; margin-bottom: 10px; }
-          h1 { margin: 0; font-size: 18px; }
-          small { color: #667085; }
-          .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 10px; }
-          .kpi { border: 1px solid #dbe5f1; padding: 8px; border-radius: 6px; }
-          .kpi span { display: block; color: #667085; font-size: 10px; text-transform: uppercase; font-weight: 800; }
-          .kpi strong { display: block; font-size: 16px; }
-          img { width: 100%; height: auto; border: 1px solid #dbe5f1; }
-          footer { margin-top: 8px; color: #667085; font-size: 10px; display: flex; justify-content: space-between; }
-        </style>
-      </head>
-      <body>
-        <header>
-          <div>
-            <h1>Plano escuela CIALPA</h1>
-            <small>Edicion vigente v${_escape(version)} · ${_escape(model.exportedAt)}</small>
-          </div>
-          <small>Exportacion para impresion / guardar como PDF</small>
-        </header>
-        <section class="kpis">
-          <div class="kpi"><span>Area relevada</span><strong>${metrics.areaTotal.toFixed(2)} m2</strong></div>
-          <div class="kpi"><span>Aulas</span><strong>${metrics.rooms}</strong></div>
-          <div class="kpi"><span>Bloques</span><strong>${metrics.blocks}</strong></div>
-          <div class="kpi"><span>Puertas</span><strong>${metrics.doors}</strong></div>
-          <div class="kpi"><span>Ventanas</span><strong>${metrics.windows}</strong></div>
-        </section>
-        <img src="${image}" alt="Plano general de la escuela">
-        <footer>
-          <span>CIALPA - Relevamiento Escolar</span>
-          <span>Fuente: datos cargados en el dispositivo / borrador local</span>
-        </footer>
-        <script>
-          window.onload = function () {
-            window.focus();
-            window.print();
-          };
-        </script>
-      </body>
-      </html>`);
+    popup.document.write(_planPrintHtml());
     popup.document.close();
   }
 
