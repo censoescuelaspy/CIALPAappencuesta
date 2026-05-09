@@ -32,6 +32,16 @@ const MecFormModule = (() => {
   };
 
   const SKETCH_CANVAS = { width: 760, height: 460 };
+  const BLOCK_ELECTRIC_FIELDS = [
+    'tablero_estado',
+    'acometida_tipo',
+    'medidor_estado',
+    'llave_termomagnetica',
+    'proteccion_diferencial',
+    'puesta_tierra',
+    'circuitos_identificados',
+    'electricidad_observacion',
+  ];
 
   const SKETCH_TOOLS = [
     { id: 'select', label: 'Seleccionar' },
@@ -68,6 +78,7 @@ const MecFormModule = (() => {
       _activeModuleId = _data.__activeModuleId || _activeModuleId;
       _activeClassroomId = _data.__activeClassroomId || _data.__classroomSketch?.id || _activeClassroomId;
       _activeSanitaryId = _data.__activeSanitaryId || _activeSanitaryId;
+      _migrateElectricityDraftToBlocks();
     } catch {
       _data = {};
     }
@@ -101,7 +112,7 @@ const MecFormModule = (() => {
   }
 
   async function _setEvidenceFiles(moduleId, fieldId, files) {
-    const key = `${moduleId}.${fieldId}`;
+    const key = _fieldEvidenceKey(moduleId, fieldId);
     _data.__evidence = _data.__evidence || {};
     _data.__evidence[key] = await Promise.all([...files].map(file => _readEvidenceFile(file, _fieldEvidenceContext(moduleId, fieldId))));
     _saveDraft(false);
@@ -159,13 +170,20 @@ const MecFormModule = (() => {
   function _fieldEvidenceContext(moduleId, fieldId) {
     const module = MEC_SCHEMA.modules.find(item => item.id === moduleId);
     const field = module?.sections.flatMap(section => section.fields).find(item => item.id === fieldId);
+    const block = moduleId === 'bloques' ? _blockById(_data.__activeBlockId) : null;
     return {
       scope: 'cuestionario',
       moduleLabel: module?.title || moduleId,
+      blockLabel: block?.bloque_codigo || '',
       elementType: 'Campo',
       elementLabel: field?.label || fieldId,
-      fieldPath: `${moduleId}.${fieldId}`,
+      fieldPath: _fieldEvidenceKey(moduleId, fieldId),
     };
+  }
+
+  function _fieldEvidenceKey(moduleId, fieldId) {
+    if (moduleId === 'bloques' && _data.__activeBlockId) return `${moduleId}.${_data.__activeBlockId}.${fieldId}`;
+    return `${moduleId}.${fieldId}`;
   }
 
   function _classroomEvidenceContext(room = _data.__classroomSketch || {}) {
@@ -363,15 +381,20 @@ const MecFormModule = (() => {
     const root = document.getElementById('mec-form-root');
     if (!root) return;
     _normalizeNumberedNames();
+    _migrateElectricityDraftToBlocks();
 
     const saved = _readSavedMeta();
     const implemented = MEC_SCHEMA.modules.filter(module => module.status !== 'planned');
+    if (!implemented.some(module => module.id === _activeModuleId)) {
+      _activeModuleId = implemented[0]?.id || 'general';
+      _data.__activeModuleId = _activeModuleId;
+    }
+    const activeModule = implemented.find(module => module.id === _activeModuleId) || implemented[0];
     root.innerHTML = `
       <div class="mec-command">
         <div>
-          <p class="mec-eyebrow">Replica CIALPA del cuestionario MEC</p>
           <h3>Carga tecnica guiada</h3>
-          <p>Complete por etapas. La app guarda cada cambio y muestra solo lo necesario segun las respuestas.</p>
+          <p>Autoguardado activo. Trabaje por bloque, piso y ambiente; la barra superior mantiene la navegacion siempre a mano.</p>
         </div>
         <div class="mec-command__stats">
           <div>
@@ -390,19 +413,22 @@ const MecFormModule = (() => {
           <nav class="mec-stepper" aria-label="Modulos del cuestionario MEC">
             ${MEC_SCHEMA.modules.map((module, index) => _renderModuleNav(module, index)).join('')}
           </nav>
-          <div class="mec-rail__actions">
-            <button class="btn btn-primary btn-sm" onclick="MecFormModule.validate()">Validar etapa</button>
-            <span class="mec-autosave-pill">Autoguardado siempre activo</span>
-          </div>
-          <div id="mec-validation-summary" class="mec-validation-summary"></div>
         </aside>
 
         <section class="mec-questionnaire">
           <div class="mec-stage-toolbar">
             <button class="btn btn-outline btn-sm" onclick="MecFormModule.previousModule()">Anterior</button>
-            <span>${implemented.length} etapas activas en este prototipo</span>
+            <label class="mec-stage-select">
+              <span>Etapa</span>
+              <select class="form-control form-control-sm" onchange="MecFormModule.selectModule(this.value)">
+                ${implemented.map(module => `<option value="${_escape(module.id)}" ${module.id === _activeModuleId ? 'selected' : ''}>${_escape(module.title)}</option>`).join('')}
+              </select>
+            </label>
+            <span class="mec-stage-current">${_escape(activeModule?.description || `${implemented.length} etapas activas`)}</span>
+            <button class="btn btn-outline btn-sm" onclick="MecFormModule.validate()">Validar</button>
             <button class="btn btn-primary btn-sm" onclick="MecFormModule.nextModule()">Siguiente</button>
           </div>
+          <div id="mec-validation-summary" class="mec-validation-summary"></div>
           ${MEC_SCHEMA.modules.map(_renderModule).join('')}
         </section>
       </div>`;
@@ -645,9 +671,9 @@ const MecFormModule = (() => {
   }
 
   function _renderEvidenceControl(moduleId, field) {
-    const key = `${moduleId}.${field.id}`;
+    const key = _fieldEvidenceKey(moduleId, field.id);
     const photos = _data.__evidence?.[key] || [];
-    const inputId = `mec_photo_${moduleId}_${field.id}`;
+    const inputId = `mec_photo_${_slug(key)}`;
     return `
       <div class="mec-evidence" data-evidence-key="${_escape(key)}">
         <input id="${_escape(inputId)}" class="mec-evidence-input" type="file" accept="image/*" capture="environment" multiple
@@ -1275,6 +1301,30 @@ const MecFormModule = (() => {
     }
   }
 
+  function _migrateElectricityDraftToBlocks() {
+    if (!_data?.electricidad || _data.__electricidadMigratedToBlocks) return;
+    _ensureBlocks();
+    const target = _blockById(_data.__activeBlockId) || (_data.__blocks || [])[0];
+    if (!target) return;
+    BLOCK_ELECTRIC_FIELDS.forEach(field => {
+      if (target[field] === undefined && _data.electricidad[field] !== undefined) {
+        target[field] = _data.electricidad[field];
+      }
+    });
+    if (target.id === _data.__activeBlockId) {
+      const { id: _id, ...values } = target;
+      _data.bloques = { ...(_data.bloques || {}), ...values };
+    }
+    if (_data.__evidence) {
+      BLOCK_ELECTRIC_FIELDS.forEach(field => {
+        const oldKey = `electricidad.${field}`;
+        const newKey = `bloques.${target.id}.${field}`;
+        if (_data.__evidence[oldKey] && !_data.__evidence[newKey]) _data.__evidence[newKey] = _data.__evidence[oldKey];
+      });
+    }
+    _data.__electricidadMigratedToBlocks = true;
+  }
+
   function _syncActiveBlock() {
     _ensureBlocks();
     const foundIndex = (_data.__blocks || []).findIndex(item => item.id === _data.__activeBlockId);
@@ -1297,6 +1347,7 @@ const MecFormModule = (() => {
       block.cantidad_plantas ? `${block.cantidad_plantas} planta(s)` : '',
       block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : '',
       block.tipo_circulacion || '',
+      block.tablero_estado ? `Tablero: ${block.tablero_estado}` : '',
     ].filter(Boolean).join(' · ') || 'Pendiente de completar';
   }
 
@@ -4916,6 +4967,11 @@ const MecFormModule = (() => {
 
   function _refreshDynamicState() {
     if (!_initialized && !document.getElementById('mec-form-root')) return;
+    const activeModule = MEC_SCHEMA.modules.find(module => module.id === _activeModuleId);
+    const stageSelect = document.querySelector('.mec-stage-select select');
+    const stageCurrent = document.querySelector('.mec-stage-current');
+    if (stageSelect && stageSelect.value !== _activeModuleId) stageSelect.value = _activeModuleId;
+    if (stageCurrent && activeModule) stageCurrent.textContent = activeModule.description || activeModule.title || '';
 
     MEC_SCHEMA.modules.forEach(module => {
       const moduleEl = document.querySelector(`.mec-module[data-module="${module.id}"]`);

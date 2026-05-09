@@ -4,7 +4,7 @@
  */
 
 const MEC_SCHEMA = {
-  version: '0.1.1',
+  version: '0.1.2',
   source: 'manual/MANUAL_ENCUESTADOR_CIALPA.md',
   modules: [
     {
@@ -109,25 +109,9 @@ const MEC_SCHEMA = {
       ],
     },
     {
-      id: 'electricidad',
-      title: 'Electricidad',
-      description: 'Tablero, acometida, medidor, protecciones y estado general.',
-      sections: [
-        {
-          id: 'tablero',
-          title: '1 - Tablero y protecciones',
-          fields: [
-            { id: 'tablero_estado', label: 'Estado del tablero electrico principal', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto obligatoria del tablero electrico', options: ['Bueno', 'Regular', 'Malo', 'No existe / no visible'] },
-            { id: 'llave_termomagnetica', label: 'Cuenta con llave termomagnetica', type: 'radio', evidence: true, evidenceLabel: 'Foto de protecciones', options: ['Si', 'No', 'No verificable'] },
-            { id: 'electricidad_observacion', label: 'Observaciones electricas', type: 'textarea' },
-          ],
-        },
-      ],
-    },
-    {
       id: 'bloques',
       title: 'Bloques y Plantas',
-      description: 'Registro basico del bloque, cantidad de plantas y circulacion.',
+      description: 'Registro del bloque, pisos, circulacion y caracteristicas electricas propias.',
       sections: [
         {
           id: 'bloque_general',
@@ -139,6 +123,20 @@ const MEC_SCHEMA = {
             { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'tipo_circulacion', label: 'Circulacion vertical principal', type: 'radio', options: ['Escalera', 'Rampa', 'Ambas', 'No aplica'] },
             { id: 'bloque_observacion', label: 'Observaciones del bloque', type: 'textarea' },
+          ],
+        },
+        {
+          id: 'bloque_electricidad',
+          title: '2 - Electricidad del bloque',
+          fields: [
+            { id: 'tablero_estado', label: 'Estado del tablero electrico del bloque', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del tablero electrico del bloque', options: ['Bueno', 'Regular', 'Malo', 'No existe / no visible'] },
+            { id: 'acometida_tipo', label: 'Acometida del bloque', type: 'radio', evidence: true, evidenceLabel: 'Foto de acometida o punto de ingreso', options: ['Aerea', 'Subterranea', 'Compartida con otro bloque', 'No visible', 'No existe'] },
+            { id: 'medidor_estado', label: 'Medidor o punto de medicion', type: 'radio', options: ['Propio del bloque', 'Compartido', 'No visible', 'No existe'] },
+            { id: 'llave_termomagnetica', label: 'Llave termomagnetica del bloque', type: 'radio', evidence: true, evidenceLabel: 'Foto de protecciones electricas del bloque', options: ['Si', 'No', 'No verificable'] },
+            { id: 'proteccion_diferencial', label: 'Disyuntor diferencial', type: 'radio', options: ['Si', 'No', 'No verificable'] },
+            { id: 'puesta_tierra', label: 'Puesta a tierra visible/verificable', type: 'radio', options: ['Si', 'No', 'No verificable'] },
+            { id: 'circuitos_identificados', label: 'Circuitos identificados/rotulados', type: 'radio', options: ['Si', 'Parcialmente', 'No'] },
+            { id: 'electricidad_observacion', label: 'Observaciones electricas del bloque', type: 'textarea' },
           ],
         },
       ],

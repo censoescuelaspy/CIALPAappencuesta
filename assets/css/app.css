@@ -1,7 +1,7 @@
 /* ============================================================
    CIALPA — Relevamiento Escolar
    app.css — Complete application styles
-   Version: 2.5.17
+   Version: 2.5.18
    ============================================================ */
 
 /* ── CSS Custom Properties ────────────────────────────────── */
@@ -1727,7 +1727,7 @@ td {
   font-size: .8rem;
 }
 
-/* ── Densidad móvil/tablet, v2.5.17 ───────────────────────── */
+/* ── Densidad móvil/tablet, v2.5.18 ───────────────────────── */
 @media (max-width: 1024px) {
   :root {
     --sidebar-width: 232px;

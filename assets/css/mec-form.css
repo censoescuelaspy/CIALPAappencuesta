@@ -10,9 +10,9 @@
   display: flex;
   align-items: stretch;
   justify-content: space-between;
-  gap: 1.25rem;
-  margin-bottom: 1rem;
-  padding: 1.1rem;
+  gap: .9rem;
+  margin-bottom: .75rem;
+  padding: .75rem .85rem;
   border: 1px solid #d8e0ea;
   border-radius: var(--radius-md);
   background: #ffffff;
@@ -31,13 +31,15 @@
 .mec-command h3 {
   margin: 0 0 .25rem;
   color: #172033;
-  font-size: 1.28rem;
+  font-size: 1.08rem;
 }
 
 .mec-command p {
   max-width: 680px;
   margin: 0;
   color: #617083;
+  font-size: .86rem;
+  line-height: 1.35;
 }
 
 .mec-command__stats {
@@ -48,8 +50,8 @@
 }
 
 .mec-command__stats div {
-  min-height: 74px;
-  padding: .75rem;
+  min-height: 58px;
+  padding: .55rem;
   border: 1px solid #dbe5f1;
   border-radius: var(--radius-md);
   background: #f7fafc;
@@ -67,12 +69,12 @@
   display: block;
   margin-top: .3rem;
   color: #172033;
-  font-size: 1rem;
+  font-size: .92rem;
 }
 
 .mec-shell {
   display: grid;
-  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-columns: 204px minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
@@ -85,17 +87,17 @@
 .mec-stepper {
   display: flex;
   flex-direction: column;
-  gap: .55rem;
+  gap: .42rem;
   margin-bottom: .8rem;
 }
 
 .mec-step {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: .65rem;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: .48rem;
   width: 100%;
-  min-height: 66px;
-  padding: .65rem;
+  min-height: 54px;
+  padding: .5rem;
   border: 1px solid #dbe5f1;
   border-radius: var(--radius-md);
   background: #fff;
@@ -122,8 +124,8 @@
 }
 
 .mec-step__number {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -145,12 +147,13 @@
 
 .mec-step__text strong {
   line-height: 1.15;
+  font-size: .86rem;
 }
 
 .mec-step__text small {
   margin-top: .25rem;
   color: #66788d;
-  font-size: .75rem;
+  font-size: .68rem;
 }
 
 .mec-rail__actions {
@@ -175,6 +178,7 @@
 }
 
 .mec-validation-summary {
+  margin-bottom: .75rem;
   padding: .8rem;
   border: 1px solid #f2c2c2;
   border-radius: var(--radius-md);
@@ -213,17 +217,45 @@
   justify-content: space-between;
   gap: .75rem;
   margin-bottom: .75rem;
-  padding: .65rem .75rem;
+  padding: .55rem .65rem;
   border: 1px solid #dbe5f1;
   border-radius: var(--radius-md);
   background: #fff;
   box-shadow: var(--shadow-sm);
 }
 
-.mec-stage-toolbar span {
+.mec-stage-toolbar .btn {
+  min-height: 40px;
+}
+
+.mec-stage-current {
+  flex: 1 1 220px;
   color: #66788d;
-  font-size: .84rem;
+  font-size: .78rem;
   font-weight: 700;
+  line-height: 1.25;
+}
+
+.mec-stage-select {
+  flex: 0 1 220px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .45rem;
+  align-items: center;
+  margin: 0;
+}
+
+.mec-stage-select span {
+  color: #415068;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.mec-stage-select .form-control {
+  min-height: 40px;
+  padding-block: .35rem;
+  font-weight: 800;
 }
 
 .mec-module {
@@ -1220,7 +1252,7 @@
   }
 
   .mec-rail {
-    position: static;
+    display: none;
   }
 
   .mec-stepper {
@@ -1267,7 +1299,7 @@
   }
 }
 
-/* ── Densidad móvil/tablet para carga de campo, v2.5.17 ───── */
+/* ── Densidad móvil/tablet para carga de campo, v2.5.18 ───── */
 @media (max-width: 1024px) {
   .mec-header-actions {
     gap: .35rem;
@@ -1353,8 +1385,12 @@
     padding: .5rem .6rem;
   }
 
-  .mec-stage-toolbar span {
+  .mec-stage-current {
     font-size: .76rem;
+  }
+
+  .mec-stage-select {
+    flex: 1 1 210px;
   }
 
   .mec-module__header {
@@ -1690,9 +1726,14 @@
     flex: 1 1 calc(50% - .3rem);
   }
 
-  .mec-stage-toolbar span {
+  .mec-stage-current {
     flex: 1 1 100%;
     font-size: .68rem;
+  }
+
+  .mec-stage-select {
+    flex: 1 1 100%;
+    grid-template-columns: 42px minmax(0, 1fr);
   }
 
   .mec-module__header {
@@ -1899,6 +1940,11 @@
 @media (max-width: 430px) {
   .mec-field-grid {
     grid-template-columns: 1fr;
+  }
+
+  .mec-stage-select,
+  .mec-stage-current {
+    flex: 1 1 100%;
   }
 
   .mec-options,
