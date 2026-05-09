@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.5.11
+ * Version: 2.5.12
  */
 
 const MapModule = (() => {
