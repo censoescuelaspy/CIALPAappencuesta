@@ -647,28 +647,6 @@
   gap: .75rem;
 }
 
-.mec-block-preview {
-  margin-top: .75rem;
-  padding: .65rem;
-  border: 1px solid #dbe5f1;
-  border-radius: var(--radius-md);
-  background: #fff;
-}
-
-.mec-block-preview strong {
-  display: block;
-  margin-bottom: .35rem;
-  color: #27364a;
-  font-size: .82rem;
-}
-
-.mec-block-preview canvas {
-  width: 100%;
-  display: block;
-  border: 1px solid #e2e8f0;
-  border-radius: var(--radius-md);
-}
-
 .mec-choice-buttons {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
@@ -1246,7 +1224,7 @@
   }
 }
 
-/* ── Densidad móvil/tablet para carga de campo, v2.5.6 ────── */
+/* ── Densidad móvil/tablet para carga de campo, v2.5.7 ────── */
 @media (max-width: 1024px) {
   .mec-header-actions {
     gap: .35rem;

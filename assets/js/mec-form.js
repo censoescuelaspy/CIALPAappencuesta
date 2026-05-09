@@ -716,10 +716,6 @@ const MecFormModule = (() => {
                 </button>`).join('')}
             </div>
             <small id="mec-sketch-status">${_escape(_sketchStatusText(sketch))}</small>
-            <div class="mec-block-preview">
-              <strong>Ubicacion en bloque</strong>
-              <canvas id="mec-block-preview-canvas" width="420" height="180" aria-label="Vista del aula dentro del bloque"></canvas>
-            </div>
           </div>
         </div>
       </section>`;
@@ -1781,7 +1777,6 @@ const MecFormModule = (() => {
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', touchEnd, { passive: false });
     _drawSketch(ctx, canvas);
-    _drawBlockPreview();
     _centerSketchOnActiveRoom();
   }
 
@@ -1829,20 +1824,158 @@ const MecFormModule = (() => {
     ctx.fillStyle = 'rgba(23,32,51,.66)';
     ctx.textAlign = 'left';
     ctx.fillText(`${block?.bloque_codigo || 'Bloque actual'} · contenedor de aulas`, blockRect.x + 8, blockRect.y - 10);
-    rooms.forEach(({ room, object }) => {
-      ctx.fillStyle = 'rgba(43,108,176,.065)';
-      ctx.strokeStyle = 'rgba(43,108,176,.42)';
+    rooms.forEach(({ room }) => _drawContextClassroom(ctx, room));
+    ctx.restore();
+  }
+
+  function _drawContextClassroom(ctx, room) {
+    const roomObject = _roomObjectForClassroom(room);
+    if (!roomObject) return;
+    ctx.save();
+    ctx.globalAlpha = .58;
+    _drawContextRoom(ctx, room, roomObject);
+    (room.objects || [])
+      .filter(object => object.id !== roomObject.id)
+      .forEach(object => _drawContextSketchObject(ctx, room, object));
+    ctx.restore();
+  }
+
+  function _drawContextRoom(ctx, room, roomObject) {
+    ctx.fillStyle = 'rgba(43,108,176,.065)';
+    ctx.strokeStyle = 'rgba(43,108,176,.44)';
+    ctx.lineWidth = 2;
+    ctx.fillRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
+    ctx.strokeRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
+    ctx.strokeStyle = 'rgba(43,108,176,.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
+    _labelSketchObject(ctx, roomObject, `${room.name || 'Aula'} ${_contextDimensionsText(room, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14);
+  }
+
+  function _drawContextSketchObject(ctx, room, object) {
+    const label = _contextObjectLabel(room, object);
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (object.type === 'wall') {
+      ctx.strokeStyle = 'rgba(23,32,51,.58)';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(object.x1, object.y1);
+      ctx.lineTo(object.x2, object.y2);
+      ctx.stroke();
+      _labelSketchObject(ctx, object, label, (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 14);
+      ctx.restore();
+      return;
+    }
+    if (object.type === 'pencil') {
+      const points = object.points || [];
+      if (points.length) {
+        ctx.strokeStyle = 'rgba(124,45,18,.62)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        points.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+        ctx.stroke();
+      }
+      ctx.restore();
+      return;
+    }
+    if (object.type === 'text') {
+      ctx.fillStyle = 'rgba(124,45,18,.72)';
+      ctx.font = '800 12px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(_truncateLabel(ctx, object.ficha?.observacion || object.text || 'Texto', Math.max(24, object.w || 80)), object.x + (object.w || 0) / 2, object.y + (object.h || 0) / 2);
+      ctx.restore();
+      return;
+    }
+    if (_isPointSketchObject(object)) {
+      ctx.fillStyle = object.type === 'outlet' ? 'rgba(183,121,31,.68)' : 'rgba(214,158,46,.68)';
+      ctx.strokeStyle = 'rgba(23,32,51,.36)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(object.x, object.y, _sketchPointRadius(object.type), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      _labelSketchObject(ctx, object, label, object.x, object.y + 21);
+      ctx.restore();
+      return;
+    }
+    if (object.type === 'door') {
+      ctx.fillStyle = 'rgba(47,133,90,.18)';
+      ctx.strokeStyle = 'rgba(47,133,90,.68)';
       ctx.lineWidth = 2;
       ctx.fillRect(object.x, object.y, object.w, object.h);
       ctx.strokeRect(object.x, object.y, object.w, object.h);
-      ctx.strokeStyle = 'rgba(43,108,176,.25)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(object.x + 5, object.y + 5, Math.max(0, object.w - 10), Math.max(0, object.h - 10));
-      ctx.fillStyle = 'rgba(23,63,104,.76)';
-      ctx.font = '800 10px system-ui, sans-serif';
-      ctx.fillText(room.name || 'Aula', object.x + 6, object.y + 14);
-    });
+      _drawContextOpeningSwing(ctx, object);
+    } else if (object.type === 'window') {
+      ctx.fillStyle = 'rgba(43,108,176,.14)';
+      ctx.strokeStyle = 'rgba(43,108,176,.68)';
+      ctx.lineWidth = 3;
+      ctx.fillRect(object.x, object.y, object.w, object.h);
+      ctx.strokeRect(object.x, object.y, object.w, object.h);
+    } else if (object.type === 'stair') {
+      ctx.fillStyle = 'rgba(74,85,104,.14)';
+      ctx.strokeStyle = 'rgba(74,85,104,.62)';
+      ctx.lineWidth = 2;
+      ctx.fillRect(object.x, object.y, object.w, object.h);
+      ctx.strokeRect(object.x, object.y, object.w, object.h);
+    } else {
+      const style = _sketchStyle(object.type);
+      ctx.fillStyle = style.fill;
+      ctx.strokeStyle = style.stroke;
+      ctx.lineWidth = Math.max(1.5, style.lineWidth - 1);
+      ctx.fillRect(object.x, object.y, object.w, object.h);
+      ctx.strokeRect(object.x, object.y, object.w, object.h);
+    }
+    _labelSketchObject(ctx, object, label, object.x + (object.w || 0) / 2, object.y - 14);
     ctx.restore();
+  }
+
+  function _drawContextOpeningSwing(ctx, object) {
+    if (object.type !== 'door') return;
+    const vertical = ['left', 'right'].includes(_openingSide(object));
+    const length = vertical ? object.h : object.w;
+    const hinge = _doorHingePoint(object, 8);
+    const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = 'rgba(47,133,90,.55)';
+    ctx.beginPath();
+    ctx.arc(hinge.x, hinge.y, Math.max(18, length), angles.start, angles.end, angles.ccw);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function _contextObjectLabel(room, object) {
+    const base = object.type === 'room' ? (room.name || _sketchLabel(object.type)) : (object.ficha?.codigo || object.label || _sketchLabel(object.type));
+    const dimensions = _contextDimensionsText(room, object);
+    return dimensions ? `${base} ${dimensions}` : base;
+  }
+
+  function _contextDimensionsText(room, object) {
+    const roomObject = _roomObjectForClassroom(room);
+    const length = Number(room.length || 0);
+    const width = Number(room.width || 0);
+    if (!roomObject || !length || !width) return '';
+    const scale = { x: length / roomObject.w, y: width / roomObject.h, avg: ((length / roomObject.w) + (width / roomObject.h)) / 2 };
+    if (object.type === 'room') return `${length.toFixed(2)} x ${width.toFixed(2)}m`;
+    if (object.type === 'wall') {
+      const px = Math.hypot(object.x2 - object.x1, object.y2 - object.y1);
+      return `${(px * scale.avg).toFixed(2)}m`;
+    }
+    if (object.type === 'window') {
+      const objectLength = (_openingLengthPixels(object) * (['left', 'right'].includes(_openingSide(object)) ? scale.y : scale.x)).toFixed(2);
+      const height = object.ficha?.alto_m ? Number(object.ficha.alto_m).toFixed(2) : 's/d';
+      return `L${objectLength} A${height}m`;
+    }
+    if (object.type === 'door') {
+      return `L${(_openingLengthPixels(object) * (['left', 'right'].includes(_openingSide(object)) ? scale.y : scale.x)).toFixed(2)}m`;
+    }
+    if (_isPointSketchObject(object) || object.type === 'pencil' || object.type === 'text') return '';
+    if (object.w && object.h) return `${(object.w * scale.x).toFixed(2)} x ${(object.h * scale.y).toFixed(2)}m`;
+    return '';
   }
 
   function _ensureSketchObjects() {
@@ -2074,12 +2207,7 @@ const MecFormModule = (() => {
   }
 
   function _drawTextObject(ctx, object, selected) {
-    ctx.fillStyle = selected ? 'rgba(255,247,237,.95)' : 'rgba(255,255,255,.9)';
-    ctx.strokeStyle = selected ? '#111827' : '#9a3412';
-    ctx.lineWidth = selected ? 3 : 2;
-    ctx.fillRect(object.x, object.y, object.w, object.h);
-    ctx.strokeRect(object.x, object.y, object.w, object.h);
-    ctx.fillStyle = '#7c2d12';
+    ctx.fillStyle = selected ? '#111827' : '#7c2d12';
     ctx.font = '800 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -2866,7 +2994,6 @@ const MecFormModule = (() => {
   function _redrawSketchCanvas() {
     const canvas = document.getElementById('mec-classroom-canvas');
     if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
-    _drawBlockPreview();
     _centerSketchOnActiveRoom();
   }
 
@@ -2901,44 +3028,6 @@ const MecFormModule = (() => {
     const zoom = document.querySelector('.mec-sketch-zoom span');
     if (zoom) zoom.textContent = `${Math.round(_sketchZoom * 100)}%`;
     _centerSketchOnActiveRoom(true);
-  }
-
-  function _drawBlockPreview() {
-    const canvas = document.getElementById('mec-block-preview-canvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const block = _activeClassroomBlock();
-    const rooms = _sketchRoomsForActiveBlockFloor();
-    const sourceRect = _sketchBlockRect();
-    const previewRect = { x: 14, y: 28, w: 392, h: 130 };
-    ctx.strokeStyle = '#172033';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(previewRect.x, previewRect.y, previewRect.w, previewRect.h);
-    ctx.fillStyle = '#172033';
-    ctx.font = '800 12px system-ui, sans-serif';
-    ctx.fillText(`${block?.bloque_codigo || 'Bloque actual'} · vista exacta`, 16, 16);
-    rooms.forEach(room => {
-      const object = room.id === _activeClassroomId
-        ? (_data.__classroomSketch.objects || []).find(item => item.type === 'room')
-        : _roomObjectForClassroom(room);
-      if (!object) return;
-      const x = previewRect.x + ((object.x - sourceRect.x) / sourceRect.w) * previewRect.w;
-      const y = previewRect.y + ((object.y - sourceRect.y) / sourceRect.h) * previewRect.h;
-      const w = Math.max(12, (object.w / sourceRect.w) * previewRect.w);
-      const h = Math.max(10, (object.h / sourceRect.h) * previewRect.h);
-      const active = room.id === _activeClassroomId;
-      ctx.fillStyle = active ? 'rgba(232,76,34,.16)' : 'rgba(43,108,176,.08)';
-      ctx.strokeStyle = active ? '#e84c22' : '#2b6cb0';
-      ctx.lineWidth = active ? 3 : 2;
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeRect(x, y, w, h);
-      ctx.fillStyle = active ? '#9a3412' : '#173f68';
-      ctx.font = '800 10px system-ui, sans-serif';
-      ctx.fillText(room.name || 'Aula', x + 5, y + 13);
-    });
   }
 
   function _fieldValueForObjectMeters(object, axis) {
@@ -3983,11 +4072,6 @@ const MecFormModule = (() => {
           const ow = Math.max(20, object.w * sx);
           const oh = Math.max(10, object.h * sy);
           _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
-          ctx.strokeStyle = '#9a3412';
-          ctx.fillStyle = 'rgba(255,247,237,.9)';
-          ctx.lineWidth = 1;
-          ctx.fillRect(ox, oy, ow, oh);
-          ctx.strokeRect(ox, oy, ow, oh);
           ctx.fillStyle = '#7c2d12';
           ctx.font = '700 7px system-ui, sans-serif';
           ctx.textAlign = 'center';

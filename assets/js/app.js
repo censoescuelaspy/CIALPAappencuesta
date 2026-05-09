@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.6
+ * Version: 2.5.7
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -398,12 +398,22 @@ const AppController = (() => {
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
         const sidebar = document.getElementById('sidebar');
+        if (!sidebar) return;
         if (window.matchMedia('(max-width: 900px)').matches) {
-          sidebar?.classList.toggle('sidebar--open');
+          const open = !sidebar.classList.contains('sidebar--open');
+          sidebar.classList.toggle('sidebar--open', open);
           document.body.classList.remove('sidebar-auto-hidden', 'sidebar-peek');
+          if (!open && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          toggleBtn.setAttribute('aria-expanded', String(open));
+          toggleBtn.setAttribute('aria-label', open ? 'Cerrar menu' : 'Abrir menu');
         } else {
-          document.body.classList.toggle('sidebar-auto-hidden');
+          const hidden = !document.body.classList.contains('sidebar-auto-hidden');
+          if (hidden && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          sidebar.classList.remove('sidebar--open');
+          document.body.classList.toggle('sidebar-auto-hidden', hidden);
           document.body.classList.remove('sidebar-peek');
+          toggleBtn.setAttribute('aria-expanded', String(!hidden));
+          toggleBtn.setAttribute('aria-label', hidden ? 'Mostrar menu' : 'Ocultar menu');
         }
       });
     }

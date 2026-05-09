@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.5.6
+ * Version: 2.5.7
  */
 
 const API = (() => {
