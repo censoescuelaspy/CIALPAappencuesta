@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.5.13
+ * Version: 2.5.14
  */
 
 const SurveyModule = (() => {

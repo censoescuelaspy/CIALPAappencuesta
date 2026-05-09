@@ -1037,16 +1037,64 @@ const MecFormModule = (() => {
       a.y + a.h + gap > b.y;
   }
 
-  function _clampRectToBlock(rect) {
-    const block = _sketchBlockRect();
-    const w = Math.min(rect.w, block.w);
-    const h = Math.min(rect.h, block.h);
+  function _clampRectToBounds(rect, bounds) {
+    const w = Math.min(rect.w, bounds.w);
+    const h = Math.min(rect.h, bounds.h);
     return {
-      x: Math.max(block.x, Math.min(rect.x, block.x + block.w - w)),
-      y: Math.max(block.y, Math.min(rect.y, block.y + block.h - h)),
+      ...rect,
+      x: Math.max(bounds.x, Math.min(rect.x, bounds.x + bounds.w - w)),
+      y: Math.max(bounds.y, Math.min(rect.y, bounds.y + bounds.h - h)),
       w,
       h,
     };
+  }
+
+  function _snapValueToTargets(value, targets, threshold = 12) {
+    return targets
+      .filter(Number.isFinite)
+      .map(target => ({ target, distance: Math.abs(value - target) }))
+      .filter(item => item.distance <= threshold)
+      .sort((a, b) => a.distance - b.distance)[0]?.target ?? value;
+  }
+
+  function _snapRectToGuides(rect, bounds, blockers = [], threshold = 12) {
+    const clamped = _clampRectToBounds(rect, bounds);
+    const xTargets = [bounds.x, bounds.x + bounds.w - clamped.w];
+    const yTargets = [bounds.y, bounds.y + bounds.h - clamped.h];
+    blockers.forEach(other => {
+      xTargets.push(other.x, other.x + other.w - clamped.w, other.x - clamped.w, other.x + other.w);
+      yTargets.push(other.y, other.y + other.h - clamped.h, other.y - clamped.h, other.y + other.h);
+    });
+    return _clampRectToBounds({
+      ...clamped,
+      x: _snapValueToTargets(clamped.x, xTargets, threshold),
+      y: _snapValueToTargets(clamped.y, yTargets, threshold),
+    }, bounds);
+  }
+
+  function _resolveRectOverlapInBounds(rect, blockers = [], bounds, gap = 0) {
+    const desired = _clampRectToBounds(rect, bounds);
+    if (!blockers.some(other => _rectsOverlap(desired, other, gap))) return desired;
+    const candidates = [];
+    blockers.forEach(other => {
+      if (!_rectsOverlap(desired, other, gap)) return;
+      candidates.push(
+        { ...desired, x: other.x - desired.w - gap },
+        { ...desired, x: other.x + other.w + gap },
+        { ...desired, y: other.y - desired.h - gap },
+        { ...desired, y: other.y + other.h + gap },
+      );
+    });
+    const valid = candidates
+      .map(candidate => _clampRectToBounds(candidate, bounds))
+      .filter(candidate => !blockers.some(other => _rectsOverlap(candidate, other, gap)))
+      .sort((a, b) => _rectDistance(a, desired) - _rectDistance(b, desired));
+    return valid[0] || desired;
+  }
+
+  function _clampRectToBlock(rect) {
+    const block = _sketchBlockRect();
+    return _clampRectToBounds(rect, block);
   }
 
   function _clampPointToBlock(point) {
@@ -1365,6 +1413,30 @@ const MecFormModule = (() => {
     item.ancho_m = ((object.h / blockRect.h) * blockWidth).toFixed(2);
   }
 
+  function _sanitaryRoomBlockers(item) {
+    const block = _blockForSanitary(item);
+    const floor = _normalizeFloor(item?.planta || 'Piso 1');
+    const sameFloorSanitaries = (_data.__sanitaries || [])
+      .filter(other => other.id !== item.id)
+      .filter(other => _matchesBlockReference(other.bloque, block))
+      .filter(other => _normalizeFloor(other.planta || 'Piso 1') === floor)
+      .map(other => _sanitaryRoomObject(other))
+      .filter(Boolean);
+    const sameFloorRooms = (_data.__classrooms || [])
+      .filter(room => room.blockId === block?.id)
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === floor)
+      .map(room => _roomObjectForClassroom(room))
+      .filter(Boolean);
+    return [...sameFloorRooms, ...sameFloorSanitaries];
+  }
+
+  function _snapSanitaryRoomRect(item, rect) {
+    const bounds = _sketchBlockRect();
+    const blockers = _sanitaryRoomBlockers(item);
+    const snapped = _snapRectToGuides(rect, bounds, blockers, 14);
+    return _resolveRectOverlapInBounds(snapped, blockers, bounds, 0);
+  }
+
   function _suggestSanitaryRect(item, size) {
     const blockRect = _sketchBlockRect();
     const padding = 10;
@@ -1372,21 +1444,13 @@ const MecFormModule = (() => {
       w: Math.min(size.w, blockRect.w - padding * 2),
       h: Math.min(size.h, blockRect.h - padding * 2),
     };
-    const sameFloorSanitaries = (_data.__sanitaries || [])
-      .filter(other => other.id !== item.id)
-      .filter(other => _matchesBlockReference(other.bloque, _blockForSanitary(item)))
-      .filter(other => _normalizeFloor(other.planta || 'Piso 1') === _normalizeFloor(item.planta || 'Piso 1'))
-      .map(other => _sanitaryRoomObject(other))
-      .filter(Boolean);
-    const sameFloorRooms = (_data.__classrooms || [])
-      .filter(room => room.blockId === _blockForSanitary(item)?.id)
-      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(item.planta || 'Piso 1'))
-      .map(room => _roomObjectForClassroom(room))
-      .filter(Boolean);
+    const blockers = _sanitaryRoomBlockers(item);
     const candidates = [];
-    [...sameFloorSanitaries, ...sameFloorRooms].forEach(rect => {
+    blockers.forEach(rect => {
       candidates.push({ x: rect.x + rect.w, y: rect.y });
       candidates.push({ x: rect.x, y: rect.y + rect.h });
+      candidates.push({ x: rect.x - rectSize.w, y: rect.y });
+      candidates.push({ x: rect.x, y: rect.y - rectSize.h });
     });
     for (let y = blockRect.y + padding; y <= blockRect.y + blockRect.h - rectSize.h - padding; y += 18) {
       for (let x = blockRect.x + padding; x <= blockRect.x + blockRect.w - rectSize.w - padding; x += 18) {
@@ -1395,9 +1459,9 @@ const MecFormModule = (() => {
     }
     const free = candidates.find(candidate => {
       const rect = _clampRectToBlock({ ...candidate, ...rectSize });
-      return !sameFloorSanitaries.some(other => _rectsOverlap(rect, other, 6));
+      return !blockers.some(other => _rectsOverlap(rect, other, 0));
     }) || { x: blockRect.x + padding, y: blockRect.y + padding };
-    return _clampRectToBlock({ ...free, ...rectSize });
+    return _snapSanitaryRoomRect(item, { ...free, ...rectSize });
   }
 
   function _ensureSanitaryRoomObject(item, resizeFromDimensions = false) {
@@ -1426,12 +1490,12 @@ const MecFormModule = (() => {
     if (resizeFromDimensions) {
       object.w = size.w;
       object.h = size.h;
-      const rect = _clampRectToBlock(object);
+      const rect = _snapSanitaryRoomRect(item, object);
       object.x = rect.x;
       object.y = rect.y;
       object.w = rect.w;
       object.h = rect.h;
-      _reflowSanitaryOpenings(item);
+      _reflowSanitaryChildren(item);
     }
     return object;
   }
@@ -2008,13 +2072,17 @@ const MecFormModule = (() => {
     const room = _ensureSanitaryRoomObject(item);
     const next = item.plano.cabinas.length + 1;
     const cabinId = `cab_${Date.now()}`;
+    const rect = _suggestSanitaryStallRect(item, {
+      w: Math.min(72, Math.max(34, room.w - 24)),
+      h: Math.min(54, Math.max(28, room.h - 28)),
+    });
     const object = {
       id: `san_stall_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: 'stall',
-      x: room.x + 12 + ((next - 1) % 4) * 18,
-      y: room.y + 14 + Math.floor((next - 1) / 4) * 18,
-      w: Math.min(72, Math.max(34, room.w - 24)),
-      h: Math.min(54, Math.max(28, room.h - 28)),
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
       ficha: { codigo: `Cabina ${next}`, artefacto: 'Inodoro', estado: item.estado || '', cabinId },
     };
     _clampSanitaryChildToRoom(item, object);
@@ -2387,7 +2455,7 @@ const MecFormModule = (() => {
       event.preventDefault();
       const point = pointFromEvent(event);
       const rotateHit = _findSanitaryOpeningRotateHandleAt(point);
-      if (rotateHit) {
+      if (rotateHit && rotateHit.id === _selectedSanitaryObjectId) {
         _selectedSanitaryObjectId = rotateHit.id;
         _flipOpeningSwing(rotateHit);
         _saveDraft(false);
@@ -2396,14 +2464,17 @@ const MecFormModule = (() => {
         return;
       }
       const handleHit = _findSanitaryResizeHandleAt(point);
-      if (handleHit) {
-        resizing = handleHit;
-        if (handleHit.scope === 'child') _selectedSanitaryObjectId = handleHit.object.id;
-        else _selectedSanitaryObjectId = null;
-        _drawSanitarySketch(ctx, canvas);
-        return;
-      }
       const objectHit = _findSanitaryChildObjectAt(point);
+      if (handleHit) {
+        const resizeSelectedChild = handleHit.scope === 'child' && handleHit.object.id === _selectedSanitaryObjectId;
+        if (handleHit.scope === 'room' || resizeSelectedChild || !objectHit) {
+          resizing = handleHit;
+          if (handleHit.scope === 'child') _selectedSanitaryObjectId = handleHit.object.id;
+          else _selectedSanitaryObjectId = null;
+          _drawSanitarySketch(ctx, canvas);
+          return;
+        }
+      }
       if (objectHit) {
         _selectedSanitaryObjectId = objectHit.object.id;
         movingObject = objectHit;
@@ -3641,7 +3712,7 @@ const MecFormModule = (() => {
     const item = hit?.item;
     if (!object || !item) return;
     const previous = { x: object.x, y: object.y };
-    const rect = _clampRectToBlock({ x: point.x - offset.x, y: point.y - offset.y, w: object.w, h: object.h });
+    const rect = _snapSanitaryRoomRect(item, { x: point.x - offset.x, y: point.y - offset.y, w: object.w, h: object.h });
     object.x = rect.x;
     object.y = rect.y;
     const dx = object.x - previous.x;
@@ -3704,13 +3775,13 @@ const MecFormModule = (() => {
       object.y = Math.round(newY);
     }
     if (handle.name.includes('s')) object.h = Math.max(minH, Math.round(point.y - object.y));
-    const rect = _clampRectToBlock(object);
+    const rect = _snapSanitaryRoomRect(item, object);
     object.x = rect.x;
     object.y = rect.y;
     object.w = rect.w;
     object.h = rect.h;
     _syncSanitaryDimensionsFromObject(item, object);
-    _reflowSanitaryOpenings(item);
+    _reflowSanitaryChildren(item);
   }
 
   function _resizeSanitaryChildObject(hit, point) {
@@ -3753,6 +3824,56 @@ const MecFormModule = (() => {
     _clampSanitaryChildToRoom(item, object);
   }
 
+  function _sanitaryStallBlockers(item, objectId = null) {
+    return (item.objects || [])
+      .filter(child => child.type === 'stall' && child.id !== objectId)
+      .map(child => ({ x: child.x, y: child.y, w: child.w, h: child.h }))
+      .filter(rect => Number.isFinite(rect.x) && Number.isFinite(rect.y));
+  }
+
+  function _snapSanitaryChildRect(item, object, rect) {
+    const room = _sanitaryRoomObject(item);
+    if (!room) return rect;
+    const bounds = { x: room.x, y: room.y, w: room.w, h: room.h };
+    const blockers = object.type === 'stall' ? _sanitaryStallBlockers(item, object.id) : [];
+    const snapped = _snapRectToGuides(rect, bounds, blockers, object.type === 'stall' ? 10 : 8);
+    return object.type === 'stall'
+      ? _resolveRectOverlapInBounds(snapped, blockers, bounds, 0)
+      : snapped;
+  }
+
+  function _suggestSanitaryStallRect(item, size) {
+    const room = _ensureSanitaryRoomObject(item);
+    const padding = 6;
+    const rectSize = {
+      w: Math.min(size.w, Math.max(28, room.w - padding * 2)),
+      h: Math.min(size.h, Math.max(24, room.h - padding * 2)),
+    };
+    const blockers = _sanitaryStallBlockers(item);
+    const candidates = [];
+    const last = blockers[blockers.length - 1];
+    if (last) {
+      candidates.push({ x: last.x + last.w, y: last.y });
+      candidates.push({ x: last.x, y: last.y + last.h });
+      candidates.push({ x: last.x - rectSize.w, y: last.y });
+    }
+    blockers.forEach(rect => {
+      candidates.push({ x: rect.x + rect.w, y: rect.y });
+      candidates.push({ x: rect.x, y: rect.y + rect.h });
+    });
+    for (let y = room.y + padding; y <= room.y + room.h - rectSize.h - padding; y += 12) {
+      for (let x = room.x + padding; x <= room.x + room.w - rectSize.w - padding; x += 12) {
+        candidates.push({ x, y });
+      }
+    }
+    const bounds = { x: room.x, y: room.y, w: room.w, h: room.h };
+    const free = candidates
+      .map(candidate => _clampRectToBounds({ ...candidate, ...rectSize }, bounds))
+      .find(rect => !blockers.some(other => _rectsOverlap(rect, other, 0)))
+      || _clampRectToBounds({ x: room.x + padding, y: room.y + padding, ...rectSize }, bounds);
+    return free;
+  }
+
   function _clampSanitaryChildToRoom(item, object) {
     const room = _sanitaryRoomObject(item);
     if (!room || !object || object.type === 'sanitary-room') return object;
@@ -3762,10 +3883,11 @@ const MecFormModule = (() => {
       object.y = Math.max(room.y + 6, Math.min(object.y, room.y + room.h - 6));
       return object;
     }
-    object.w = Math.min(object.w, room.w);
-    object.h = Math.min(object.h, room.h);
-    object.x = Math.max(room.x, Math.min(object.x, room.x + room.w - object.w));
-    object.y = Math.max(room.y, Math.min(object.y, room.y + room.h - object.h));
+    const rect = _snapSanitaryChildRect(item, object, object);
+    object.x = rect.x;
+    object.y = rect.y;
+    object.w = rect.w;
+    object.h = rect.h;
     return object;
   }
 
@@ -3782,7 +3904,7 @@ const MecFormModule = (() => {
       { side: 'right', value: Math.abs(center.x - (room.x + room.w)) },
     ].sort((a, b) => a.value - b.value);
     const nearest = distances[0];
-    if (nearest && nearest.value <= 54) {
+    if (nearest) {
       _orientOpeningToSide(object, nearest.side);
       if (nearest.side === 'top') {
         object.y = room.y;
@@ -4213,6 +4335,16 @@ const MecFormModule = (() => {
           object.x = room.x + room.w - object.w;
           object.y = room.y + ratio * Math.max(1, room.h - object.h);
         }
+      });
+  }
+
+  function _reflowSanitaryChildren(item) {
+    _reflowSanitaryOpenings(item);
+    (item.objects || [])
+      .filter(object => object.type !== 'sanitary-room')
+      .forEach(object => {
+        if (['door', 'window'].includes(object.type)) _clampSanitaryOpeningToRoom(item, object);
+        else _clampSanitaryChildToRoom(item, object);
       });
   }
 
