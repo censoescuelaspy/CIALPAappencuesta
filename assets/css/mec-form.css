@@ -1246,7 +1246,7 @@
   }
 }
 
-/* ── Densidad móvil/tablet para carga de campo, v2.5.5 ────── */
+/* ── Densidad móvil/tablet para carga de campo, v2.5.6 ────── */
 @media (max-width: 1024px) {
   .mec-header-actions {
     gap: .35rem;

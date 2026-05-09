@@ -635,7 +635,7 @@ const MecFormModule = (() => {
       <section class="mec-section mec-sketch">
         <div class="mec-section__header">
           <h4>Aulas y croquis dimensionales</h4>
-          <p class="mec-hint">Cada aula queda guardada automaticamente como registro independiente. Al elegir un bloque puede ver y navegar sus aulas asociadas.</p>
+          <p class="mec-hint">Cada aula queda guardada automaticamente como registro independiente. En el plano del bloque puede tocar cualquier aula para activarla, moverla y acomodarla junto a las demas.</p>
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
@@ -729,7 +729,7 @@ const MecFormModule = (() => {
     const count = (sketch.objects || []).length;
     const selected = _findSketchObjectById(_selectedSketchObjectId);
     const distances = selected ? _openingDistanceText(selected) : '';
-    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Doble clic o doble toque para agregar; clic simple selecciona y mueve.${distances ? ` Distancias: ${distances}.` : ''}`;
+    return `${count} elemento(s). Herramienta activa: ${_sketchToolLabel(_sketchTool)}. Clic simple selecciona/mueve; toque un aula tenue del bloque para activarla. Doble clic o doble toque agrega elementos.${distances ? ` Distancias: ${distances}.` : ''}`;
   }
 
   function _sketchToolLabel(toolId) {
@@ -851,20 +851,52 @@ const MecFormModule = (() => {
   function _buildRoomObjectFromDimensions(length, width, id = null, rect = null) {
     const lengthM = Number(length || 7);
     const widthM = Number(width || 5);
-    const maxW = 560;
-    const maxH = 320;
-    const ratio = Math.max(lengthM, widthM, 1);
-    const roomW = Math.max(220, Math.round((lengthM / ratio) * maxW));
-    const roomH = Math.max(150, Math.round((widthM / ratio) * maxH));
+    const size = _roomSizeFromDimensions(lengthM, widthM);
     return {
       id: id || `room_${Date.now()}`,
       type: 'room',
-      x: rect ? Math.round(rect.x) : Math.round((SKETCH_CANVAS.width - roomW) / 2),
-      y: rect ? Math.round(rect.y) : Math.round((SKETCH_CANVAS.height - roomH) / 2),
-      w: rect ? Math.round(rect.w) : roomW,
-      h: rect ? Math.round(rect.h) : roomH,
+      x: rect ? Math.round(rect.x) : Math.round((SKETCH_CANVAS.width - size.w) / 2),
+      y: rect ? Math.round(rect.y) : Math.round((SKETCH_CANVAS.height - size.h) / 2),
+      w: rect ? Math.round(rect.w) : size.w,
+      h: rect ? Math.round(rect.h) : size.h,
       label: `${lengthM || '?'}m x ${widthM || '?'}m`,
     };
+  }
+
+  function _roomSizeFromDimensions(length, width) {
+    const block = _activeClassroomBlock();
+    const blockLength = Number(block?.largo_m || 0);
+    const blockWidth = Number(block?.ancho_m || 0);
+    const blockRect = _sketchBlockRect();
+    if (blockLength && blockWidth && length && width) {
+      return {
+        w: Math.max(54, Math.min(blockRect.w, Math.round((length / blockLength) * blockRect.w))),
+        h: Math.max(38, Math.min(blockRect.h, Math.round((width / blockWidth) * blockRect.h))),
+      };
+    }
+    const ratio = Math.max(length, width, 1);
+    return {
+      w: Math.max(160, Math.round((length / ratio) * 260)),
+      h: Math.max(110, Math.round((width / ratio) * 180)),
+    };
+  }
+
+  function _sketchBlockRect(canvas = SKETCH_CANVAS) {
+    return {
+      x: 44,
+      y: 64,
+      w: Math.max(120, canvas.width - 88),
+      h: Math.max(120, canvas.height - 130),
+    };
+  }
+
+  function _roomObjectForClassroom(room) {
+    return (room?.objects || []).find(object => object.type === 'room') || null;
+  }
+
+  function _sketchRoomsForActiveBlockFloor() {
+    return _visibleClassroomsForActiveBlock(_data.__classrooms || [])
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(_data.__classroomSketch?.floor || 'Piso 1'));
   }
 
   function _layoutSketchRoomsForActiveBlock() {
@@ -874,10 +906,34 @@ const MecFormModule = (() => {
     return _layoutPlanRooms(source, 58, 82, SKETCH_CANVAS.width - 116, SKETCH_CANVAS.height - 166);
   }
 
-  function _activeRoomLayoutRect() {
-    const item = _layoutSketchRoomsForActiveBlock().find(layout => layout.room.id === _activeClassroomId);
-    if (!item) return null;
-    return { x: item.x, y: item.y, w: item.w, h: item.h };
+  function _suggestRoomRectForNewClassroom(length, width) {
+    const blockRect = _sketchBlockRect();
+    const size = _roomSizeFromDimensions(Number(length || 7), Number(width || 5));
+    const sameFloor = _sketchRoomsForActiveBlockFloor()
+      .filter(room => room.id !== _activeClassroomId)
+      .map(room => _roomObjectForClassroom(room))
+      .filter(Boolean);
+    const padding = 10;
+    const clampedSize = {
+      w: Math.min(size.w, blockRect.w - padding * 2),
+      h: Math.min(size.h, blockRect.h - padding * 2),
+    };
+    const candidates = [];
+    const last = sameFloor[sameFloor.length - 1];
+    if (last) {
+      candidates.push({ x: last.x + last.w, y: last.y });
+      candidates.push({ x: last.x, y: last.y + last.h });
+    }
+    for (let y = blockRect.y + padding; y <= blockRect.y + blockRect.h - clampedSize.h - padding; y += 18) {
+      for (let x = blockRect.x + padding; x <= blockRect.x + blockRect.w - clampedSize.w - padding; x += 18) {
+        candidates.push({ x, y });
+      }
+    }
+    const free = candidates.find(candidate => {
+      const rect = _clampRectToBlock({ ...candidate, ...clampedSize });
+      return !sameFloor.some(room => _rectsOverlap(rect, room, 8));
+    }) || { x: blockRect.x + padding, y: blockRect.y + padding };
+    return _clampRectToBlock({ ...free, ...clampedSize });
   }
 
   function _ensureActiveRoomObject(rect = null) {
@@ -887,6 +943,25 @@ const MecFormModule = (() => {
     const room = _buildRoomObjectFromDimensions(_data.__classroomSketch.length, _data.__classroomSketch.width, null, rect);
     _data.__classroomSketch.objects.unshift(room);
     return room;
+  }
+
+  function _rectsOverlap(a, b, gap = 0) {
+    return a.x < b.x + b.w + gap &&
+      a.x + a.w + gap > b.x &&
+      a.y < b.y + b.h + gap &&
+      a.y + a.h + gap > b.y;
+  }
+
+  function _clampRectToBlock(rect) {
+    const block = _sketchBlockRect();
+    const w = Math.min(rect.w, block.w);
+    const h = Math.min(rect.h, block.h);
+    return {
+      x: Math.max(block.x, Math.min(rect.x, block.x + block.w - w)),
+      y: Math.max(block.y, Math.min(rect.y, block.y + block.h - h)),
+      w,
+      h,
+    };
   }
 
   function _requestSketchCenter() {
@@ -915,11 +990,12 @@ const MecFormModule = (() => {
     _syncActiveClassroomFromSketch();
     const nextNumber = (_data.__classrooms || []).length + 1;
     const block = _blockById(_data.__activeBlockId);
-    const blockArea = Number(block?.largo_m || 0) * Number(block?.ancho_m || 0);
-    const usedArea = block ? _blockAreaUsed(block.id) : 0;
-    const remainingArea = Math.max(0, blockArea - usedArea);
-    const suggestedWidth = Number(block?.ancho_m || 0);
-    const suggestedLength = remainingArea && suggestedWidth ? remainingArea / suggestedWidth : '';
+    const blockLength = Number(block?.largo_m || 0);
+    const blockWidth = Number(block?.ancho_m || 0);
+    const blockRooms = _visibleClassroomsForActiveBlock(_data.__classrooms || []).filter(room => room.length && room.width);
+    const referenceRoom = blockRooms[blockRooms.length - 1] || null;
+    const suggestedLength = Number(referenceRoom?.length || 0) || (blockLength ? Math.min(7, blockLength) : 7);
+    const suggestedWidth = Number(referenceRoom?.width || 0) || (blockWidth ? Math.min(5, blockWidth) : 5);
     _activeClassroomId = `aula_${Date.now()}`;
     _data.__classroomSketch = {
       id: _activeClassroomId,
@@ -932,14 +1008,14 @@ const MecFormModule = (() => {
       objects: [],
     };
     _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
-    const rect = _activeRoomLayoutRect();
+    const rect = _suggestRoomRectForNewClassroom(_data.__classroomSketch.length, _data.__classroomSketch.width);
     _data.__classroomSketch.objects = [_buildRoomObjectFromDimensions(_data.__classroomSketch.length, _data.__classroomSketch.width, null, rect)];
     _syncActiveClassroomFromSketch();
     _selectedSketchObjectId = null;
     _requestSketchCenter();
     _saveDraft(false);
     _render();
-    UI.showToast(remainingArea ? 'Nueva aula ubicada sobre el area restante estimada del bloque.' : 'Nueva aula lista para cargar.', 'success');
+    UI.showToast('Nueva aula agregada al plano del bloque. Puede arrastrarla hasta su posicion real.', 'success');
   }
 
   function saveCurrentClassroom() {
@@ -1550,7 +1626,7 @@ const MecFormModule = (() => {
 
       const rotateHit = _findOpeningRotateHandleAt(point);
       const handleHit = _findResizeHandleAt(point);
-      const selected = rotateHit || handleHit?.object || _findSketchObjectAt(point);
+      const selected = rotateHit || handleHit?.object || _findSketchObjectAt(point) || _activateContextClassroomAt(point);
       _selectedSketchObjectId = selected?.id || null;
       if (rotateHit) {
         rotatingObject = rotateHit;
@@ -1652,7 +1728,7 @@ const MecFormModule = (() => {
     const createAt = event => {
       event.preventDefault();
       const point = pointFromEvent(event);
-      const selected = _findSketchObjectAt(point);
+      const selected = _findSketchObjectAt(point) || _activateContextClassroomAt(point);
       if (selected) {
         _selectedSketchObjectId = selected.id;
         _drawSketch(ctx, canvas);
@@ -1674,7 +1750,7 @@ const MecFormModule = (() => {
         Math.hypot(point.x - lastTap.point.x, point.y - lastTap.point.y) < 28;
       end(event);
       if (isDoubleTap) {
-        const selected = _findSketchObjectAt(point);
+        const selected = _findSketchObjectAt(point) || _activateContextClassroomAt(point);
         if (selected) {
           _selectedSketchObjectId = selected.id;
           _drawSketch(ctx, canvas);
@@ -1735,30 +1811,36 @@ const MecFormModule = (() => {
   }
 
   function _drawSketchBlockContext(ctx, canvas) {
-    const rooms = _visibleClassroomsForActiveBlock(_data.__classrooms || [])
+    const blockRect = _sketchBlockRect(canvas);
+    const block = _activeClassroomBlock();
+    const rooms = _sketchRoomsForActiveBlockFloor()
       .filter(room => room.id !== _activeClassroomId)
-      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(_data.__classroomSketch?.floor || 'Piso 1'));
-    if (!rooms.length) return;
+      .map(room => ({ room, object: _roomObjectForClassroom(room) }))
+      .filter(item => item.object);
     ctx.save();
-    ctx.fillStyle = 'rgba(43,108,176,.035)';
-    ctx.strokeStyle = 'rgba(43,108,176,.26)';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = 'rgba(23,32,51,.025)';
+    ctx.fillRect(blockRect.x, blockRect.y, blockRect.w, blockRect.h);
+    ctx.strokeStyle = 'rgba(23,32,51,.22)';
+    ctx.lineWidth = 2;
     ctx.setLineDash([6, 5]);
-    ctx.strokeRect(44, 64, canvas.width - 88, canvas.height - 130);
+    ctx.strokeRect(blockRect.x, blockRect.y, blockRect.w, blockRect.h);
     ctx.setLineDash([]);
     ctx.font = '800 11px system-ui, sans-serif';
-    ctx.fillStyle = 'rgba(23,63,104,.72)';
+    ctx.fillStyle = 'rgba(23,32,51,.66)';
     ctx.textAlign = 'left';
-    ctx.fillText('Contexto del bloque: aulas ya cargadas', 52, 55);
-    _layoutPlanRooms(rooms, 58, 82, canvas.width - 116, canvas.height - 166).forEach(item => {
-      ctx.fillStyle = 'rgba(43,108,176,.055)';
-      ctx.strokeStyle = 'rgba(43,108,176,.34)';
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(item.x, item.y, item.w, item.h);
-      ctx.strokeRect(item.x, item.y, item.w, item.h);
-      ctx.fillStyle = 'rgba(23,63,104,.72)';
+    ctx.fillText(`${block?.bloque_codigo || 'Bloque actual'} · contenedor de aulas`, blockRect.x + 8, blockRect.y - 10);
+    rooms.forEach(({ room, object }) => {
+      ctx.fillStyle = 'rgba(43,108,176,.065)';
+      ctx.strokeStyle = 'rgba(43,108,176,.42)';
+      ctx.lineWidth = 2;
+      ctx.fillRect(object.x, object.y, object.w, object.h);
+      ctx.strokeRect(object.x, object.y, object.w, object.h);
+      ctx.strokeStyle = 'rgba(43,108,176,.25)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(object.x + 5, object.y + 5, Math.max(0, object.w - 10), Math.max(0, object.h - 10));
+      ctx.fillStyle = 'rgba(23,63,104,.76)';
       ctx.font = '800 10px system-ui, sans-serif';
-      ctx.fillText(item.room.name || 'Aula', item.x + 6, item.y + 14);
+      ctx.fillText(room.name || 'Aula', object.x + 6, object.y + 14);
     });
     ctx.restore();
   }
@@ -2428,6 +2510,25 @@ const MecFormModule = (() => {
       .find(object => _sketchObjectContains(object, point));
   }
 
+  function _findContextClassroomAt(point) {
+    return [..._sketchRoomsForActiveBlockFloor()]
+      .reverse()
+      .filter(room => room.id !== _activeClassroomId)
+      .map(room => ({ room, object: _roomObjectForClassroom(room) }))
+      .find(item => item.object && _sketchObjectContains(item.object, point)) || null;
+  }
+
+  function _activateContextClassroomAt(point) {
+    const hit = _findContextClassroomAt(point);
+    if (!hit) return null;
+    _syncActiveClassroomFromSketch();
+    _activeClassroomId = hit.room.id;
+    _loadActiveClassroomIntoSketch();
+    if (_data.__classroomSketch?.blockId) _data.__activeBlockId = _data.__classroomSketch.blockId;
+    _selectedSketchObjectId = hit.object.id;
+    return _findSketchObjectById(hit.object.id);
+  }
+
   function _findSketchObjectById(id) {
     _ensureSketchObjects();
     return _data.__classroomSketch.objects.find(object => object.id === id) || null;
@@ -2534,8 +2635,9 @@ const MecFormModule = (() => {
     if (object.type === 'room') {
       const prevX = object.x;
       const prevY = object.y;
-      object.x = point.x - offset.x;
-      object.y = point.y - offset.y;
+      const next = _clampRoomPosition(object, point.x - offset.x, point.y - offset.y);
+      object.x = next.x;
+      object.y = next.y;
       const dx = object.x - prevX;
       const dy = object.y - prevY;
       (_data.__classroomSketch.objects || []).forEach(item => {
@@ -2558,6 +2660,19 @@ const MecFormModule = (() => {
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
     _clampOpeningToRoom(object);
+  }
+
+  function _clampRoomPosition(room, x, y) {
+    const rect = _clampRectToBlock({ x, y, w: room.w, h: room.h });
+    return { x: rect.x, y: rect.y };
+  }
+
+  function _clampRoomWithinBlock(room) {
+    const rect = _clampRectToBlock(room);
+    room.x = rect.x;
+    room.y = rect.y;
+    room.w = rect.w;
+    room.h = rect.h;
   }
 
   function _resizeSketchObject(object, point, handle) {
@@ -2598,6 +2713,7 @@ const MecFormModule = (() => {
     if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 14;
     if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 14;
     if (object.type === 'room') {
+      _clampRoomWithinBlock(object);
       _updateSketchDimensionsFromRoom(object, previousScale);
       _reflowAttachedOpenings(object);
     }
@@ -2795,23 +2911,33 @@ const MecFormModule = (() => {
     ctx.fillStyle = '#f8fafc';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     const block = _activeClassroomBlock();
-    const rooms = (_data.__classrooms || []).filter(room => room.blockId === (block?.id || _data.__classroomSketch?.blockId));
+    const rooms = _sketchRoomsForActiveBlockFloor();
+    const sourceRect = _sketchBlockRect();
+    const previewRect = { x: 14, y: 28, w: 392, h: 130 };
     ctx.strokeStyle = '#172033';
     ctx.lineWidth = 2;
-    ctx.strokeRect(14, 22, 392, 120);
+    ctx.strokeRect(previewRect.x, previewRect.y, previewRect.w, previewRect.h);
     ctx.fillStyle = '#172033';
     ctx.font = '800 12px system-ui, sans-serif';
-    ctx.fillText(block?.bloque_codigo || 'Bloque actual', 16, 16);
-    _layoutPlanRooms(rooms.length ? rooms : [_data.__classroomSketch], 18, 34, 384, 92).forEach(item => {
-      const active = item.room.id === _activeClassroomId;
+    ctx.fillText(`${block?.bloque_codigo || 'Bloque actual'} · vista exacta`, 16, 16);
+    rooms.forEach(room => {
+      const object = room.id === _activeClassroomId
+        ? (_data.__classroomSketch.objects || []).find(item => item.type === 'room')
+        : _roomObjectForClassroom(room);
+      if (!object) return;
+      const x = previewRect.x + ((object.x - sourceRect.x) / sourceRect.w) * previewRect.w;
+      const y = previewRect.y + ((object.y - sourceRect.y) / sourceRect.h) * previewRect.h;
+      const w = Math.max(12, (object.w / sourceRect.w) * previewRect.w);
+      const h = Math.max(10, (object.h / sourceRect.h) * previewRect.h);
+      const active = room.id === _activeClassroomId;
       ctx.fillStyle = active ? 'rgba(232,76,34,.16)' : 'rgba(43,108,176,.08)';
       ctx.strokeStyle = active ? '#e84c22' : '#2b6cb0';
       ctx.lineWidth = active ? 3 : 2;
-      ctx.fillRect(item.x, item.y, item.w, item.h);
-      ctx.strokeRect(item.x, item.y, item.w, item.h);
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
       ctx.fillStyle = active ? '#9a3412' : '#173f68';
       ctx.font = '800 10px system-ui, sans-serif';
-      ctx.fillText(item.room.name || 'Aula', item.x + 5, item.y + 14);
+      ctx.fillText(room.name || 'Aula', x + 5, y + 13);
     });
   }
 
@@ -3314,18 +3440,14 @@ const MecFormModule = (() => {
     if (blockLength && length > blockLength) length = blockLength;
     if (blockWidth && width > blockWidth) width = blockWidth;
     if (blockLength && blockWidth) {
-      const remaining = Math.max(0, blockLength * blockWidth - _blockAreaUsed(block.id, _activeClassroomId));
-      if (length * width > remaining && remaining > 0) {
-        const ratio = Math.sqrt(remaining / (length * width));
-        length = Math.max(1, length * ratio);
-        width = Math.max(1, width * ratio);
-      }
       _data.__classroomSketch.length = length.toFixed(1);
       _data.__classroomSketch.width = width.toFixed(1);
     }
-    _syncActiveClassroomFromSketch();
-    const rect = _activeRoomLayoutRect();
     const previousRoom = (_data.__classroomSketch.objects || []).find(object => object.type === 'room');
+    const size = _roomSizeFromDimensions(length, width);
+    const rect = previousRoom
+      ? _clampRectToBlock({ x: previousRoom.x, y: previousRoom.y, w: size.w, h: size.h })
+      : _suggestRoomRectForNewClassroom(length, width);
     const room = _buildRoomObjectFromDimensions(length, width, previousRoom?.id, rect);
     _data.__classroomSketch.objects = [
       room,
