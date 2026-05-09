@@ -78,7 +78,7 @@ const MecFormModule = (() => {
     _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _data.__activeSanitaryId = _activeSanitaryId || '';
     _normalizeNumberedNames();
-    if (_data.__classroomSketch && _data.__classrooms) _syncActiveClassroomFromSketch();
+    if (_data.__classroomSketch && _data.__classrooms && (_activeClassroomId || _data.__classroomSketch.id)) _syncActiveClassroomFromSketch();
     _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _data.__activeSanitaryId = _activeSanitaryId || '';
     _normalizeNumberedNames();
@@ -491,6 +491,7 @@ const MecFormModule = (() => {
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newBlock()">+ Nuevo bloque</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveBlock()">Eliminar bloque activo</button>
           <span class="mec-autosave-pill">Autoguardado</span>
         </div>
         <div class="mec-repeat-list">
@@ -685,6 +686,9 @@ const MecFormModule = (() => {
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveClassroom()">Eliminar aula activa</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveFloor()">Eliminar piso activo</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveBlock()">Eliminar bloque activo</button>
           <span class="mec-autosave-pill">Autoguardado</span>
         </div>
         ${_renderClassroomBlockNavigator()}
@@ -799,6 +803,10 @@ const MecFormModule = (() => {
     _data.__classrooms = _data.__classrooms || [];
     _ensureBlocks();
     if (!_data.__classrooms.length) {
+      if (_data.__allowEmptyClassrooms) {
+        _setBlankClassroomSketch(_data.__activeBlockId || '', _activeFloor());
+        return;
+      }
       _data.__classroomSketch = _data.__classroomSketch || { name: 'Aula 1', objects: [] };
       _activeClassroomId = _activeClassroomId || _data.__classroomSketch.id || `aula_${Date.now()}`;
       _data.__classroomSketch.id = _activeClassroomId;
@@ -818,6 +826,41 @@ const MecFormModule = (() => {
       _activeClassroomId = _data.__classrooms[0].id;
       _loadActiveClassroomIntoSketch();
     }
+  }
+
+  function _setBlankClassroomSketch(blockId = _data.__activeBlockId || '', floor = _activeFloor()) {
+    _activeClassroomId = null;
+    _selectedSketchObjectId = null;
+    _data.__classroomSketch = {
+      id: '',
+      name: '',
+      blockId,
+      floor: _normalizeFloor(floor || 'Piso 1'),
+      length: '',
+      width: '',
+      openings: '',
+      objects: [],
+    };
+  }
+
+  function _selectBestClassroomAfterDeletion(blockId = _data.__activeBlockId, floor = _activeFloor()) {
+    const normalizedFloor = _normalizeFloor(floor || 'Piso 1');
+    const candidates = _data.__classrooms || [];
+    const next = candidates.find(room => room.blockId === blockId && _normalizeFloor(room.floor || 'Piso 1') === normalizedFloor)
+      || candidates.find(room => room.blockId === blockId)
+      || candidates[0]
+      || null;
+    if (next) {
+      _data.__allowEmptyClassrooms = false;
+      _activeClassroomId = next.id;
+      _data.__activeBlockId = next.blockId || blockId || _data.__activeBlockId;
+      _setActiveFloor(next.floor || normalizedFloor);
+      _loadActiveClassroomIntoSketch();
+      return next;
+    }
+    _data.__allowEmptyClassrooms = true;
+    _setBlankClassroomSketch(blockId || _data.__activeBlockId || '', normalizedFloor);
+    return null;
   }
 
   function _blockOrderIndex(blockId) {
@@ -1177,6 +1220,7 @@ const MecFormModule = (() => {
 
   function newClassroom() {
     _syncActiveClassroomFromSketch();
+    _data.__allowEmptyClassrooms = false;
     const block = _blockById(_data.__activeBlockId);
     const blockLength = Number(block?.largo_m || 0);
     const blockWidth = Number(block?.ancho_m || 0);
@@ -1327,6 +1371,113 @@ const MecFormModule = (() => {
     _syncActiveBlock();
     _saveDraft(true);
     _render();
+  }
+
+  async function deleteActiveClassroom() {
+    if (_data.__classroomSketch && _activeClassroomId) _syncActiveClassroomFromSketch();
+    const room = (_data.__classrooms || []).find(item => item.id === _activeClassroomId);
+    if (!room) {
+      UI.showToast('No hay aula activa para eliminar.', 'warning');
+      return;
+    }
+    const confirmed = await UI.showConfirm('Eliminar aula', `¿Confirma eliminar ${_escape(_classroomHierarchyLabel(room) || room.name || 'esta aula')} y todos sus elementos?`);
+    if (!confirmed) return;
+    const blockId = room.blockId || _data.__activeBlockId;
+    const floor = room.floor || _activeFloor();
+    _data.__classrooms = (_data.__classrooms || []).filter(item => item.id !== room.id);
+    if (_selectedPlanId === `room::${room.id}`) _selectedPlanId = null;
+    _selectBestClassroomAfterDeletion(blockId, floor);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Aula eliminada.', 'success');
+  }
+
+  async function deleteActiveFloor() {
+    if (_data.__classroomSketch && _activeClassroomId) _syncActiveClassroomFromSketch();
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('No hay bloque activo para eliminar piso.', 'warning');
+      return;
+    }
+    const floor = _activeFloor();
+    const floorNumber = _floorNumberValue(floor);
+    const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === floor);
+    const sanitaries = (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block) && _normalizeFloor(item.planta || 'Piso 1') === floor);
+    const configuredFloors = _configuredFloorCount(block);
+    if (!rooms.length && !sanitaries.length && configuredFloors <= 1) {
+      UI.showToast('El bloque solo tiene un piso vacio. Use eliminar bloque si corresponde.', 'info');
+      return;
+    }
+    const confirmed = await UI.showConfirm(
+      'Eliminar piso',
+      `¿Confirma eliminar ${_escape(floor)} de ${_escape(block.bloque_codigo || 'Bloque')}? Se quitaran ${rooms.length} aula(s), ${sanitaries.length} sanitario(s) y se reenumeraran los pisos superiores.`,
+    );
+    if (!confirmed) return;
+    _data.__classrooms = (_data.__classrooms || []).filter(room => !(room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === floor));
+    _data.__sanitaries = (_data.__sanitaries || []).filter(item => !(_matchesBlockReference(item.bloque, block) && _normalizeFloor(item.planta || 'Piso 1') === floor));
+    (_data.__classrooms || [])
+      .filter(room => room.blockId === block.id && _floorNumberValue(room.floor) > floorNumber)
+      .forEach(room => { room.floor = _normalizeFloor(_floorNumberValue(room.floor) - 1); });
+    (_data.__sanitaries || [])
+      .filter(item => _matchesBlockReference(item.bloque, block) && _floorNumberValue(item.planta) > floorNumber)
+      .forEach(item => { item.planta = _normalizeFloor(_floorNumberValue(item.planta) - 1); });
+    const remainingMax = Math.max(1,
+      ...(_data.__classrooms || []).filter(room => room.blockId === block.id).map(room => _floorNumberValue(room.floor)),
+      ...(_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block)).map(item => _floorNumberValue(item.planta)),
+      configuredFloors - 1);
+    block.cantidad_plantas = String(remainingMax);
+    if (block.id === _data.__activeBlockId) {
+      const { id: _id, ...values } = block;
+      _data.bloques = { ...(_data.bloques || {}), ...values };
+    }
+    const nextFloor = _normalizeFloor(Math.min(floorNumber, remainingMax));
+    _setActiveFloor(nextFloor);
+    _selectBestClassroomAfterDeletion(block.id, nextFloor);
+    _activeSanitaryId = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])[0]?.id || null;
+    _selectedPlanId = null;
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Piso eliminado.', 'success');
+  }
+
+  async function deleteActiveBlock() {
+    _syncActiveBlock();
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('No hay bloque activo para eliminar.', 'warning');
+      return;
+    }
+    const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id);
+    const sanitaries = (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
+    const confirmed = await UI.showConfirm(
+      'Eliminar bloque',
+      `¿Confirma eliminar ${_escape(block.bloque_codigo || 'este bloque')}? Se quitaran ${rooms.length} aula(s), ${sanitaries.length} sanitario(s), pisos y elementos asociados.`,
+    );
+    if (!confirmed) return;
+    const blockIndex = Math.max(0, (_data.__blocks || []).findIndex(item => item.id === block.id));
+    _data.__classrooms = (_data.__classrooms || []).filter(room => room.blockId !== block.id);
+    _data.__sanitaries = (_data.__sanitaries || []).filter(item => !_matchesBlockReference(item.bloque, block));
+    _data.__blocks = (_data.__blocks || []).filter(item => item.id !== block.id);
+    if (!_data.__blocks.length) {
+      _data.__activeBlockId = `bloque_${Date.now()}`;
+      _data.bloques = { bloque_codigo: 'Bloque 1', cantidad_plantas: '1' };
+      _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+    } else {
+      const next = _data.__blocks[Math.min(blockIndex, _data.__blocks.length - 1)];
+      _data.__activeBlockId = next.id;
+      const { id: _id, ...values } = next;
+      _data.bloques = values;
+    }
+    _setActiveFloor('Piso 1');
+    _selectBestClassroomAfterDeletion(_data.__activeBlockId, _activeFloor());
+    _activeSanitaryId = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])[0]?.id || null;
+    _selectedPlanId = null;
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Bloque eliminado.', 'success');
   }
 
   function _ensureSanitaries() {
@@ -1592,8 +1743,11 @@ const MecFormModule = (() => {
       const room = (_data.__classrooms || []).find(item =>
         item.blockId === _data.__activeBlockId && _normalizeFloor(item.floor || 'Piso 1') === normalized);
       if (room) {
+        _data.__allowEmptyClassrooms = false;
         _activeClassroomId = room.id;
         _loadActiveClassroomIntoSketch();
+      } else if (_data.__allowEmptyClassrooms) {
+        _setBlankClassroomSketch(_data.__activeBlockId || '', normalized);
       } else {
         _activeClassroomId = `aula_${Date.now()}`;
         _data.__classroomSketch = {
@@ -6456,9 +6610,12 @@ const MecFormModule = (() => {
     selectFloor,
     newBlock,
     saveCurrentBlock,
+    deleteActiveBlock,
     selectClassroom,
     newClassroom,
     saveCurrentClassroom,
+    deleteActiveClassroom,
+    deleteActiveFloor,
     addSanitary,
     selectSanitary,
     addSanitaryFixture,
