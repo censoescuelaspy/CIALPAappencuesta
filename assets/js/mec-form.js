@@ -62,14 +62,19 @@ const MecFormModule = (() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
       _data = saved.values || saved || {};
+      _activeModuleId = _data.__activeModuleId || _activeModuleId;
+      _activeClassroomId = _data.__activeClassroomId || _data.__classroomSketch?.id || _activeClassroomId;
     } catch {
       _data = {};
     }
   }
 
   function _saveDraft(showToast = false) {
+    _data.__activeModuleId = _activeModuleId;
+    _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _normalizeNumberedNames();
     if (_data.__classroomSketch && _data.__classrooms) _syncActiveClassroomFromSketch();
+    _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _normalizeNumberedNames();
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       savedAt: new Date().toISOString(),
@@ -310,7 +315,7 @@ const MecFormModule = (() => {
         ...(_data.bloques || {}),
         ...values,
         bloque_codigo: activeBlock.bloque_codigo,
-        cantidad_plantas: values.cantidad_plantas || _data.bloques?.cantidad_plantas || '1',
+        cantidad_plantas: values.cantidad_plantas ?? _data.bloques?.cantidad_plantas ?? '1',
       };
     }
   }
@@ -2791,7 +2796,7 @@ const MecFormModule = (() => {
   }
 
   function _clampRoomPosition(room, x, y) {
-    const rect = _clampRectToBlock({ x, y, w: room.w, h: room.h });
+    const rect = _resolveRoomOverlap(room, _clampRectToBlock({ x, y, w: room.w, h: room.h }));
     return { x: rect.x, y: rect.y };
   }
 
@@ -2801,6 +2806,40 @@ const MecFormModule = (() => {
     room.y = rect.y;
     room.w = rect.w;
     room.h = rect.h;
+  }
+
+  function _otherRoomObjectsForActiveFloor(roomId = _activeClassroomId) {
+    return _sketchRoomsForActiveBlockFloor()
+      .filter(room => room.id !== roomId)
+      .map(room => _roomObjectForClassroom(room))
+      .filter(Boolean);
+  }
+
+  function _resolveRoomOverlap(room, desiredRect) {
+    const others = _otherRoomObjectsForActiveFloor(_activeClassroomId);
+    if (!others.some(other => _rectsOverlap(desiredRect, other, 0))) return desiredRect;
+
+    const candidates = [];
+    others.forEach(other => {
+      if (!_rectsOverlap(desiredRect, other, 0)) return;
+      candidates.push(
+        _clampRectToBlock({ ...desiredRect, x: other.x - desiredRect.w }),
+        _clampRectToBlock({ ...desiredRect, x: other.x + other.w }),
+        _clampRectToBlock({ ...desiredRect, y: other.y - desiredRect.h }),
+        _clampRectToBlock({ ...desiredRect, y: other.y + other.h }),
+      );
+    });
+
+    const valid = candidates
+      .filter(candidate => !others.some(other => _rectsOverlap(candidate, other, 0)))
+      .sort((a, b) => _rectDistance(a, desiredRect) - _rectDistance(b, desiredRect));
+
+    if (valid.length) return valid[0];
+    return _clampRectToBlock({ x: room.x, y: room.y, w: room.w, h: room.h });
+  }
+
+  function _rectDistance(a, b) {
+    return Math.hypot((a.x + a.w / 2) - (b.x + b.w / 2), (a.y + a.h / 2) - (b.y + b.h / 2));
   }
 
   function _resizeSketchObject(object, point, handle) {
@@ -3459,8 +3498,9 @@ const MecFormModule = (() => {
     if (!module || module.status === 'planned') return;
     _syncActiveBlock();
     if (_data.__classroomSketch && _data.__classrooms) _syncActiveClassroomFromSketch();
-    _saveDraft(false);
     _activeModuleId = moduleId;
+    _data.__activeModuleId = moduleId;
+    _saveDraft(false);
     _refreshDynamicState();
     if (module.kind === 'schoolPlan') renderSchoolPlan();
     document.getElementById('mec-form-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3877,12 +3917,14 @@ const MecFormModule = (() => {
       }
       floors.forEach((floor, floorIndex) => {
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
-        const bandY = y + 34 + floorIndex * Math.max(56, Math.min(82, (h - 72) / Math.max(1, floors.length + 1)));
+        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, blockSanitaries.length > 0);
         ctx.fillStyle = '#475467';
         ctx.font = '800 11px system-ui, sans-serif';
-        ctx.fillText(floor, x + 10, bandY + 12);
-        const roomH = Math.max(34, Math.min(58, (h - 76) / Math.max(1, floors.length + 1)));
-        const roomItems = _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, roomH);
+        ctx.fillText(floor, floorRect.x, floorRect.y - 6);
+        ctx.strokeStyle = 'rgba(71,84,103,.16)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
+        const roomItems = _planRoomItemsFromSketch(floorRooms, floorRect);
         roomItems.forEach(item => {
           if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
         });
@@ -3891,6 +3933,21 @@ const MecFormModule = (() => {
       _drawPlanSanitaries(ctx, blockSanitaries, x + 14, y + h - 38, w - 28, 26);
       ctx.restore();
     });
+  }
+
+  function _planFloorRect(blockX, blockY, blockW, blockH, floorIndex, floorCount, hasSanitaries) {
+    const innerX = blockX + 14;
+    const top = blockY + 46;
+    const bottomReserve = hasSanitaries ? 44 : 14;
+    const availableH = Math.max(46, blockH - 58 - bottomReserve);
+    const count = Math.max(1, floorCount || 1);
+    const bandH = availableH / count;
+    return {
+      x: innerX,
+      y: top + floorIndex * bandH + 12,
+      w: Math.max(40, blockW - 28),
+      h: Math.max(30, bandH - 18),
+    };
   }
 
   function _planBlockLayout(blocks, canvasW, canvasH) {
@@ -3930,6 +3987,31 @@ const MecFormModule = (() => {
       cursor += roomWidth;
       return item;
     });
+  }
+
+  function _planRoomItemsFromSketch(rooms, floorRect) {
+    const source = _sketchBlockRect();
+    const fallback = [];
+    const mapped = [];
+    rooms.forEach(room => {
+      const object = _roomObjectForClassroom(room);
+      if (!object) {
+        fallback.push(room);
+        return;
+      }
+      mapped.push({
+        room,
+        x: floorRect.x + ((object.x - source.x) / source.w) * floorRect.w,
+        y: floorRect.y + ((object.y - source.y) / source.h) * floorRect.h,
+        w: Math.max(16, (object.w / source.w) * floorRect.w),
+        h: Math.max(14, (object.h / source.h) * floorRect.h),
+      });
+    });
+    if (!fallback.length) return mapped;
+    return [
+      ...mapped,
+      ..._layoutPlanRooms(fallback, floorRect.x, floorRect.y, floorRect.w, floorRect.h),
+    ];
   }
 
   function _sanitariesForBlock(block) {
@@ -4391,30 +4473,34 @@ const MecFormModule = (() => {
   function _planSvgMarkup() {
     const rooms = _data.__classrooms || [];
     const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const layout = _planBlockLayout(blocks, 900, 560);
     const parts = [
       '<svg xmlns="http://www.w3.org/2000/svg" width="900" height="560" viewBox="0 0 900 560">',
       '<rect width="900" height="560" fill="#f8fafc"/>',
     ];
-    blocks.forEach((block, blockIndex) => {
-      const col = blockIndex % 2;
-      const row = Math.floor(blockIndex / 2);
-      const x = 28 + col * 430;
-      const y = 36 + row * 250;
-      const w = 392;
-      const h = 210;
+    layout.forEach(({ block, x, y, w, h }) => {
       parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#eef2f7" stroke="#172033" stroke-width="2"/>`);
-      parts.push(`<text x="${x + 10}" y="${y + 20}" font-family="system-ui" font-size="15" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}</text>`);
+      parts.push(`<text x="${x + 10}" y="${y + 20}" font-family="system-ui" font-size="15" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}${block.largo_m && block.ancho_m ? ` · ${_escape(block.largo_m)} x ${_escape(block.ancho_m)} m` : ''}</text>`);
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+      const blockSanitaries = _sanitariesForBlock(block);
       const floors = [...new Set(blockRooms.map(room => _normalizeFloor(room.floor)))];
       floors.forEach((floor, floorIndex) => {
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
-        const bandY = y + 34 + floorIndex * 82;
-        parts.push(`<text x="${x + 10}" y="${bandY + 12}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">${_escape(floor)}</text>`);
-        _layoutPlanRooms(floorRooms, x + 14, bandY + 20, w - 28, 58).forEach(item => {
+        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, blockSanitaries.length > 0);
+        parts.push(`<text x="${floorRect.x}" y="${floorRect.y - 6}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">${_escape(floor)}</text>`);
+        parts.push(`<rect x="${floorRect.x}" y="${floorRect.y}" width="${floorRect.w}" height="${floorRect.h}" fill="none" stroke="#dbe5f1" stroke-width="1"/>`);
+        _planRoomItemsFromSketch(floorRooms, floorRect).forEach(item => {
           parts.push(`<rect x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" fill="#eaf4ff" stroke="#2b6cb0" stroke-width="2"/>`);
           parts.push(`<rect x="${item.x + 4}" y="${item.y + 4}" width="${Math.max(0, item.w - 8)}" height="${Math.max(0, item.h - 8)}" fill="none" stroke="#8db8e8" stroke-width="1"/>`);
           parts.push(`<text x="${item.x + 6}" y="${item.y + 14}" font-family="system-ui" font-size="10" font-weight="800" fill="#173f68">${_escape(item.room.name || 'Aula')}</text>`);
         });
+      });
+      blockSanitaries.forEach((item, index) => {
+        const itemW = Math.max(42, Math.min(92, (w - 28) / Math.max(1, blockSanitaries.length) - 4));
+        const sx = x + 14 + index * (itemW + 4);
+        const sy = y + h - 38;
+        parts.push(`<rect x="${sx}" y="${sy}" width="${itemW}" height="26" fill="#f2ecff" stroke="#805ad5" stroke-width="1.5"/>`);
+        parts.push(`<text x="${sx + 4}" y="${sy + 12}" font-family="system-ui" font-size="9" font-weight="800" fill="#44337a">${_escape(item.codigo || 'San.')}</text>`);
       });
     });
     parts.push('</svg>');
