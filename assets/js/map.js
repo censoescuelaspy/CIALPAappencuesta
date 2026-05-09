@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.5.2
+ * Version: 2.5.4
  */
 
 const MapModule = (() => {
@@ -450,7 +450,10 @@ const MapModule = (() => {
     if (!marker || !_map) {
       _highlightListItem(id);
       const escuela = _escuelas.find(e => e.id_escuela === id);
-      if (escuela) _updateInfoPanel(escuela);
+      if (escuela) {
+        _selectedEscuela = escuela;
+        _updateInfoPanel(escuela);
+      }
       if (!window.L) UI.showToast('Mapa grafico no disponible; se muestra la ficha en la lista.', 'info');
       return;
     }
@@ -458,7 +461,10 @@ const MapModule = (() => {
     setTimeout(() => marker.openPopup(), 900);
     _highlightListItem(id);
     const escuela = _escuelas.find(e => e.id_escuela === id);
-    if (escuela) _updateInfoPanel(escuela);
+    if (escuela) {
+      _selectedEscuela = escuela;
+      _updateInfoPanel(escuela);
+    }
   }
 
   function focusListItem(id) {
@@ -598,6 +604,10 @@ const MapModule = (() => {
     return _escuelas;
   }
 
+  function getSelectedEscuela() {
+    return _selectedEscuela;
+  }
+
   function getFiltered() {
     return _filteredEscuelas;
   }
@@ -629,6 +639,7 @@ const MapModule = (() => {
     invalidateSize,
     getMap,
     getEscuelas,
+    getSelectedEscuela,
     getFiltered,
     populateFilterDropdowns,
     toggleRoutes,

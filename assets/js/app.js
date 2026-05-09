@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.2
+ * Version: 2.5.4
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -58,6 +58,16 @@ const UI = (() => {
   function showAlert(title, message, type = 'info') {
     return new Promise(resolve => {
       const modal = _createSimpleModal(title, `<p>${_escapeHtml(message)}</p>`, type, [
+        { label: 'Aceptar', class: 'btn-primary', value: true },
+      ], resolve);
+      document.body.appendChild(modal);
+      requestAnimationFrame(() => modal.classList.add('modal--visible'));
+    });
+  }
+
+  function showHtmlAlert(title, html, type = 'info') {
+    return new Promise(resolve => {
+      const modal = _createSimpleModal(title, String(html || ''), type, [
         { label: 'Aceptar', class: 'btn-primary', value: true },
       ], resolve);
       document.body.appendChild(modal);
@@ -149,6 +159,7 @@ const UI = (() => {
     setLoading,
     showToast,
     showAlert,
+    showHtmlAlert,
     showConfirm,
     showPrompt,
     openModal,
@@ -386,8 +397,10 @@ const AppController = (() => {
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) {
       toggleBtn.addEventListener('click', () => {
-        if (window.matchMedia('(max-width: 768px)').matches) {
-          document.getElementById('sidebar').classList.toggle('sidebar--open');
+        const sidebar = document.getElementById('sidebar');
+        if (window.matchMedia('(max-width: 900px)').matches) {
+          sidebar?.classList.toggle('sidebar--open');
+          document.body.classList.remove('sidebar-auto-hidden', 'sidebar-peek');
         } else {
           document.body.classList.toggle('sidebar-auto-hidden');
           document.body.classList.remove('sidebar-peek');

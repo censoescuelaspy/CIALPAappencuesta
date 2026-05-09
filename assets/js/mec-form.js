@@ -7,6 +7,7 @@ const MecFormModule = (() => {
   'use strict';
 
   const STORAGE_KEY = 'cialpa_mec_form_draft_v1';
+  const PLAN_CANVAS_ID = 'school-plan-canvas';
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
@@ -35,11 +36,12 @@ const MecFormModule = (() => {
     { id: 'board', label: 'Pizarron' },
     { id: 'outlet', label: 'Toma' },
     { id: 'damage', label: 'Dano' },
-    { id: 'photo', label: 'Foto' },
+    { id: 'light', label: 'Foco' },
   ];
 
   function init() {
     _loadDraft();
+    _prefillGeneralFromSelectedSchool();
     _render();
     _initialized = true;
   }
@@ -103,6 +105,49 @@ const MecFormModule = (() => {
     return _data[moduleId]?.[fieldId];
   }
 
+  function _selectedSchoolFromContext() {
+    return (typeof SurveyModule !== 'undefined' && SurveyModule.getCurrentEscuela?.())
+      || (typeof MapModule !== 'undefined' && MapModule.getSelectedEscuela?.())
+      || null;
+  }
+
+  function _firstPresent(source, keys) {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return '';
+  }
+
+  function _prefillGeneralFromSelectedSchool(force = false) {
+    const school = _selectedSchoolFromContext();
+    if (!school) return;
+    _data.general = _data.general || {};
+    const selectedId = String(school.id_escuela || school.codigo_local || '');
+    const changedSchool = selectedId && selectedId !== String(_data.__selectedSchool?.id_escuela || _data.__selectedSchool?.codigo_local || '');
+    const mapping = {
+      latitud: ['latitud', 'lat', 'latitude'],
+      longitud: ['longitud', 'lng', 'lon', 'longitude'],
+      codigo_local: ['codigo_local', 'cod_local', 'codigo', 'id_escuela'],
+      departamento: ['departamento'],
+      distrito: ['distrito'],
+      localidad: ['localidad', 'barrio'],
+      direccion: ['direccion', 'direccion_referencia', 'referencia'],
+      director: ['director', 'nombre_director', 'responsable'],
+    };
+    Object.entries(mapping).forEach(([field, keys]) => {
+      const value = _firstPresent(school, keys);
+      if (!value) return;
+      if (force || changedSchool || !_data.general[field]) _data.general[field] = String(value);
+    });
+    _data.__selectedSchool = {
+      id_escuela: school.id_escuela || '',
+      codigo_local: school.codigo_local || '',
+      nombre: school.nombre || school.nombre_escuela || '',
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
   function _fieldVisible(field) {
     if (!field.visibleWhen) return true;
     const current = _getValue(field.visibleWhen.field);
@@ -147,6 +192,16 @@ const MecFormModule = (() => {
       codigo: _numberedLabel('Sanitario', index),
       planta: _normalizeFloor(item.planta),
     }));
+    const activeBlock = (_data.__blocks || []).find(block => block.id === _data.__activeBlockId);
+    if (activeBlock) {
+      const { id: _id, ...values } = activeBlock;
+      _data.bloques = {
+        ...(_data.bloques || {}),
+        ...values,
+        bloque_codigo: activeBlock.bloque_codigo,
+        cantidad_plantas: values.cantidad_plantas || _data.bloques?.cantidad_plantas || '1',
+      };
+    }
   }
 
   function _render() {
@@ -200,6 +255,7 @@ const MecFormModule = (() => {
     _bindInputs(root);
     _bindSketch(root);
     _refreshDynamicState();
+    renderSchoolPlan();
   }
 
   function _readSavedMeta() {
@@ -252,9 +308,21 @@ const MecFormModule = (() => {
   function _renderActiveModule(module) {
     if (module.kind === 'classroomSketch') return _renderClassroomSketchModule();
     if (module.kind === 'sanitaryList') return _renderSanitaryModule();
+    if (module.kind === 'schoolPlan') return _renderSchoolPlanModule();
     if (module.id === 'bloques') return _renderBlockModule(module);
     if (!module.sections?.length) return _renderDevelopmentModule(module);
     return module.sections.map(section => _renderSection(module, section)).join('');
+  }
+
+  function _renderSchoolPlanModule() {
+    return `
+      <section class="mec-section mec-section--plan">
+        <div class="mec-section__header">
+          <h4>Plano escuela</h4>
+          <p class="mec-hint">Integra automaticamente bloques, pisos, aulas, sanitarios y elementos cargados en el cuestionario.</p>
+        </div>
+        <div id="mec-school-plan-root" data-school-plan-root></div>
+      </section>`;
   }
 
   function _renderBlockModule(module) {
@@ -320,7 +388,7 @@ const MecFormModule = (() => {
       return _wrapField(moduleId, field, `
         <div class="mec-options">
           ${field.options.map(option => `
-            <label class="mec-option ${_choiceToneClass(option)}">
+            <label class="mec-option ${_choiceToneClass(option)} ${value === option ? 'mec-option--active' : ''}">
               <input type="radio" name="${id}" value="${_escape(option)}" ${value === option ? 'checked' : ''}>
               <span>${_escape(option)}</span>
             </label>`).join('')}
@@ -332,7 +400,7 @@ const MecFormModule = (() => {
       return _wrapField(moduleId, field, `
         <div class="mec-options mec-options--columns">
           ${field.options.map(option => `
-            <label class="mec-option">
+            <label class="mec-option ${_choiceToneClass(option)} ${values.includes(option) ? 'mec-option--active' : ''}">
               <input type="checkbox" value="${_escape(option)}" ${values.includes(option) ? 'checked' : ''}>
               <span>${_escape(option)}</span>
             </label>`).join('')}
@@ -395,7 +463,8 @@ const MecFormModule = (() => {
         ${field.evidence ? `<p><strong>Evidencia:</strong> ${_escape(field.evidenceLabel || 'Se recomienda asociar foto.')}</p>` : ''}
         ${field.required ? '<p><strong>Campo obligatorio.</strong></p>' : '<p>Campo opcional, registre el dato si puede verificarlo.</p>'}
       </div>`;
-    UI.showAlert(field.label, html, 'info');
+    if (UI.showHtmlAlert) UI.showHtmlAlert(field.label, html, 'info');
+    else UI.showAlert(field.label, _fieldHelpText(field), 'info');
   }
 
   function _findSchemaField(moduleId, fieldId) {
@@ -471,24 +540,38 @@ const MecFormModule = (() => {
         </div>
         <div class="mec-sketch__layout">
           <div class="mec-sketch__tools">
-            <label class="mec-label"><span>Aula</span></label>
-            <input class="form-control" type="text" value="${_escape(sketch.name || '')}" readonly aria-readonly="true">
-            <label class="mec-label"><span>Bloque</span></label>
-            ${_blockOptions(sketch.blockId || _data.__activeBlockId || '')}
-            <label class="mec-label"><span>Piso</span></label>
-            <input class="form-control" type="number" min="1" step="1" value="${_escape(String(sketch.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}" data-sketch-field="floorNumber">
-            <label class="mec-label"><span>Largo aproximado</span></label>
-            <div class="mec-input-with-unit">
-              <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.length || '')}" data-sketch-field="length">
-              <span class="mec-unit">m</span>
+            <div class="mec-sketch-meta">
+              <div class="form-group">
+                <label>Aula</label>
+                <input class="form-control" type="text" value="${_escape(sketch.name || '')}" readonly aria-readonly="true">
+              </div>
+              <div class="form-group">
+                <label>Bloque</label>
+                ${_blockOptions(sketch.blockId || _data.__activeBlockId || '')}
+              </div>
+              <div class="form-group">
+                <label>Piso</label>
+                <input class="form-control" type="number" min="1" step="1" value="${_escape(String(sketch.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}" data-sketch-field="floorNumber">
+              </div>
+              <div class="form-group">
+                <label>Largo</label>
+                <div class="mec-input-with-unit">
+                  <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.length || '')}" data-sketch-field="length">
+                  <span class="mec-unit">m</span>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Ancho</label>
+                <div class="mec-input-with-unit">
+                  <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.width || '')}" data-sketch-field="width">
+                  <span class="mec-unit">m</span>
+                </div>
+              </div>
+              <div class="form-group form-group--wide">
+                <label>Aberturas / obs.</label>
+                <textarea class="form-control" rows="2" data-sketch-field="openings">${_escape(sketch.openings || '')}</textarea>
+              </div>
             </div>
-            <label class="mec-label"><span>Ancho aproximado</span></label>
-            <div class="mec-input-with-unit">
-              <input class="form-control" type="number" min="0" step="0.1" value="${_escape(sketch.width || '')}" data-sketch-field="width">
-              <span class="mec-unit">m</span>
-            </div>
-            <label class="mec-label"><span>Aberturas / observaciones</span></label>
-            <textarea class="form-control" rows="4" data-sketch-field="openings">${_escape(sketch.openings || '')}</textarea>
             <div class="mec-sketch__actions">
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()">Generar aula base</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.editSelectedSketchObject()">Editar ficha</button>
@@ -551,7 +634,7 @@ const MecFormModule = (() => {
       board: '&#x25AC;',
       outlet: '&#x25C9;',
       damage: '!',
-      photo: '&#x25C8;',
+      light: '&#x25C9;',
     }[toolId] || '+';
   }
 
@@ -697,12 +780,24 @@ const MecFormModule = (() => {
     _data.bloques = _data.bloques || {};
     if (!_data.__activeBlockId) _data.__activeBlockId = _data.__blocks[0]?.id || `bloque_${Date.now()}`;
     if (!_data.__blocks.length) {
+      _data.bloques = {
+        bloque_codigo: 'Bloque 1',
+        cantidad_plantas: '1',
+        ..._data.bloques,
+      };
       _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
     }
   }
 
   function _syncActiveBlock() {
     _ensureBlocks();
+    const currentIndex = Math.max(0, (_data.__blocks || []).findIndex(item => item.id === _data.__activeBlockId));
+    _data.bloques = {
+      bloque_codigo: _numberedLabel('Bloque', currentIndex),
+      cantidad_plantas: '1',
+      ...(_data.bloques || {}),
+    };
+    _data.bloques.bloque_codigo = _numberedLabel('Bloque', currentIndex);
     const block = { id: _data.__activeBlockId, ...(_data.bloques || {}) };
     const index = _data.__blocks.findIndex(item => item.id === block.id);
     if (index >= 0) _data.__blocks[index] = block;
@@ -1103,7 +1198,12 @@ const MecFormModule = (() => {
 
       if (input.type === 'radio') {
         fieldEl.querySelectorAll('input[type="radio"]').forEach(radio => {
-          radio.addEventListener('change', () => _setValue(moduleId, fieldId, radio.value));
+          radio.addEventListener('change', () => {
+            fieldEl.querySelectorAll('.mec-option').forEach(label => {
+              label.classList.toggle('mec-option--active', label.contains(radio) && radio.checked);
+            });
+            _setValue(moduleId, fieldId, radio.value);
+          });
         });
         return;
       }
@@ -1112,6 +1212,10 @@ const MecFormModule = (() => {
         fieldEl.querySelectorAll('input[type="checkbox"]').forEach(box => {
           box.addEventListener('change', () => {
             const values = [...fieldEl.querySelectorAll('input[type="checkbox"]:checked')].map(el => el.value);
+            fieldEl.querySelectorAll('.mec-option').forEach(label => {
+              const input = label.querySelector('input[type="checkbox"]');
+              label.classList.toggle('mec-option--active', Boolean(input?.checked));
+            });
             _setValue(moduleId, fieldId, values);
           });
         });
@@ -1142,6 +1246,7 @@ const MecFormModule = (() => {
           }
         }
         _updateSketchStatus();
+        if (['length', 'width'].includes(input.dataset.sketchField)) _redrawSketchCanvas();
         renderSchoolPlan();
       };
       input.addEventListener('input', persist);
@@ -1177,7 +1282,7 @@ const MecFormModule = (() => {
       if (rotateHit) {
         rotatingObject = rotateHit;
         _pushSketchHistory();
-        _rotateOpeningToNextWall(rotatingObject);
+        _flipOpeningSwing(rotatingObject);
         _saveDraft(false);
         _announceOpeningDistances(rotatingObject);
         rotatingObject = null;
@@ -1376,7 +1481,7 @@ const MecFormModule = (() => {
     const y = Math.min(start.y, end.y);
     const w = Math.max(24, Math.abs(end.x - start.x));
     const h = Math.max(18, Math.abs(end.y - start.y));
-    if (type === 'outlet' || type === 'photo') {
+    if (_isPointSketchObject(type)) {
       return { id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: {} };
     }
     return _clampOpeningToRoom({ id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: {} });
@@ -1389,7 +1494,7 @@ const MecFormModule = (() => {
     let object;
     if (_sketchTool === 'wall') {
       object = { id, type: 'wall', x1: point.x - 42, y1: point.y, x2: point.x + 42, y2: point.y };
-    } else if (_sketchTool === 'outlet' || _sketchTool === 'photo') {
+    } else if (_isPointSketchObject(_sketchTool)) {
       object = { id, type: _sketchTool, x: point.x, y: point.y, r: _sketchPointRadius(_sketchTool), ficha: {} };
     } else {
       const size = _defaultSketchSize(_sketchTool);
@@ -1428,6 +1533,11 @@ const MecFormModule = (() => {
     return normalized;
   }
 
+  function _isPointSketchObject(objectOrType) {
+    const type = typeof objectOrType === 'string' ? objectOrType : objectOrType?.type;
+    return ['outlet', 'light', 'photo'].includes(type);
+  }
+
   function _drawSketchObject(ctx, object, isDraft = false) {
     const selected = object.id === _selectedSketchObjectId;
     const style = _sketchStyle(object.type);
@@ -1439,11 +1549,22 @@ const MecFormModule = (() => {
     ctx.lineCap = 'round';
 
     if (object.type === 'wall') {
+      ctx.save();
+      ctx.strokeStyle = selected ? '#111827' : style.stroke;
+      ctx.lineWidth = selected ? 8 : 7;
       ctx.beginPath();
       ctx.moveTo(object.x1, object.y1);
       ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
+      ctx.strokeStyle = selected ? '#f8fafc' : 'rgba(255,255,255,.72)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(object.x1, object.y1);
+      ctx.lineTo(object.x2, object.y2);
+      ctx.stroke();
+      ctx.restore();
       _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 18);
+      if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
       ctx.restore();
       return;
     }
@@ -1469,13 +1590,13 @@ const MecFormModule = (() => {
       return;
     }
 
-    if (object.type === 'outlet' || object.type === 'photo') {
+    if (_isPointSketchObject(object)) {
       const radius = _sketchPointRadius(object.type);
       ctx.beginPath();
       ctx.arc(object.x, object.y, radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      _labelSketchObject(ctx, object, object.type === 'photo' ? 'Foto' : 'TC', object.x, object.y + (object.type === 'outlet' ? 22 : 28));
+      _labelSketchObject(ctx, object, object.type === 'outlet' ? 'TC' : 'Foco', object.x, object.y + 22);
       ctx.restore();
       return;
     }
@@ -1547,16 +1668,32 @@ const MecFormModule = (() => {
   function _doorSwingAngles(object, swing) {
     const side = _openingSide(object);
     const inward = swing > 0;
-    if (_doorHingeEnd(object) === 'end') {
-      if (side === 'left') return { start: 0, end: inward ? -Math.PI / 2 : Math.PI / 2, leaf: inward ? -Math.PI / 2 : Math.PI / 2, ccw: inward };
-      if (side === 'right') return { start: Math.PI, end: inward ? Math.PI * 1.5 : Math.PI / 2, leaf: inward ? Math.PI * 1.5 : Math.PI / 2, ccw: !inward };
-      if (side === 'bottom') return { start: -Math.PI / 2, end: inward ? 0 : Math.PI, leaf: inward ? 0 : Math.PI, ccw: inward };
-      return { start: Math.PI / 2, end: inward ? Math.PI : 0, leaf: inward ? Math.PI : 0, ccw: !inward };
-    }
-    if (side === 'left') return { start: 0, end: inward ? Math.PI / 2 : -Math.PI / 2, leaf: inward ? Math.PI / 2 : -Math.PI / 2, ccw: !inward };
-    if (side === 'right') return { start: Math.PI, end: inward ? Math.PI / 2 : Math.PI * 1.5, leaf: inward ? Math.PI / 2 : Math.PI * 1.5, ccw: inward };
-    if (side === 'bottom') return { start: -Math.PI / 2, end: inward ? Math.PI : 0, leaf: inward ? Math.PI : 0, ccw: !inward };
-    return { start: Math.PI / 2, end: inward ? 0 : Math.PI, leaf: inward ? 0 : Math.PI, ccw: inward };
+    const end = _doorHingeEnd(object) === 'end';
+    const closed = _doorClosedAngle(side, end);
+    const open = _doorOpenAngle(side, end, inward);
+    const delta = _shortestAngleDelta(closed, open);
+    return { start: closed, end: closed + delta, leaf: closed + delta, ccw: delta < 0, delta };
+  }
+
+  function _doorClosedAngle(side, end) {
+    if (side === 'left') return end ? -Math.PI / 2 : Math.PI / 2;
+    if (side === 'right') return end ? -Math.PI / 2 : Math.PI / 2;
+    if (side === 'bottom') return end ? Math.PI : 0;
+    return end ? Math.PI : 0;
+  }
+
+  function _doorOpenAngle(side, end, inward) {
+    if (side === 'left') return inward ? 0 : Math.PI;
+    if (side === 'right') return inward ? Math.PI : 0;
+    if (side === 'bottom') return inward ? -Math.PI / 2 : Math.PI / 2;
+    return inward ? Math.PI / 2 : -Math.PI / 2;
+  }
+
+  function _shortestAngleDelta(start, end) {
+    let delta = end - start;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return delta;
   }
 
   function _doorHingeEnd(object) {
@@ -1610,12 +1747,13 @@ const MecFormModule = (() => {
       board: { stroke: '#4a5568', fill: 'rgba(74,85,104,.16)', lineWidth: 3 },
       outlet: { stroke: '#b7791f', fill: 'rgba(183,121,31,.18)', lineWidth: 3 },
       damage: { stroke: '#c53030', fill: 'rgba(197,48,48,.18)', lineWidth: 3 },
-      photo: { stroke: '#805ad5', fill: 'rgba(128,90,213,.18)', lineWidth: 3 },
+      light: { stroke: '#d69e2e', fill: 'rgba(246,173,85,.2)', lineWidth: 3 },
+      photo: { stroke: '#d69e2e', fill: 'rgba(246,173,85,.2)', lineWidth: 3 },
     }[type] || { stroke: '#1f5d99', fill: 'rgba(31,93,153,.14)', lineWidth: 3 };
   }
 
   function _sketchPointRadius(type) {
-    return type === 'outlet' ? 7 : 10;
+    return type === 'outlet' ? 7 : 8;
   }
 
   function _sketchLabel(type) {
@@ -1626,17 +1764,20 @@ const MecFormModule = (() => {
       stair: 'Esc',
       board: 'Piz',
       damage: 'Dano',
+      outlet: 'TC',
+      light: 'Foco',
+      photo: 'Foco',
     }[type] || type;
   }
 
   function _sketchObjectLabel(object) {
-    const base = object.ficha?.codigo || object.label || _sketchLabel(object.type);
+    const base = object.type === 'room' ? _sketchLabel(object.type) : (object.ficha?.codigo || object.label || _sketchLabel(object.type));
     const dimensions = _sketchDimensionsText(object);
     return dimensions ? `${base} ${dimensions}` : base;
   }
 
   function _sketchDimensionsText(object) {
-    if (object.type === 'outlet' || object.type === 'photo') return '';
+    if (_isPointSketchObject(object)) return '';
     const scale = _sketchScale();
     if (!scale) return '';
     if (object.type === 'wall') {
@@ -1697,8 +1838,9 @@ const MecFormModule = (() => {
       left: Math.abs(object.x - room.x),
       right: Math.abs((object.x + object.w) - (room.x + room.w)),
     };
-    const side = Object.entries(near).sort((a, b) => a[1] - b[1])[0]?.[0];
-    if (!side || near[side] > 16) return '';
+    const nearestSide = Object.entries(near).sort((a, b) => a[1] - b[1])[0]?.[0];
+    const side = object.attached?.side || nearestSide;
+    if (!side || (!object.attached?.side && near[side] > 16)) return '';
     if (side === 'top' || side === 'bottom') {
       const left = Math.max(0, (object.x - room.x) * scale.x);
       const right = Math.max(0, (room.x + room.w - (object.x + object.w)) * scale.x);
@@ -1776,10 +1918,17 @@ const MecFormModule = (() => {
   }
 
   function _isResizableSketchObject(object) {
-    return object && !['wall', 'outlet', 'photo'].includes(object.type);
+    return object && !_isPointSketchObject(object);
   }
 
   function _resizeHandles(object) {
+    if (object.type === 'wall') {
+      const size = 16;
+      return [
+        { name: 'p1', x: object.x1, y: object.y1, size },
+        { name: 'p2', x: object.x2, y: object.y2, size },
+      ];
+    }
     if (['door', 'window'].includes(object.type)) {
       const side = _openingSide(object);
       const size = 16;
@@ -1818,7 +1967,7 @@ const MecFormModule = (() => {
   }
 
   function _openingRotateHandle(object) {
-    if (!['door', 'window'].includes(object?.type)) return null;
+    if (object?.type !== 'door') return null;
     const side = _openingSide(object);
     const center = { x: object.x + object.w / 2, y: object.y + object.h / 2 };
     const offset = 28;
@@ -1850,7 +1999,7 @@ const MecFormModule = (() => {
     ctx.font = '800 9px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#172033';
-    ctx.fillText('Rotar', handle.x, handle.y + 24);
+    ctx.fillText(object.type === 'door' ? 'Abrir' : 'Girar', handle.x, handle.y + 24);
     ctx.restore();
   }
 
@@ -1859,7 +2008,7 @@ const MecFormModule = (() => {
     ctx.font = '700 12px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const text = object.label || label;
+    const text = label || object.label;
     const width = ctx.measureText(text).width + 12;
     ctx.fillStyle = 'rgba(255,255,255,.88)';
     ctx.fillRect(x - width / 2, y - 10, width, 20);
@@ -1907,7 +2056,7 @@ const MecFormModule = (() => {
     if (object.type === 'wall') {
       return _distanceToSegment(point, { x: object.x1, y: object.y1 }, { x: object.x2, y: object.y2 }) < 12;
     }
-    if (object.type === 'outlet' || object.type === 'photo') {
+    if (_isPointSketchObject(object)) {
       const dx = point.x - object.x;
       const dy = point.y - object.y;
       return Math.sqrt(dx * dx + dy * dy) <= _sketchPointRadius(object.type) + 10;
@@ -1928,7 +2077,7 @@ const MecFormModule = (() => {
     if (object.type === 'wall') {
       return { x1: point.x - object.x1, y1: point.y - object.y1, x2: point.x - object.x2, y2: point.y - object.y2 };
     }
-    if (object.type === 'outlet' || object.type === 'photo') {
+    if (_isPointSketchObject(object)) {
       return { x: point.x - object.x, y: point.y - object.y };
     }
     return { x: point.x - object.x, y: point.y - object.y };
@@ -1942,7 +2091,7 @@ const MecFormModule = (() => {
       object.y2 = point.y - offset.y2;
       return;
     }
-    if (object.type === 'outlet' || object.type === 'photo') {
+    if (_isPointSketchObject(object)) {
       object.x = point.x - offset.x;
       object.y = point.y - offset.y;
       return;
@@ -1974,6 +2123,17 @@ const MecFormModule = (() => {
 
   function _resizeSketchObject(object, point, handle) {
     if (!_isResizableSketchObject(object)) return;
+    if (object.type === 'wall') {
+      if (handle.name === 'p1') {
+        object.x1 = Math.round(point.x);
+        object.y1 = Math.round(point.y);
+      } else {
+        object.x2 = Math.round(point.x);
+        object.y2 = Math.round(point.y);
+      }
+      return;
+    }
+    const previousScale = object.type === 'room' ? _sketchScale() : null;
     const minW = 18;
     const minH = 12;
     const right = object.x + object.w;
@@ -1998,8 +2158,29 @@ const MecFormModule = (() => {
     if (object.type === 'door') _orientOpeningToSide(object, _openingSide(object));
     if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 14;
     if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 14;
-    if (object.type === 'room') _reflowAttachedOpenings(object);
+    if (object.type === 'room') {
+      _updateSketchDimensionsFromRoom(object, previousScale);
+      _reflowAttachedOpenings(object);
+    }
     _clampOpeningToRoom(object);
+  }
+
+  function _updateSketchDimensionsFromRoom(room, previousScale) {
+    if (!room || !previousScale) return;
+    const length = room.w * previousScale.x;
+    const width = room.h * previousScale.y;
+    if (Number.isFinite(length) && length > 0) _data.__classroomSketch.length = length.toFixed(2);
+    if (Number.isFinite(width) && width > 0) _data.__classroomSketch.width = width.toFixed(2);
+    delete room.label;
+    _syncSketchDimensionInputs();
+  }
+
+  function _syncSketchDimensionInputs() {
+    const sketch = _data.__classroomSketch || {};
+    const lengthInput = document.querySelector('[data-sketch-field="length"]');
+    const widthInput = document.querySelector('[data-sketch-field="width"]');
+    if (lengthInput && document.activeElement !== lengthInput) lengthInput.value = sketch.length || '';
+    if (widthInput && document.activeElement !== widthInput) widthInput.value = sketch.width || '';
   }
 
   function _clampOpeningToRoom(object) {
@@ -2084,6 +2265,12 @@ const MecFormModule = (() => {
       object.y = room.y + ratio * Math.max(1, room.h - object.h);
     }
     object.attached = _openingAttachment(object, room, side);
+  }
+
+  function _flipOpeningSwing(object) {
+    if (!object || object.type !== 'door') return;
+    object.ficha = object.ficha || {};
+    object.ficha.abre_hacia = object.ficha.abre_hacia === 'Exterior' ? 'Interior' : 'Exterior';
   }
 
   function _openingAttachment(object, room, side) {
@@ -2247,9 +2434,15 @@ const MecFormModule = (() => {
         materiales: common.materiales,
         extra: [{ key: 'prioridad', label: 'Prioridad', options: ['Baja', 'Media', 'Alta', 'Urgente'] }],
       },
+      light: {
+        title: 'Ficha de iluminacion',
+        typeOptions: ['Foco LED', 'Tubo fluorescente', 'Panel', 'Artefacto colgante', 'No verificable', 'Otro'],
+        extra: [{ key: 'funcionamiento', label: 'Funcionamiento', options: ['Funciona', 'Intermitente', 'No funciona', 'No verificable'] }],
+        ...common,
+      },
       photo: {
-        title: 'Ficha de evidencia',
-        typeOptions: ['General', 'Detalle', 'Riesgo', 'Mantenimiento', 'Otro'],
+        title: 'Ficha de iluminacion',
+        typeOptions: ['Foco LED', 'Tubo fluorescente', 'Panel', 'Artefacto colgante', 'No verificable', 'Otro'],
         extra: [],
         ...common,
       },
@@ -2419,7 +2612,7 @@ const MecFormModule = (() => {
     const object = _findSketchObjectById(data.get('object_id'));
     if (!object) return false;
     object.ficha = object.ficha || {};
-    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'bisagra', 'seguridad', 'pasamanos', 'prioridad', 'observacion']
+    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'bisagra', 'seguridad', 'pasamanos', 'prioridad', 'funcionamiento', 'observacion']
       .forEach(key => {
         if (data.has(key)) object.ficha[key] = String(data.get(key) || '').trim();
       });
@@ -2578,6 +2771,7 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _activeModuleId = moduleId;
     _refreshDynamicState();
+    if (module.kind === 'schoolPlan') renderSchoolPlan();
     document.getElementById('mec-form-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -2704,13 +2898,12 @@ const MecFormModule = (() => {
       return;
     }
     _pushSketchHistory();
-    object.ficha = object.ficha || {};
-    object.ficha.bisagra = object.ficha.bisagra === 'Fin' ? 'Inicio' : 'Fin';
+    _flipOpeningSwing(object);
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
     renderSchoolPlan();
-    UI.showToast(`Apertura de puerta cambiada: bisagra al ${object.ficha.bisagra.toLowerCase()}.`, 'success');
+    UI.showToast(`Apertura de puerta cambiada: ${object.ficha.abre_hacia || 'Interior'}.`, 'success');
   }
 
   async function deleteSelectedSketchObject() {
@@ -2750,13 +2943,15 @@ const MecFormModule = (() => {
   }
 
   function renderSchoolPlan() {
-    _loadDraft();
-    const root = document.getElementById('school-plan-root');
+    if (!_initialized && !Object.keys(_data || {}).length) _loadDraft();
+    const root = _activeSchoolPlanRoot();
     if (!root) return;
     const sketch = _data.__classroomSketch || {};
     _ensureClassrooms();
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
+    const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
+    root.dataset.planCanvasId = canvasId;
 
     root.innerHTML = `
       <div class="school-plan">
@@ -2768,6 +2963,7 @@ const MecFormModule = (() => {
           ${_planKpi('Puertas', metrics.doors, _stateSummaryText(metrics.states.door))}
           ${_planKpi('Ventanas', metrics.windows, _stateSummaryText(metrics.states.window))}
           ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
+          ${_planKpi('Luces', metrics.lights, _stateSummaryText(metrics.states.light))}
           ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
         </section>
 
@@ -2789,7 +2985,7 @@ const MecFormModule = (() => {
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
-            <canvas id="school-plan-canvas" width="900" height="560" aria-label="Plano general de la escuela"></canvas>
+            <canvas id="${canvasId}" data-school-plan-canvas width="900" height="560" aria-label="Plano general de la escuela"></canvas>
           </div>
           <aside class="school-plan__side">
             <h3>Aulas y elementos</h3>
@@ -2798,6 +2994,7 @@ const MecFormModule = (() => {
               <span><i class="legend-door"></i>Puerta</span>
               <span><i class="legend-window"></i>Ventana</span>
               <span><i class="legend-outlet"></i>Toma</span>
+              <span><i class="legend-light"></i>Foco</span>
               <span><i class="legend-damage"></i>Dano</span>
               <span><i class="legend-sanitary"></i>Sanitario</span>
             </div>
@@ -2814,6 +3011,18 @@ const MecFormModule = (() => {
     _bindSchoolPlanCanvas();
   }
 
+  function _activeSchoolPlanRoot() {
+    return document.querySelector('.mec-module--active #mec-school-plan-root')
+      || document.getElementById('school-plan-root')
+      || document.getElementById('mec-school-plan-root');
+  }
+
+  function _activeSchoolPlanCanvas() {
+    return document.querySelector('.mec-module--active [data-school-plan-canvas]')
+      || document.getElementById(PLAN_CANVAS_ID)
+      || document.getElementById('mec-school-plan-canvas');
+  }
+
   function _planKpi(label, value, note) {
     return `
       <article class="school-plan-kpi">
@@ -2827,7 +3036,7 @@ const MecFormModule = (() => {
     return {
       aulas: 'Aulas',
       aberturas: 'Puertas/Ventanas',
-      electricidad: 'Tomas',
+      electricidad: 'Tomas/Focos',
       danos: 'Danos',
       etiquetas: 'Etiquetas',
     }[key] || key;
@@ -2894,11 +3103,12 @@ const MecFormModule = (() => {
   function _schoolPlanMetrics(sketch, objects) {
     const classrooms = _data.__classrooms || [];
     const areaTotal = classrooms.reduce((sum, room) => sum + (Number(room.length || 0) * Number(room.width || 0)), 0);
-    const states = { door: {}, window: {}, outlet: {}, damage: {} };
+    const states = { door: {}, window: {}, outlet: {}, light: {}, photo: {}, damage: {} };
     objects.forEach(object => {
-      if (states[object.type]) {
+      const stateKey = object.type === 'photo' ? 'light' : object.type;
+      if (states[stateKey]) {
         const state = object.ficha?.estado || 'Sin estado';
-        states[object.type][state] = (states[object.type][state] || 0) + 1;
+        states[stateKey][state] = (states[stateKey][state] || 0) + 1;
       }
     });
     return {
@@ -2909,6 +3119,7 @@ const MecFormModule = (() => {
       doors: objects.filter(object => object.type === 'door').length,
       windows: objects.filter(object => object.type === 'window').length,
       outlets: objects.filter(object => object.type === 'outlet').length,
+      lights: objects.filter(object => ['light', 'photo'].includes(object.type)).length,
       alerts: objects.filter(object => _isPlanAlert(object)).length + (_data.__sanitaries || []).filter(item => _isPlanAlert({ ficha: item })).length,
       states,
     };
@@ -2937,7 +3148,7 @@ const MecFormModule = (() => {
   }
 
   function _drawSchoolPlan() {
-    const canvas = document.getElementById('school-plan-canvas');
+    const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
     _ensureSketchObjects();
     const ctx = canvas.getContext('2d');
@@ -3114,10 +3325,10 @@ const MecFormModule = (() => {
     const sx = w / roomObject.w;
     const sy = h / roomObject.h;
     (room.objects || [])
-      .filter(object => ['door', 'window', 'outlet'].includes(object.type))
+      .filter(object => ['door', 'window', 'outlet', 'light', 'photo'].includes(object.type))
       .forEach(object => {
         if (['door', 'window'].includes(object.type) && !_planLayers.aberturas) return;
-        if (object.type === 'outlet' && !_planLayers.electricidad) return;
+        if (['outlet', 'light', 'photo'].includes(object.type) && !_planLayers.electricidad) return;
         const ox = x + (object.x - roomObject.x) * sx;
         const oy = y + (object.y - roomObject.y) * sy;
         if (object.type === 'door') {
@@ -3155,10 +3366,10 @@ const MecFormModule = (() => {
           ctx.stroke();
           return;
         }
-        ctx.fillStyle = '#b7791f';
+        ctx.fillStyle = object.type === 'outlet' ? '#b7791f' : '#d69e2e';
         _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: 16, h: 16 });
         ctx.beginPath();
-        ctx.arc(ox, oy, 2.5, 0, Math.PI * 2);
+        ctx.arc(ox, oy, object.type === 'outlet' ? 2.5 : 3.5, 0, Math.PI * 2);
         ctx.fill();
       });
     if (_planLayers.danos) {
@@ -3276,7 +3487,7 @@ const MecFormModule = (() => {
   }
 
   function _bindSchoolPlanCanvas() {
-    const canvas = document.getElementById('school-plan-canvas');
+    const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
     const hit = event => {
       const rect = canvas.getBoundingClientRect();
@@ -3499,7 +3710,7 @@ const MecFormModule = (() => {
   }
 
   function exportPlanPng() {
-    const canvas = document.getElementById('school-plan-canvas');
+    const canvas = _activeSchoolPlanCanvas();
     if (!canvas) {
       UI.showToast('Abra la vista Plano escuela para exportar PNG.', 'warning');
       return;
@@ -3518,7 +3729,7 @@ const MecFormModule = (() => {
   }
 
   function printPlanPdf() {
-    const canvas = document.getElementById('school-plan-canvas');
+    const canvas = _activeSchoolPlanCanvas();
     if (!canvas) {
       UI.showToast('Abra la vista Plano escuela para imprimir el plano.', 'warning');
       return;

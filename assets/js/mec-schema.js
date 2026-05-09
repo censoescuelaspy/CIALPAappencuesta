@@ -4,7 +4,7 @@
  */
 
 const MEC_SCHEMA = {
-  version: '0.1.0',
+  version: '0.1.1',
   source: 'manual/MANUAL_ENCUESTADOR_CIALPA.md',
   modules: [
     {
@@ -157,6 +157,14 @@ const MEC_SCHEMA = {
       description: 'Registro repetible de baterias sanitarias, artefactos, accesibilidad, estado y evidencias.',
       status: 'development',
       kind: 'sanitaryList',
+      sections: [],
+    },
+    {
+      id: 'plano',
+      title: 'Plano escuela',
+      description: 'Vista integrada de bloques, pisos, aulas, sanitarios, elementos y KPIs del relevamiento.',
+      status: 'development',
+      kind: 'schoolPlan',
       sections: [],
     },
   ],
