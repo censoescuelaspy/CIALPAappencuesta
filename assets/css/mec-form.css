@@ -631,7 +631,7 @@
   display: block;
   background: #fbfcfe;
   touch-action: none;
-  transform-origin: center center;
+  transform-origin: top left;
 }
 
 .mec-sketch__board small {
@@ -921,6 +921,45 @@
   flex-wrap: wrap;
 }
 
+.mec-sanitary-fixtures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: .45rem;
+  margin: .5rem 0 .75rem;
+}
+
+.mec-sanitary-fixture {
+  min-height: 52px;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: #27364a;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .55rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-sanitary-fixture span {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #eef6ff;
+  color: #173f68;
+  display: grid;
+  place-items: center;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.mec-sanitary-fixture strong {
+  font-size: .78rem;
+  line-height: 1.15;
+}
+
 .mec-sanitary-svg {
   width: 100%;
   max-height: 280px;
@@ -1207,7 +1246,7 @@
   }
 }
 
-/* ── Densidad móvil/tablet para carga de campo, v2.5.4 ────── */
+/* ── Densidad móvil/tablet para carga de campo, v2.5.5 ────── */
 @media (max-width: 1024px) {
   .mec-header-actions {
     gap: .35rem;

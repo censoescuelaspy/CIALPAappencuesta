@@ -15,6 +15,7 @@ const MecFormModule = (() => {
   let _selectedSketchObjectId = null;
   let _activeClassroomId = null;
   let _sketchZoom = 1;
+  let _pendingSketchCenter = false;
   let _selectedPlanId = null;
   let _planHitAreas = [];
   const _sketchHistory = [];
@@ -27,6 +28,8 @@ const MecFormModule = (() => {
     etiquetas: true,
   };
 
+  const SKETCH_CANVAS = { width: 760, height: 460 };
+
   const SKETCH_TOOLS = [
     { id: 'select', label: 'Seleccionar' },
     { id: 'wall', label: 'Pared' },
@@ -35,8 +38,17 @@ const MecFormModule = (() => {
     { id: 'stair', label: 'Escalera' },
     { id: 'board', label: 'Pizarron' },
     { id: 'outlet', label: 'Toma' },
-    { id: 'damage', label: 'Dano' },
+    { id: 'damage', label: 'Dano/obs.' },
     { id: 'light', label: 'Foco' },
+    { id: 'text', label: 'Texto' },
+    { id: 'pencil', label: 'Lapiz' },
+  ];
+
+  const SANITARY_FIXTURES = [
+    { id: 'toilet', field: 'inodoros', label: 'Inodoro', short: 'WC' },
+    { id: 'sink', field: 'lavamanos', label: 'Lavamanos', short: 'LV' },
+    { id: 'urinal', field: 'urinarios', label: 'Urinario', short: 'UR' },
+    { id: 'shower', field: 'duchas', label: 'Ducha', short: 'DU' },
   ];
 
   function init() {
@@ -80,24 +92,123 @@ const MecFormModule = (() => {
   async function _setEvidenceFiles(moduleId, fieldId, files) {
     const key = `${moduleId}.${fieldId}`;
     _data.__evidence = _data.__evidence || {};
-    _data.__evidence[key] = await Promise.all([...files].map(file => _readEvidenceFile(file)));
+    _data.__evidence[key] = await Promise.all([...files].map(file => _readEvidenceFile(file, _fieldEvidenceContext(moduleId, fieldId))));
     _saveDraft(false);
     _refreshEvidenceState(key);
     UI.showToast('Foto asociada a la respuesta.', 'success');
   }
 
-  function _readEvidenceFile(file) {
+  function _readEvidenceFile(file, context = {}) {
+    const indexedAt = new Date().toISOString();
+    const enrichedContext = _normalizeEvidenceContext(context);
+    const label = _evidenceIndexLabel(enrichedContext);
     return new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = () => resolve({
         name: file.name,
+        indexedName: `${_slug(label || 'evidencia')}_${Date.now()}_${_slug(file.name || 'foto')}`,
         type: file.type,
         size: file.size,
-        capturedAt: new Date().toISOString(),
+        capturedAt: indexedAt,
+        label,
+        indexKey: _slug(label || file.name || 'evidencia'),
+        context: enrichedContext,
         dataUrl: reader.result,
       });
       reader.readAsDataURL(file);
     });
+  }
+
+  function _normalizeEvidenceContext(context = {}) {
+    const school = _schoolEvidenceContext();
+    return {
+      scope: context.scope || 'cuestionario',
+      schoolCode: context.schoolCode || school.schoolCode,
+      schoolName: context.schoolName || school.schoolName,
+      moduleLabel: context.moduleLabel || '',
+      blockLabel: context.blockLabel || '',
+      floorLabel: context.floorLabel || '',
+      spaceLabel: context.spaceLabel || '',
+      elementType: context.elementType || '',
+      elementLabel: context.elementLabel || '',
+      elementId: context.elementId || '',
+      fieldPath: context.fieldPath || '',
+    };
+  }
+
+  function _schoolEvidenceContext() {
+    const selected = _selectedSchoolFromContext() || _data.__selectedSchool || {};
+    const general = _data.general || {};
+    return {
+      schoolCode: _firstPresent(selected, ['codigo_establecimiento', 'codigo', 'CODIGO', 'id']) || general.codigo_establecimiento || general.codigo_local || '',
+      schoolName: _firstPresent(selected, ['nombre', 'institucion', 'NOMBRE', 'nombre_establecimiento']) || general.nombre_institucion || general.nombre_establecimiento || '',
+    };
+  }
+
+  function _fieldEvidenceContext(moduleId, fieldId) {
+    const module = MEC_SCHEMA.modules.find(item => item.id === moduleId);
+    const field = module?.sections.flatMap(section => section.fields).find(item => item.id === fieldId);
+    return {
+      scope: 'cuestionario',
+      moduleLabel: module?.title || moduleId,
+      elementType: 'Campo',
+      elementLabel: field?.label || fieldId,
+      fieldPath: `${moduleId}.${fieldId}`,
+    };
+  }
+
+  function _classroomEvidenceContext(room = _data.__classroomSketch || {}) {
+    const block = _blockById(room.blockId || _data.__activeBlockId);
+    return {
+      blockLabel: block?.bloque_codigo || room.blockId || '',
+      floorLabel: _normalizeFloor(room.floor || 'Piso 1'),
+      spaceLabel: room.name || '',
+    };
+  }
+
+  function _sketchObjectEvidenceContext(object, room = _data.__classroomSketch || {}) {
+    const roomContext = _classroomEvidenceContext(room);
+    return {
+      scope: 'plano',
+      ...roomContext,
+      elementType: _sketchLabel(object?.type),
+      elementLabel: object?.ficha?.codigo || object?.label || _sketchLabel(object?.type),
+      elementId: object?.id || '',
+    };
+  }
+
+  function _sanitaryEvidenceContext(item) {
+    return {
+      scope: 'sanitario',
+      blockLabel: _sanitaryBlockLabel(item),
+      floorLabel: _normalizeFloor(item?.planta || 'Piso 1'),
+      spaceLabel: item?.codigo || 'Sanitario',
+      elementType: 'Sanitario',
+      elementLabel: item?.codigo || 'Sanitario',
+      elementId: item?.id || '',
+    };
+  }
+
+  function _evidenceIndexLabel(context = {}) {
+    const school = [context.schoolCode, context.schoolName].filter(Boolean).join(' ');
+    return [
+      school || 'Escuela sin codigo',
+      context.blockLabel,
+      context.floorLabel,
+      context.spaceLabel,
+      context.elementType && context.elementLabel ? `${context.elementType} ${context.elementLabel}` : context.elementLabel,
+      context.fieldPath,
+    ].filter(Boolean).join(' / ');
+  }
+
+  function _slug(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 120) || 'item';
   }
 
   function _getValue(path) {
@@ -519,6 +630,7 @@ const MecFormModule = (() => {
     _ensureClassrooms();
     const sketch = _data.__classroomSketch || {};
     const classrooms = _data.__classrooms || [];
+    const visibleClassrooms = _orderedClassroomsForNavigator(_visibleClassroomsForActiveBlock(classrooms));
     return `
       <section class="mec-section mec-sketch">
         <div class="mec-section__header">
@@ -531,12 +643,12 @@ const MecFormModule = (() => {
         </div>
         ${_renderClassroomBlockNavigator()}
         <div class="mec-repeat-list">
-          ${_orderedClassroomsForNavigator(classrooms).map((room, index) => `
+          ${visibleClassrooms.length ? visibleClassrooms.map((room, index) => `
             <button class="mec-repeat-item ${room.id === _activeClassroomId ? 'mec-repeat-item--active' : ''}" type="button"
               onclick="MecFormModule.selectClassroom('${_escape(room.id)}')">
               <strong>${_escape(room.name || `Aula ${index + 1}`)}</strong>
               <span>${_escape(_classroomSummary(room))}</span>
-            </button>`).join('')}
+            </button>`).join('') : '<p class="text-muted">Este bloque todavia no tiene aulas. Use + Nueva aula.</p>'}
         </div>
         <div class="mec-sketch__layout">
           <div class="mec-sketch__tools">
@@ -591,7 +703,7 @@ const MecFormModule = (() => {
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSketchZoom(0.15)">+</button>
             </div>
             <div class="mec-sketch-canvas-wrap">
-              <canvas id="mec-classroom-canvas" width="760" height="460" style="transform:scale(${_sketchZoom});" aria-label="Croquis manual del aula"></canvas>
+              <canvas id="mec-classroom-canvas" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="transform:scale(${_sketchZoom});" aria-label="Croquis manual del aula"></canvas>
             </div>
             <div class="mec-sketch-toolset" aria-label="Elementos para insertar en el croquis">
               ${SKETCH_TOOLS.map(tool => `
@@ -635,6 +747,8 @@ const MecFormModule = (() => {
       outlet: '&#x25C9;',
       damage: '!',
       light: '&#x25C9;',
+      text: 'T',
+      pencil: '&#x270E;',
     }[toolId] || '+';
   }
 
@@ -646,8 +760,16 @@ const MecFormModule = (() => {
       _activeClassroomId = _activeClassroomId || _data.__classroomSketch.id || `aula_${Date.now()}`;
       _data.__classroomSketch.id = _activeClassroomId;
       _data.__classroomSketch.name = _data.__classroomSketch.name || 'Aula 1';
+      _data.__classroomSketch.blockId = _data.__classroomSketch.blockId || _data.__activeBlockId || '';
+      _data.__classroomSketch.floor = _normalizeFloor(_data.__classroomSketch.floor || 'Piso 1');
       _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
     }
+    _data.__classrooms.forEach((room, index) => {
+      room.name = room.name || _numberedLabel('Aula', index);
+      room.blockId = room.blockId || _data.__activeBlockId || '';
+      room.floor = _normalizeFloor(room.floor || 'Piso 1');
+      room.objects = Array.isArray(room.objects) ? room.objects : [];
+    });
     if (!_activeClassroomId || !_data.__classrooms.some(room => room.id === _activeClassroomId)) {
       _activeClassroomId = _data.__classrooms[0].id;
       _loadActiveClassroomIntoSketch();
@@ -673,13 +795,14 @@ const MecFormModule = (() => {
   }
 
   function _orderedClassroomsForNavigator(classrooms) {
-    const activeBlockId = _data.__activeBlockId || '';
     return [...(classrooms || [])].sort((a, b) => {
-      const aActive = a.blockId === activeBlockId ? 0 : 1;
-      const bActive = b.blockId === activeBlockId ? 0 : 1;
-      if (aActive !== bActive) return aActive - bActive;
       return String(a.name || '').localeCompare(String(b.name || ''), 'es');
     });
+  }
+
+  function _visibleClassroomsForActiveBlock(classrooms = _data.__classrooms || []) {
+    const activeBlockId = _data.__activeBlockId || _data.__classroomSketch?.blockId || '';
+    return (classrooms || []).filter(room => (room.blockId || activeBlockId) === activeBlockId);
   }
 
   function _cloneClassroom(sketch) {
@@ -725,6 +848,51 @@ const MecFormModule = (() => {
     return parts.join(' · ');
   }
 
+  function _buildRoomObjectFromDimensions(length, width, id = null, rect = null) {
+    const lengthM = Number(length || 7);
+    const widthM = Number(width || 5);
+    const maxW = 560;
+    const maxH = 320;
+    const ratio = Math.max(lengthM, widthM, 1);
+    const roomW = Math.max(220, Math.round((lengthM / ratio) * maxW));
+    const roomH = Math.max(150, Math.round((widthM / ratio) * maxH));
+    return {
+      id: id || `room_${Date.now()}`,
+      type: 'room',
+      x: rect ? Math.round(rect.x) : Math.round((SKETCH_CANVAS.width - roomW) / 2),
+      y: rect ? Math.round(rect.y) : Math.round((SKETCH_CANVAS.height - roomH) / 2),
+      w: rect ? Math.round(rect.w) : roomW,
+      h: rect ? Math.round(rect.h) : roomH,
+      label: `${lengthM || '?'}m x ${widthM || '?'}m`,
+    };
+  }
+
+  function _layoutSketchRoomsForActiveBlock() {
+    const rooms = _visibleClassroomsForActiveBlock(_data.__classrooms || [])
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(_data.__classroomSketch?.floor || 'Piso 1'));
+    const source = rooms.length ? rooms : [_data.__classroomSketch || {}];
+    return _layoutPlanRooms(source, 58, 82, SKETCH_CANVAS.width - 116, SKETCH_CANVAS.height - 166);
+  }
+
+  function _activeRoomLayoutRect() {
+    const item = _layoutSketchRoomsForActiveBlock().find(layout => layout.room.id === _activeClassroomId);
+    if (!item) return null;
+    return { x: item.x, y: item.y, w: item.w, h: item.h };
+  }
+
+  function _ensureActiveRoomObject(rect = null) {
+    _ensureSketchObjects();
+    const existing = _data.__classroomSketch.objects.find(object => object.type === 'room');
+    if (existing) return existing;
+    const room = _buildRoomObjectFromDimensions(_data.__classroomSketch.length, _data.__classroomSketch.width, null, rect);
+    _data.__classroomSketch.objects.unshift(room);
+    return room;
+  }
+
+  function _requestSketchCenter() {
+    _pendingSketchCenter = true;
+  }
+
   function selectClassroom(id) {
     _syncActiveClassroomFromSketch();
     _activeClassroomId = id;
@@ -738,6 +906,7 @@ const MecFormModule = (() => {
       }
     }
     _selectedSketchObjectId = null;
+    _requestSketchCenter();
     _saveDraft(false);
     _render();
   }
@@ -763,7 +932,11 @@ const MecFormModule = (() => {
       objects: [],
     };
     _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
+    const rect = _activeRoomLayoutRect();
+    _data.__classroomSketch.objects = [_buildRoomObjectFromDimensions(_data.__classroomSketch.length, _data.__classroomSketch.width, null, rect)];
+    _syncActiveClassroomFromSketch();
     _selectedSketchObjectId = null;
+    _requestSketchCenter();
     _saveDraft(false);
     _render();
     UI.showToast(remainingArea ? 'Nueva aula ubicada sobre el area restante estimada del bloque.' : 'Nueva aula lista para cargar.', 'success');
@@ -847,16 +1020,23 @@ const MecFormModule = (() => {
 
   function selectBlockForClassrooms(id) {
     _syncActiveClassroomFromSketch();
-    selectBlock(id);
+    const block = (_data.__blocks || []).find(item => item.id === id);
+    if (!block) return;
+    _data.__activeBlockId = id;
+    const { id: _id, ...values } = block;
+    _data.bloques = values;
     const room = (_data.__classrooms || []).find(item => item.blockId === id);
     if (!room) {
       _selectedSketchObjectId = null;
+      _saveDraft(false);
+      _render();
       UI.showToast('Bloque seleccionado. Pulse + Nueva aula para cargar su primera aula.', 'info');
       return;
     }
     _activeClassroomId = room.id;
     _loadActiveClassroomIntoSketch();
     _selectedSketchObjectId = null;
+    _requestSketchCenter();
     _saveDraft(false);
     _render();
   }
@@ -879,14 +1059,20 @@ const MecFormModule = (() => {
   }
 
   function _ensureSanitaries() {
+    _ensureBlocks();
     _data.__sanitaries = _data.__sanitaries || [];
+    _data.__sanitaries.forEach((item, index) => {
+      item.codigo = item.codigo || _numberedLabel('Sanitario', index);
+      item.bloque = item.bloque || _activeBlockLabel();
+      item.planta = _normalizeFloor(item.planta || 'Piso 1');
+    });
   }
 
   function _sanitaryTemplate(index = 1) {
     return {
       id: `san_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       codigo: `Sanitario ${index}`,
-      bloque: '',
+      bloque: _activeBlockLabel(),
       planta: 'Piso 1',
       tipo: 'Bateria sanitaria',
       uso: 'Estudiantes',
@@ -924,20 +1110,63 @@ const MecFormModule = (() => {
 
   function _renderSanitaryModule() {
     _ensureSanitaries();
-    const items = _data.__sanitaries;
+    const items = _visibleSanitariesForActiveBlock(_data.__sanitaries);
     return `
       <section class="mec-section mec-sanitary">
         <div class="mec-section__header">
           <h4>Sanitarios y saneamiento</h4>
-          <p class="mec-hint">Registre cada bano, bateria sanitaria o sanitario accesible como elemento independiente, con cantidades, estado y evidencia.</p>
+          <p class="mec-hint">Registre cada bano, bateria sanitaria o sanitario accesible como ambiente independiente dentro del bloque activo.</p>
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.addSanitary()">+ Agregar sanitario</button>
+          <span class="mec-autosave-pill">Autoguardado</span>
         </div>
+        ${_renderSanitaryBlockNavigator()}
         <div class="mec-sanitary-list">
           ${items.length ? items.map(_renderSanitaryCard).join('') : '<p class="text-muted">Todavia no hay sanitarios cargados.</p>'}
         </div>
       </section>`;
+  }
+
+  function _renderSanitaryBlockNavigator() {
+    _ensureBlocks();
+    const blocks = _data.__blocks || [];
+    if (!blocks.length) return '';
+    return `
+      <div class="mec-block-tabs" aria-label="Navegacion de bloques para sanitarios">
+        ${blocks.map(block => {
+          const count = (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block)).length;
+          return `
+            <button class="mec-block-tab ${block.id === _data.__activeBlockId ? 'mec-block-tab--active' : ''}" type="button"
+              onclick="MecFormModule.selectBlock('${_escape(block.id)}')">
+              <strong>${_escape(block.bloque_codigo || 'Bloque 1')}</strong>
+              <span>${count} sanitario(s)</span>
+            </button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function _visibleSanitariesForActiveBlock(items = _data.__sanitaries || []) {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) return items || [];
+    return (items || []).filter(item => _matchesBlockReference(item.bloque, block));
+  }
+
+  function _activeBlockLabel() {
+    const block = _blockById(_data.__activeBlockId);
+    return block?.bloque_codigo || _data.bloques?.bloque_codigo || '';
+  }
+
+  function _sanitaryBlockLabel(item) {
+    const block = (_data.__blocks || []).find(candidate => _matchesBlockReference(item?.bloque, candidate));
+    return block?.bloque_codigo || item?.bloque || _activeBlockLabel();
+  }
+
+  function _matchesBlockReference(value, block) {
+    if (!block) return false;
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return block.id === _data.__activeBlockId;
+    return [block.id, block.bloque_codigo].filter(Boolean).map(item => String(item).trim().toLowerCase()).includes(raw);
   }
 
   function _renderSanitaryCard(item, index) {
@@ -972,7 +1201,7 @@ const MecFormModule = (() => {
           <div class="mec-sanitary-plan__header">
             <div>
               <strong>Croquis del sanitario</strong>
-              <span>Cabinas internas segun inodoros registrados</span>
+              <span>Cabinas y artefactos internos asociados al sanitario</span>
             </div>
             <div>
               <button class="btn btn-xs btn-outline" type="button" onclick="MecFormModule.regenerateSanitaryPlan('${_escape(item.id)}')">Regenerar</button>
@@ -980,6 +1209,7 @@ const MecFormModule = (() => {
               <button class="btn btn-xs btn-danger" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cabina</button>
             </div>
           </div>
+          ${_renderSanitaryFixtureTools(item)}
           ${_renderSanitarySketch(item)}
         </div>
 
@@ -1034,12 +1264,38 @@ const MecFormModule = (() => {
 
   function _sanitaryInput(item, key, label, type, step = '1') {
     const value = key === 'planta' ? (String(item[key] || 'Piso 1').match(/\d+/)?.[0] || '1') : (item[key] || '');
+    if (key === 'bloque') {
+      _ensureBlocks();
+      return `
+        <div class="form-group">
+          <label>${_escape(label)}</label>
+          <select class="form-control"
+            onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value)">
+            ${(_data.__blocks || []).map((block, index) => {
+              const labelValue = block.bloque_codigo || _numberedLabel('Bloque', index);
+              const selected = _matchesBlockReference(item.bloque, block);
+              return `<option value="${_escape(labelValue)}" ${selected ? 'selected' : ''}>${_escape(labelValue)}</option>`;
+            }).join('')}
+          </select>
+        </div>`;
+    }
     return `
       <div class="form-group">
         <label>${_escape(label)}</label>
         <input class="form-control" type="${_escape(type)}" min="${key === 'planta' ? '1' : '0'}" step="${_escape(step)}" value="${_escape(value)}"
           oninput="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value, false)"
           onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value)">
+      </div>`;
+  }
+
+  function _renderSanitaryFixtureTools(item) {
+    return `
+      <div class="mec-sanitary-fixtures" aria-label="Artefactos sanitarios">
+        ${SANITARY_FIXTURES.map(tool => `
+          <button class="mec-sanitary-fixture" type="button" onclick="MecFormModule.addSanitaryFixture('${_escape(item.id)}', '${_escape(tool.id)}')">
+            <span>${_escape(tool.short)}</span>
+            <strong>+ ${_escape(tool.label)}</strong>
+          </button>`).join('')}
       </div>`;
   }
 
@@ -1071,6 +1327,7 @@ const MecFormModule = (() => {
     const stallW = count ? innerW / count : innerW;
     const lavCount = Math.max(0, Number(item.lavamanos || 0));
     const urinalCount = Math.max(0, Number(item.urinarios || 0));
+    const showerCount = Math.max(0, Number(item.duchas || 0));
     return `
       <svg class="mec-sanitary-svg" viewBox="0 0 420 220" role="img" aria-label="Croquis sanitario ${_escape(item.codigo || '')}">
         <rect x="8" y="8" width="404" height="204" rx="4" fill="#fbfcfe" stroke="#172033" stroke-width="3"/>
@@ -1096,7 +1353,11 @@ const MecFormModule = (() => {
           const x = 286 + index * 24;
           return `<path d="M ${x} 184 h16 v18 q-8 8 -16 0 z" fill="#fff" stroke="#805ad5" stroke-width="1.5"/>`;
         }).join('')}
-        <text x="18" y="204" font-size="9" font-weight="800" fill="#667085">Lavamanos: ${lavCount} · Urinarios: ${urinalCount} · Accesible: ${_escape(item.accesible || 'No')}</text>
+        ${Array.from({ length: showerCount }).map((_, index) => {
+          const x = 340 + index * 18;
+          return `<g><rect x="${x}" y="34" width="14" height="22" rx="2" fill="#fff" stroke="#0891b2" stroke-width="1.3"/><line x1="${x + 7}" y1="56" x2="${x + 7}" y2="70" stroke="#0891b2" stroke-width="1.2"/></g>`;
+        }).join('')}
+        <text x="18" y="204" font-size="9" font-weight="800" fill="#667085">Lavamanos: ${lavCount} · Urinarios: ${urinalCount} · Duchas: ${showerCount} · Accesible: ${_escape(item.accesible || 'No')}</text>
       </svg>`;
   }
 
@@ -1108,6 +1369,18 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _render();
     UI.showToast('Sanitario agregado.', 'success');
+  }
+
+  function addSanitaryFixture(id, fixtureId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    const fixture = SANITARY_FIXTURES.find(tool => tool.id === fixtureId);
+    if (!item || !fixture) return;
+    const next = Math.max(0, Number(item[fixture.field] || 0)) + 1;
+    item[fixture.field] = String(next);
+    if (fixture.id === 'toilet') _ensureSanitaryPlan(item, true);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
   }
 
   function setSanitaryValue(id, key, value, rerender = true) {
@@ -1158,7 +1431,7 @@ const MecFormModule = (() => {
   async function setSanitaryEvidence(id, input) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
-    item.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file)));
+    item.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _sanitaryEvidenceContext(item))));
     _saveDraft(false);
     _render();
     UI.showToast('Foto asociada al sanitario.', 'success');
@@ -1293,6 +1566,15 @@ const MecFormModule = (() => {
         movingObject = selected;
         moveOffset = _moveOffsetForObject(selected, point);
         mutationRecorded = false;
+      } else if (_sketchTool === 'pencil') {
+        drawing = true;
+        draftObject = {
+          id: `sk_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+          type: 'pencil',
+          points: [point],
+          ficha: { codigo: 'Lapiz' },
+        };
+        mutationRecorded = false;
       }
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
@@ -1321,7 +1603,12 @@ const MecFormModule = (() => {
         return;
       }
       if (!drawing || !draftObject) return;
-      draftObject = _newSketchObject(_sketchTool, draftObject.start, point, draftObject.id);
+      if (draftObject.type === 'pencil') {
+        const last = draftObject.points[draftObject.points.length - 1];
+        if (!last || Math.hypot(point.x - last.x, point.y - last.y) > 3) draftObject.points.push(point);
+      } else {
+        draftObject = _newSketchObject(_sketchTool, draftObject.start, point, draftObject.id);
+      }
       _drawSketch(ctx, canvas, draftObject);
     };
     const end = event => {
@@ -1419,6 +1706,7 @@ const MecFormModule = (() => {
     canvas.addEventListener('touchend', touchEnd, { passive: false });
     _drawSketch(ctx, canvas);
     _drawBlockPreview();
+    _centerSketchOnActiveRoom();
   }
 
   function _drawSketch(ctx, canvas, draftObject = null) {
@@ -1441,8 +1729,38 @@ const MecFormModule = (() => {
       ctx.stroke();
     }
 
+    _drawSketchBlockContext(ctx, canvas);
     _data.__classroomSketch.objects.forEach(object => _drawSketchObject(ctx, object));
     if (draftObject) _drawSketchObject(ctx, draftObject, true);
+  }
+
+  function _drawSketchBlockContext(ctx, canvas) {
+    const rooms = _visibleClassroomsForActiveBlock(_data.__classrooms || [])
+      .filter(room => room.id !== _activeClassroomId)
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(_data.__classroomSketch?.floor || 'Piso 1'));
+    if (!rooms.length) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(43,108,176,.035)';
+    ctx.strokeStyle = 'rgba(43,108,176,.26)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 5]);
+    ctx.strokeRect(44, 64, canvas.width - 88, canvas.height - 130);
+    ctx.setLineDash([]);
+    ctx.font = '800 11px system-ui, sans-serif';
+    ctx.fillStyle = 'rgba(23,63,104,.72)';
+    ctx.textAlign = 'left';
+    ctx.fillText('Contexto del bloque: aulas ya cargadas', 52, 55);
+    _layoutPlanRooms(rooms, 58, 82, canvas.width - 116, canvas.height - 166).forEach(item => {
+      ctx.fillStyle = 'rgba(43,108,176,.055)';
+      ctx.strokeStyle = 'rgba(43,108,176,.34)';
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(item.x, item.y, item.w, item.h);
+      ctx.strokeRect(item.x, item.y, item.w, item.h);
+      ctx.fillStyle = 'rgba(23,63,104,.72)';
+      ctx.font = '800 10px system-ui, sans-serif';
+      ctx.fillText(item.room.name || 'Aula', item.x + 6, item.y + 14);
+    });
+    ctx.restore();
   }
 
   function _ensureSketchObjects() {
@@ -1477,6 +1795,9 @@ const MecFormModule = (() => {
     if (type === 'wall') {
       return { id, type, start, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
     }
+    if (type === 'pencil') {
+      return { id, type, points: [start, end], ficha: { codigo: 'Lapiz' } };
+    }
     const x = Math.min(start.x, end.x);
     const y = Math.min(start.y, end.y);
     const w = Math.max(24, Math.abs(end.x - start.x));
@@ -1494,6 +1815,27 @@ const MecFormModule = (() => {
     let object;
     if (_sketchTool === 'wall') {
       object = { id, type: 'wall', x1: point.x - 42, y1: point.y, x2: point.x + 42, y2: point.y };
+    } else if (_sketchTool === 'text') {
+      object = {
+        id,
+        type: 'text',
+        x: Math.round(point.x - 70),
+        y: Math.round(point.y - 18),
+        w: 140,
+        h: 36,
+        text: 'Texto',
+        ficha: { codigo: 'Texto', observacion: 'Texto' },
+      };
+    } else if (_sketchTool === 'pencil') {
+      object = {
+        id,
+        type: 'pencil',
+        points: [
+          { x: point.x - 28, y: point.y },
+          { x: point.x + 28, y: point.y },
+        ],
+        ficha: { codigo: 'Lapiz' },
+      };
     } else if (_isPointSketchObject(_sketchTool)) {
       object = { id, type: _sketchTool, x: point.x, y: point.y, r: _sketchPointRadius(_sketchTool), ficha: {} };
     } else {
@@ -1523,6 +1865,7 @@ const MecFormModule = (() => {
       stair: { w: 90, h: 54 },
       board: { w: 112, h: 34 },
       damage: { w: 58, h: 38 },
+      text: { w: 140, h: 36 },
       room: { w: 240, h: 160 },
     }[type] || { w: 54, h: 28 };
   }
@@ -1590,6 +1933,19 @@ const MecFormModule = (() => {
       return;
     }
 
+    if (object.type === 'pencil') {
+      _drawPencilObject(ctx, object, selected);
+      ctx.restore();
+      return;
+    }
+
+    if (object.type === 'text') {
+      _drawTextObject(ctx, object, selected);
+      if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
+      ctx.restore();
+      return;
+    }
+
     if (_isPointSketchObject(object)) {
       const radius = _sketchPointRadius(object.type);
       ctx.beginPath();
@@ -1611,6 +1967,50 @@ const MecFormModule = (() => {
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     if (object.type === 'window' && selected) _drawOpeningRotateHandle(ctx, object);
     ctx.restore();
+  }
+
+  function _drawPencilObject(ctx, object, selected) {
+    const points = object.points || [];
+    if (!points.length) return;
+    ctx.save();
+    ctx.strokeStyle = selected ? '#111827' : '#7c2d12';
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+    ctx.stroke();
+    if (selected) {
+      const box = _pencilBounds(object);
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(17,24,39,.55)';
+      ctx.strokeRect(box.x - 6, box.y - 6, box.w + 12, box.h + 12);
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  function _drawTextObject(ctx, object, selected) {
+    ctx.fillStyle = selected ? 'rgba(255,247,237,.95)' : 'rgba(255,255,255,.9)';
+    ctx.strokeStyle = selected ? '#111827' : '#9a3412';
+    ctx.lineWidth = selected ? 3 : 2;
+    ctx.fillRect(object.x, object.y, object.w, object.h);
+    ctx.strokeRect(object.x, object.y, object.w, object.h);
+    ctx.fillStyle = '#7c2d12';
+    ctx.font = '800 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const text = object.ficha?.observacion || object.text || object.ficha?.codigo || 'Texto';
+    ctx.fillText(_truncateLabel(ctx, text, Math.max(18, object.w - 12)), object.x + object.w / 2, object.y + object.h / 2);
+  }
+
+  function _truncateLabel(ctx, text, maxWidth) {
+    const value = String(text || '');
+    if (ctx.measureText(value).width <= maxWidth) return value;
+    let next = value;
+    while (next.length > 3 && ctx.measureText(`${next}...`).width > maxWidth) next = next.slice(0, -1);
+    return `${next}...`;
   }
 
   function _drawRoomObject(ctx, object, selected) {
@@ -1748,6 +2148,8 @@ const MecFormModule = (() => {
       outlet: { stroke: '#b7791f', fill: 'rgba(183,121,31,.18)', lineWidth: 3 },
       damage: { stroke: '#c53030', fill: 'rgba(197,48,48,.18)', lineWidth: 3 },
       light: { stroke: '#d69e2e', fill: 'rgba(246,173,85,.2)', lineWidth: 3 },
+      text: { stroke: '#9a3412', fill: 'rgba(255,247,237,.85)', lineWidth: 2 },
+      pencil: { stroke: '#7c2d12', fill: 'transparent', lineWidth: 2 },
       photo: { stroke: '#d69e2e', fill: 'rgba(246,173,85,.2)', lineWidth: 3 },
     }[type] || { stroke: '#1f5d99', fill: 'rgba(31,93,153,.14)', lineWidth: 3 };
   }
@@ -1763,10 +2165,12 @@ const MecFormModule = (() => {
       window: 'Vtna',
       stair: 'Esc',
       board: 'Piz',
-      damage: 'Dano',
+      damage: 'Obs',
       outlet: 'TC',
       light: 'Foco',
       photo: 'Foco',
+      text: 'Txt',
+      pencil: 'Lapiz',
     }[type] || type;
   }
 
@@ -1778,6 +2182,7 @@ const MecFormModule = (() => {
 
   function _sketchDimensionsText(object) {
     if (_isPointSketchObject(object)) return '';
+    if (object.type === 'pencil') return '';
     const scale = _sketchScale();
     if (!scale) return '';
     if (object.type === 'wall') {
@@ -1918,7 +2323,7 @@ const MecFormModule = (() => {
   }
 
   function _isResizableSketchObject(object) {
-    return object && !_isPointSketchObject(object);
+    return object && !_isPointSketchObject(object) && object.type !== 'pencil';
   }
 
   function _resizeHandles(object) {
@@ -2056,6 +2461,11 @@ const MecFormModule = (() => {
     if (object.type === 'wall') {
       return _distanceToSegment(point, { x: object.x1, y: object.y1 }, { x: object.x2, y: object.y2 }) < 12;
     }
+    if (object.type === 'pencil') {
+      const points = object.points || [];
+      if (points.length === 1) return Math.hypot(point.x - points[0].x, point.y - points[0].y) < 12;
+      return points.some((item, index) => index > 0 && _distanceToSegment(point, points[index - 1], item) < 12);
+    }
     if (_isPointSketchObject(object)) {
       const dx = point.x - object.x;
       const dy = point.y - object.y;
@@ -2073,9 +2483,27 @@ const MecFormModule = (() => {
     return Math.hypot(point.x - (a.x + t * dx), point.y - (a.y + t * dy));
   }
 
+  function _pencilBounds(object) {
+    const points = object.points || [];
+    if (!points.length) return { x: 0, y: 0, w: 0, h: 0 };
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    return {
+      x: minX,
+      y: minY,
+      w: Math.max(1, Math.max(...xs) - minX),
+      h: Math.max(1, Math.max(...ys) - minY),
+    };
+  }
+
   function _moveOffsetForObject(object, point) {
     if (object.type === 'wall') {
       return { x1: point.x - object.x1, y1: point.y - object.y1, x2: point.x - object.x2, y2: point.y - object.y2 };
+    }
+    if (object.type === 'pencil') {
+      return { points: (object.points || []).map(item => ({ x: point.x - item.x, y: point.y - item.y })) };
     }
     if (_isPointSketchObject(object)) {
       return { x: point.x - object.x, y: point.y - object.y };
@@ -2089,6 +2517,13 @@ const MecFormModule = (() => {
       object.y1 = point.y - offset.y1;
       object.x2 = point.x - offset.x2;
       object.y2 = point.y - offset.y2;
+      return;
+    }
+    if (object.type === 'pencil') {
+      object.points = (object.points || []).map((item, index) => ({
+        x: point.x - (offset.points?.[index]?.x || 0),
+        y: point.y - (offset.points?.[index]?.y || 0),
+      }));
       return;
     }
     if (_isPointSketchObject(object)) {
@@ -2107,6 +2542,10 @@ const MecFormModule = (() => {
         if (item.id === object.id) return;
         if (item.type === 'wall') {
           item.x1 += dx; item.x2 += dx; item.y1 += dy; item.y2 += dy;
+          return;
+        }
+        if (item.type === 'pencil') {
+          item.points = (item.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
           return;
         }
         if (item.x !== undefined) {
@@ -2312,6 +2751,26 @@ const MecFormModule = (() => {
     const canvas = document.getElementById('mec-classroom-canvas');
     if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
     _drawBlockPreview();
+    _centerSketchOnActiveRoom();
+  }
+
+  function _centerSketchOnActiveRoom(force = false) {
+    if (!force && !_pendingSketchCenter) return;
+    const wrap = document.querySelector('.mec-sketch-canvas-wrap');
+    const canvas = document.getElementById('mec-classroom-canvas');
+    const room = (_data.__classroomSketch?.objects || []).find(object => object.type === 'room');
+    if (!wrap || !canvas || !room) {
+      _pendingSketchCenter = false;
+      return;
+    }
+    _pendingSketchCenter = false;
+    requestAnimationFrame(() => {
+      const scale = _sketchZoom || 1;
+      const centerX = (room.x + room.w / 2) * scale;
+      const centerY = (room.y + room.h / 2) * scale;
+      wrap.scrollLeft = Math.max(0, centerX - wrap.clientWidth / 2);
+      wrap.scrollTop = Math.max(0, centerY - wrap.clientHeight / 2);
+    });
   }
 
   function _updateSketchStatus() {
@@ -2325,6 +2784,7 @@ const MecFormModule = (() => {
     if (canvas) canvas.style.transform = `scale(${_sketchZoom})`;
     const zoom = document.querySelector('.mec-sketch-zoom span');
     if (zoom) zoom.textContent = `${Math.round(_sketchZoom * 100)}%`;
+    _centerSketchOnActiveRoom(true);
   }
 
   function _drawBlockPreview() {
@@ -2438,6 +2898,18 @@ const MecFormModule = (() => {
         title: 'Ficha de iluminacion',
         typeOptions: ['Foco LED', 'Tubo fluorescente', 'Panel', 'Artefacto colgante', 'No verificable', 'Otro'],
         extra: [{ key: 'funcionamiento', label: 'Funcionamiento', options: ['Funciona', 'Intermitente', 'No funciona', 'No verificable'] }],
+        ...common,
+      },
+      text: {
+        title: 'Ficha de texto libre',
+        typeOptions: ['Nota', 'Medida', 'Observacion', 'Referencia'],
+        extra: [],
+        ...common,
+      },
+      pencil: {
+        title: 'Ficha de trazo libre',
+        typeOptions: ['Trazo', 'Croquis', 'Marca', 'Observacion'],
+        extra: [],
         ...common,
       },
       photo: {
@@ -2585,7 +3057,7 @@ const MecFormModule = (() => {
     });
     const input = modal.querySelector('#sketch-object-photo');
     input.addEventListener('change', async () => {
-      object.ficha.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file)));
+      object.ficha.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _sketchObjectEvidenceContext(object))));
       const count = modal.querySelector('#sketch-object-photo-count');
       if (count) count.textContent = `${object.ficha.evidencias.length} foto(s) asociada(s)`;
       _saveDraft(false);
@@ -2692,11 +3164,15 @@ const MecFormModule = (() => {
   function _moduleProgressText(module) {
     if (module.id === 'bloques') return `${(_data.__blocks || []).length} bloque(s)`;
     if (module.kind === 'classroomSketch') {
+      _ensureClassrooms();
       const rooms = _data.__classrooms || [];
       const closed = rooms.filter(room => (room.objects || []).some(object => object.type === 'room') && room.length && room.width).length;
       return `${closed}/${rooms.length} aula(s)`;
     }
-    if (module.kind === 'sanitaryList') return `${(_data.__sanitaries || []).length} sanitario(s)`;
+    if (module.kind === 'sanitaryList') {
+      _ensureSanitaries();
+      return `${(_data.__sanitaries || []).length} sanitario(s)`;
+    }
     return '';
   }
 
@@ -2847,25 +3323,16 @@ const MecFormModule = (() => {
       _data.__classroomSketch.length = length.toFixed(1);
       _data.__classroomSketch.width = width.toFixed(1);
     }
-    const maxW = 560;
-    const maxH = 320;
-    const ratio = Math.max(length, width, 1);
-    const roomW = Math.max(220, Math.round((length / ratio) * maxW));
-    const roomH = Math.max(150, Math.round((width / ratio) * maxH));
-    const room = {
-      id: `room_${Date.now()}`,
-      type: 'room',
-      x: Math.round((760 - roomW) / 2),
-      y: Math.round((460 - roomH) / 2),
-      w: roomW,
-      h: roomH,
-      label: `${length || '?'}m x ${width || '?'}m`,
-    };
+    _syncActiveClassroomFromSketch();
+    const rect = _activeRoomLayoutRect();
+    const previousRoom = (_data.__classroomSketch.objects || []).find(object => object.type === 'room');
+    const room = _buildRoomObjectFromDimensions(length, width, previousRoom?.id, rect);
     _data.__classroomSketch.objects = [
       room,
       ..._data.__classroomSketch.objects.filter(object => object.type !== 'room'),
     ];
     _selectedSketchObjectId = room.id;
+    _requestSketchCenter();
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
@@ -2948,6 +3415,7 @@ const MecFormModule = (() => {
     if (!root) return;
     const sketch = _data.__classroomSketch || {};
     _ensureClassrooms();
+    _ensureSanitaries();
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
@@ -2995,7 +3463,7 @@ const MecFormModule = (() => {
               <span><i class="legend-window"></i>Ventana</span>
               <span><i class="legend-outlet"></i>Toma</span>
               <span><i class="legend-light"></i>Foco</span>
-              <span><i class="legend-damage"></i>Dano</span>
+              <span><i class="legend-damage"></i>Dano/obs.</span>
               <span><i class="legend-sanitary"></i>Sanitario</span>
             </div>
             <div class="school-plan__list">
@@ -3037,7 +3505,7 @@ const MecFormModule = (() => {
       aulas: 'Aulas',
       aberturas: 'Puertas/Ventanas',
       electricidad: 'Tomas/Focos',
-      danos: 'Danos',
+      danos: 'Danos/obs.',
       etiquetas: 'Etiquetas',
     }[key] || key;
   }
@@ -3086,6 +3554,7 @@ const MecFormModule = (() => {
     const id = `sanitary::${item.id}`;
     return `
       <button class="school-plan-object school-plan-object--sanitary ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
+        ondblclick="MecFormModule.editPlanSanitary('${_escape(item.id)}')"
         onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
         <span class="school-plan-object__type">Sanitario</span>
         <strong>${_escape(item.codigo || `Sanitario ${index + 1}`)}</strong>
@@ -3151,6 +3620,7 @@ const MecFormModule = (() => {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
     _ensureSketchObjects();
+    _ensureSanitaries();
     const ctx = canvas.getContext('2d');
     _planHitAreas = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -3252,11 +3722,7 @@ const MecFormModule = (() => {
   }
 
   function _sanitariesForBlock(block) {
-    const names = [block.id, block.bloque_codigo].filter(Boolean).map(value => String(value).trim().toLowerCase());
-    return (_data.__sanitaries || []).filter(item => {
-      const value = String(item.bloque || '').trim().toLowerCase();
-      return value && names.includes(value);
-    });
+    return (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
   }
 
   function _drawPlanSanitaries(ctx, sanitaries, x, y, w, h) {
@@ -3387,6 +3853,38 @@ const MecFormModule = (() => {
         ctx.stroke();
       });
     }
+    if (_planLayers.etiquetas) {
+      (room.objects || []).filter(object => ['text', 'pencil'].includes(object.type)).forEach(object => {
+        if (object.type === 'text') {
+          const ox = x + (object.x - roomObject.x) * sx;
+          const oy = y + (object.y - roomObject.y) * sy;
+          const ow = Math.max(20, object.w * sx);
+          const oh = Math.max(10, object.h * sy);
+          _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+          ctx.strokeStyle = '#9a3412';
+          ctx.fillStyle = 'rgba(255,247,237,.9)';
+          ctx.lineWidth = 1;
+          ctx.fillRect(ox, oy, ow, oh);
+          ctx.strokeRect(ox, oy, ow, oh);
+          ctx.fillStyle = '#7c2d12';
+          ctx.font = '700 7px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(_truncateLabel(ctx, object.ficha?.observacion || object.text || 'Texto', Math.max(16, ow - 4)), ox + ow / 2, oy + oh / 2 + 2);
+          return;
+        }
+        const points = object.points || [];
+        if (!points.length) return;
+        const scaled = points.map(point => ({ x: x + (point.x - roomObject.x) * sx, y: y + (point.y - roomObject.y) * sy }));
+        const box = _pencilBounds({ points: scaled });
+        _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: box.x - 4, y: box.y - 4, w: box.w + 8, h: box.h + 8 });
+        ctx.strokeStyle = '#7c2d12';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(scaled[0].x, scaled[0].y);
+        scaled.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+        ctx.stroke();
+      });
+    }
     (room.objects || []).filter(object => object.type === 'stair').forEach(object => {
       const ox = x + (object.x - roomObject.x) * sx;
       const oy = y + (object.y - roomObject.y) * sy;
@@ -3425,6 +3923,19 @@ const MecFormModule = (() => {
   function editPlanClassroom(id) {
     selectModule('aulas');
     selectClassroom(id);
+  }
+
+  function editPlanSanitary(id) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return;
+    const block = (_data.__blocks || []).find(candidate => _matchesBlockReference(item.bloque, candidate));
+    if (block) {
+      _data.__activeBlockId = block.id;
+      const { id: _id, ...values } = block;
+      _data.bloques = values;
+    }
+    _selectedPlanId = `sanitary::${id}`;
+    selectModule('sanitarios');
   }
 
   function selectPlanItem(id) {
@@ -3814,16 +4325,49 @@ const MecFormModule = (() => {
   }
 
   function _buildEvidenceIndex() {
-    return Object.entries(_data.__evidence || {}).flatMap(([fieldPath, photos]) =>
-      photos.map((photo, index) => ({
+    const index = [];
+    Object.entries(_data.__evidence || {}).forEach(([fieldPath, photos]) => {
+      (photos || []).forEach((photo, photoIndex) => index.push({
         fieldPath,
-        index: index + 1,
+        index: photoIndex + 1,
         name: photo.name,
+        indexedName: photo.indexedName || '',
+        label: photo.label || _evidenceIndexLabel(photo.context || { fieldPath }),
         type: photo.type,
         size: photo.size,
         capturedAt: photo.capturedAt,
-      }))
-    );
+        context: photo.context || {},
+      }));
+    });
+    (_data.__classrooms || []).forEach(room => {
+      (room.objects || []).forEach(object => {
+        (object.ficha?.evidencias || []).forEach((photo, photoIndex) => index.push({
+          fieldPath: `plano.${room.id}.${object.id}`,
+          index: photoIndex + 1,
+          name: photo.name,
+          indexedName: photo.indexedName || '',
+          label: photo.label || _evidenceIndexLabel(_sketchObjectEvidenceContext(object, room)),
+          type: photo.type,
+          size: photo.size,
+          capturedAt: photo.capturedAt,
+          context: photo.context || _sketchObjectEvidenceContext(object, room),
+        }));
+      });
+    });
+    (_data.__sanitaries || []).forEach(item => {
+      (item.evidencias || []).forEach((photo, photoIndex) => index.push({
+        fieldPath: `sanitarios.${item.id}`,
+        index: photoIndex + 1,
+        name: photo.name,
+        indexedName: photo.indexedName || '',
+        label: photo.label || _evidenceIndexLabel(_sanitaryEvidenceContext(item)),
+        type: photo.type,
+        size: photo.size,
+        capturedAt: photo.capturedAt,
+        context: photo.context || _sanitaryEvidenceContext(item),
+      }));
+    });
+    return index;
   }
 
   function toggleModule(moduleId) {
@@ -3851,6 +4395,7 @@ const MecFormModule = (() => {
     newClassroom,
     saveCurrentClassroom,
     addSanitary,
+    addSanitaryFixture,
     regenerateSanitaryPlan,
     addSanitaryStall,
     deleteSanitaryStall,
@@ -3864,6 +4409,7 @@ const MecFormModule = (() => {
     renderSchoolPlan,
     editPlanObject,
     editPlanClassroom,
+    editPlanSanitary,
     selectPlanItem,
     deletePlanSelection,
     togglePlanLayer,
