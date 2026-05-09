@@ -38,7 +38,7 @@ const MecFormModule = (() => {
     { id: 'stair', label: 'Escalera' },
     { id: 'board', label: 'Pizarron' },
     { id: 'outlet', label: 'Toma' },
-    { id: 'damage', label: 'Dano/obs.' },
+    { id: 'damage', label: 'Daño/obs.' },
     { id: 'light', label: 'Foco' },
     { id: 'text', label: 'Texto' },
     { id: 'pencil', label: 'Lapiz' },
@@ -745,9 +745,9 @@ const MecFormModule = (() => {
       window: '&#x25AD;',
       stair: '&#x25EB;',
       board: '&#x25AC;',
-      outlet: '&#x25C9;',
+      outlet: 'TC',
       damage: '!',
-      light: '&#x25C9;',
+      light: '&#x2733;',
       text: 'T',
       pencil: '&#x270E;',
     }[toolId] || '+';
@@ -892,7 +892,9 @@ const MecFormModule = (() => {
   }
 
   function _roomObjectForClassroom(room) {
-    return (room?.objects || []).find(object => object.type === 'room') || null;
+    return (room?.objects || []).find(object => object.type === 'room') ||
+      (room?.objects || []).find(object => object.type === 'sanitary-room') ||
+      null;
   }
 
   function _sketchRoomsForActiveBlockFloor() {
@@ -963,6 +965,61 @@ const MecFormModule = (() => {
       w,
       h,
     };
+  }
+
+  function _clampPointToBlock(point) {
+    const block = _sketchBlockRect();
+    return {
+      x: Math.max(block.x, Math.min(point.x, block.x + block.w)),
+      y: Math.max(block.y, Math.min(point.y, block.y + block.h)),
+    };
+  }
+
+  function _edgeRectsForActiveBlockFloor(extraRects = []) {
+    const activeRoom = (_data.__classroomSketch?.objects || []).find(object => object.type === 'room');
+    const classroomRects = _sketchRoomsForActiveBlockFloor()
+      .map(room => _roomObjectForClassroom(room))
+      .filter(Boolean);
+    const sanitaryRects = _sanitaryRoomsForActiveBlockFloor()
+      .map(item => item.object)
+      .filter(Boolean);
+    return [activeRoom, ...classroomRects, ...sanitaryRects, ...extraRects]
+      .filter(Boolean)
+      .filter((rect, index, list) => list.findIndex(item => item.id && item.id === rect.id) === index || !rect.id);
+  }
+
+  function _snapPointToPlanEdges(point, threshold = 10, extraRects = []) {
+    const snapped = _clampPointToBlock(point);
+    _edgeRectsForActiveBlockFloor(extraRects).forEach(rect => {
+      const withinY = snapped.y >= rect.y - threshold && snapped.y <= rect.y + rect.h + threshold;
+      const withinX = snapped.x >= rect.x - threshold && snapped.x <= rect.x + rect.w + threshold;
+      if (withinY && Math.abs(snapped.x - rect.x) <= threshold) snapped.x = rect.x;
+      if (withinY && Math.abs(snapped.x - (rect.x + rect.w)) <= threshold) snapped.x = rect.x + rect.w;
+      if (withinX && Math.abs(snapped.y - rect.y) <= threshold) snapped.y = rect.y;
+      if (withinX && Math.abs(snapped.y - (rect.y + rect.h)) <= threshold) snapped.y = rect.y + rect.h;
+    });
+    return _clampPointToBlock(snapped);
+  }
+
+  function _snapWallObject(object) {
+    if (!object || object.type !== 'wall') return object;
+    const p1 = _snapPointToPlanEdges({ x: object.x1, y: object.y1 });
+    const p2 = _snapPointToPlanEdges({ x: object.x2, y: object.y2 });
+    object.x1 = Math.round(p1.x);
+    object.y1 = Math.round(p1.y);
+    object.x2 = Math.round(p2.x);
+    object.y2 = Math.round(p2.y);
+    if (Math.abs(object.x1 - object.x2) <= 6) {
+      const x = Math.round((object.x1 + object.x2) / 2);
+      object.x1 = x;
+      object.x2 = x;
+    }
+    if (Math.abs(object.y1 - object.y2) <= 6) {
+      const y = Math.round((object.y1 + object.y2) / 2);
+      object.y1 = y;
+      object.y2 = y;
+    }
+    return object;
   }
 
   function _requestSketchCenter() {
@@ -1142,6 +1199,8 @@ const MecFormModule = (() => {
       item.codigo = item.codigo || _numberedLabel('Sanitario', index);
       item.bloque = item.bloque || _activeBlockLabel();
       item.planta = _normalizeFloor(item.planta || 'Piso 1');
+      item.objects = Array.isArray(item.objects) ? item.objects : [];
+      _ensureSanitaryRoomObject(item);
     });
   }
 
@@ -1170,8 +1229,101 @@ const MecFormModule = (() => {
       privacidad: '',
       observacion: '',
       evidencias: [],
+      objects: [],
       plano: { cabinas: [] },
     };
+  }
+
+  function _blockForSanitary(item) {
+    return (_data.__blocks || []).find(block => _matchesBlockReference(item?.bloque, block)) || _blockById(_data.__activeBlockId);
+  }
+
+  function _sanitaryRoomObject(item) {
+    return (item?.objects || []).find(object => object.type === 'sanitary-room' || object.type === 'room') || null;
+  }
+
+  function _roomSizeFromDimensionsForBlock(block, length, width) {
+    const blockLength = Number(block?.largo_m || 0);
+    const blockWidth = Number(block?.ancho_m || 0);
+    const blockRect = _sketchBlockRect();
+    if (blockLength && blockWidth && length && width) {
+      return {
+        w: Math.max(38, Math.min(blockRect.w, Math.round((length / blockLength) * blockRect.w))),
+        h: Math.max(30, Math.min(blockRect.h, Math.round((width / blockWidth) * blockRect.h))),
+      };
+    }
+    return _roomSizeFromDimensions(length || 3, width || 2);
+  }
+
+  function _suggestSanitaryRect(item, size) {
+    const blockRect = _sketchBlockRect();
+    const padding = 10;
+    const rectSize = {
+      w: Math.min(size.w, blockRect.w - padding * 2),
+      h: Math.min(size.h, blockRect.h - padding * 2),
+    };
+    const sameFloorSanitaries = (_data.__sanitaries || [])
+      .filter(other => other.id !== item.id)
+      .filter(other => _matchesBlockReference(other.bloque, _blockForSanitary(item)))
+      .filter(other => _normalizeFloor(other.planta || 'Piso 1') === _normalizeFloor(item.planta || 'Piso 1'))
+      .map(other => _sanitaryRoomObject(other))
+      .filter(Boolean);
+    const sameFloorRooms = (_data.__classrooms || [])
+      .filter(room => room.blockId === _blockForSanitary(item)?.id)
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(item.planta || 'Piso 1'))
+      .map(room => _roomObjectForClassroom(room))
+      .filter(Boolean);
+    const candidates = [];
+    [...sameFloorSanitaries, ...sameFloorRooms].forEach(rect => {
+      candidates.push({ x: rect.x + rect.w, y: rect.y });
+      candidates.push({ x: rect.x, y: rect.y + rect.h });
+    });
+    for (let y = blockRect.y + padding; y <= blockRect.y + blockRect.h - rectSize.h - padding; y += 18) {
+      for (let x = blockRect.x + padding; x <= blockRect.x + blockRect.w - rectSize.w - padding; x += 18) {
+        candidates.push({ x, y });
+      }
+    }
+    const free = candidates.find(candidate => {
+      const rect = _clampRectToBlock({ ...candidate, ...rectSize });
+      return !sameFloorSanitaries.some(other => _rectsOverlap(rect, other, 6));
+    }) || { x: blockRect.x + padding, y: blockRect.y + padding };
+    return _clampRectToBlock({ ...free, ...rectSize });
+  }
+
+  function _ensureSanitaryRoomObject(item, resizeFromDimensions = false) {
+    if (!item) return null;
+    item.objects = Array.isArray(item.objects) ? item.objects : [];
+    const block = _blockForSanitary(item);
+    const length = Number(item.largo_m || 3);
+    const width = Number(item.ancho_m || 2);
+    const size = _roomSizeFromDimensionsForBlock(block, length, width);
+    let object = _sanitaryRoomObject(item);
+    if (!object) {
+      const rect = _suggestSanitaryRect(item, size);
+      object = {
+        id: `san_room_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        type: 'sanitary-room',
+        x: rect.x,
+        y: rect.y,
+        w: rect.w,
+        h: rect.h,
+        ficha: { codigo: item.codigo || 'Sanitario' },
+      };
+      item.objects.unshift(object);
+      return object;
+    }
+    object.type = 'sanitary-room';
+    if (resizeFromDimensions) {
+      object.w = size.w;
+      object.h = size.h;
+      const rect = _clampRectToBlock(object);
+      object.x = rect.x;
+      object.y = rect.y;
+      object.w = rect.w;
+      object.h = rect.h;
+      _reflowSanitaryOpenings(item);
+    }
+    return object;
   }
 
   function _renderSanitaryChoice(name, id, options, selected) {
@@ -1227,6 +1379,18 @@ const MecFormModule = (() => {
     const block = _blockById(_data.__activeBlockId);
     if (!block) return items || [];
     return (items || []).filter(item => _matchesBlockReference(item.bloque, block));
+  }
+
+  function _visibleSanitariesForActiveBlockFloor(items = _data.__sanitaries || []) {
+    const floor = _normalizeFloor(_data.__classroomSketch?.floor || 'Piso 1');
+    return _visibleSanitariesForActiveBlock(items)
+      .filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
+  }
+
+  function _sanitaryRoomsForActiveBlockFloor() {
+    return _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])
+      .map(item => ({ item, object: _ensureSanitaryRoomObject(item) }))
+      .filter(entry => entry.object);
   }
 
   function _activeBlockLabel() {
@@ -1373,6 +1537,14 @@ const MecFormModule = (() => {
             <span>${_escape(tool.short)}</span>
             <strong>+ ${_escape(tool.label)}</strong>
           </button>`).join('')}
+        <button class="mec-sanitary-fixture" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'door')">
+          <span>Pta</span>
+          <strong>+ Puerta</strong>
+        </button>
+        <button class="mec-sanitary-fixture" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'window')">
+          <span>Vtna</span>
+          <strong>+ Ventana</strong>
+        </button>
       </div>`;
   }
 
@@ -1442,6 +1614,7 @@ const MecFormModule = (() => {
     _ensureSanitaries();
     const item = _sanitaryTemplate(_data.__sanitaries.length + 1);
     _ensureSanitaryPlan(item, true);
+    _ensureSanitaryRoomObject(item);
     _data.__sanitaries.push(item);
     _saveDraft(false);
     _render();
@@ -1455,18 +1628,51 @@ const MecFormModule = (() => {
     const next = Math.max(0, Number(item[fixture.field] || 0)) + 1;
     item[fixture.field] = String(next);
     if (fixture.id === 'toilet') _ensureSanitaryPlan(item, true);
+    _ensureSanitaryRoomObject(item);
     _saveDraft(false);
     _render();
     renderSchoolPlan();
+  }
+
+  function addSanitaryOpening(id, type) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item || !['door', 'window'].includes(type)) return;
+    const room = _ensureSanitaryRoomObject(item);
+    if (!room) return;
+    const size = _defaultSketchSize(type);
+    const object = {
+      id: `san_obj_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type,
+      x: Math.round(room.x + room.w / 2 - size.w / 2),
+      y: Math.round(room.y + room.h - size.h),
+      w: size.w,
+      h: size.h,
+      ficha: { codigo: _sketchLabel(type) },
+    };
+    _orientOpeningToSide(object, 'bottom');
+    object.w = Math.min(object.w, Math.max(18, room.w));
+    object.y = room.y + room.h - object.h;
+    object.x = Math.max(room.x, Math.min(object.x, room.x + room.w - object.w));
+    object.attached = _openingAttachment(object, room, 'bottom');
+    item.objects.push(object);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast(`${_sketchLabel(type)} agregada al sanitario.`, 'success');
   }
 
   function setSanitaryValue(id, key, value, rerender = true) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
     item[key] = key === 'planta' ? _normalizeFloor(value) : value;
+    if (['largo_m', 'ancho_m'].includes(key)) _ensureSanitaryRoomObject(item, true);
+    if (['bloque', 'planta'].includes(key)) _ensureSanitaryRoomObject(item);
     if (rerender && ['inodoros', 'estado'].includes(key)) _ensureSanitaryPlan(item, true);
     _saveDraft(false);
-    if (rerender) _render();
+    if (rerender) {
+      _render();
+      renderSchoolPlan();
+    }
   }
 
   function regenerateSanitaryPlan(id) {
@@ -1607,6 +1813,7 @@ const MecFormModule = (() => {
     let drawing = false;
     let draftObject = null;
     let movingObject = null;
+    let movingSanitary = null;
     let resizingObject = null;
     let rotatingObject = null;
     let moveOffset = null;
@@ -1627,7 +1834,10 @@ const MecFormModule = (() => {
 
       const rotateHit = _findOpeningRotateHandleAt(point);
       const handleHit = _findResizeHandleAt(point);
-      const selected = rotateHit || handleHit?.object || _findSketchObjectAt(point) || _activateContextClassroomAt(point);
+      const preliminarySelected = rotateHit || handleHit?.object || _findSketchObjectAt(point);
+      const sanitaryHit = (!preliminarySelected || preliminarySelected.type === 'room') ? _findContextSanitaryAt(point) : null;
+      const localSelected = sanitaryHit ? null : preliminarySelected;
+      const selected = localSelected || (!sanitaryHit ? _activateContextClassroomAt(point) : null);
       _selectedSketchObjectId = selected?.id || null;
       if (rotateHit) {
         rotatingObject = rotateHit;
@@ -1638,6 +1848,11 @@ const MecFormModule = (() => {
         rotatingObject = null;
       } else if (handleHit) {
         resizingObject = handleHit;
+        mutationRecorded = false;
+      } else if (sanitaryHit) {
+        movingSanitary = sanitaryHit;
+        moveOffset = { x: point.x - sanitaryHit.object.x, y: point.y - sanitaryHit.object.y };
+        _selectedPlanId = `sanitary::${sanitaryHit.item.id}`;
         mutationRecorded = false;
       } else if (selected) {
         movingObject = selected;
@@ -1665,6 +1880,12 @@ const MecFormModule = (() => {
           mutationRecorded = true;
         }
         _resizeSketchObject(resizingObject.object, point, resizingObject.handle);
+        _drawSketch(ctx, canvas);
+        _updateSketchStatus();
+        return;
+      }
+      if (movingSanitary) {
+        _moveSanitaryRoomObject(movingSanitary, point, moveOffset);
         _drawSketch(ctx, canvas);
         _updateSketchStatus();
         return;
@@ -1702,6 +1923,13 @@ const MecFormModule = (() => {
         rotatingObject = null;
         return;
       }
+      if (movingSanitary) {
+        movingSanitary = null;
+        moveOffset = null;
+        _saveDraft(false);
+        renderSchoolPlan();
+        return;
+      }
       if (movingObject) {
         const changed = movingObject;
         movingObject = null;
@@ -1729,6 +1957,14 @@ const MecFormModule = (() => {
     const createAt = event => {
       event.preventDefault();
       const point = pointFromEvent(event);
+      const sanitaryHit = _findContextSanitaryAt(point);
+      if (sanitaryHit) {
+        _selectedPlanId = `sanitary::${sanitaryHit.item.id}`;
+        _drawSketch(ctx, canvas);
+        _updateSketchStatus();
+        editPlanSanitary(sanitaryHit.item.id);
+        return;
+      }
       const selected = _findSketchObjectAt(point) || _activateContextClassroomAt(point);
       if (selected) {
         _selectedSketchObjectId = selected.id;
@@ -1751,6 +1987,13 @@ const MecFormModule = (() => {
         Math.hypot(point.x - lastTap.point.x, point.y - lastTap.point.y) < 28;
       end(event);
       if (isDoubleTap) {
+        const sanitaryHit = _findContextSanitaryAt(point);
+        if (sanitaryHit) {
+          _selectedPlanId = `sanitary::${sanitaryHit.item.id}`;
+          editPlanSanitary(sanitaryHit.item.id);
+          lastTap = { time: 0, point: null };
+          return;
+        }
         const selected = _findSketchObjectAt(point) || _activateContextClassroomAt(point);
         if (selected) {
           _selectedSketchObjectId = selected.id;
@@ -1807,6 +2050,7 @@ const MecFormModule = (() => {
 
     _drawSketchBlockContext(ctx, canvas);
     _data.__classroomSketch.objects.forEach(object => _drawSketchObject(ctx, object));
+    _drawSketchSanitaryOverlay(ctx);
     if (draftObject) _drawSketchObject(ctx, draftObject, true);
   }
 
@@ -1833,6 +2077,10 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
+  function _drawSketchSanitaryOverlay(ctx) {
+    _sanitaryRoomsForActiveBlockFloor().forEach(({ item, object }) => _drawContextSanitary(ctx, item, object));
+  }
+
   function _drawContextClassroom(ctx, room) {
     const roomObject = _roomObjectForClassroom(room);
     if (!roomObject) return;
@@ -1845,6 +2093,32 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
+  function _drawContextSanitary(ctx, item, roomObject) {
+    if (!roomObject) return;
+    const adapter = {
+      id: item.id,
+      name: item.codigo || 'Sanitario',
+      length: item.largo_m || '',
+      width: item.ancho_m || '',
+      objects: item.objects || [],
+    };
+    ctx.save();
+    ctx.globalAlpha = .66;
+    ctx.fillStyle = 'rgba(128,90,213,.095)';
+    ctx.strokeStyle = 'rgba(128,90,213,.62)';
+    ctx.lineWidth = 2.2;
+    ctx.fillRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
+    ctx.strokeRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
+    ctx.strokeStyle = 'rgba(128,90,213,.32)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
+    _labelSketchObject(ctx, roomObject, `${item.codigo || 'Sanitario'} ${_contextDimensionsText(adapter, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
+    (item.objects || [])
+      .filter(object => object.id !== roomObject.id)
+      .forEach(object => _drawContextSketchObject(ctx, adapter, object));
+    ctx.restore();
+  }
+
   function _drawContextRoom(ctx, room, roomObject) {
     ctx.fillStyle = 'rgba(43,108,176,.065)';
     ctx.strokeStyle = 'rgba(43,108,176,.44)';
@@ -1854,7 +2128,7 @@ const MecFormModule = (() => {
     ctx.strokeStyle = 'rgba(43,108,176,.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
-    _labelSketchObject(ctx, roomObject, `${room.name || 'Aula'} ${_contextDimensionsText(room, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14);
+    _labelSketchObject(ctx, roomObject, `${room.name || 'Aula'} ${_contextDimensionsText(room, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
   }
 
   function _drawContextSketchObject(ctx, room, object) {
@@ -1868,7 +2142,7 @@ const MecFormModule = (() => {
       ctx.moveTo(object.x1, object.y1);
       ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
-      _labelSketchObject(ctx, object, label, (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 14);
+      _labelSketchObject(ctx, object, label, (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 14, true);
       ctx.restore();
       return;
     }
@@ -1895,14 +2169,7 @@ const MecFormModule = (() => {
       return;
     }
     if (_isPointSketchObject(object)) {
-      ctx.fillStyle = object.type === 'outlet' ? 'rgba(183,121,31,.68)' : 'rgba(214,158,46,.68)';
-      ctx.strokeStyle = 'rgba(23,32,51,.36)';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(object.x, object.y, _sketchPointRadius(object.type), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      _labelSketchObject(ctx, object, label, object.x, object.y + 21);
+      _drawPointSketchObject(ctx, object, false);
       ctx.restore();
       return;
     }
@@ -1933,7 +2200,7 @@ const MecFormModule = (() => {
       ctx.fillRect(object.x, object.y, object.w, object.h);
       ctx.strokeRect(object.x, object.y, object.w, object.h);
     }
-    _labelSketchObject(ctx, object, label, object.x + (object.w || 0) / 2, object.y - 14);
+    _labelSketchObject(ctx, object, label, object.x + (object.w || 0) / 2, object.y - 14, true);
     ctx.restore();
   }
 
@@ -1954,7 +2221,7 @@ const MecFormModule = (() => {
   }
 
   function _contextObjectLabel(room, object) {
-    const base = object.type === 'room' ? (room.name || _sketchLabel(object.type)) : (object.ficha?.codigo || object.label || _sketchLabel(object.type));
+    const base = object.type === 'room' ? (room.name || _sketchLabel(object.type)) : _sketchLabel(object.type);
     const dimensions = _contextDimensionsText(room, object);
     return dimensions ? `${base} ${dimensions}` : base;
   }
@@ -2013,7 +2280,7 @@ const MecFormModule = (() => {
   function _newSketchObject(type, start, end, existingId = null) {
     const id = existingId || `sk_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     if (type === 'wall') {
-      return { id, type, start, x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+      return _snapWallObject({ id, type, start, x1: start.x, y1: start.y, x2: end.x, y2: end.y });
     }
     if (type === 'pencil') {
       return { id, type, points: [start, end], ficha: { codigo: 'Lapiz' } };
@@ -2034,7 +2301,7 @@ const MecFormModule = (() => {
     const id = `sk_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     let object;
     if (_sketchTool === 'wall') {
-      object = { id, type: 'wall', x1: point.x - 42, y1: point.y, x2: point.x + 42, y2: point.y };
+      object = _snapWallObject({ id, type: 'wall', x1: point.x - 42, y1: point.y, x2: point.x + 42, y2: point.y });
     } else if (_sketchTool === 'text') {
       object = {
         id,
@@ -2126,7 +2393,7 @@ const MecFormModule = (() => {
       ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
       ctx.restore();
-      _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 18);
+      _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 18, true);
       if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
       ctx.restore();
       return;
@@ -2167,12 +2434,7 @@ const MecFormModule = (() => {
     }
 
     if (_isPointSketchObject(object)) {
-      const radius = _sketchPointRadius(object.type);
-      ctx.beginPath();
-      ctx.arc(object.x, object.y, radius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      _labelSketchObject(ctx, object, object.type === 'outlet' ? 'TC' : 'Foco', object.x, object.y + 22);
+      _drawPointSketchObject(ctx, object, selected);
       ctx.restore();
       return;
     }
@@ -2181,8 +2443,7 @@ const MecFormModule = (() => {
     ctx.rect(object.x, object.y, object.w, object.h);
     ctx.fill();
     ctx.stroke();
-    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
-    if (object.type === 'window') _labelSketchObject(ctx, object, _openingDistanceText(object), object.x + object.w / 2, object.y + object.h + 16, true);
+    _labelSketchObject(ctx, object, object.type === 'window' ? _openingCompactDimensionsText(object) : _sketchObjectLabel(object), object.x + object.w / 2, object.y - 12, object.type === 'window');
     if (object.type === 'window' && selected) _drawOpeningCornerGuides(ctx, object);
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     if (object.type === 'window' && selected) _drawOpeningRotateHandle(ctx, object);
@@ -2275,9 +2536,54 @@ const MecFormModule = (() => {
     ctx.setLineDash([4, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
-    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
-    _labelSketchObject(ctx, object, _openingDistanceText(object), object.x + object.w / 2, object.y + object.h + 18, true);
+    _labelSketchObject(ctx, object, _openingCompactDimensionsText(object), object.x + object.w / 2, object.y - 12, true);
     if (selected) _drawOpeningCornerGuides(ctx, object);
+  }
+
+  function _drawPointSketchObject(ctx, object, selected) {
+    ctx.save();
+    const radius = _sketchPointRadius(object.type);
+    ctx.lineWidth = selected ? 2.5 : 1.7;
+    ctx.strokeStyle = selected ? '#111827' : _sketchStyle(object.type).stroke;
+    ctx.fillStyle = selected ? 'rgba(255,255,255,.95)' : _sketchStyle(object.type).fill;
+    if (object.type === 'outlet') {
+      ctx.beginPath();
+      ctx.rect(object.x - radius, object.y - radius, radius * 2, radius * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = '#7c4a03';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(object.x - 3, object.y - 3);
+      ctx.lineTo(object.x - 3, object.y + 3);
+      ctx.moveTo(object.x + 3, object.y - 3);
+      ctx.lineTo(object.x + 3, object.y + 3);
+      ctx.stroke();
+      _labelSketchObject(ctx, object, 'Toma', object.x, object.y + 18, true);
+      ctx.restore();
+      return;
+    }
+    ctx.beginPath();
+    ctx.arc(object.x, object.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#9a6700';
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8;
+      ctx.beginPath();
+      ctx.moveTo(object.x + Math.cos(angle) * (radius + 2), object.y + Math.sin(angle) * (radius + 2));
+      ctx.lineTo(object.x + Math.cos(angle) * (radius + 6), object.y + Math.sin(angle) * (radius + 6));
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.moveTo(object.x - 4, object.y);
+    ctx.lineTo(object.x + 4, object.y);
+    ctx.moveTo(object.x, object.y - 4);
+    ctx.lineTo(object.x, object.y + 4);
+    ctx.stroke();
+    _labelSketchObject(ctx, object, 'Luz', object.x, object.y + 20, true);
+    ctx.restore();
   }
 
   function _doorSwingAngles(object, swing) {
@@ -2370,12 +2676,13 @@ const MecFormModule = (() => {
   }
 
   function _sketchPointRadius(type) {
-    return type === 'outlet' ? 7 : 8;
+    return type === 'outlet' ? 5 : 7;
   }
 
   function _sketchLabel(type) {
     return {
       room: 'Aula',
+      wall: 'Pared',
       door: 'Pta',
       window: 'Vtna',
       stair: 'Esc',
@@ -2393,6 +2700,21 @@ const MecFormModule = (() => {
     const base = object.type === 'room' ? _sketchLabel(object.type) : (object.ficha?.codigo || object.label || _sketchLabel(object.type));
     const dimensions = _sketchDimensionsText(object);
     return dimensions ? `${base} ${dimensions}` : base;
+  }
+
+  function _openingCompactDimensionsText(object) {
+    if (!['door', 'window'].includes(object?.type)) return _sketchDimensionsText(object);
+    const scale = _sketchScale();
+    const lengthPx = _openingLengthPixels(object);
+    const length = scale
+      ? (lengthPx * (['left', 'right'].includes(_openingSide(object)) ? scale.y : scale.x)).toFixed(2)
+      : object.ficha?.largo_m || object.ficha?.ancho_m || '';
+    const height = object.ficha?.alto_m ? Number(object.ficha.alto_m).toFixed(2) : '';
+    const parts = [
+      length ? `L ${length}m` : '',
+      height ? `A ${height}m` : '',
+    ].filter(Boolean);
+    return parts.join(' · ') || _sketchLabel(object.type);
   }
 
   function _sketchDimensionsText(object) {
@@ -2511,18 +2833,6 @@ const MecFormModule = (() => {
       ctx.stroke();
     });
     ctx.setLineDash([]);
-    ctx.font = '800 10px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    distances.forEach(item => {
-      const tx = item.from.x + (item.x - item.from.x) * .22;
-      const ty = item.from.y + (item.y - item.from.y) * .22;
-      const text = `${item.key} ${item.meters.toFixed(1)}m`;
-      const width = ctx.measureText(text).width + 8;
-      ctx.fillStyle = 'rgba(255,247,237,.92)';
-      ctx.fillRect(tx - width / 2, ty - 8, width, 16);
-      ctx.fillStyle = '#9a3412';
-      ctx.fillText(text, tx, ty);
-    });
     ctx.restore();
   }
 
@@ -2623,15 +2933,18 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
-  function _labelSketchObject(ctx, object, label, x, y) {
+  function _labelSketchObject(ctx, object, label, x, y, small = false) {
     if (!label) return;
-    ctx.font = '700 12px system-ui, sans-serif';
+    const fontSize = small ? 9 : 12;
+    const height = small ? 15 : 20;
+    const pad = small ? 7 : 12;
+    ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const text = label || object.label;
-    const width = ctx.measureText(text).width + 12;
-    ctx.fillStyle = 'rgba(255,255,255,.88)';
-    ctx.fillRect(x - width / 2, y - 10, width, 20);
+    const width = ctx.measureText(text).width + pad;
+    ctx.fillStyle = small ? 'rgba(255,255,255,.72)' : 'rgba(255,255,255,.88)';
+    ctx.fillRect(x - width / 2, y - height / 2, width, height);
     ctx.fillStyle = '#172033';
     ctx.fillText(text, x, y);
   }
@@ -2649,6 +2962,35 @@ const MecFormModule = (() => {
       .filter(room => room.id !== _activeClassroomId)
       .map(room => ({ room, object: _roomObjectForClassroom(room) }))
       .find(item => item.object && _sketchObjectContains(item.object, point)) || null;
+  }
+
+  function _findContextSanitaryAt(point) {
+    return [..._sanitaryRoomsForActiveBlockFloor()]
+      .reverse()
+      .find(item => item.object && _sketchObjectContains(item.object, point)) || null;
+  }
+
+  function _moveSanitaryRoomObject(hit, point, offset) {
+    const object = hit?.object;
+    const item = hit?.item;
+    if (!object || !item) return;
+    const previous = { x: object.x, y: object.y };
+    const rect = _clampRectToBlock({ x: point.x - offset.x, y: point.y - offset.y, w: object.w, h: object.h });
+    object.x = rect.x;
+    object.y = rect.y;
+    const dx = object.x - previous.x;
+    const dy = object.y - previous.y;
+    (item.objects || []).forEach(child => {
+      if (child.id === object.id) return;
+      if (child.type === 'wall') {
+        child.x1 += dx; child.x2 += dx; child.y1 += dy; child.y2 += dy;
+        return;
+      }
+      if (child.x !== undefined) {
+        child.x += dx;
+        child.y += dy;
+      }
+    });
   }
 
   function _activateContextClassroomAt(point) {
@@ -2751,6 +3093,7 @@ const MecFormModule = (() => {
       object.y1 = point.y - offset.y1;
       object.x2 = point.x - offset.x2;
       object.y2 = point.y - offset.y2;
+      _snapWallObject(object);
       return;
     }
     if (object.type === 'pencil') {
@@ -2852,6 +3195,7 @@ const MecFormModule = (() => {
         object.x2 = Math.round(point.x);
         object.y2 = Math.round(point.y);
       }
+      _snapWallObject(object);
       return;
     }
     const previousScale = object.type === 'room' ? _sketchScale() : null;
@@ -3030,6 +3374,36 @@ const MecFormModule = (() => {
       });
   }
 
+  function _reflowSanitaryOpenings(item) {
+    const room = _sanitaryRoomObject(item);
+    if (!room) return;
+    (item.objects || [])
+      .filter(object => ['door', 'window'].includes(object.type) && object.attached?.target === room.id)
+      .forEach(object => {
+        const ratio = Math.max(0, Math.min(1, Number(object.attached.ratio || 0)));
+        if (object.attached.side === 'top') {
+          _orientOpeningToSide(object, 'top');
+          object.y = room.y;
+          object.x = room.x + ratio * Math.max(1, room.w - object.w);
+        }
+        if (object.attached.side === 'bottom') {
+          _orientOpeningToSide(object, 'bottom');
+          object.y = room.y + room.h - object.h;
+          object.x = room.x + ratio * Math.max(1, room.w - object.w);
+        }
+        if (object.attached.side === 'left') {
+          _orientOpeningToSide(object, 'left');
+          object.x = room.x;
+          object.y = room.y + ratio * Math.max(1, room.h - object.h);
+        }
+        if (object.attached.side === 'right') {
+          _orientOpeningToSide(object, 'right');
+          object.x = room.x + room.w - object.w;
+          object.y = room.y + ratio * Math.max(1, room.h - object.h);
+        }
+      });
+  }
+
   function _redrawSketchCanvas() {
     const canvas = document.getElementById('mec-classroom-canvas');
     if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
@@ -3142,7 +3516,7 @@ const MecFormModule = (() => {
         ...common,
       },
       damage: {
-        title: 'Ficha de dano',
+        title: 'Ficha de daño',
         typeOptions: ['Humedad', 'Fisura', 'Rotura', 'Desprendimiento', 'Instalacion expuesta', 'Otro'],
         estados: ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'],
         materiales: common.materiales,
@@ -3714,7 +4088,7 @@ const MecFormModule = (() => {
               <span><i class="legend-window"></i>Ventana</span>
               <span><i class="legend-outlet"></i>Toma</span>
               <span><i class="legend-light"></i>Foco</span>
-              <span><i class="legend-damage"></i>Dano/obs.</span>
+              <span><i class="legend-damage"></i>Daño/obs.</span>
               <span><i class="legend-sanitary"></i>Sanitario</span>
             </div>
             <div class="school-plan__list">
@@ -3756,7 +4130,7 @@ const MecFormModule = (() => {
       aulas: 'Aulas',
       aberturas: 'Puertas/Ventanas',
       electricidad: 'Tomas/Focos',
-      danos: 'Danos/obs.',
+      danos: 'Daños/obs.',
       etiquetas: 'Etiquetas',
     }[key] || key;
   }
@@ -3909,7 +4283,10 @@ const MecFormModule = (() => {
 
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
-      const floors = [...new Set(blockRooms.map(room => _normalizeFloor(room.floor)))];
+      const floors = [...new Set([
+        ...blockRooms.map(room => _normalizeFloor(room.floor)),
+        ...blockSanitaries.map(item => _normalizeFloor(item.planta || 'Piso 1')),
+      ])];
       if (!blockRooms.length && !blockSanitaries.length) {
         ctx.fillStyle = '#667085';
         ctx.font = '700 12px system-ui, sans-serif';
@@ -3917,7 +4294,8 @@ const MecFormModule = (() => {
       }
       floors.forEach((floor, floorIndex) => {
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
-        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, blockSanitaries.length > 0);
+        const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
+        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
         ctx.fillStyle = '#475467';
         ctx.font = '800 11px system-ui, sans-serif';
         ctx.fillText(floor, floorRect.x, floorRect.y - 6);
@@ -3925,12 +4303,13 @@ const MecFormModule = (() => {
         ctx.lineWidth = 1;
         ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
         const roomItems = _planRoomItemsFromSketch(floorRooms, floorRect);
+        const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorRect);
         roomItems.forEach(item => {
           if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
         });
+        sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h));
         _drawSharedWallTicks(ctx, roomItems);
       });
-      _drawPlanSanitaries(ctx, blockSanitaries, x + 14, y + h - 38, w - 28, 26);
       ctx.restore();
     });
   }
@@ -4014,29 +4393,88 @@ const MecFormModule = (() => {
     ];
   }
 
+  function _planSanitaryItemsFromSketch(items, floorRect) {
+    const source = _sketchBlockRect();
+    return (items || []).map(sanitary => {
+      const object = _ensureSanitaryRoomObject(sanitary);
+      if (!object) return null;
+      return {
+        sanitary,
+        x: floorRect.x + ((object.x - source.x) / source.w) * floorRect.w,
+        y: floorRect.y + ((object.y - source.y) / source.h) * floorRect.h,
+        w: Math.max(12, (object.w / source.w) * floorRect.w),
+        h: Math.max(10, (object.h / source.h) * floorRect.h),
+      };
+    }).filter(Boolean);
+  }
+
   function _sanitariesForBlock(block) {
     return (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
   }
 
-  function _drawPlanSanitaries(ctx, sanitaries, x, y, w, h) {
-    if (!sanitaries.length) return;
-    const itemW = Math.max(42, Math.min(92, w / sanitaries.length - 4));
-    sanitaries.forEach((item, index) => {
-      const sx = x + index * (itemW + 4);
-      const selected = _selectedPlanId === `sanitary::${item.id}`;
-      _planHitAreas.push({ id: `sanitary::${item.id}`, type: 'sanitary', sanitaryId: item.id, x: sx, y, w: itemW, h });
-      ctx.fillStyle = selected ? 'rgba(128,90,213,.2)' : 'rgba(128,90,213,.1)';
-      ctx.strokeStyle = selected ? '#111827' : '#805ad5';
-      ctx.lineWidth = selected ? 2.5 : 1.5;
-      ctx.fillRect(sx, y, itemW, h);
-      ctx.strokeRect(sx, y, itemW, h);
+  function _drawPlanSanitaryRoom(ctx, item, x, y, w, h) {
+    const selected = _selectedPlanId === `sanitary::${item.id}`;
+    _planHitAreas.push({ id: `sanitary::${item.id}`, type: 'sanitary', sanitaryId: item.id, x, y, w, h });
+    ctx.fillStyle = selected ? 'rgba(128,90,213,.2)' : 'rgba(128,90,213,.1)';
+    ctx.strokeStyle = selected ? '#111827' : '#805ad5';
+    ctx.lineWidth = selected ? 2.5 : 1.8;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeRect(x, y, w, h);
+    ctx.strokeStyle = 'rgba(128,90,213,.38)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 3, y + 3, Math.max(0, w - 6), Math.max(0, h - 6));
+    if (_planLayers.etiquetas) {
       ctx.fillStyle = '#44337a';
       ctx.font = '800 9px system-ui, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(item.codigo || 'San.', sx + 4, y + 11);
-      ctx.font = '700 8px system-ui, sans-serif';
-      ctx.fillText(`${item.inodoros || 0} inod.`, sx + 4, y + 22);
-    });
+      ctx.fillText(item.codigo || 'Sanitario', x + 4, y + 12);
+    }
+    _drawPlanSanitaryOpenings(ctx, item, x, y, w, h);
+  }
+
+  function _drawPlanSanitaryOpenings(ctx, item, x, y, w, h) {
+    const roomObject = _sanitaryRoomObject(item);
+    if (!roomObject) return;
+    const sx = w / roomObject.w;
+    const sy = h / roomObject.h;
+    (item.objects || [])
+      .filter(object => ['door', 'window', 'outlet', 'light', 'photo'].includes(object.type))
+      .forEach(object => {
+        const ox = x + (object.x - roomObject.x) * sx;
+        const oy = y + (object.y - roomObject.y) * sy;
+        if (object.type === 'door') {
+          const vertical = ['left', 'right'].includes(_openingSide(object));
+          const ow = Math.max(5, object.w * sx);
+          const oh = Math.max(5, object.h * sy);
+          const length = vertical ? oh : Math.max(8, ow);
+          const hinge = _doorHingePoint({ ...object, x: ox, y: oy, w: ow, h: oh }, 8);
+          const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
+          ctx.strokeStyle = '#2f855a';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(hinge.x, hinge.y);
+          ctx.lineTo(hinge.x + Math.cos(angles.leaf) * length, hinge.y + Math.sin(angles.leaf) * length);
+          ctx.stroke();
+          ctx.setLineDash([2, 2]);
+          ctx.beginPath();
+          ctx.arc(hinge.x, hinge.y, length, angles.start, angles.end, angles.ccw);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          return;
+        }
+        if (object.type === 'window') {
+          const vertical = ['left', 'right'].includes(_openingSide(object));
+          const length = vertical ? Math.max(8, object.h * sy) : Math.max(8, object.w * sx);
+          ctx.strokeStyle = '#2b6cb0';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(vertical ? ox : ox + length, vertical ? oy + length : oy);
+          ctx.stroke();
+          return;
+        }
+        _drawPlanPointSymbol(ctx, object.type, ox, oy);
+      });
   }
 
   function _drawSharedWallTicks(ctx, items) {
@@ -4125,11 +4563,8 @@ const MecFormModule = (() => {
           ctx.stroke();
           return;
         }
-        ctx.fillStyle = object.type === 'outlet' ? '#b7791f' : '#d69e2e';
         _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: 16, h: 16 });
-        ctx.beginPath();
-        ctx.arc(ox, oy, object.type === 'outlet' ? 2.5 : 3.5, 0, Math.PI * 2);
-        ctx.fill();
+        _drawPlanPointSymbol(ctx, object.type, ox, oy);
       });
     if (_planLayers.danos) {
       (room.objects || []).filter(object => object.type === 'damage').forEach(object => {
@@ -4189,6 +4624,35 @@ const MecFormModule = (() => {
         ctx.stroke();
       }
     });
+  }
+
+  function _drawPlanPointSymbol(ctx, type, x, y) {
+    ctx.save();
+    if (type === 'outlet') {
+      ctx.strokeStyle = '#b7791f';
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(x - 3, y - 3, 6, 6);
+      ctx.beginPath();
+      ctx.moveTo(x - 1.5, y - 2);
+      ctx.lineTo(x - 1.5, y + 2);
+      ctx.moveTo(x + 1.5, y - 2);
+      ctx.lineTo(x + 1.5, y + 2);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    ctx.strokeStyle = '#d69e2e';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x - 4, y);
+    ctx.lineTo(x + 4, y);
+    ctx.moveTo(x, y - 4);
+    ctx.lineTo(x, y + 4);
+    ctx.stroke();
+    ctx.restore();
   }
 
   function editPlanObject(planId) {
@@ -4306,6 +4770,7 @@ const MecFormModule = (() => {
       const area = hit(event);
       if (!area) return;
       if (area.type === 'room') editPlanClassroom(area.roomId);
+      else if (area.type === 'sanitary') editPlanSanitary(area.sanitaryId);
       else editPlanObject(area.id);
     });
   }
@@ -4483,10 +4948,14 @@ const MecFormModule = (() => {
       parts.push(`<text x="${x + 10}" y="${y + 20}" font-family="system-ui" font-size="15" font-weight="800" fill="#172033">${_escape(block.bloque_codigo || 'Bloque')}${block.largo_m && block.ancho_m ? ` · ${_escape(block.largo_m)} x ${_escape(block.ancho_m)} m` : ''}</text>`);
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
-      const floors = [...new Set(blockRooms.map(room => _normalizeFloor(room.floor)))];
+      const floors = [...new Set([
+        ...blockRooms.map(room => _normalizeFloor(room.floor)),
+        ...blockSanitaries.map(item => _normalizeFloor(item.planta || 'Piso 1')),
+      ])];
       floors.forEach((floor, floorIndex) => {
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
-        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, blockSanitaries.length > 0);
+        const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
+        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
         parts.push(`<text x="${floorRect.x}" y="${floorRect.y - 6}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">${_escape(floor)}</text>`);
         parts.push(`<rect x="${floorRect.x}" y="${floorRect.y}" width="${floorRect.w}" height="${floorRect.h}" fill="none" stroke="#dbe5f1" stroke-width="1"/>`);
         _planRoomItemsFromSketch(floorRooms, floorRect).forEach(item => {
@@ -4494,13 +4963,11 @@ const MecFormModule = (() => {
           parts.push(`<rect x="${item.x + 4}" y="${item.y + 4}" width="${Math.max(0, item.w - 8)}" height="${Math.max(0, item.h - 8)}" fill="none" stroke="#8db8e8" stroke-width="1"/>`);
           parts.push(`<text x="${item.x + 6}" y="${item.y + 14}" font-family="system-ui" font-size="10" font-weight="800" fill="#173f68">${_escape(item.room.name || 'Aula')}</text>`);
         });
-      });
-      blockSanitaries.forEach((item, index) => {
-        const itemW = Math.max(42, Math.min(92, (w - 28) / Math.max(1, blockSanitaries.length) - 4));
-        const sx = x + 14 + index * (itemW + 4);
-        const sy = y + h - 38;
-        parts.push(`<rect x="${sx}" y="${sy}" width="${itemW}" height="26" fill="#f2ecff" stroke="#805ad5" stroke-width="1.5"/>`);
-        parts.push(`<text x="${sx + 4}" y="${sy + 12}" font-family="system-ui" font-size="9" font-weight="800" fill="#44337a">${_escape(item.codigo || 'San.')}</text>`);
+        _planSanitaryItemsFromSketch(floorSanitaries, floorRect).forEach(item => {
+          parts.push(`<rect x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" fill="#f2ecff" stroke="#805ad5" stroke-width="1.7"/>`);
+          parts.push(`<rect x="${item.x + 3}" y="${item.y + 3}" width="${Math.max(0, item.w - 6)}" height="${Math.max(0, item.h - 6)}" fill="none" stroke="#b794f4" stroke-width="1"/>`);
+          parts.push(`<text x="${item.x + 4}" y="${item.y + 12}" font-family="system-ui" font-size="9" font-weight="800" fill="#44337a">${_escape(item.sanitary.codigo || 'Sanitario')}</text>`);
+        });
       });
     });
     parts.push('</svg>');
@@ -4688,6 +5155,7 @@ const MecFormModule = (() => {
     saveCurrentClassroom,
     addSanitary,
     addSanitaryFixture,
+    addSanitaryOpening,
     regenerateSanitaryPlan,
     addSanitaryStall,
     deleteSanitaryStall,

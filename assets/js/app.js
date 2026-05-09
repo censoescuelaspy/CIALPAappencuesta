@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.8
+ * Version: 2.5.9
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -348,6 +348,14 @@ const AppController = (() => {
   function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-shell').style.display = 'flex';
+    document.body.classList.add('sidebar-auto-hidden');
+    document.body.classList.remove('sidebar-peek');
+    document.getElementById('sidebar')?.classList.remove('sidebar--open');
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    if (toggleBtn) {
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      toggleBtn.setAttribute('aria-label', 'Mostrar menu');
+    }
 
     _buildSidebar();
     _renderUserBar();
@@ -400,9 +408,10 @@ const AppController = (() => {
         const sidebar = document.getElementById('sidebar');
         if (!sidebar) return;
         if (window.matchMedia('(max-width: 900px)').matches) {
-          const open = !sidebar.classList.contains('sidebar--open');
+          document.body.classList.add('sidebar-auto-hidden');
+          const open = !document.body.classList.contains('sidebar-peek');
           sidebar.classList.toggle('sidebar--open', open);
-          document.body.classList.remove('sidebar-auto-hidden', 'sidebar-peek');
+          document.body.classList.toggle('sidebar-peek', open);
           if (!open && document.activeElement instanceof HTMLElement) document.activeElement.blur();
           toggleBtn.setAttribute('aria-expanded', String(open));
           toggleBtn.setAttribute('aria-label', open ? 'Cerrar menu' : 'Abrir menu');
