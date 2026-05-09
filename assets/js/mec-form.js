@@ -1692,8 +1692,8 @@ const MecFormModule = (() => {
           <div class="mec-sketch__actions">
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'door')">+ Puerta</button>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'window')">+ Ventana</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')">+ Cabina</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cabina</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')">+ Cbn</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cbn</button>
             <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')">Eliminar sanitario</button>
           </div>
         </div>
@@ -1745,7 +1745,7 @@ const MecFormModule = (() => {
   }
 
   function _sanitaryStatusText(item) {
-    return `${_sanitaryBlockLabel(item)} · ${item.planta || _activeFloor()} · arrastre sanitario, puertas, ventanas o cabinas. Estire esquinas para ajustar medidas.`;
+    return `${_sanitaryBlockLabel(item)} · ${item.planta || _activeFloor()} · arrastre sanitario, puertas, ventanas o cbn. Estire esquinas para ajustar medidas.`;
   }
 
   function _activeBlockLabel() {
@@ -1797,12 +1797,12 @@ const MecFormModule = (() => {
           <div class="mec-sanitary-plan__header">
             <div>
               <strong>Croquis del sanitario</strong>
-              <span>Cabinas y artefactos internos asociados al sanitario</span>
+              <span>Cbn y artefactos internos asociados al sanitario</span>
             </div>
             <div>
               <button class="btn btn-xs btn-outline" type="button" onclick="MecFormModule.regenerateSanitaryPlan('${_escape(item.id)}')">Regenerar</button>
-              <button class="btn btn-xs btn-outline" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')">+ Cabina</button>
-              <button class="btn btn-xs btn-danger" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cabina</button>
+              <button class="btn btn-xs btn-outline" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')">+ Cbn</button>
+              <button class="btn btn-xs btn-danger" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cbn</button>
             </div>
           </div>
           ${_renderSanitaryFixtureTools(item)}
@@ -1910,7 +1910,7 @@ const MecFormModule = (() => {
     if (force || item.plano.cabinas.length !== target) {
       item.plano.cabinas = Array.from({ length: target }, (_, index) => ({
         id: `cab_${index + 1}`,
-        label: `Cabina ${index + 1}`,
+        label: `Cbn ${index + 1}`,
         artefacto: 'Inodoro',
         estado: item.estado || '',
       }));
@@ -1946,9 +1946,9 @@ const MecFormModule = (() => {
             <line x1="${x + w - 14}" y1="${innerY + innerH}" x2="${x + w - 14}" y2="${innerY + innerH - 32}" stroke="#2f855a" stroke-width="2"/>
             <path d="M ${x + w - 14} ${innerY + innerH} A 28 28 0 0 0 ${x + w - 42} ${innerY + innerH - 28}" fill="none" stroke="#2f855a" stroke-dasharray="3 3" stroke-width="1.5"/>
             <ellipse cx="${x + w / 2}" cy="${innerY + 46}" rx="${Math.min(18, w / 4)}" ry="13" fill="#fff" stroke="#475467" stroke-width="1.5"/>
-            <text x="${x + w / 2}" y="${innerY + 92}" text-anchor="middle" font-size="9" font-weight="800" fill="#475467">${_escape(stall.label || `Cabina ${index + 1}`)}</text>`;
+            <text x="${x + w / 2}" y="${innerY + 92}" text-anchor="middle" font-size="9" font-weight="800" fill="#475467">${_escape(stall.label || `Cbn ${index + 1}`)}</text>`;
         }).join('') : `
-          <text x="210" y="104" text-anchor="middle" font-size="13" font-weight="800" fill="#667085">Indique cantidad de inodoros para generar cabinas</text>`}
+          <text x="210" y="104" text-anchor="middle" font-size="13" font-weight="800" fill="#667085">Indique cantidad de inodoros para generar cbn</text>`}
         ${Array.from({ length: lavCount }).map((_, index) => {
           const x = 36 + index * 30;
           return `<rect x="${x}" y="184" width="20" height="14" rx="3" fill="#fff" stroke="#2b6cb0" stroke-width="1.5"/>`;
@@ -2083,11 +2083,11 @@ const MecFormModule = (() => {
       y: rect.y,
       w: rect.w,
       h: rect.h,
-      ficha: { codigo: `Cabina ${next}`, artefacto: 'Inodoro', estado: item.estado || '', cabinId },
+      ficha: { codigo: `Cbn ${next}`, artefacto: 'Inodoro', estado: item.estado || '', cabinId },
     };
     _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
-    item.plano.cabinas.push({ id: cabinId, label: `Cabina ${next}`, artefacto: 'Inodoro', estado: item.estado || '' });
+    item.plano.cabinas.push({ id: cabinId, label: `Cbn ${next}`, artefacto: 'Inodoro', estado: item.estado || '' });
     item.inodoros = String(Math.max(Number(item.inodoros || 0), item.plano.cabinas.length, (item.objects || []).filter(child => child.type === 'stall').length));
     _selectedSanitaryObjectId = object.id;
     _saveDraft(false);
@@ -2101,10 +2101,10 @@ const MecFormModule = (() => {
     _ensureSanitaryPlan(item);
     const stalls = (item.objects || []).filter(child => child.type === 'stall');
     if (!item.plano.cabinas.length && !stalls.length) {
-      UI.showToast('No hay cabinas para eliminar.', 'info');
+      UI.showToast('No hay cbn para eliminar.', 'info');
       return;
     }
-    const confirmed = await UI.showConfirm('Eliminar cabina', '¿Confirma eliminar la ultima cabina del croquis sanitario?');
+    const confirmed = await UI.showConfirm('Eliminar cbn', '¿Confirma eliminar la ultima cbn del croquis sanitario?');
     if (!confirmed) return;
     const removed = stalls[stalls.length - 1];
     if (removed) item.objects = (item.objects || []).filter(child => child.id !== removed.id);
@@ -2637,7 +2637,7 @@ const MecFormModule = (() => {
       ctx.strokeStyle = 'rgba(75,85,99,.36)';
       ctx.strokeRect(object.x + 4, object.y + 4, Math.max(0, object.w - 8), Math.max(0, object.h - 8));
       ctx.setLineDash([]);
-      _labelSketchObject(ctx, object, `${object.ficha?.codigo || 'Cabina'} ${_sanitaryDimensionsText(item, object)}`, object.x + object.w / 2, object.y - 12, true);
+      _labelSketchObject(ctx, object, `${object.ficha?.codigo || 'Cbn'} ${_sanitaryDimensionsText(item, object)}`, object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawResizeHandles(ctx, object, true);
       ctx.restore();
       return;
@@ -2661,11 +2661,18 @@ const MecFormModule = (() => {
     const length = vertical ? object.h : object.w;
     const hinge = _doorHingePoint(object, thickness);
     const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
-    ctx.fillStyle = selected ? 'rgba(47,133,90,.28)' : 'rgba(47,133,90,.16)';
-    ctx.strokeStyle = selected ? '#111827' : '#2f855a';
+    const variant = _doorVariant(object);
+    ctx.fillStyle = selected ? 'rgba(47,133,90,.28)' : (variant === 'opening' ? 'rgba(255,255,255,.92)' : 'rgba(47,133,90,.16)');
+    ctx.strokeStyle = selected ? '#111827' : (variant === 'opening' ? '#667085' : '#2f855a');
     ctx.lineWidth = selected ? 3 : 2;
     ctx.fillRect(object.x, object.y, object.w, object.h);
     ctx.strokeRect(object.x, object.y, object.w, object.h);
+    if (variant !== 'door') {
+      _drawOpeningVariantMark(ctx, object, variant);
+      _labelSketchObject(ctx, object, _sanitaryOpeningCompactDimensionsText(item, object), object.x + object.w / 2, object.y - 12, true);
+      if (selected) _drawResizeHandles(ctx, object, true);
+      return;
+    }
     ctx.beginPath();
     ctx.moveTo(hinge.x, hinge.y);
     ctx.arc(hinge.x, hinge.y, Math.max(18, length), angles.start, angles.end, angles.ccw);
@@ -2896,6 +2903,11 @@ const MecFormModule = (() => {
 
   function _drawContextOpeningSwing(ctx, object) {
     if (object.type !== 'door') return;
+    const variant = _doorVariant(object);
+    if (variant !== 'door') {
+      _drawOpeningVariantMark(ctx, object, variant);
+      return;
+    }
     const vertical = ['left', 'right'].includes(_openingSide(object));
     const length = vertical ? object.h : object.w;
     const hinge = _doorHingePoint(object, 8);
@@ -3038,7 +3050,7 @@ const MecFormModule = (() => {
   function _defaultSketchSize(type) {
     return {
       door: { w: 56, h: 8 },
-      window: { w: 86, h: 18 },
+      window: { w: 86, h: 8 },
       stair: { w: 90, h: 54 },
       board: { w: 112, h: 34 },
       damage: { w: 58, h: 38 },
@@ -3098,7 +3110,7 @@ const MecFormModule = (() => {
     if (object.type === 'door') {
       _drawDoorObject(ctx, object, selected);
       if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
-      if (selected) _drawOpeningRotateHandle(ctx, object);
+      if (selected && _doorVariant(object) === 'door') _drawOpeningRotateHandle(ctx, object);
       ctx.restore();
       return;
     }
@@ -3204,11 +3216,18 @@ const MecFormModule = (() => {
     const hingeX = hinge.x;
     const hingeY = hinge.y;
     const radius = Math.max(18, length);
-    ctx.fillStyle = selected ? 'rgba(47,133,90,.28)' : 'rgba(47,133,90,.16)';
-    ctx.strokeStyle = selected ? '#111827' : '#2f855a';
+    const variant = _doorVariant(object);
+    ctx.fillStyle = selected ? 'rgba(47,133,90,.28)' : (variant === 'opening' ? 'rgba(255,255,255,.92)' : 'rgba(47,133,90,.16)');
+    ctx.strokeStyle = selected ? '#111827' : (variant === 'opening' ? '#667085' : '#2f855a');
     ctx.lineWidth = selected ? 3 : 2;
     ctx.fillRect(object.x, object.y, object.w, object.h);
     ctx.strokeRect(object.x, object.y, object.w, object.h);
+    if (variant !== 'door') {
+      _drawOpeningVariantMark(ctx, object, variant);
+      _labelSketchObject(ctx, object, _openingCompactDimensionsText(object), object.x + object.w / 2, object.y - 12, true);
+      if (selected) _drawOpeningCornerGuides(ctx, object);
+      return;
+    }
     ctx.beginPath();
     ctx.moveTo(hingeX, hingeY);
     const angles = _doorSwingAngles(object, swing);
@@ -3228,6 +3247,45 @@ const MecFormModule = (() => {
     ctx.setLineDash([]);
     _labelSketchObject(ctx, object, _openingCompactDimensionsText(object), object.x + object.w / 2, object.y - 12, true);
     if (selected) _drawOpeningCornerGuides(ctx, object);
+  }
+
+  function _doorVariant(object) {
+    const text = `${object?.ficha?.subtipo || ''} ${object?.ficha?.tipo || ''} ${object?.ficha?.codigo || ''}`
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (text.includes('sin puerta') || text.includes('sin hoja') || text.includes('solo abertura')) return 'opening';
+    if (text.includes('cortina') || text.includes('lona')) return 'curtain';
+    return 'door';
+  }
+
+  function _drawOpeningVariantMark(ctx, object, variant) {
+    const side = _openingSide(object);
+    const vertical = ['left', 'right'].includes(side);
+    const x1 = vertical ? object.x + object.w / 2 : object.x;
+    const y1 = vertical ? object.y : object.y + object.h / 2;
+    const x2 = vertical ? object.x + object.w / 2 : object.x + object.w;
+    const y2 = vertical ? object.y + object.h : object.y + object.h / 2;
+    ctx.save();
+    ctx.lineWidth = variant === 'curtain' ? 2 : 2.4;
+    ctx.strokeStyle = variant === 'curtain' ? '#7c3aed' : '#667085';
+    ctx.setLineDash(variant === 'curtain' ? [3, 4] : [7, 4]);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    if (variant === 'curtain') {
+      const steps = 6;
+      for (let i = 1; i <= steps; i += 1) {
+        const t = i / steps;
+        const px = x1 + (x2 - x1) * t + (vertical ? (i % 2 ? 3 : -3) : 0);
+        const py = y1 + (y2 - y1) * t + (!vertical ? (i % 2 ? 3 : -3) : 0);
+        ctx.lineTo(px, py);
+      }
+    } else {
+      ctx.lineTo(x2, y2);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
   }
 
   function _drawPointSketchObject(ctx, object, selected) {
@@ -3377,7 +3435,7 @@ const MecFormModule = (() => {
       door: 'Pta',
       window: 'Vtna',
       stair: 'Esc',
-      stall: 'Cabina',
+      stall: 'Cbn',
       board: 'Piz',
       damage: 'Obs',
       outlet: 'TC',
@@ -3702,6 +3760,7 @@ const MecFormModule = (() => {
       .filter(object => object.type === 'door')
       .reverse()
       .find(object => {
+        if (_doorVariant(object) !== 'door') return false;
         const handle = _openingRotateHandle(object);
         return handle && Math.hypot(point.x - handle.x, point.y - handle.y) <= handle.size / 2 + 6;
       }) || null;
@@ -3962,6 +4021,7 @@ const MecFormModule = (() => {
     for (const object of [..._data.__classroomSketch.objects].reverse()) {
       const handle = _openingRotateHandle(object);
       if (!handle) continue;
+      if (_doorVariant(object) !== 'door') continue;
       if (Math.hypot(point.x - handle.x, point.y - handle.y) <= handle.size / 2 + 6) return object;
     }
     return null;
@@ -4069,11 +4129,14 @@ const MecFormModule = (() => {
     }
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
-    _clampOpeningToRoom(object);
+    if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else _snapSketchObjectInsideActiveRoom(object);
   }
 
   function _clampRoomPosition(room, x, y) {
-    const rect = _resolveRoomOverlap(room, _clampRectToBlock({ x, y, w: room.w, h: room.h }));
+    const blockers = _otherRoomObjectsForActiveFloor(room.id || _activeClassroomId);
+    const snapped = _snapRectToGuides(_clampRectToBlock({ x, y, w: room.w, h: room.h }), _sketchBlockRect(), blockers, 14);
+    const rect = _resolveRoomOverlap(room, snapped);
     return { x: rect.x, y: rect.y };
   }
 
@@ -4086,10 +4149,38 @@ const MecFormModule = (() => {
   }
 
   function _otherRoomObjectsForActiveFloor(roomId = _activeClassroomId) {
-    return _sketchRoomsForActiveBlockFloor()
+    const roomObjects = _sketchRoomsForActiveBlockFloor()
       .filter(room => room.id !== roomId)
       .map(room => _roomObjectForClassroom(room))
       .filter(Boolean);
+    const sanitaryObjects = _sanitaryRoomsForActiveBlockFloor()
+      .map(item => item.object)
+      .filter(Boolean);
+    return [...roomObjects, ...sanitaryObjects];
+  }
+
+  function _activeSketchRoomObject() {
+    return (_data.__classroomSketch?.objects || []).find(item => item.type === 'room') || null;
+  }
+
+  function _rectangularSketchBlockers(objectId) {
+    return (_data.__classroomSketch?.objects || [])
+      .filter(item => item.id !== objectId)
+      .filter(item => !['room', 'wall', 'pencil', 'door', 'window'].includes(item.type))
+      .filter(item => !_isPointSketchObject(item))
+      .filter(item => item.x !== undefined && item.y !== undefined && item.w && item.h);
+  }
+
+  function _snapSketchObjectInsideActiveRoom(object) {
+    const room = _activeSketchRoomObject();
+    if (!room || !object || object.x === undefined || object.w === undefined) return object;
+    const blockers = _rectangularSketchBlockers(object.id);
+    const rect = _snapRectToGuides(object, room, blockers, 8);
+    object.x = rect.x;
+    object.y = rect.y;
+    object.w = rect.w;
+    object.h = rect.h;
+    return object;
   }
 
   function _resolveRoomOverlap(room, desiredRect) {
@@ -4155,14 +4246,15 @@ const MecFormModule = (() => {
       object.h = Math.max(minH, Math.round(point.y - object.y));
     }
     if (object.type === 'door') _orientOpeningToSide(object, _openingSide(object));
-    if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 14;
-    if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 14;
+    if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 8;
+    if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 8;
     if (object.type === 'room') {
       _clampRoomWithinBlock(object);
       _updateSketchDimensionsFromRoom(object, previousScale);
       _reflowAttachedOpenings(object);
     }
-    _clampOpeningToRoom(object);
+    if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else if (object.type !== 'room') _snapSketchObjectInsideActiveRoom(object);
   }
 
   function _updateSketchDimensionsFromRoom(room, previousScale) {
@@ -4197,7 +4289,7 @@ const MecFormModule = (() => {
       { side: 'right', value: Math.abs(center.x - (room.x + room.w)) },
     ].sort((a, b) => a.value - b.value);
     const nearest = distances[0];
-    if (nearest && nearest.value <= 54) {
+    if (nearest) {
       _orientOpeningToSide(object, nearest.side);
       if (nearest.side === 'top') {
         object.y = room.y;
@@ -4228,7 +4320,7 @@ const MecFormModule = (() => {
       ? (currentVertical ? object.h : object.w)
       : (currentVertical ? object.h : object.w);
     length = Math.max(object.type === 'door' ? 34 : 42, length || 48);
-    const thickness = object.type === 'door' ? 8 : 14;
+    const thickness = 8;
     if (nextVertical) {
       object.w = thickness;
       object.h = length;
@@ -4429,8 +4521,8 @@ const MecFormModule = (() => {
         ...common,
       },
       door: {
-        title: 'Ficha de puerta',
-        typeOptions: ['Madera', 'Metal', 'Vidrio', 'Reja', 'Mixta', 'Otro'],
+        title: 'Ficha de abertura',
+        typeOptions: ['Con puerta madera', 'Con puerta metal', 'Con puerta vidrio', 'Reja', 'Sin puerta', 'Cortina', 'Media puerta', 'Porton', 'Otro'],
         extra: [
           { key: 'cerradura', label: 'Cerradura', options: ['Funciona', 'Regular', 'No funciona', 'No tiene'] },
           { key: 'abre_hacia', label: 'Apertura', options: ['Interior', 'Exterior', 'Corrediza', 'No verificable'] },
@@ -4558,11 +4650,10 @@ const MecFormModule = (() => {
                 <label>Codigo corto</label>
                 <input class="form-control" name="codigo" value="${_escape(object.ficha.codigo || _sketchLabel(object.type))}" maxlength="16">
               </div>
-              ${compactOpening ? '' : `
-                <div class="form-group">
-                  <label>Tipo</label>
-                  ${_choiceButtons('subtipo', cfg.typeOptions, object.ficha.subtipo || '')}
-                </div>`}
+              <div class="form-group">
+                <label>${object.type === 'door' ? 'Tipo de abertura' : 'Tipo'}</label>
+                ${_choiceButtons('subtipo', cfg.typeOptions, object.ficha.subtipo || '')}
+              </div>
               <div class="form-group">
                 <label>Estado</label>
                 ${_choiceButtons('estado', cfg.estados, object.ficha.estado || '')}
@@ -5209,7 +5300,7 @@ const MecFormModule = (() => {
     const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
     const rows = Math.max(1, Math.ceil(blocks.length / 2));
     const maxFloors = Math.max(1, ...blocks.map(block => _planFloorsForBlock(block).length));
-    return Math.max(560, 280 * rows + Math.max(0, maxFloors - 1) * 120);
+    return Math.max(620, 320 * rows + Math.max(0, maxFloors - 1) * 170);
   }
 
   function _drawSchoolPlan() {
@@ -5283,15 +5374,20 @@ const MecFormModule = (() => {
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
         const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
         const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
-        ctx.fillStyle = '#475467';
-        ctx.font = '800 11px system-ui, sans-serif';
-        ctx.fillText(floor, floorRect.x, floorRect.y - 6);
-        ctx.strokeStyle = 'rgba(71,84,103,.16)';
+        const floorContentRect = _planFloorContentRect(floorRect);
+        ctx.fillStyle = 'rgba(255,255,255,.68)';
+        ctx.fillRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
+        ctx.strokeStyle = 'rgba(71,84,103,.28)';
         ctx.lineWidth = 1;
         ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
-        const roomItems = _planRoomItemsFromSketch(floorRooms, floorRect);
-        const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorRect);
-        const floorMetersPerPx = _planFloorMetersPerPx(block, floorRect);
+        ctx.fillStyle = 'rgba(71,84,103,.08)';
+        ctx.fillRect(floorRect.x + 1, floorRect.y + 1, floorRect.w - 2, 18);
+        ctx.fillStyle = '#475467';
+        ctx.font = '800 10px system-ui, sans-serif';
+        ctx.fillText(floor, floorRect.x + 8, floorRect.y + 13);
+        const roomItems = _planRoomItemsFromSketch(floorRooms, floorContentRect);
+        const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorContentRect);
+        const floorMetersPerPx = _planFloorMetersPerPx(block, floorContentRect);
         roomItems.forEach(item => distanceItems.push({
           id: `room::${item.room.id}`,
           type: 'room',
@@ -5326,7 +5422,7 @@ const MecFormModule = (() => {
   function _planFloorRect(blockX, blockY, blockW, blockH, floorIndex, floorCount, hasSanitaries) {
     const innerX = blockX + 14;
     const top = blockY + 48;
-    const gap = 18;
+    const gap = 34;
     const bottomReserve = hasSanitaries ? 16 : 14;
     const availableH = Math.max(36, blockH - 62 - bottomReserve - gap * Math.max(0, floorCount - 1));
     const count = Math.max(1, floorCount || 1);
@@ -5336,6 +5432,15 @@ const MecFormModule = (() => {
       y: top + floorIndex * (bandH + gap),
       w: Math.max(40, blockW - 28),
       h: Math.max(28, bandH),
+    };
+  }
+
+  function _planFloorContentRect(floorRect) {
+    return {
+      x: floorRect.x + 6,
+      y: floorRect.y + 23,
+      w: Math.max(28, floorRect.w - 12),
+      h: Math.max(20, floorRect.h - 29),
     };
   }
 
@@ -5357,7 +5462,8 @@ const MecFormModule = (() => {
     });
     const maxLength = Math.max(...models.map(model => model.length), 30);
     const maxStackWidth = Math.max(...models.map(model => model.width * model.floorCount), 20);
-    const maxGapPx = Math.max(...models.map(model => Math.max(0, model.floorCount - 1) * 18), 0);
+    const floorGap = 34;
+    const maxGapPx = Math.max(...models.map(model => Math.max(0, model.floorCount - 1) * floorGap), 0);
     const cols = 2;
     const cellW = (canvasW - 72) / cols;
     const rows = Math.max(1, Math.ceil(blocks.length / cols));
@@ -5369,7 +5475,7 @@ const MecFormModule = (() => {
       const row = Math.floor(index / cols);
       const bw = Math.max(70, length * scale);
       const floorH = Math.max(34, width * scale);
-      const bh = Math.max(78, 62 + floorCount * floorH + Math.max(0, floorCount - 1) * 18);
+      const bh = Math.max(78, 68 + floorCount * floorH + Math.max(0, floorCount - 1) * floorGap);
       const cellX = 28 + col * cellW;
       const cellY = 36 + row * cellH;
       const autoX = cellX + Math.max(0, (cellW - bw) / 2);
@@ -5555,7 +5661,13 @@ const MecFormModule = (() => {
           const ow = Math.max(5, object.w * sx);
           const oh = Math.max(5, object.h * sy);
           const length = vertical ? oh : Math.max(8, ow);
-          const hinge = _doorHingePoint({ ...object, x: ox, y: oy, w: ow, h: oh }, 8);
+          const scaledObject = { ...object, x: ox, y: oy, w: ow, h: oh };
+          const variant = _doorVariant(object);
+          if (variant !== 'door') {
+            _drawOpeningVariantMark(ctx, scaledObject, variant);
+            return;
+          }
+          const hinge = _doorHingePoint(scaledObject, 8);
           const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
           ctx.strokeStyle = '#2f855a';
           ctx.lineWidth = 1.5;
@@ -5593,7 +5705,7 @@ const MecFormModule = (() => {
             ctx.fillStyle = '#4b5563';
             ctx.font = '800 7px system-ui, sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText(_truncateLabel(ctx, object.ficha?.codigo || 'Cabina', Math.max(18, ow - 4)), ox + ow / 2, oy + Math.min(12, oh / 2 + 3));
+            ctx.fillText(_truncateLabel(ctx, object.ficha?.codigo || 'Cbn', Math.max(18, ow - 4)), ox + ow / 2, oy + Math.min(12, oh / 2 + 3));
           }
           return;
         }
@@ -5657,9 +5769,15 @@ const MecFormModule = (() => {
           const ow = Math.max(8, object.w * sx);
           const oh = Math.max(8, object.h * sy);
           const length = vertical ? oh : Math.max(12, ow);
-          const hinge = _doorHingePoint({ ...object, x: ox, y: oy, w: ow, h: oh }, 8);
-          const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
           _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16) });
+          const scaledObject = { ...object, x: ox, y: oy, w: ow, h: oh };
+          const variant = _doorVariant(object);
+          if (variant !== 'door') {
+            _drawOpeningVariantMark(ctx, scaledObject, variant);
+            return;
+          }
+          const hinge = _doorHingePoint(scaledObject, 8);
+          const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
           ctx.strokeStyle = '#2f855a';
           ctx.lineWidth = 2;
           ctx.beginPath();
@@ -6140,14 +6258,16 @@ const MecFormModule = (() => {
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
         const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
         const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
-        parts.push(`<text x="${floorRect.x}" y="${floorRect.y - 6}" font-family="system-ui" font-size="11" font-weight="800" fill="#475467">${_escape(floor)}</text>`);
-        parts.push(`<rect x="${floorRect.x}" y="${floorRect.y}" width="${floorRect.w}" height="${floorRect.h}" fill="none" stroke="#dbe5f1" stroke-width="1"/>`);
-        _planRoomItemsFromSketch(floorRooms, floorRect).forEach(item => {
+        const floorContentRect = _planFloorContentRect(floorRect);
+        parts.push(`<rect x="${floorRect.x}" y="${floorRect.y}" width="${floorRect.w}" height="${floorRect.h}" fill="#ffffff" fill-opacity=".68" stroke="#dbe5f1" stroke-width="1"/>`);
+        parts.push(`<rect x="${floorRect.x + 1}" y="${floorRect.y + 1}" width="${floorRect.w - 2}" height="18" fill="#eef2f7" fill-opacity=".8"/>`);
+        parts.push(`<text x="${floorRect.x + 8}" y="${floorRect.y + 13}" font-family="system-ui" font-size="10" font-weight="800" fill="#475467">${_escape(floor)}</text>`);
+        _planRoomItemsFromSketch(floorRooms, floorContentRect).forEach(item => {
           parts.push(`<rect x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" fill="#eaf4ff" stroke="#2b6cb0" stroke-width="2"/>`);
           parts.push(`<rect x="${item.x + 4}" y="${item.y + 4}" width="${Math.max(0, item.w - 8)}" height="${Math.max(0, item.h - 8)}" fill="none" stroke="#8db8e8" stroke-width="1"/>`);
           parts.push(`<text x="${item.x + 6}" y="${item.y + 14}" font-family="system-ui" font-size="10" font-weight="800" fill="#173f68">${_escape(item.room.name || 'Aula')}</text>`);
         });
-        _planSanitaryItemsFromSketch(floorSanitaries, floorRect).forEach(item => {
+        _planSanitaryItemsFromSketch(floorSanitaries, floorContentRect).forEach(item => {
           parts.push(`<rect x="${item.x}" y="${item.y}" width="${item.w}" height="${item.h}" fill="#f2ecff" stroke="#805ad5" stroke-width="1.7"/>`);
           parts.push(`<rect x="${item.x + 3}" y="${item.y + 3}" width="${Math.max(0, item.w - 6)}" height="${Math.max(0, item.h - 6)}" fill="none" stroke="#b794f4" stroke-width="1"/>`);
           parts.push(`<text x="${item.x + 4}" y="${item.y + 12}" font-family="system-ui" font-size="9" font-weight="800" fill="#44337a">${_escape(item.sanitary.codigo || 'Sanitario')}</text>`);
