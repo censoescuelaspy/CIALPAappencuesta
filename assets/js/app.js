@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.10
+ * Version: 2.5.11
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -348,13 +348,15 @@ const AppController = (() => {
   function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-shell').style.display = 'flex';
-    document.body.classList.add('sidebar-auto-hidden');
-    document.body.classList.remove('sidebar-peek');
-    document.getElementById('sidebar')?.classList.remove('sidebar--open');
+    const sidebar = document.getElementById('sidebar');
+    const mobile = window.matchMedia('(max-width: 900px)').matches;
+    document.body.classList.toggle('sidebar-auto-hidden', mobile);
+    document.body.classList.toggle('sidebar-peek', mobile);
+    sidebar?.classList.toggle('sidebar--open', mobile);
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      toggleBtn.setAttribute('aria-label', 'Mostrar menu');
+      toggleBtn.setAttribute('aria-expanded', 'true');
+      toggleBtn.setAttribute('aria-label', 'Ocultar menu');
     }
 
     _buildSidebar();
@@ -363,6 +365,7 @@ const AppController = (() => {
     _bindGlobalEvents();
 
     showModule('inicio');
+    requestAnimationFrame(() => _ensureVisibleModule('inicio'));
   }
 
   function _buildSidebar() {
@@ -600,6 +603,16 @@ const AppController = (() => {
     // Update page title
     const mod = MODULES[moduleId];
     if (mod) document.title = `${mod.label} — ${APP_CONFIG.APP_NAME}`;
+  }
+
+  function _ensureVisibleModule(moduleId = 'inicio') {
+    const active = document.querySelector('.module-panel--active');
+    const fallback = document.getElementById(`module-${moduleId}`);
+    if (active || !fallback) return;
+    fallback.classList.add('module-panel--active');
+    document.querySelectorAll('.nav-item').forEach(item =>
+      item.classList.toggle('nav-item--active', item.dataset.module === moduleId));
+    _currentModule = moduleId;
   }
 
   async function _initModule(id) {
