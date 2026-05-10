@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * config.js — Central application configuration
- * Version: 2.5.30
+ * Version: 2.5.31
  */
 
 const APP_CONFIG = {
