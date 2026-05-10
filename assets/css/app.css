@@ -178,11 +178,11 @@ h5 { font-size: 1rem;    font-weight: 600; }
 body.sidebar-auto-hidden #sidebar {
   position: fixed;
   inset: 0 auto 0 0;
-  min-width: 0;
-  width: 0;
+  min-width: var(--sidebar-width);
+  width: var(--sidebar-width);
   opacity: 0;
-  transform: translateX(-100%);
-  pointer-events: none;
+  transform: translateX(calc(56px - var(--sidebar-width)));
+  pointer-events: auto;
   box-shadow: none;
 }
 
@@ -201,7 +201,7 @@ body.sidebar-auto-hidden.sidebar-peek #sidebar {
   left: 0;
   width: 32px;
   height: 100vh;
-  z-index: 1000;
+  z-index: 90;
   display: none;
   cursor: pointer;
 }
@@ -211,6 +211,7 @@ body.sidebar-auto-hidden #sidebar-hotzone {
 }
 
 body.sidebar-auto-hidden #sidebar-hotzone:hover + #sidebar,
+body.sidebar-auto-hidden #sidebar:hover,
 body.sidebar-auto-hidden.sidebar-peek #sidebar,
 body.sidebar-auto-hidden #sidebar.sidebar--open {
   min-width: var(--sidebar-width);
