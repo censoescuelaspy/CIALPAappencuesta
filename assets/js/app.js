@@ -349,10 +349,9 @@ const AppController = (() => {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-shell').style.display = 'flex';
     const sidebar = document.getElementById('sidebar');
-    const mobile = window.matchMedia('(max-width: 900px)').matches;
-    document.body.classList.toggle('sidebar-auto-hidden', mobile);
-    document.body.classList.toggle('sidebar-peek', mobile);
-    sidebar?.classList.toggle('sidebar--open', mobile);
+    document.body.classList.add('sidebar-auto-hidden');
+    document.body.classList.remove('sidebar-peek');
+    sidebar?.classList.remove('sidebar--open');
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) {
       toggleBtn.setAttribute('aria-expanded', 'true');
