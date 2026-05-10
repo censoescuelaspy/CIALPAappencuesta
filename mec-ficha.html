@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CIALPA - Ficha grafica del local</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+    <link rel="stylesheet" href="assets/css/mec-ficha.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">CIALPA</p>
+        <h1>Ficha grafica del local</h1>
+      </div>
+      <nav class="topbar-actions">
+        <button id="sidebarToggleBtn" class="ghost" type="button" aria-controls="leftSidebar" aria-expanded="true">Panel</button>
+        <button id="settingsBtn" class="ghost" type="button">Configurar conexion</button>
+        <span id="statusPill" class="pill" data-state="offline">Sin endpoint</span>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <aside id="leftSidebar" class="sidebar">
+        <section class="picker">
+          <h2>1. Elegir local</h2>
+          <label>
+            Departamento
+            <select id="dptoSelect">
+              <option value="">- Seleccione -</option>
+            </select>
+          </label>
+
+          <label>
+            Distrito
+            <select id="distSelect" disabled>
+              <option value="">- Seleccione un departamento -</option>
+            </select>
+          </label>
+
+          <label>
+            Buscar local
+            <input id="searchLocal" type="search" placeholder="Nombre, fid o barrio..." autocomplete="off" disabled>
+          </label>
+
+          <ul id="localesList" class="locales-list" aria-live="polite"></ul>
+          <p id="localesHint" class="hint"></p>
+        </section>
+
+        <section id="fichaPanel" class="ficha hidden">
+          <h2>2. Predio escolar</h2>
+          <p id="localTitle" class="local-title"></p>
+          <p id="localMeta" class="muted"></p>
+
+          <div class="toolbar">
+            <button id="drawPolygonBtn" class="primary" type="button">Dibujar predio</button>
+            <button id="clearDrawBtn" class="secondary" type="button">Borrar dibujo</button>
+            <button id="centerLocalBtn" class="ghost" type="button">Centrar mapa</button>
+          </div>
+
+          <dl class="metrics">
+            <div>
+              <dt>Vertices</dt>
+              <dd id="metricVertices">0</dd>
+            </div>
+            <div>
+              <dt>Area aproximada</dt>
+              <dd id="metricArea">- m&sup2;</dd>
+            </div>
+            <div>
+              <dt>Estado</dt>
+              <dd id="metricEstado">borrador</dd>
+            </div>
+          </dl>
+
+          <h3>3. Guardar</h3>
+          <div class="actions">
+            <button id="saveBtn" class="primary" type="button">Guardar ficha</button>
+            <button id="exportBtn" class="ghost" type="button">Exportar JSON</button>
+          </div>
+          <p id="saveStatus" class="hint"></p>
+        </section>
+
+        <section id="arquitecturaPanel" class="ficha hidden">
+          <h2>3. Registro arquitectonico</h2>
+
+          <details open>
+            <summary>Bloques constructivos</summary>
+            <div class="form-grid">
+              <label>Nombre <input id="bloqueNombre" type="text" placeholder="Bloque A"></label>
+              <label>Plantas <input id="bloquePlantas" type="text" placeholder="PB, PA"></label>
+              <label>Largo (m) <input id="bloqueLargo" type="number" min="0" step="0.01"></label>
+              <label>Ancho (m) <input id="bloqueAncho" type="number" min="0" step="0.01"></label>
+            </div>
+            <button id="addBloqueBtn" class="secondary" type="button">Agregar bloque</button>
+            <ul id="bloquesList" class="entity-list"></ul>
+          </details>
+
+          <details>
+            <summary>Espacios por bloque</summary>
+            <div class="form-grid">
+              <label>Bloque <select id="espacioBloque"></select></label>
+              <label>Tipo
+                <select id="espacioTipo">
+                  <option>Aula</option>
+                  <option>Direccion</option>
+                  <option>Sanitario</option>
+                  <option>Laboratorio</option>
+                  <option>Biblioteca</option>
+                  <option>Deposito</option>
+                  <option>Otro</option>
+                </select>
+              </label>
+              <label>Nombre/numero <input id="espacioNombre" type="text" placeholder="Aula 1"></label>
+              <label>Situacion
+                <select id="espacioSituacion">
+                  <option>En uso</option>
+                  <option>Sin uso</option>
+                  <option>Requiere reparacion</option>
+                </select>
+              </label>
+              <label>Largo <input id="espacioLargo" type="number" min="0" step="0.01"></label>
+              <label>Ancho <input id="espacioAncho" type="number" min="0" step="0.01"></label>
+            </div>
+            <fieldset id="sanitarioFixtures" class="fixture-picker hidden">
+              <legend>Artefactos de cabina sanitaria</legend>
+              <label><input type="checkbox" value="inodoro"> Inodoro</label>
+              <label><input type="checkbox" value="posapapel"> Portapapel</label>
+              <label><input type="checkbox" value="cisterna_baja"> Cisterna baja</label>
+              <label><input type="checkbox" value="cisterna_alta"> Cisterna alta</label>
+              <label><input type="checkbox" value="lavamanos"> Lavamanos</label>
+              <label><input type="checkbox" value="barra_apoyo"> Barra de apoyo</label>
+            </fieldset>
+            <button id="addEspacioBtn" class="secondary" type="button">Agregar espacio</button>
+            <ul id="espaciosList" class="entity-list"></ul>
+          </details>
+
+          <details>
+            <summary>Areas, elementos y cercado</summary>
+            <div class="form-grid">
+              <label>Area recreativa <input id="areaNombre" type="text" placeholder="Patio principal"></label>
+              <label>Tipo <input id="areaTipo" type="text" placeholder="Patio, cancha, plaza"></label>
+              <label>Largo (m) <input id="areaLargo" type="number" min="0" step="0.01"></label>
+              <label>Ancho (m) <input id="areaAncho" type="number" min="0" step="0.01"></label>
+            </div>
+            <button id="addAreaBtn" class="secondary" type="button">Agregar area</button>
+            <ul id="areasList" class="entity-list"></ul>
+
+            <div class="form-grid compact">
+              <label>Elemento <input id="elementoNombre" type="text" placeholder="Escalera principal"></label>
+              <label>Tipo
+                <select id="elementoTipo">
+                  <option value="equipamiento">Equipamiento</option>
+                  <option value="escalera">Escalera</option>
+                  <option value="rampa">Rampa</option>
+                  <option value="dano_estructural">Daño estructural</option>
+                  <option value="acometida">Acometida</option>
+                  <option value="mastil">Mastil</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </label>
+              <label>Ubicacion logica
+                <select id="elementoParent">
+                  <option value="">Exterior / sin espacio</option>
+                </select>
+              </label>
+            </div>
+            <button id="addElementoBtn" class="secondary" type="button">Agregar elemento</button>
+            <p class="hint">Los elementos se crean en el centro visible del mapa. Arrastralos para ubicarlos; las guias aparecen cerca de otros elementos alineables.</p>
+            <ul id="elementosList" class="entity-list"></ul>
+
+            <div class="form-grid compact">
+              <label>Cercado
+                <select id="cercadoPresencia">
+                  <option value="">Sin registrar</option>
+                  <option value="si">Si</option>
+                  <option value="parcial">Parcial</option>
+                  <option value="no">No</option>
+                </select>
+              </label>
+              <label>Tipo <input id="cercadoTipo" type="text" placeholder="Muralla, tejido, reja"></label>
+              <label>% cubierto <input id="cercadoPorcentaje" type="number" min="0" max="100" step="1"></label>
+            </div>
+          </details>
+        </section>
+      </aside>
+
+      <main id="map" aria-label="Mapa satelital del local"></main>
+      <div id="distanceLegend" class="distance-legend">Distancias: centro a centro entre elementos puntuales; borde a borde solo cuando ambos objetos tienen geometria.</div>
+    </div>
+
+    <dialog id="settingsDialog" class="settings">
+      <form method="dialog">
+        <h2>Conexion al backend</h2>
+        <p class="muted">
+          Mientras no se configure un endpoint, la ficha se guarda solo en este navegador (localStorage).
+        </p>
+        <label>
+          URL del Apps Script Web App
+          <input id="endpointInput" type="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+        </label>
+        <label>
+          Token de sesion (auth.js)
+          <input id="tokenInput" type="text" autocomplete="off">
+        </label>
+        <label>
+          Nombre del digitalizador
+          <input id="userInput" type="text" autocomplete="name">
+        </label>
+        <div class="dialog-actions">
+          <button value="cancel" formnovalidate>Cancelar</button>
+          <button id="saveSettingsBtn" value="save" class="primary" type="button">Guardar configuracion</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+    <script src="assets/js/mec-ficha.js"></script>
+  </body>
+</html>

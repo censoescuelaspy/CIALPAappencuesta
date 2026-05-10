@@ -82,6 +82,10 @@ function _handleRequest(e) {
       params._session = authResult.session;
     }
 
+    if (typeof FG_ACTIONS !== 'undefined' && FG_ACTIONS.has(action)) {
+      return _respond(fgRoute(action, params));
+    }
+
     // Route to handler
     switch (action) {
       // Auth
