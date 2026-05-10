@@ -118,6 +118,7 @@ const MEC_SCHEMA = {
           title: '1 - Identificacion del bloque',
           fields: [
             { id: 'bloque_codigo', label: 'Bloque', type: 'text', required: true, hint: 'La app enumera automaticamente: Bloque 1, Bloque 2, etc.' },
+            { id: 'estado_bloque', label: 'Estado del bloque', type: 'select', required: true, options: ['Operativo', 'En construccion', 'Derrumbado / colapsado', 'Clausurado', 'Sin uso', 'No verificable'] },
             { id: 'cantidad_plantas', label: 'Cantidad de plantas', type: 'number', required: true, min: 1, step: 1 },
             { id: 'largo_m', label: 'Largo aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
