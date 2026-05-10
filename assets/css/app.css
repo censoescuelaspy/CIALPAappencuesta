@@ -203,13 +203,14 @@ body.sidebar-auto-hidden.sidebar-peek #sidebar {
   height: 100vh;
   z-index: 1000;
   display: none;
-  cursor: ew-resize;
+  cursor: pointer;
 }
 
 body.sidebar-auto-hidden #sidebar-hotzone {
   display: block;
 }
 
+body.sidebar-auto-hidden #sidebar-hotzone:hover + #sidebar,
 body.sidebar-auto-hidden.sidebar-peek #sidebar,
 body.sidebar-auto-hidden #sidebar.sidebar--open {
   min-width: var(--sidebar-width);
