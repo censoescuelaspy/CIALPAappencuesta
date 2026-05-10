@@ -4,6 +4,47 @@
 
 ---
 
+## Sesión de mejora arquitectónica - 2026-05-10 - v2.5.31
+
+### Estado publicado
+- App web: `https://censoescuelaspy.github.io/CIALPAappencuesta/?v=2.5.31`
+- Rama publicada: `main`
+- Commit principal: `f6a5bd4` - `feat: agregar auditor arquitectonico del plano`
+- Commit de alineación: `41f94d5` - `chore: alinear comentario de version`
+- Verificación en GitHub Pages: `index OK`, `config OK`, `mec-form OK`, `css OK`, `sw OK`
+
+### Cambios implementados
+- Agregado el **Auditor arquitectónico** dentro del plano general de escuela.
+- Nuevo KPI **Calidad técnica** con puntaje `0-100`.
+- Detección automática de omisiones críticas:
+  - bloques sin dimensiones o sin ambientes asociados;
+  - pisos con aulas pero sin sanitario;
+  - aulas operativas sin puerta, ventana, toma, iluminación, medidas o geometría;
+  - sanitarios sin puerta de acceso, inodoro, lavamanos, agua, medidas o recinto dibujado;
+  - cabinas sin componentes, sin inodoro o con privacidad deficiente;
+  - objetos en mal estado, sin funcionamiento, expuestos o con riesgo;
+  - daños estructurales con prioridad alta, severa, urgente o de riesgo inmediato.
+- Cada observación del auditor queda como botón seleccionable para localizar rápidamente el bloque, aula, sanitario u objeto observado en el plano.
+- Agregados estilos responsivos para panel de auditoría, tarjetas de observaciones y barra de calidad.
+- Corregido un `summary` duplicado en el panel de cabinas sanitarias.
+- Versión y cache actualizados a `v2.5.31` en `config.js`, `index.html` y `sw.js`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/config.js`
+- `git diff --check`
+- Verificación HTTP de GitHub Pages para `index.html`, `config.js`, `mec-form.js`, `mec-form.css` y `sw.js`.
+
+### Próximos pasos recomendados
+- Convertir las observaciones del auditor en checklist de cierre por escuela.
+- Agregar exportación de auditoría a PDF/JSON junto con el plano.
+- Incorporar reglas de dimensionamiento por tipo de ambiente y capacidad.
+- Agregar modo "rutas y evacuación" con puertas, escaleras, accesibilidad y recorridos.
+- Crear biblioteca de tipologías arquitectónicas para insertar aulas, sanitarios y bloques completos con configuraciones prearmadas.
+- Agregar comparador entre relevamiento actual y versión anterior de la misma escuela.
+
+---
+
 ## Sesión de Deploy — 2026-04-27 / 2026-04-28
 
 ### Objetivo
