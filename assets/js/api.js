@@ -8,6 +8,195 @@ const API = (() => {
   'use strict';
 
   const _IS_DEMO = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
+  const EXAMPLE_SCHOOL_ID = 'ESC_DEMO_CIALPA';
+
+  function _exampleMecDraft() {
+    return {
+      __activeModuleId: 'plano',
+      __activeBlockId: 'bloque_demo_a',
+      __activeFloor: 'Piso 1',
+      __activeClassroomId: 'aula_demo_a_1',
+      __activeSanitaryId: 'san_demo_a_1',
+      __selectedSchool: {
+        id_escuela: EXAMPLE_SCHOOL_ID,
+        codigo_local: 'DEMO-0001',
+        nombre: 'Escuela Ficticia CIALPA - Modelo Integral',
+        syncedAt: new Date().toISOString(),
+      },
+      general: {
+        codigo_local: 'DEMO-0001',
+        nombre_institucion: 'Escuela Ficticia CIALPA - Modelo Integral',
+        departamento: 'Central',
+        distrito: 'Luque',
+        localidad: 'Ykuakaranday',
+        direccion: 'Calle Escuela Modelo y Avenida del Relevamiento',
+        director: 'Directora Demo',
+        latitud: '-25.2678',
+        longitud: '-57.4872',
+      },
+      bloques: {
+        bloque_codigo: 'Bloque 1',
+        estado_bloque: 'Operativo',
+        cantidad_plantas: '2',
+        largo_m: '28',
+        ancho_m: '12',
+        tipo_circulacion: 'Escalera',
+        bloque_observacion: 'Bloque principal de dos pisos, operativo.',
+        tablero_estado: 'Bueno',
+        acometida_tipo: 'Aerea',
+        medidor_estado: 'Propio del bloque',
+        llave_termomagnetica: 'Si',
+        proteccion_diferencial: 'Si',
+        puesta_tierra: 'Si',
+        circuitos_identificados: 'Si',
+        electricidad_observacion: 'Tablero rotulado y accesible.',
+      },
+      __blocks: [
+        {
+          id: 'bloque_demo_a',
+          bloque_codigo: 'Bloque 1',
+          estado_bloque: 'Operativo',
+          cantidad_plantas: '2',
+          largo_m: '28',
+          ancho_m: '12',
+          tipo_circulacion: 'Escalera',
+          bloque_observacion: 'Bloque principal de dos pisos.',
+          tablero_estado: 'Bueno',
+          acometida_tipo: 'Aerea',
+          medidor_estado: 'Propio del bloque',
+          llave_termomagnetica: 'Si',
+          proteccion_diferencial: 'Si',
+          puesta_tierra: 'Si',
+          circuitos_identificados: 'Si',
+        },
+        {
+          id: 'bloque_demo_b',
+          bloque_codigo: 'Bloque 2',
+          estado_bloque: 'Operativo',
+          cantidad_plantas: '1',
+          largo_m: '22',
+          ancho_m: '10',
+          tipo_circulacion: 'No aplica',
+          bloque_observacion: 'Bloque administrativo y aulas iniciales.',
+          tablero_estado: 'Regular',
+          acometida_tipo: 'Compartida con otro bloque',
+          medidor_estado: 'Compartido',
+          llave_termomagnetica: 'Si',
+          proteccion_diferencial: 'No verificable',
+          puesta_tierra: 'No verificable',
+          circuitos_identificados: 'Parcialmente',
+        },
+        {
+          id: 'bloque_demo_c',
+          bloque_codigo: 'Bloque 3',
+          estado_bloque: 'En construccion',
+          cantidad_plantas: '1',
+          largo_m: '18',
+          ancho_m: '9',
+          tipo_circulacion: 'No aplica',
+          bloque_observacion: 'Sector en construccion, sin uso pedagogico.',
+          tablero_estado: 'No existe / no visible',
+          acometida_tipo: 'No existe',
+          medidor_estado: 'No existe',
+          llave_termomagnetica: 'No',
+          proteccion_diferencial: 'No',
+          puesta_tierra: 'No verificable',
+          circuitos_identificados: 'No',
+        },
+      ],
+      __classrooms: [
+        _demoClassroom('aula_demo_a_1', 'bloque_demo_a', 'Piso 1', 'Aula 1', 'Operativa', 7, 5, 74, 96),
+        _demoClassroom('aula_demo_a_2', 'bloque_demo_a', 'Piso 1', 'Aula 2', 'Operativa', 7, 5, 258, 96),
+        _demoClassroom('aula_demo_a_3', 'bloque_demo_a', 'Piso 2', 'Aula 1', 'Operativa', 7, 5, 74, 96),
+        _demoClassroom('aula_demo_a_4', 'bloque_demo_a', 'Piso 2', 'Aula 2', 'Operativa', 7, 5, 258, 96),
+        _demoClassroom('aula_demo_b_1', 'bloque_demo_b', 'Piso 1', 'Aula 1', 'Operativa', 6.5, 5, 80, 118),
+        _demoClassroom('aula_demo_b_2', 'bloque_demo_b', 'Piso 1', 'Aula 2', 'Operativa', 6.5, 5, 270, 118),
+        _demoClassroom('aula_demo_c_1', 'bloque_demo_c', 'Piso 1', 'Aula 1', 'En construccion', 6, 4, 92, 128, true),
+      ],
+      __classroomSketch: _demoClassroom('aula_demo_a_1', 'bloque_demo_a', 'Piso 1', 'Aula 1', 'Operativa', 7, 5, 74, 96),
+      __sanitaries: [
+        _demoSanitary('san_demo_a_1', 'Bloque 1', 'Piso 1', 'Sanitario 1', 548, 116, 'Bueno'),
+        _demoSanitary('san_demo_a_2', 'Bloque 1', 'Piso 2', 'Sanitario 1', 548, 116, 'Regular'),
+        _demoSanitary('san_demo_b_1', 'Bloque 2', 'Piso 1', 'Sanitario 1', 548, 138, 'Bueno'),
+        _demoSanitary('san_demo_c_1', 'Bloque 3', 'Piso 1', 'Sanitario 1', 548, 146, 'Fuera de servicio'),
+      ],
+    };
+  }
+
+  function _demoClassroom(id, blockId, floor, name, estado, length, width, x, y, underConstruction = false) {
+    return {
+      id, blockId, floor, name, estado,
+      length: String(length),
+      width: String(width),
+      openings: underConstruction ? 'Aula en construccion: sin uso, sin mobiliario instalado.' : 'Puerta principal, ventanas laterales, tomas y focos verificados.',
+      objects: [
+        { id: `${id}_room`, type: 'room', x, y, w: 168, h: 120 },
+        { id: `${id}_door`, type: 'door', x: x + 18, y: y + 112, w: 42, h: 8, attached: { side: 'bottom', ratio: .24, offset: 18 }, ficha: { codigo: 'Pta 1', subtipo: 'Con puerta madera', estado: underConstruction ? 'No verificable' : 'Bueno', abre_hacia: 'Interior', bisagra: 'Inicio', observacion: '' } },
+        { id: `${id}_win1`, type: 'window', x: x + 42, y, w: 70, h: 8, attached: { side: 'top', ratio: .5, offset: 42 }, ficha: { codigo: 'Vtna 1', subtipo: 'Corrediza', estado: underConstruction ? 'No verificable' : 'Bueno', alto_m: '1.20' } },
+        { id: `${id}_board`, type: 'board', x: x + 44, y: y + 18, w: 82, h: 24, ficha: { codigo: 'Piz 1', subtipo: 'Acrilico', estado: underConstruction ? 'No tiene' : 'Bueno', material: 'Mixto' } },
+        { id: `${id}_outlet`, type: 'outlet', x: x + 136, y: y + 88, r: 5, ficha: { codigo: 'TC 1', subtipo: 'Doble', estado: underConstruction ? 'No verificable' : 'Bueno', seguridad: 'Seguro', tapa: 'Buena', puesta_tierra: 'Tiene', altura_m: '0.45' } },
+        { id: `${id}_light`, type: 'light', x: x + 84, y: y + 62, r: 7, ficha: { codigo: 'Foco 1', subtipo: 'Panel', estado: underConstruction ? 'No verificable' : 'Bueno', funcionamiento: underConstruction ? 'No verificable' : 'Funciona' } },
+        ...(underConstruction ? [{ id: `${id}_damage`, type: 'damage', x: x + 134, y: y + 18, w: 24, h: 24, ficha: { codigo: 'Obra', subtipo: 'Instalacion expuesta', estado: 'Moderado', prioridad: 'Media', sector: 'Pared', accion_recomendada: 'Observar', observacion: 'Sector en obra, verificar antes de habilitar.' } }] : []),
+      ],
+    };
+  }
+
+  function _demoSanitary(id, bloque, planta, codigo, x, y, estado) {
+    return {
+      id, codigo, bloque, planta,
+      tipo: 'Bateria sanitaria',
+      uso: 'Estudiantes',
+      genero: 'Mixto',
+      inodoros: '2',
+      lavamanos: '1',
+      urinarios: '1',
+      duchas: '0',
+      largo_m: '4.2',
+      ancho_m: '2.8',
+      accesible: 'Si, parcial',
+      agua: estado === 'Fuera de servicio' ? 'No' : 'Si',
+      desague: 'Camara septica',
+      ventilacion: 'Natural',
+      iluminacion: 'Natural',
+      estado,
+      limpieza: estado === 'Bueno' ? 'Buena' : 'Regular',
+      privacidad: 'Adecuada',
+      observacion: estado === 'Fuera de servicio' ? 'Sanitario asociado a bloque en construccion.' : 'Sanitario con artefactos cargados para ejemplo.',
+      evidencias: [],
+      plano: { cabinas: [{ id: `${id}_cab1`, label: 'Cbn 1', artefacto: 'Inodoro', estado }, { id: `${id}_cab2`, label: 'Cbn 2', artefacto: 'Inodoro', estado }] },
+      objects: [
+        { id: `${id}_room`, type: 'sanitary-room', x, y, w: 126, h: 92 },
+        { id: `${id}_door`, type: 'door', x: x + 12, y: y + 84, w: 34, h: 8, attached: { side: 'bottom', ratio: .22, offset: 12 }, ficha: { codigo: 'Pta 1', subtipo: 'Con puerta madera', estado, abre_hacia: 'Exterior', bisagra: 'Inicio' } },
+        { id: `${id}_stall1`, type: 'stall', x: x + 10, y: y + 12, w: 46, h: 56, ficha: { codigo: 'Cbn 1', artefacto: 'Inodoro', estado, cabinId: `${id}_cab1`, fixtures: [{ id: 'toilet', estado }, { id: 'cistern_low', estado }, { id: 'paper_holder', estado }] } },
+        { id: `${id}_stall2`, type: 'stall', x: x + 62, y: y + 12, w: 46, h: 56, ficha: { codigo: 'Cbn 2', artefacto: 'Inodoro', estado, cabinId: `${id}_cab2`, fixtures: [{ id: 'toilet', estado }, { id: 'cistern_high', estado }, { id: 'paper_holder', estado }] } },
+        { id: `${id}_sink`, type: 'sink', x: x + 78, y: y + 72, w: 30, h: 18, ficha: { codigo: 'LV 1', subtipo: 'Lavamanos', estado } },
+        { id: `${id}_urinal`, type: 'urinal', x: x + 50, y: y + 72, w: 22, h: 18, ficha: { codigo: 'UR 1', subtipo: 'Urinario', estado } },
+      ],
+    };
+  }
+
+  const _EXAMPLE_SCHOOL = {
+    id_escuela: EXAMPLE_SCHOOL_ID,
+    codigo_local: 'DEMO-0001',
+    nombre: 'Escuela Ficticia CIALPA - Modelo Integral',
+    departamento: 'Central',
+    distrito: 'Luque',
+    localidad: 'Ykuakaranday',
+    zona: 'Urbana',
+    estado_relevamiento: 'en_curso',
+    latitud: -25.2678,
+    longitud: -57.4872,
+    encuestador_asignado: 'juan.perez',
+    supervisor_asignado: 'Supervisor Demo',
+    es_ejemplo: true,
+    resumen_ejemplo: '3 bloques, Bloque 1 con 2 pisos, sanitarios en cada piso y aula en construccion.',
+    mec_draft: _exampleMecDraft(),
+  };
+
+  function _withExampleSchool(escuelas = []) {
+    const rows = Array.isArray(escuelas) ? escuelas : [];
+    return [_EXAMPLE_SCHOOL, ...rows.filter(item => item.id_escuela !== EXAMPLE_SCHOOL_ID && item.codigo_local !== _EXAMPLE_SCHOOL.codigo_local)];
+  }
 
   const _DEMO_USERS = [
     { usuario: 'admin', password: 'admin123', nombres: 'Admin', apellidos: 'Sistema', rol: 'admin', id_usuario: 'u_admin' },
@@ -19,6 +208,7 @@ const API = (() => {
   ];
 
   const _DEMO_ESCUELAS = [
+    _EXAMPLE_SCHOOL,
     { id_escuela: 'ESC_0010046', codigo_local: '0010046', nombre: 'ESCUELA BÁSICA N° 3 REPÚBLICA DEL BRASIL', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'pendiente', latitud: -25.2968, longitud: -57.6309, encuestador_asignado: '', supervisor_asignado: '' },
     { id_escuela: 'ESC_0011004', codigo_local: '0011004', nombre: 'ESCUELA BÁSICA N° 2 CELSA SPERATTI', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'en_curso', latitud: -25.2830, longitud: -57.6350, encuestador_asignado: 'Juan Pérez', supervisor_asignado: 'María González' },
     { id_escuela: 'ESC_0011007', codigo_local: '0011007', nombre: 'COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO', departamento: 'Capital', distrito: 'Asunción', localidad: 'Asunción', zona: 'Urbana', estado_relevamiento: 'finalizada', latitud: -25.2890, longitud: -57.6170, encuestador_asignado: 'Juan Pérez', supervisor_asignado: 'María González' },
@@ -29,14 +219,14 @@ const API = (() => {
   const _DEMO_MODULOS = [];
 
   const _DEMO_STATS = {
-    total: 4,
+    total: 5,
     pendiente: 2,
-    en_curso: 1,
+    en_curso: 2,
     finalizada: 1,
     incidencia: 0,
-    porcentaje_avance: 25,
-    por_departamento: [{ departamento: 'Capital', total: 4, finalizada: 1, en_curso: 1 }],
-    por_zona: [{ zona: 'Urbana', total: 4 }],
+    porcentaje_avance: 20,
+    por_departamento: [{ departamento: 'Central', total: 1, finalizada: 0, en_curso: 1 }, { departamento: 'Capital', total: 4, finalizada: 1, en_curso: 1 }],
+    por_zona: [{ zona: 'Urbana', total: 5 }],
     por_encuestador: [
       { encuestador: 'Juan Pérez', asignadas: 2, finalizadas: 1 },
       { encuestador: 'María González', asignadas: 0, finalizadas: 0 },
@@ -345,8 +535,15 @@ const API = (() => {
     throw new Error(msg);
   }
 
-  async function getEscuelas(filters = {}) { return call('getEscuelas', 'GET', filters, { skipLoading: true }); }
-  async function getEscuela(id) { return call('getEscuela', 'GET', { id_escuela: id }); }
+  async function getEscuelas(filters = {}) {
+    const result = await call('getEscuelas', 'GET', filters, { skipLoading: true });
+    if (result.status === 'ok') result.data = _withExampleSchool(result.data || []);
+    return result;
+  }
+  async function getEscuela(id) {
+    if (id === EXAMPLE_SCHOOL_ID || id === _EXAMPLE_SCHOOL.codigo_local) return { status: 'ok', data: _EXAMPLE_SCHOOL };
+    return call('getEscuela', 'GET', { id_escuela: id });
+  }
   async function updateEscuelaEstado(id, estado, observacion = '') { return call('updateEscuelaEstado', 'POST', { id_escuela: id, estado, observacion }); }
   async function asignarEscuela(datos) { return call('asignarEscuela', 'POST', datos); }
 

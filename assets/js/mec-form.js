@@ -276,9 +276,24 @@ const MecFormModule = (() => {
   function _prefillGeneralFromSelectedSchool(force = false) {
     const school = _selectedSchoolFromContext();
     if (!school) return;
-    _data.general = _data.general || {};
     const selectedId = String(school.id_escuela || school.codigo_local || '');
     const changedSchool = selectedId && selectedId !== String(_data.__selectedSchool?.id_escuela || _data.__selectedSchool?.codigo_local || '');
+    if (school.mec_draft && (force || changedSchool || !_data.__selectedSchool?.id_escuela)) {
+      _data = JSON.parse(JSON.stringify(school.mec_draft));
+      _activeModuleId = _data.__activeModuleId || 'general';
+      _activeClassroomId = _data.__activeClassroomId || _data.__classroomSketch?.id || null;
+      _activeSanitaryId = _data.__activeSanitaryId || null;
+      _selectedSketchObjectId = null;
+      _selectedSanitaryObjectId = null;
+      _data.__selectedSchool = {
+        id_escuela: school.id_escuela || '',
+        codigo_local: school.codigo_local || '',
+        nombre: school.nombre || school.nombre_escuela || '',
+        syncedAt: new Date().toISOString(),
+      };
+      return;
+    }
+    _data.general = _data.general || {};
     const mapping = {
       latitud: ['latitud', 'lat', 'latitude'],
       longitud: ['longitud', 'lng', 'lon', 'longitude'],

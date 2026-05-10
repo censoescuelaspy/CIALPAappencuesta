@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.5.27</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.5.28</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.5.27</strong>
+      Edición vigente<br><strong class="app-version">v2.5.28</strong>
     </div>
   </aside>
 
@@ -151,6 +151,20 @@
           <div class="inicio-hero">
             <h2>Bienvenido al Sistema de Relevamiento Escolar</h2>
             <p>Gestioná las encuestas de infraestructura escolar desde este panel.</p>
+          </div>
+
+          <div class="card" id="inicio-escuela-ejemplo">
+            <div class="card__header">
+              <h4 class="card__title">Escuela ficticia de ejemplo</h4>
+              <span class="badge badge--in-progress">Datos completos</span>
+            </div>
+            <p><strong>Escuela Ficticia CIALPA - Modelo Integral</strong></p>
+            <p class="text-muted">Incluye 3 bloques, Bloque 1 con 2 pisos, aulas operativas, aula en construccion y sanitarios cargados en cada piso.</p>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="SurveyModule.selectEscuela('ESC_DEMO_CIALPA')">Abrir ejemplo</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('mapa')">Ver en mapa</button>
+              <button class="btn btn-outline" onclick="SurveyModule.selectEscuela('ESC_DEMO_CIALPA'); setTimeout(() => AppController.showModule('mec'), 150)">Ver cuestionario MEC</button>
+            </div>
           </div>
 
           <div class="inicio-grid">
@@ -192,7 +206,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.5.27</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.5.28</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
