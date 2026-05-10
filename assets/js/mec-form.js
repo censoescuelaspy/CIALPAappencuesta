@@ -447,12 +447,17 @@ const MecFormModule = (() => {
         <section class="mec-questionnaire">
           <div class="mec-stage-toolbar">
             <button class="btn btn-outline btn-sm" onclick="MecFormModule.previousModule()">Anterior</button>
-            <label class="mec-stage-select">
+            <div class="mec-stage-picker">
               <span>Etapa</span>
-              <select class="form-control form-control-sm" onchange="MecFormModule.selectModule(this.value)">
-                ${implemented.map(module => `<option value="${_escape(module.id)}" ${module.id === _activeModuleId ? 'selected' : ''}>${_escape(module.title)}</option>`).join('')}
-              </select>
-            </label>
+              <div class="mec-stage-buttons">
+                ${implemented.map(module => `
+                  <button class="mec-stage-button ${module.id === _activeModuleId ? 'mec-stage-button--active' : ''}" type="button"
+                    data-stage-module="${_escape(module.id)}"
+                    onclick="MecFormModule.selectModule('${_escape(module.id)}')">
+                    ${_escape(module.title)}
+                  </button>`).join('')}
+              </div>
+            </div>
             <span class="mec-stage-current">${_escape(activeModule?.description || `${implemented.length} etapas activas`)}</span>
             <button class="btn btn-outline btn-sm" onclick="MecFormModule.validate()">Validar</button>
             <button class="btn btn-primary btn-sm" onclick="MecFormModule.nextModule()">Siguiente</button>
@@ -773,9 +778,11 @@ const MecFormModule = (() => {
               </div>
               <div class="form-group form-group--wide">
                 <label>Estado del aula</label>
-                <select class="form-control" data-sketch-field="estado">
-                  ${['Operativa', 'En construccion', 'Derrumbada / colapsada', 'Clausurada', 'Sin uso', 'No verificable'].map(option => `<option value="${_escape(option)}" ${sketch.estado === option ? 'selected' : ''}>${_escape(option)}</option>`).join('')}
-                </select>
+                ${_buttonChoiceGroup(
+                  ['Operativa', 'En construccion', 'Derrumbada / colapsada', 'Clausurada', 'Sin uso', 'No verificable'],
+                  sketch.estado || '',
+                  option => `MecFormModule.setSketchField('estado', '${_escape(option)}')`
+                )}
               </div>
               <div class="form-group">
                 <label>Largo</label>
@@ -1400,9 +1407,13 @@ const MecFormModule = (() => {
   function _blockOptions(selected) {
     _ensureBlocks();
     return `
-      <select class="form-control" data-sketch-field="blockId">
-        ${(_data.__blocks || []).map((block, index) => `<option value="${_escape(block.id)}" ${block.id === selected ? 'selected' : ''}>${_escape(block.bloque_codigo || _numberedLabel('Bloque', index))}</option>`).join('')}
-      </select>`;
+      <div class="mec-choice-buttons mec-choice-buttons--compact">
+        ${(_data.__blocks || []).map((block, index) => `
+          <button class="mec-choice ${block.id === selected ? 'mec-choice--active' : ''}" type="button"
+            onclick="MecFormModule.setSketchField('blockId', '${_escape(block.id)}')">
+            ${_escape(block.bloque_codigo || _numberedLabel('Bloque', index))}
+          </button>`).join('')}
+      </div>`;
   }
 
   function selectBlock(id) {
@@ -2107,14 +2118,17 @@ const MecFormModule = (() => {
       return `
         <div class="form-group">
           <label>${_escape(label)}</label>
-          <select class="form-control"
-            onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', this.value)">
+          <div class="mec-choice-buttons mec-choice-buttons--compact">
             ${(_data.__blocks || []).map((block, index) => {
               const labelValue = block.bloque_codigo || _numberedLabel('Bloque', index);
               const selected = _matchesBlockReference(item.bloque, block);
-              return `<option value="${_escape(labelValue)}" ${selected ? 'selected' : ''}>${_escape(labelValue)}</option>`;
+              return `
+                <button class="mec-choice ${selected ? 'mec-choice--active' : ''}" type="button"
+                  onclick="MecFormModule.setSanitaryValue('${_escape(item.id)}', '${_escape(key)}', '${_escape(labelValue)}')">
+                  ${_escape(labelValue)}
+                </button>`;
             }).join('')}
-          </select>
+          </div>
         </div>`;
     }
     return `
@@ -2181,17 +2195,21 @@ const MecFormModule = (() => {
           </div>
           <div class="form-group">
             <label>Estado cabina</label>
-            <select class="form-control"
-              onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'estado', this.value)">
-              ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${selected.ficha?.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
-            </select>
+            ${_buttonChoiceGroup(
+              SANITARY_FIXTURE_STATES,
+              selected.ficha?.estado || '',
+              state => `MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'estado', '${_escape(state)}')`,
+              'mec-choice-buttons--compact'
+            )}
           </div>
           <div class="form-group">
             <label>Puerta</label>
-            <select class="form-control"
-              onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'puerta', this.value)">
-              ${['Con puerta', 'Sin puerta', 'Cortina', 'Danada', 'No verificable'].map(option => `<option value="${_escape(option)}" ${selected.ficha?.puerta === option ? 'selected' : ''}>${_escape(option)}</option>`).join('')}
-            </select>
+            ${_buttonChoiceGroup(
+              ['Con puerta', 'Sin puerta', 'Cortina', 'Dañada', 'No verificable'],
+              selected.ficha?.puerta || '',
+              option => `MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'puerta', '${_escape(option)}')`,
+              'mec-choice-buttons--compact'
+            )}
           </div>
         </div>
         <div class="mec-repeat-toolbar">
@@ -2240,17 +2258,21 @@ const MecFormModule = (() => {
             </div>
             <div class="form-group">
               <label>Estado cabina</label>
-              <select class="form-control"
-                onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'estado', this.value, false)">
-                ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${stall.ficha.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
-              </select>
+              ${_buttonChoiceGroup(
+                SANITARY_FIXTURE_STATES,
+                stall.ficha.estado || '',
+                state => `MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'estado', '${_escape(state)}', false)`,
+                'mec-choice-buttons--compact'
+              )}
             </div>
             <div class="form-group">
               <label>Puerta</label>
-              <select class="form-control"
-                onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'puerta', this.value, false)">
-                ${['Con puerta', 'Sin puerta', 'Cortina', 'Danada', 'No verificable'].map(option => `<option value="${_escape(option)}" ${stall.ficha.puerta === option ? 'selected' : ''}>${_escape(option)}</option>`).join('')}
-              </select>
+              ${_buttonChoiceGroup(
+                ['Con puerta', 'Sin puerta', 'Cortina', 'Dañada', 'No verificable'],
+                stall.ficha.puerta || '',
+                option => `MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'puerta', '${_escape(option)}', false)`,
+                'mec-choice-buttons--compact'
+              )}
             </div>
           </div>
           <div class="mec-cabin-add-row">
@@ -2346,10 +2368,12 @@ const MecFormModule = (() => {
           </div>
           <div class="form-group">
             <label>Estado</label>
-            <select class="form-control"
-              onchange="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(selected.id)}', 'estado', this.value)">
-              ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${selected.ficha.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
-            </select>
+            ${_buttonChoiceGroup(
+              SANITARY_FIXTURE_STATES,
+              selected.ficha.estado || '',
+              state => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(selected.id)}', 'estado', '${_escape(state)}')`,
+              'mec-choice-buttons--compact'
+            )}
           </div>
         </div>
         <label class="mec-label"><span>Observacion</span></label>
@@ -2370,10 +2394,12 @@ const MecFormModule = (() => {
     return `
       <div class="mec-cabin-fixture">
         <strong>${_escape(cfg.label)}</strong>
-        <select class="form-control form-control-sm"
-          onchange="MecFormModule.setSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', '${_escape(fixture.id)}', 'estado', this.value)">
-          ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${fixture.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
-        </select>
+        ${_buttonChoiceGroup(
+          SANITARY_FIXTURE_STATES,
+          fixture.estado || '',
+          state => `MecFormModule.setSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', '${_escape(fixture.id)}', 'estado', '${_escape(state)}')`,
+          'mec-choice-buttons--compact mec-choice-buttons--tiny'
+        )}
         <button class="btn btn-xs btn-outline" type="button"
           onclick="MecFormModule.removeSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', '${_escape(fixture.id)}')">Quitar</button>
       </div>`;
@@ -2854,7 +2880,7 @@ const MecFormModule = (() => {
     root.querySelectorAll('.mec-field').forEach(fieldEl => {
       const moduleId = fieldEl.dataset.module;
       const fieldId = fieldEl.dataset.field;
-      const input = fieldEl.querySelector('input, select, textarea');
+      const input = fieldEl.querySelector('input, textarea');
       if (!input) return;
 
       const schemaChoices = fieldEl.querySelectorAll('.mec-schema-choice');
@@ -5801,10 +5827,11 @@ const MecFormModule = (() => {
   function _refreshDynamicState() {
     if (!_initialized && !document.getElementById('mec-form-root')) return;
     const activeModule = MEC_SCHEMA.modules.find(module => module.id === _activeModuleId);
-    const stageSelect = document.querySelector('.mec-stage-select select');
     const stageCurrent = document.querySelector('.mec-stage-current');
-    if (stageSelect && stageSelect.value !== _activeModuleId) stageSelect.value = _activeModuleId;
     if (stageCurrent && activeModule) stageCurrent.textContent = activeModule.description || activeModule.title || '';
+    document.querySelectorAll('.mec-stage-button').forEach(button => {
+      button.classList.toggle('mec-stage-button--active', button.dataset.stageModule === _activeModuleId);
+    });
 
     MEC_SCHEMA.modules.forEach(module => {
       const moduleEl = document.querySelector(`.mec-module[data-module="${module.id}"]`);
@@ -6006,6 +6033,28 @@ const MecFormModule = (() => {
     _updateSketchStatus();
   }
 
+  function setSketchField(field, value, rerender = true) {
+    _data.__classroomSketch = _data.__classroomSketch || {};
+    if (field === 'floorNumber') _setActiveFloor(value);
+    else _data.__classroomSketch[field] = value;
+    if (field === 'blockId') {
+      _data.__activeBlockId = value;
+      const block = _blockById(value);
+      if (block) {
+        const { id: _id, ...values } = block;
+        _data.bloques = values;
+      }
+    }
+    if (_activeClassroomId || _data.__classroomSketch?.id) _syncActiveClassroomFromSketch();
+    _saveDraft(false);
+    if (rerender) {
+      _render();
+    } else {
+      _updateSketchStatus();
+      renderSchoolPlan();
+    }
+  }
+
   function editSelectedSketchObject() {
     openSketchObjectFicha(_selectedSketchObjectId);
   }
@@ -6204,6 +6253,17 @@ const MecFormModule = (() => {
         <strong>${_escape(value)}</strong>
         <small>${_escape(note || '')}</small>
       </article>`;
+  }
+
+  function _buttonChoiceGroup(options, selected, onClickForOption, className = '') {
+    return `
+      <div class="mec-choice-buttons ${_escape(className)}">
+        ${options.map(option => `
+          <button class="mec-choice ${_choiceToneClass(option)} ${selected === option ? 'mec-choice--active' : ''}" type="button"
+            onclick="${_escape(onClickForOption(option))}">
+            ${_escape(option)}
+          </button>`).join('')}
+      </div>`;
   }
 
   function _renderPlanBuilderPanel() {
@@ -8591,6 +8651,7 @@ const MecFormModule = (() => {
     exportJson,
     toggleModule,
     setSketchTool,
+    setSketchField,
     selectBlock,
     selectBlockForClassrooms,
     selectBlockForSanitaries,

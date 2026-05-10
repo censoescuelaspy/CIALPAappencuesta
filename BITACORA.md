@@ -4,6 +4,40 @@
 
 ---
 
+## Sesión de reemplazo de desplegables por botones - 2026-05-10 - v2.5.33
+
+### Objetivo
+- Hacer la app más ágil para carga de campo, reduciendo fricción táctil y evitando listas desplegables en decisiones frecuentes.
+
+### Cambios implementados
+- Eliminados los `<select>` visibles de `index.html`, `mec-ficha.html` y de los módulos JavaScript de la app.
+- Agregado sistema genérico `UI.setButtonChoice()` / `UI.refreshButtonChoices()` para que los botones mantengan compatibilidad con formularios y filtros existentes.
+- Reemplazados por botones:
+  - filtros del mapa: departamento, zona, encuestador y estado;
+  - filtros de estadísticas: departamento y encuestador;
+  - incidencia: tipo de incidencia y prioridad;
+  - encuestador: zona asignada y rol;
+  - formulario MEC: etapa, bloque del aula, estado del aula, bloque del sanitario;
+  - sanitarios: estado de cabina, puerta de cabina, estado de objeto sanitario y estado de componentes internos.
+- La ficha gráfica auxiliar (`mec-ficha.html`) también pasa a botones para departamento, distrito, bloque, tipo/situación de espacio, tipo/ubicación de elemento y cercado.
+- Corregidas etiquetas visibles de daño/puerta a `Daño`, `Daños` y `Dañada`.
+- Los filtros del mapa aplican automáticamente al tocar un botón.
+- Los formularios conservan valores en `input hidden`, para no romper `FormData`, guardado ni validaciones existentes.
+- Version y cache actualizados a `v2.5.33`.
+
+### Validaciones ejecutadas
+- `rg -n '<select' index.html mec-ficha.html assets/js assets/css` sin resultados.
+- `node --check assets/js/app.js`
+- `node --check assets/js/map.js`
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/mec-ficha.js`
+- `node --check assets/js/admin.js`
+- `node --check assets/js/stats.js`
+- `node --check assets/js/config.js`
+- `git diff --check`
+
+---
+
 ## Sesión de optimización del registro arquitectónico - 2026-05-10 - v2.5.32
 
 ### Enfoque corregido

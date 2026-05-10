@@ -441,7 +441,7 @@ const MapModule = (() => {
       row.tiempo_estimado_min = row.tiempo_estimado_min || '45';
     });
     loadMarkers(_escuelas);
-    populateFilterDropdowns();
+    populateFilterButtons();
     UI.showToast(`Asignacion local generada en ${n} sectores. Pendiente persistir en Sheets.`, 'success', 6000);
   }
 
@@ -627,21 +627,25 @@ const MapModule = (() => {
     return _filteredEscuelas;
   }
 
-  // ── Populate filter dropdowns ─────────────────────────────────────────────
+  // ── Populate filter buttons ───────────────────────────────────────────────
 
-  function populateFilterDropdowns() {
+  function populateFilterButtons() {
     const departamentos = [...new Set(_escuelas.map(e => e.departamento).filter(Boolean))].sort();
     const encuestadores = [...new Set(_escuelas.map(e => e.encuestador_asignado).filter(Boolean))].sort();
 
-    _populateSelect('filter-departamento', departamentos, 'Todos los departamentos');
-    _populateSelect('filter-encuestador', encuestadores, 'Todos los encuestadores');
+    _populateButtonChoices('filter-departamento', departamentos, 'Todos los departamentos');
+    _populateButtonChoices('filter-encuestador', encuestadores, 'Todos los encuestadores');
   }
 
-  function _populateSelect(id, options, placeholder) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.innerHTML = `<option value="">${_escape(placeholder)}</option>` +
-      options.map(o => `<option value="${_escape(o)}">${_escape(o)}</option>`).join('');
+  function _populateButtonChoices(id, options, placeholder) {
+    const input = document.getElementById(id);
+    const list = document.querySelector(`[data-choice-list="${id}"]`);
+    if (!input || !list) return;
+    list.innerHTML = [
+      `<button class="choice-button" type="button" data-choice-target="${_escape(id)}" data-choice-value="">${_escape(placeholder)}</button>`,
+      ...options.map(option => `<button class="choice-button" type="button" data-choice-target="${_escape(id)}" data-choice-value="${_escape(option)}">${_escape(option)}</button>`),
+    ].join('');
+    UI.refreshButtonChoices(list);
   }
 
   return {
@@ -656,7 +660,7 @@ const MapModule = (() => {
     getEscuelas,
     getSelectedEscuela,
     getFiltered,
-    populateFilterDropdowns,
+    populateFilterButtons,
     toggleRoutes,
     promptAutoAssign,
     autoAssignClusters,

@@ -182,6 +182,7 @@ const AdminModule = (() => {
       if (form.elements['activo']) {
         form.elements['activo'].checked = enc?.activo === 'true' || enc?.activo === true || isNew;
       }
+      UI.refreshButtonChoices(form);
     }
 
     UI.openModal('modal-encuestador');

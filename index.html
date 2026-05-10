@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.5.32</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.5.33</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.5.32</strong>
+      Edición vigente<br><strong class="app-version">v2.5.33</strong>
     </div>
   </aside>
 
@@ -206,7 +206,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.5.32</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.5.33</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -245,25 +245,29 @@
               <form id="map-filter-form">
                 <input id="filter-search" type="text" class="form-control form-control-sm"
                   placeholder="Buscar escuela..." />
-                <select id="filter-departamento" class="form-control form-control-sm">
-                  <option value="">Todos los departamentos</option>
-                </select>
-                <select id="filter-zona" class="form-control form-control-sm">
-                  <option value="">Todas las zonas</option>
-                  <option value="Urbana">Urbana</option>
-                  <option value="Rural">Rural</option>
-                  <option value="Rural Remota">Rural Remota</option>
-                </select>
-                <select id="filter-encuestador" class="form-control form-control-sm">
-                  <option value="">Todos los encuestadores</option>
-                </select>
-                <select id="filter-estado" class="form-control form-control-sm">
-                  <option value="">Todos los estados</option>
-                  <option value="pendiente">Pendiente</option>
-                  <option value="en_curso">En Curso</option>
-                  <option value="finalizada">Finalizada</option>
-                  <option value="incidencia">Con Incidencia</option>
-                </select>
+                <input id="filter-departamento" type="hidden" value="" />
+                <div class="choice-button-strip" data-choice-list="filter-departamento">
+                  <button class="choice-button choice-button--active" type="button" data-choice-target="filter-departamento" data-choice-value="">Todos los departamentos</button>
+                </div>
+                <input id="filter-zona" type="hidden" value="" />
+                <div class="choice-button-strip">
+                  <button class="choice-button choice-button--active" type="button" data-choice-target="filter-zona" data-choice-value="">Todas las zonas</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-zona" data-choice-value="Urbana">Urbana</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-zona" data-choice-value="Rural">Rural</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-zona" data-choice-value="Rural Remota">Rural Remota</button>
+                </div>
+                <input id="filter-encuestador" type="hidden" value="" />
+                <div class="choice-button-strip" data-choice-list="filter-encuestador">
+                  <button class="choice-button choice-button--active" type="button" data-choice-target="filter-encuestador" data-choice-value="">Todos los encuestadores</button>
+                </div>
+                <input id="filter-estado" type="hidden" value="" />
+                <div class="choice-button-strip">
+                  <button class="choice-button choice-button--active" type="button" data-choice-target="filter-estado" data-choice-value="">Todos los estados</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="pendiente">Pendiente</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="en_curso">En Curso</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="finalizada">Finalizada</button>
+                  <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="incidencia">Incidencia</button>
+                </div>
               </form>
               <div class="map-sidebar__filter-btns">
                 <button id="map-filter-apply" class="btn btn-sm btn-primary" style="flex:1;">Filtrar</button>
@@ -513,15 +517,17 @@
               </div>
               <div class="form-group" style="margin:0;">
                 <label>Departamento</label>
-                <select name="departamento" class="form-control form-control-sm">
-                  <option value="">Todos</option>
-                </select>
+                <input id="stats-filter-departamento" name="departamento" type="hidden" value="" />
+                <div class="choice-button-strip">
+                  <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-departamento" data-choice-value="">Todos</button>
+                </div>
               </div>
               <div class="form-group" style="margin:0;">
                 <label>Encuestador</label>
-                <select name="encuestador" class="form-control form-control-sm">
-                  <option value="">Todos</option>
-                </select>
+                <input id="stats-filter-encuestador" name="encuestador" type="hidden" value="" />
+                <div class="choice-button-strip">
+                  <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-encuestador" data-choice-value="">Todos</button>
+                </div>
               </div>
               <div style="display:flex;gap:.5rem;">
                 <button id="stats-filter-apply" type="button" class="btn btn-sm btn-primary">Filtrar</button>
@@ -755,24 +761,25 @@
         <input type="hidden" name="id_escuela" />
         <div class="form-group">
           <label>Tipo de incidencia *</label>
-          <select name="tipo_incidencia" class="form-control" required>
-            <option value="">Seleccionar...</option>
-            <option>Escuela cerrada</option>
-            <option>Acceso bloqueado</option>
-            <option>Director/a ausente</option>
-            <option>Formulario incompleto</option>
-            <option>Problema técnico</option>
-            <option>Seguridad / riesgo</option>
-            <option>Otra</option>
-          </select>
+          <input id="inc-tipo" name="tipo_incidencia" type="hidden" value="" />
+          <div class="choice-button-grid">
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Escuela cerrada">Escuela cerrada</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Acceso bloqueado">Acceso bloqueado</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Director/a ausente">Director/a ausente</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Formulario incompleto">Formulario incompleto</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Problema técnico">Problema técnico</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Seguridad / riesgo">Seguridad / riesgo</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Otra">Otra</button>
+          </div>
         </div>
         <div class="form-group">
           <label>Prioridad *</label>
-          <select name="prioridad" class="form-control" required>
-            <option value="alta">Alta</option>
-            <option value="media" selected>Media</option>
-            <option value="baja">Baja</option>
-          </select>
+          <input id="inc-prioridad" name="prioridad" type="hidden" value="media" />
+          <div class="choice-button-strip">
+            <button class="choice-button choice-button--danger" type="button" data-choice-target="inc-prioridad" data-choice-value="alta">Alta</button>
+            <button class="choice-button choice-button--warning choice-button--active" type="button" data-choice-target="inc-prioridad" data-choice-value="media">Media</button>
+            <button class="choice-button choice-button--success" type="button" data-choice-target="inc-prioridad" data-choice-value="baja">Baja</button>
+          </div>
         </div>
         <div class="form-group">
           <label>Descripción *</label>
@@ -838,20 +845,22 @@
         <div class="form-row">
           <div class="form-group">
             <label>Zona asignada</label>
-            <select name="zona_asignada" class="form-control">
-              <option value="">Sin asignar</option>
-              <option>Urbana</option>
-              <option>Rural</option>
-              <option>Rural Remota</option>
-            </select>
+            <input id="enc-zona" name="zona_asignada" type="hidden" value="" />
+            <div class="choice-button-strip">
+              <button class="choice-button choice-button--active" type="button" data-choice-target="enc-zona" data-choice-value="">Sin asignar</button>
+              <button class="choice-button" type="button" data-choice-target="enc-zona" data-choice-value="Urbana">Urbana</button>
+              <button class="choice-button" type="button" data-choice-target="enc-zona" data-choice-value="Rural">Rural</button>
+              <button class="choice-button" type="button" data-choice-target="enc-zona" data-choice-value="Rural Remota">Rural Remota</button>
+            </div>
           </div>
           <div class="form-group">
             <label>Rol</label>
-            <select name="rol" class="form-control">
-              <option value="encuestador">Encuestador</option>
-              <option value="supervisor">Supervisor</option>
-              <option value="admin">Admin</option>
-            </select>
+            <input id="enc-rol" name="rol" type="hidden" value="encuestador" />
+            <div class="choice-button-strip">
+              <button class="choice-button choice-button--active" type="button" data-choice-target="enc-rol" data-choice-value="encuestador">Encuestador</button>
+              <button class="choice-button" type="button" data-choice-target="enc-rol" data-choice-value="supervisor">Supervisor</button>
+              <button class="choice-button" type="button" data-choice-target="enc-rol" data-choice-value="admin">Admin</button>
+            </div>
           </div>
           <div class="form-group" style="display:flex;align-items:center;gap:.5rem;padding-top:1.5rem;">
             <input type="checkbox" name="activo" id="enc-activo" checked style="width:auto;" />

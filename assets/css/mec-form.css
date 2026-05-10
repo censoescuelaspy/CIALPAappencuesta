@@ -236,8 +236,8 @@
   line-height: 1.25;
 }
 
-.mec-stage-select {
-  flex: 0 1 220px;
+.mec-stage-picker {
+  flex: 1 1 320px;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: .45rem;
@@ -245,17 +245,43 @@
   margin: 0;
 }
 
-.mec-stage-select span {
+.mec-stage-picker span {
   color: #415068;
   font-size: .68rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.mec-stage-select .form-control {
-  min-height: 40px;
-  padding-block: .35rem;
-  font-weight: 800;
+.mec-stage-buttons {
+  display: flex;
+  gap: .35rem;
+  overflow-x: auto;
+  padding-bottom: .1rem;
+  scrollbar-width: thin;
+}
+
+.mec-stage-button {
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: .45rem .62rem;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: .74rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mec-stage-button:hover {
+  border-color: #8fb0d3;
+  background: #f1f7ff;
+}
+
+.mec-stage-button--active {
+  border-color: #173f68;
+  background: #173f68;
+  color: #fff;
 }
 
 .mec-module {
@@ -706,6 +732,15 @@
   gap: .5rem;
 }
 
+.mec-choice-buttons--compact {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: .32rem;
+}
+
+.mec-choice-buttons--tiny {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+
 .mec-choice {
   min-height: 46px;
   padding: .62rem .7rem;
@@ -1022,6 +1057,18 @@
   background: #fff;
 }
 
+.mec-choice-buttons--compact .mec-choice {
+  min-height: 36px;
+  padding: .42rem .48rem;
+  font-size: .75rem;
+}
+
+.mec-choice-buttons--tiny .mec-choice {
+  min-height: 30px;
+  padding: .28rem .34rem;
+  font-size: .66rem;
+}
+
 .mec-sanitary-cabin-panel {
   margin: .65rem 0 .45rem;
   padding: .65rem;
@@ -1095,7 +1142,7 @@
 
 .mec-cabin-fixture {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(120px, 150px) auto;
+  grid-template-columns: minmax(120px, .75fr) minmax(210px, 1.4fr) auto;
   align-items: center;
   gap: .45rem;
   padding: .45rem;
@@ -1693,7 +1740,7 @@
     font-size: .76rem;
   }
 
-  .mec-stage-select {
+  .mec-stage-picker {
     flex: 1 1 210px;
   }
 
@@ -2073,7 +2120,7 @@
     font-size: .68rem;
   }
 
-  .mec-stage-select {
+  .mec-stage-picker {
     flex: 1 1 100%;
     grid-template-columns: 42px minmax(0, 1fr);
   }
@@ -2284,7 +2331,7 @@
     grid-template-columns: 1fr;
   }
 
-  .mec-stage-select,
+  .mec-stage-picker,
   .mec-stage-current {
     flex: 1 1 100%;
   }

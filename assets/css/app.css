@@ -524,8 +524,67 @@ body.sidebar-auto-hidden #sidebar.sidebar--open {
 .form-control-sm { padding: .3rem .6rem; font-size: .8rem; }
 .form-control::placeholder { color: var(--color-text-muted); }
 
-select.form-control { cursor: pointer; }
 textarea.form-control { resize: vertical; min-height: 80px; }
+
+.choice-button-strip,
+.choice-button-grid {
+  display: grid;
+  gap: .4rem;
+}
+
+.choice-button-strip {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.choice-button-grid {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.map-sidebar__filters .choice-button-strip {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choice-button {
+  min-height: 36px;
+  padding: .42rem .55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  font-size: .78rem;
+  font-weight: 750;
+  line-height: 1.15;
+  cursor: pointer;
+  text-align: center;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
+}
+
+.choice-button:hover {
+  border-color: var(--color-primary);
+  background: #fff7ed;
+}
+
+.choice-button--active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .14);
+}
+
+.choice-button--danger.choice-button--active {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+}
+
+.choice-button--warning.choice-button--active {
+  border-color: var(--color-warning);
+  background: var(--color-warning);
+}
+
+.choice-button--success.choice-button--active {
+  border-color: var(--color-success);
+  background: var(--color-success);
+}
 
 .form-row {
   display: grid;
@@ -2134,7 +2193,6 @@ td {
 
   .form-control,
   .form-control-sm,
-  select.form-control,
   textarea.form-control {
     min-height: 34px;
     padding: .36rem .5rem;

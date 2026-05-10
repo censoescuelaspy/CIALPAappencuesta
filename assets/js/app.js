@@ -15,6 +15,14 @@ const UI = (() => {
   function init() {
     _loadingEl = document.getElementById('global-loading');
     _toastContainer = document.getElementById('toast-container');
+    if (document.body.dataset.choiceButtonsBound !== 'true') {
+      document.body.dataset.choiceButtonsBound = 'true';
+      document.addEventListener('click', event => {
+        const button = event.target.closest('[data-choice-target][data-choice-value]');
+        if (!button) return;
+        setButtonChoice(button.dataset.choiceTarget, button.dataset.choiceValue);
+      });
+    }
   }
 
   function setLoading(visible, message = 'Cargando...') {
@@ -150,6 +158,31 @@ const UI = (() => {
     }
   }
 
+  function setButtonChoice(target, value) {
+    const input = _choiceInput(target);
+    if (!input) return;
+    input.value = value || '';
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    refreshButtonChoices(document);
+  }
+
+  function refreshButtonChoices(root = document) {
+    const scope = root?.querySelectorAll ? root : document;
+    const buttons = [
+      ...(scope.matches?.('[data-choice-target][data-choice-value]') ? [scope] : []),
+      ...scope.querySelectorAll('[data-choice-target][data-choice-value]'),
+    ];
+    buttons.forEach(button => {
+      const input = _choiceInput(button.dataset.choiceTarget);
+      button.classList.toggle('choice-button--active', Boolean(input) && String(input.value || '') === String(button.dataset.choiceValue || ''));
+    });
+  }
+
+  function _choiceInput(target) {
+    if (!target) return null;
+    return document.getElementById(target) || document.querySelector(`[name="${String(target).replace(/"/g, '\\"')}"]`);
+  }
+
   function _escapeHtml(str) {
     return String(str ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   }
@@ -164,6 +197,8 @@ const UI = (() => {
     showPrompt,
     openModal,
     closeModal,
+    setButtonChoice,
+    refreshButtonChoices,
   };
 })();
 
@@ -179,7 +214,10 @@ const IncidenciasModule = (() => {
     const form = modal.querySelector('#form-incidencia');
     if (form) {
       form.elements['id_escuela'].value = id_escuela;
+      form.elements['tipo_incidencia'].value = '';
       form.elements['descripcion'].value = descripcionPrevia;
+      form.elements['prioridad'].value = 'media';
+      UI.refreshButtonChoices(form);
     }
 
     UI.openModal('modal-incidencia');
@@ -701,7 +739,7 @@ const AppController = (() => {
       const result = await API.getEscuelas();
       if (result.status === 'ok') {
         MapModule.loadMarkers(result.data || []);
-        MapModule.populateFilterDropdowns();
+        MapModule.populateFilterButtons();
         MapModule.updateOfflineStatus();
         _bindMapFilters();
       }
@@ -731,6 +769,7 @@ const AppController = (() => {
       clearBtn.dataset.bound = 'true';
       clearBtn.addEventListener('click', () => {
         document.getElementById('map-filter-form')?.reset();
+        UI.refreshButtonChoices(document.getElementById('map-filter-form'));
         MapModule.clearFilters();
       });
     }
@@ -742,6 +781,13 @@ const AppController = (() => {
         document.getElementById('map-filter-apply')?.click();
       });
     }
+    ['filter-departamento', 'filter-zona', 'filter-encuestador', 'filter-estado'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input && input.dataset.bound !== 'true') {
+        input.dataset.bound = 'true';
+        input.addEventListener('change', () => document.getElementById('map-filter-apply')?.click());
+      }
+    });
   }
 
   // ── Logout ─────────────────────────────────────────────────────────────────

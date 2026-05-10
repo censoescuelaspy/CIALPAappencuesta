@@ -32,7 +32,9 @@ const StatsModule = (() => {
     if (resetBtn && resetBtn.dataset.bound !== 'true') {
       resetBtn.dataset.bound = 'true';
       resetBtn.addEventListener('click', () => {
-        document.getElementById('stats-filter-form')?.reset();
+        const form = document.getElementById('stats-filter-form');
+        form?.reset();
+        UI.refreshButtonChoices(form);
         loadStats();
       });
     }
@@ -177,7 +179,7 @@ const StatsModule = (() => {
       ['Puertas', mec.doors || 0, 'Aberturas dibujadas'],
       ['Ventanas', mec.windows || 0, 'Aberturas dibujadas'],
       ['Tomas', mec.outlets || 0, 'Electricidad en croquis'],
-      ['Danos', mec.damages || 0, 'Alertas visibles'],
+      ['Daños', mec.damages || 0, 'Alertas visibles'],
       ['Escaleras', mec.stairs || 0, 'Circulacion vertical'],
       ['Fotos de campos', mec.fieldEvidenceCount || 0, `${mec.evidencePending || 0} pendientes`],
       ['Fotos de objetos', mec.objectEvidenceCount || 0, 'Puertas, ventanas, danos, etc.'],

@@ -26,6 +26,45 @@
 
   const $ = (id) => document.getElementById(id);
 
+  function setChoiceValue(id, value, dispatch = true) {
+    const input = $(id);
+    if (!input) return;
+    input.value = value || "";
+    refreshChoiceButtons(document, id);
+    if (dispatch) input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  function refreshChoiceButtons(root = document, onlyTarget = null) {
+    const scope = root?.querySelectorAll ? root : document;
+    scope.querySelectorAll("[data-choice-target][data-choice-value]").forEach((button) => {
+      const target = button.dataset.choiceTarget;
+      if (onlyTarget && target !== onlyTarget) return;
+      const input = $(target);
+      button.classList.toggle("choice-button--active", Boolean(input) && String(input.value || "") === String(button.dataset.choiceValue || ""));
+      if (input?.disabled) button.disabled = true;
+    });
+  }
+
+  function renderChoiceButtons(containerId, targetId, choices, emptyLabel = null, config = {}) {
+    const container = $(containerId);
+    const input = $(targetId);
+    if (!container || !input) return;
+    const normalized = choices.map((choice) => typeof choice === "string" ? { value: choice, label: choice } : choice);
+    const allChoices = emptyLabel === null ? normalized : [{ value: "", label: emptyLabel, disabled: Boolean(config.disableEmpty) }, ...normalized];
+    container.replaceChildren();
+    allChoices.forEach((choice) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "choice-button";
+      button.textContent = choice.label;
+      button.dataset.choiceTarget = targetId;
+      button.dataset.choiceValue = choice.value || "";
+      button.disabled = Boolean(input.disabled || choice.disabled);
+      container.appendChild(button);
+    });
+    refreshChoiceButtons(container, targetId);
+  }
+
   function text(value) {
     return value === null || value === undefined || value === "" ? "-" : String(value);
   }
@@ -64,6 +103,12 @@
   }
 
   function bindEvents() {
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-choice-target][data-choice-value]");
+      if (!button || button.disabled) return;
+      setChoiceValue(button.dataset.choiceTarget, button.dataset.choiceValue);
+    });
+
     $("settingsBtn")?.addEventListener("click", () => $("settingsDialog")?.showModal());
     $("sidebarToggleBtn")?.addEventListener("click", () => toggleSidebar(true));
     $("saveSettingsBtn")?.addEventListener("click", () => {
@@ -153,15 +198,15 @@
       const response = await fetch(DATA_INDEX_URL);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       state.index = await response.json();
-      const select = $("dptoSelect");
-      state.index.departamentos.forEach((dpto) => {
-        const option = document.createElement("option");
-        option.value = dpto.slug;
-        option.textContent = `${dpto.dpto_desc} (${dpto.total})`;
-        option.dataset.file = dpto.archivo;
-        option.dataset.dpto = dpto.dpto;
-        select.appendChild(option);
-      });
+      renderChoiceButtons(
+        "dptoChoices",
+        "dptoSelect",
+        state.index.departamentos.map((dpto) => ({
+          value: dpto.slug,
+          label: `${dpto.dpto_desc} (${dpto.total})`
+        })),
+        "- Seleccione -"
+      );
       $("localesHint").textContent = `Indice cargado: ${state.index.total_locales} locales.`;
     } catch (error) {
       $("localesHint").textContent = `No se pudo cargar el indice de locales: ${error.message}`;
@@ -169,31 +214,27 @@
   }
 
   async function onDepartamentoChange() {
-    const option = $("dptoSelect").selectedOptions[0];
+    const dpto = state.index?.departamentos?.find((item) => item.slug === $("dptoSelect").value);
     $("localesList").replaceChildren();
-    $("distSelect").replaceChildren();
     $("distSelect").disabled = true;
+    setChoiceValue("distSelect", "", false);
+    renderChoiceButtons("distChoices", "distSelect", [], "Seleccione un departamento", { disableEmpty: true });
     $("searchLocal").disabled = true;
     state.locales = [];
-    if (!option || !option.dataset.file) return;
+    if (!dpto?.archivo) return;
 
     $("localesHint").textContent = "Cargando locales...";
     try {
-      const response = await fetch(`data/${option.dataset.file}`);
+      const response = await fetch(`data/${dpto.archivo}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       state.locales = await response.json();
-      const dpto = state.index.departamentos.find((item) => item.slug === option.value);
-      const allOption = document.createElement("option");
-      allOption.value = "";
-      allOption.textContent = "Todos los distritos";
-      $("distSelect").appendChild(allOption);
-      (dpto?.distritos || []).forEach((dist) => {
-        const distOption = document.createElement("option");
-        distOption.value = dist.dist;
-        distOption.textContent = dist.dist_desc;
-        $("distSelect").appendChild(distOption);
-      });
       $("distSelect").disabled = false;
+      renderChoiceButtons(
+        "distChoices",
+        "distSelect",
+        (dpto.distritos || []).map((dist) => ({ value: dist.dist, label: dist.dist_desc })),
+        "Todos los distritos"
+      );
       $("searchLocal").disabled = false;
       renderLocales();
     } catch (error) {
@@ -369,19 +410,26 @@
 
   function renderBloques() {
     const list = $("bloquesList");
-    const select = $("espacioBloque");
+    const input = $("espacioBloque");
+    const current = input?.value || "";
+    const blockChoices = [];
     list.replaceChildren();
-    select.replaceChildren();
     state.ficha.bloques.forEach((bloque) => {
       list.appendChild(entityItem(`${bloque.nombre} (${bloque.largo_m || "-"} x ${bloque.ancho_m || "-"} m)`, () => {
         state.ficha.bloques = state.ficha.bloques.filter((b) => b.id_bloque !== bloque.id_bloque);
         renderBloques();
       }));
-      const option = document.createElement("option");
-      option.value = bloque.id_bloque;
-      option.textContent = bloque.nombre;
-      select.appendChild(option);
+      blockChoices.push({ value: bloque.id_bloque, label: bloque.nombre });
     });
+    renderChoiceButtons(
+      "espacioBloqueChoices",
+      "espacioBloque",
+      blockChoices,
+      blockChoices.length ? null : "Agregue un bloque primero",
+      { disableEmpty: true }
+    );
+    const nextValue = blockChoices.some((choice) => choice.value === current) ? current : (blockChoices[0]?.value || "");
+    setChoiceValue("espacioBloque", nextValue, false);
     renderEspacios();
     renderElementoParents();
   }
@@ -484,8 +532,8 @@
       atributos: { medicion_distancia: "centro_a_centro" }
     });
     $("elementoNombre").value = "";
-    $("elementoTipo").value = "equipamiento";
-    $("elementoParent").value = "";
+    setChoiceValue("elementoTipo", "equipamiento", false);
+    setChoiceValue("elementoParent", "", false);
     renderElementos();
   }
 
@@ -498,15 +546,20 @@
       const item = document.createElement("li");
       const span = document.createElement("span");
       const controls = document.createElement("div");
-      const parent = document.createElement("select");
+      const parentChoices = document.createElement("div");
       const remove = document.createElement("button");
       span.textContent = `${elementIconText(elemento.tipo)} ${elemento.nombre} - ${elementTypeLabel(elemento.tipo)} - ${labelForParent(elemento.parent_espacio_id)}`;
-      parent.appendChild(new Option("Exterior / sin espacio", ""));
-      espacioOptions().forEach((opt) => parent.appendChild(new Option(opt.label, opt.id)));
-      parent.value = elemento.parent_espacio_id || "";
-      parent.addEventListener("change", () => {
-        elemento.parent_espacio_id = parent.value;
-        renderElementos();
+      parentChoices.className = "entity-choice-grid";
+      [{ id: "", label: "Exterior" }, ...espacioOptions()].forEach((opt) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `choice-button ${String(elemento.parent_espacio_id || "") === String(opt.id || "") ? "choice-button--active" : ""}`;
+        button.textContent = opt.label;
+        button.addEventListener("click", () => {
+          elemento.parent_espacio_id = opt.id || "";
+          renderElementos();
+        });
+        parentChoices.appendChild(button);
       });
       remove.type = "button";
       remove.textContent = "Quitar";
@@ -515,7 +568,7 @@
         renderElementos();
       });
       controls.className = "entity-controls";
-      controls.append(parent, remove);
+      controls.append(parentChoices, remove);
       item.append(span, controls);
       list.appendChild(item);
       renderElementMarker(elemento);
@@ -524,12 +577,13 @@
   }
 
   function renderElementoParents() {
-    const select = $("elementoParent");
-    if (!select) return;
-    const current = select.value;
-    select.replaceChildren(new Option("Exterior / sin espacio", ""));
-    espacioOptions().forEach((opt) => select.appendChild(new Option(opt.label, opt.id)));
-    select.value = Array.from(select.options).some((opt) => opt.value === current) ? current : "";
+    const input = $("elementoParent");
+    if (!input) return;
+    const current = input.value;
+    const parentChoices = [{ value: "", label: "Exterior / sin espacio" }, ...espacioOptions().map((opt) => ({ value: opt.id, label: opt.label }))];
+    renderChoiceButtons("elementoParentChoices", "elementoParent", parentChoices);
+    const nextValue = parentChoices.some((choice) => choice.value === current) ? current : "";
+    setChoiceValue("elementoParent", nextValue, false);
   }
 
   function espacioOptions() {
@@ -655,6 +709,7 @@
     $("cercadoPresencia").value = c.presencia || "";
     $("cercadoTipo").value = c.tipo || "";
     $("cercadoPorcentaje").value = c.porcentaje_cubierto || "";
+    refreshChoiceButtons(document, "cercadoPresencia");
   }
 
   function syncCercado() {
