@@ -2197,7 +2197,6 @@ const MecFormModule = (() => {
         <div class="mec-repeat-toolbar">
           <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openSanitaryStallFicha('${_escape(item.id)}', '${_escape(selected.id)}')">Abrir ficha emergente</button>
         </div>
-        <summary>${_escape(selected.ficha?.codigo || 'Cabina')} · objetos y estado</summary>
         <div class="mec-cabin-add-row">
           ${_renderSanitaryCabinFixtureButtons(item, selected, available)}
         </div>
@@ -6122,6 +6121,7 @@ const MecFormModule = (() => {
     _ensureSanitaries();
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
+    const audit = _schoolPlanAudit();
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
     const canvasHeight = _planCanvasHeight();
     root.dataset.planCanvasId = canvasId;
@@ -6138,7 +6138,10 @@ const MecFormModule = (() => {
           ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
           ${_planKpi('Luces', metrics.lights, _stateSummaryText(metrics.states.light))}
           ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
+          ${_planKpi('Calidad tecnica', `${audit.score}/100`, audit.summaryText)}
         </section>
+
+        ${_renderArchitectAudit(audit)}
 
         <section class="school-plan__layout">
           <div class="school-plan__board">
@@ -6301,6 +6304,248 @@ const MecFormModule = (() => {
       alerts: allObjects.filter(object => _isPlanAlert(object)).length + sanitaries.filter(item => _isPlanAlert({ ficha: item })).length,
       states,
     };
+  }
+
+  function _schoolPlanAudit() {
+    const issues = [];
+    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const classrooms = _data.__classrooms || [];
+    const sanitaries = _data.__sanitaries || [];
+    const roomMatchesBlock = (room, block) => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque');
+    const isInactiveState = value => _auditText(value).includes('construccion')
+      || _auditText(value).includes('derrumb')
+      || _auditText(value).includes('colaps')
+      || _auditText(value).includes('clausur')
+      || _auditText(value).includes('sin uso');
+
+    blocks.forEach((block, index) => {
+      const targetId = `block::${block.id || 'sin_bloque'}`;
+      const label = block.bloque_codigo || _numberedLabel('Bloque', index);
+      const blockRooms = classrooms.filter(room => roomMatchesBlock(room, block));
+      const blockSanitaries = sanitaries.filter(item => _matchesBlockReference(item.bloque, block));
+      const stateText = _auditText(`${block.estado_bloque || ''} ${block.observacion || ''}`);
+      if (!Number(block.largo_m || 0) || !Number(block.ancho_m || 0)) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: dimensiones del bloque pendientes`, 'Complete largo y ancho para controlar escala, ocupacion y distancias.', targetId, 'Completar bloque');
+      }
+      if (stateText.includes('derrumb') || stateText.includes('colaps') || stateText.includes('clausur')) {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: condicion critica`, block.estado_bloque || 'Bloque con condicion critica declarada.', targetId, 'Revisar estado');
+      } else if (stateText.includes('construccion') || stateText.includes('sin uso')) {
+        _pushPlanAuditIssue(issues, 'info', `${label}: bloque no operativo`, block.estado_bloque || 'Bloque no operativo o en construccion.', targetId, 'Documentar avance');
+      }
+      if (!blockRooms.length && !blockSanitaries.length && !isInactiveState(block.estado_bloque)) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin ambientes asociados`, 'No hay aulas ni sanitarios vinculados al bloque.', targetId, 'Vincular ambientes');
+      }
+      _planFloorsForBlock(block, classrooms, sanitaries).forEach(floor => {
+        const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor || 'Piso 1') === floor);
+        const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
+        if (floorRooms.length && !floorSanitaries.length && !isInactiveState(block.estado_bloque)) {
+          _pushPlanAuditIssue(issues, 'warning', `${label} ${floor}: falta sanitario`, 'Hay aulas relevadas en el piso, pero no hay sanitario registrado en esa planta.', targetId, 'Agregar sanitario');
+        }
+      });
+    });
+
+    classrooms.forEach((room, index) => {
+      const targetId = `room::${room.id}`;
+      const label = _classroomHierarchyLabel(room) || room.name || _numberedLabel('Aula', index);
+      const objects = Array.isArray(room.objects) ? room.objects : [];
+      const roomObjects = objects.filter(object => object.type !== 'room');
+      const stateText = _auditText(room.estado || '');
+      const inactive = isInactiveState(room.estado);
+      const hasRoomGeometry = objects.some(object => object.type === 'room');
+      const hasDimensions = Number(room.length || 0) > 0 && Number(room.width || 0) > 0;
+      const hasDoor = roomObjects.some(object => object.type === 'door');
+      const hasWindow = roomObjects.some(object => object.type === 'window');
+      const hasOutlet = roomObjects.some(object => object.type === 'outlet');
+      const hasLight = roomObjects.some(object => object.type === 'light' || object.type === 'photo');
+
+      if (stateText.includes('derrumb') || stateText.includes('colaps') || stateText.includes('clausur')) {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: aula critica`, room.estado || 'Aula declarada fuera de uso o colapsada.', targetId, 'Revisar seguridad');
+      } else if (stateText.includes('construccion') || stateText.includes('sin uso')) {
+        _pushPlanAuditIssue(issues, 'info', `${label}: aula no operativa`, room.estado || 'Aula no operativa.', targetId, 'Documentar estado');
+      }
+      if (!hasDimensions && !inactive) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin medidas`, 'Complete largo y ancho del aula para validar area y escala.', targetId, 'Completar medidas');
+      }
+      if (!hasRoomGeometry && !inactive) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: falta geometria`, 'El aula existe en la lista, pero no tiene rectangulo base en el croquis.', targetId, 'Dibujar aula');
+      }
+      if (!inactive && !hasDoor) {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: sin puerta`, 'Todo ambiente operativo debe registrar al menos una puerta o abertura de acceso.', targetId, 'Agregar puerta');
+      }
+      if (!inactive && !hasWindow) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin ventana`, 'No hay ventana registrada para ventilacion/iluminacion natural.', targetId, 'Agregar ventana');
+      }
+      if (!inactive && !hasOutlet) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin toma`, 'No hay toma corriente relevada en el aula.', targetId, 'Agregar toma');
+      }
+      if (!inactive && !hasLight) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin iluminacion`, 'No hay foco, luminaria o foto de iluminacion asociada.', targetId, 'Agregar foco');
+      }
+      roomObjects.forEach(object => _auditSketchObject(issues, object, object.planId || `${room.id}::${object.id}`, label));
+    });
+
+    sanitaries.forEach((item, index) => {
+      const targetId = `sanitary::${item.id}`;
+      const label = item.codigo || _numberedLabel('Sanitario', index);
+      const objects = Array.isArray(item.objects) ? item.objects : [];
+      const room = _sanitaryRoomObject(item);
+      const externalDoors = objects.filter(object => object.type === 'door' && !object.ficha?.parentStallId);
+      const stalls = objects.filter(object => object.type === 'stall');
+      const directToilets = objects.filter(object => object.type === 'toilet');
+      const hasToilet = Number(item.inodoros || 0) > 0
+        || directToilets.length > 0
+        || stalls.some(stall => (stall.ficha?.fixtures || []).some(fixture => fixture.id === 'toilet'));
+      const hasSink = Number(item.lavamanos || 0) > 0
+        || objects.some(object => object.type === 'sink')
+        || stalls.some(stall => (stall.ficha?.fixtures || []).some(fixture => fixture.id === 'sink'));
+      const stateText = _auditText(`${item.estado || ''} ${item.agua || ''} ${item.desague || ''} ${item.privacidad || ''}`);
+
+      if (!Number(item.largo_m || 0) || !Number(item.ancho_m || 0)) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin medidas`, 'Complete largo y ancho del sanitario para controlar capacidad y escala.', targetId, 'Completar sanitario');
+      }
+      if (!room) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin geometria`, 'No hay recinto sanitario dibujado en el plano.', targetId, 'Dibujar recinto');
+      }
+      if (stateText.includes('fuera') || stateText.includes('malo') || stateText.includes('no funciona')) {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: estado sanitario critico`, item.estado || 'Sanitario con funcionamiento critico.', targetId, 'Revisar servicio');
+      }
+      if (stateText.includes('agua no') || item.agua === 'No') {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: sin agua`, 'El sanitario no puede considerarse operativo sin provision de agua.', targetId, 'Registrar agua');
+      }
+      if (!externalDoors.length) {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: sin puerta de acceso`, 'Registre una puerta de acceso al recinto sanitario.', targetId, 'Agregar puerta');
+      }
+      if (!hasToilet) {
+        _pushPlanAuditIssue(issues, 'critical', `${label}: sin inodoro`, 'No hay inodoro directo ni cabina con inodoro registrado.', targetId, 'Agregar inodoro');
+      }
+      if (!hasSink) {
+        _pushPlanAuditIssue(issues, 'warning', `${label}: sin lavamanos`, 'Todo sanitario relevado deberia registrar lavamanos o justificar su ausencia.', targetId, 'Agregar lavamanos');
+      }
+      stalls.forEach(stall => {
+        const fixtures = Array.isArray(stall.ficha?.fixtures) ? stall.ficha.fixtures : [];
+        const stallName = stall.ficha?.codigo || 'Cabina';
+        const doorText = _auditText(stall.ficha?.puerta || '');
+        if (!fixtures.length) {
+          _pushPlanAuditIssue(issues, 'warning', `${label}: ${stallName} sin componentes`, 'La cabina no tiene inodoro, cisterna o portapapel asociados.', targetId, 'Completar cabina');
+        } else if (!fixtures.some(fixture => fixture.id === 'toilet')) {
+          _pushPlanAuditIssue(issues, 'warning', `${label}: ${stallName} sin inodoro`, 'La cabina tiene componentes, pero no incluye inodoro.', targetId, 'Agregar inodoro');
+        }
+        if (doorText.includes('sin puerta') || doorText.includes('danad') || doorText.includes('dano')) {
+          _pushPlanAuditIssue(issues, 'warning', `${label}: ${stallName} con privacidad deficiente`, stall.ficha?.puerta || 'Puerta de cabina pendiente.', targetId, 'Revisar puerta');
+        }
+        fixtures.forEach(fixture => {
+          const fixtureText = _auditText(fixture.estado || '');
+          if (fixtureText.includes('malo') || fixtureText.includes('no funciona') || fixtureText.includes('no tiene')) {
+            const cfg = SANITARY_CABIN_FIXTURES.find(tool => tool.id === fixture.id);
+            _pushPlanAuditIssue(issues, 'warning', `${label}: ${stallName} - ${cfg?.label || fixture.id}`, fixture.estado || 'Componente observado.', targetId, 'Revisar componente');
+          }
+        });
+      });
+      objects
+        .filter(object => !['sanitary-room', 'room', 'stall'].includes(object.type))
+        .forEach(object => _auditSketchObject(issues, object, targetId, label));
+    });
+
+    if (sanitaries.length && !sanitaries.some(item => _auditText(item.accesible || '').startsWith('si'))) {
+      _pushPlanAuditIssue(issues, 'warning', 'Accesibilidad sanitaria pendiente', 'No hay ningun sanitario marcado como accesible.', `sanitary::${sanitaries[0].id}`, 'Revisar accesibilidad');
+    }
+
+    issues.sort((a, b) => _auditSeverityWeight(a.severity) - _auditSeverityWeight(b.severity));
+    const counts = issues.reduce((acc, issue) => {
+      acc[issue.severity] = (acc[issue.severity] || 0) + 1;
+      return acc;
+    }, { critical: 0, warning: 0, info: 0 });
+    const score = Math.max(0, Math.min(100, 100 - counts.critical * 14 - counts.warning * 6 - counts.info * 2));
+    const summaryText = issues.length
+      ? `${counts.critical} crit., ${counts.warning} adv., ${counts.info} nota(s)`
+      : 'Sin observaciones tecnicas';
+    return {
+      score,
+      counts,
+      issues,
+      summaryText,
+      status: score >= 90 ? 'Listo para revision' : score >= 70 ? 'Requiere ajustes' : 'Atencion prioritaria',
+    };
+  }
+
+  function _auditSketchObject(issues, object, targetId, contextLabel) {
+    if (!object || object.type === 'room') return;
+    const text = _auditText(`${object.ficha?.estado || ''} ${object.ficha?.prioridad || ''} ${object.ficha?.seguridad || ''} ${object.ficha?.funcionamiento || ''}`);
+    const label = object.ficha?.codigo || _sketchLabel(object.type);
+    if (object.type === 'damage') {
+      if (text.includes('riesgo') || text.includes('urgente') || text.includes('severo') || text.includes('alta')) {
+        _pushPlanAuditIssue(issues, 'critical', `${contextLabel}: daño estructural prioritario`, `${label} - ${object.ficha?.estado || object.ficha?.prioridad || 'Prioridad alta'}`, targetId, 'Abrir ficha');
+      } else {
+        _pushPlanAuditIssue(issues, 'info', `${contextLabel}: daño registrado`, `${label} - ${object.ficha?.estado || 'Sin estado'}`, targetId, 'Revisar daño');
+      }
+      return;
+    }
+    if (text.includes('riesgo') || text.includes('expuesto') || text.includes('urgente') || text.includes('severo')) {
+      _pushPlanAuditIssue(issues, 'critical', `${contextLabel}: ${label} en riesgo`, object.ficha?.estado || object.ficha?.seguridad || 'Elemento critico.', targetId, 'Abrir ficha');
+    } else if (text.includes('malo') || text.includes('no funciona') || text.includes('no verificable') || text.includes('rota') || text.includes('flojo')) {
+      _pushPlanAuditIssue(issues, 'warning', `${contextLabel}: ${label} observado`, object.ficha?.estado || object.ficha?.seguridad || 'Elemento observado.', targetId, 'Abrir ficha');
+    }
+  }
+
+  function _pushPlanAuditIssue(issues, severity, title, detail, targetId, action) {
+    issues.push({
+      id: `audit_${issues.length + 1}`,
+      severity,
+      title,
+      detail,
+      targetId,
+      action: action || 'Revisar',
+    });
+  }
+
+  function _auditText(value) {
+    return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function _auditSeverityWeight(severity) {
+    return { critical: 0, warning: 1, info: 2 }[severity] ?? 3;
+  }
+
+  function _auditSeverityLabel(severity) {
+    return { critical: 'Critico', warning: 'Advertencia', info: 'Nota' }[severity] || severity;
+  }
+
+  function _renderArchitectAudit(audit) {
+    const topIssues = (audit.issues || []).slice(0, 8);
+    const scoreTone = audit.score >= 90 ? 'good' : audit.score >= 70 ? 'watch' : 'danger';
+    return `
+      <section class="school-plan-audit school-plan-audit--${scoreTone}">
+        <div class="school-plan-audit__header">
+          <div>
+            <span>Auditor arquitectonico</span>
+            <strong>${_escape(audit.status)}</strong>
+          </div>
+          <div class="school-plan-audit__score">
+            <b>${_escape(audit.score)}</b>
+            <small>/100</small>
+          </div>
+        </div>
+        <div class="school-plan-audit__bar" aria-hidden="true"><span style="width:${Math.max(0, Math.min(100, audit.score))}%"></span></div>
+        <div class="school-plan-audit__stats">
+          <span><b>${audit.counts.critical || 0}</b> criticas</span>
+          <span><b>${audit.counts.warning || 0}</b> advertencias</span>
+          <span><b>${audit.counts.info || 0}</b> notas</span>
+        </div>
+        <div class="school-plan-audit__issues">
+          ${topIssues.length ? topIssues.map(issue => `
+            <button class="school-plan-audit-issue school-plan-audit-issue--${_escape(issue.severity)}" type="button"
+              onclick="MecFormModule.selectPlanItem('${_escape(issue.targetId || '')}')">
+              <span>${_escape(_auditSeverityLabel(issue.severity))}</span>
+              <strong>${_escape(issue.title)}</strong>
+              <small>${_escape(issue.detail || '')}</small>
+              <em>${_escape(issue.action || 'Revisar')}</em>
+            </button>`).join('') : `
+            <div class="school-plan-audit-empty">
+              <strong>Plano sin observaciones criticas</strong>
+              <small>El modelo tiene una base consistente para revision tecnica y exportacion.</small>
+            </div>`}
+        </div>
+      </section>`;
   }
 
   function _schoolPlanObjects() {

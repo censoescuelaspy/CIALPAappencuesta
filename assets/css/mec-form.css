@@ -1149,6 +1149,178 @@
   line-height: 1.25;
 }
 
+.school-plan-audit {
+  display: grid;
+  gap: .72rem;
+  padding: .9rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.school-plan-audit__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.school-plan-audit__header span {
+  display: block;
+  color: #667085;
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan-audit__header strong {
+  display: block;
+  margin-top: .16rem;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.school-plan-audit__score {
+  min-width: 82px;
+  text-align: right;
+  color: #172033;
+}
+
+.school-plan-audit__score b {
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.school-plan-audit__score small {
+  color: #667085;
+  font-weight: 800;
+}
+
+.school-plan-audit__bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f7;
+}
+
+.school-plan-audit__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f855a;
+}
+
+.school-plan-audit--watch .school-plan-audit__bar span {
+  background: #b7791f;
+}
+
+.school-plan-audit--danger .school-plan-audit__bar span {
+  background: #c53030;
+}
+
+.school-plan-audit__stats {
+  display: flex;
+  gap: .55rem;
+  flex-wrap: wrap;
+  color: #526071;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.school-plan-audit__stats span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: .24rem;
+  padding: .22rem .45rem;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.school-plan-audit__issues {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: .55rem;
+}
+
+.school-plan-audit-issue {
+  width: 100%;
+  min-height: 118px;
+  display: grid;
+  align-content: start;
+  gap: .22rem;
+  padding: .62rem .68rem;
+  border: 1px solid #dbe5f1;
+  border-left: 4px solid #718096;
+  border-radius: 8px;
+  background: #fbfdff;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.school-plan-audit-issue:hover {
+  border-color: #8fb0d3;
+  background: #f1f7ff;
+}
+
+.school-plan-audit-issue span {
+  color: #526071;
+  font-size: .66rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan-audit-issue strong,
+.school-plan-audit-issue small,
+.school-plan-audit-issue em {
+  display: block;
+}
+
+.school-plan-audit-issue small {
+  color: #667085;
+  line-height: 1.28;
+}
+
+.school-plan-audit-issue em {
+  margin-top: .1rem;
+  color: #1f5d99;
+  font-size: .72rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.school-plan-audit-issue--critical {
+  border-left-color: #c53030;
+}
+
+.school-plan-audit-issue--warning {
+  border-left-color: #b7791f;
+}
+
+.school-plan-audit-issue--info {
+  border-left-color: #2b6cb0;
+}
+
+.school-plan-audit-empty {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: .18rem;
+  padding: .7rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #27364a;
+}
+
+.school-plan-audit-empty small {
+  color: #667085;
+  line-height: 1.25;
+}
+
 .school-plan__layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
@@ -1705,6 +1877,33 @@
 
   .school-plan-kpi strong {
     font-size: 1.08rem;
+  }
+
+  .school-plan-audit {
+    gap: .55rem;
+    padding: .62rem;
+  }
+
+  .school-plan-audit__header strong {
+    font-size: .88rem;
+  }
+
+  .school-plan-audit__score {
+    min-width: 64px;
+  }
+
+  .school-plan-audit__score b {
+    font-size: 1.25rem;
+  }
+
+  .school-plan-audit__issues {
+    grid-template-columns: 1fr;
+    gap: .42rem;
+  }
+
+  .school-plan-audit-issue {
+    min-height: 92px;
+    padding: .52rem;
   }
 
   .school-plan__layout {
