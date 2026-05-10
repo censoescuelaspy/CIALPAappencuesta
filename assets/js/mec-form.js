@@ -2199,10 +2199,7 @@ const MecFormModule = (() => {
         </div>
         <summary>${_escape(selected.ficha?.codigo || 'Cabina')} · objetos y estado</summary>
         <div class="mec-cabin-add-row">
-          <select class="form-control form-control-sm" onchange="MecFormModule.addSanitaryStallFixture('${_escape(item.id)}', '${_escape(selected.id)}', this.value); this.value = '';">
-            <option value="">Agregar objeto...</option>
-            ${available.map(tool => `<option value="${_escape(tool.id)}">${_escape(tool.label)}</option>`).join('')}
-          </select>
+          ${_renderSanitaryCabinFixtureButtons(item, selected, available)}
         </div>
         <div class="mec-cabin-fixture-list">
           ${fixtures.map(fixture => _renderSanitaryStallFixtureRow(item, selected, fixture)).join('')}
@@ -2258,10 +2255,7 @@ const MecFormModule = (() => {
             </div>
           </div>
           <div class="mec-cabin-add-row">
-            <select class="form-control" onchange="MecFormModule.addSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', this.value); MecFormModule.openSanitaryStallFicha('${_escape(item.id)}', '${_escape(stall.id)}');">
-              <option value="">Agregar componente...</option>
-              ${available.map(tool => `<option value="${_escape(tool.id)}">${_escape(tool.label)}</option>`).join('')}
-            </select>
+            ${_renderSanitaryCabinFixtureButtons(item, stall, available, true)}
           </div>
           <div class="mec-cabin-fixture-list">
             ${fixtures.map(fixture => _renderSanitaryStallFixtureRow(item, stall, fixture)).join('')}
@@ -2283,6 +2277,19 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _render();
     renderSchoolPlan();
+  }
+
+  function _renderSanitaryCabinFixtureButtons(item, stall, available, reopen = false) {
+    if (!available.length) return '<p class="mec-hint">Todos los componentes previstos ya fueron agregados.</p>';
+    return `
+      <div class="mec-cabin-button-grid">
+        ${available.map(tool => `
+          <button class="mec-cabin-add-button" type="button"
+            onclick="MecFormModule.addSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', '${_escape(tool.id)}')${reopen ? `; MecFormModule.openSanitaryStallFicha('${_escape(item.id)}', '${_escape(stall.id)}')` : ''}">
+            <span aria-hidden="true">${_escape(_sanitaryCabinFixtureIconText(tool.id))}</span>
+            <strong>${_escape(tool.label)}</strong>
+          </button>`).join('')}
+      </div>`;
   }
 
   function _sanitaryObjectLabel(type) {
@@ -3356,6 +3363,15 @@ const MecFormModule = (() => {
       ctx.strokeStyle = 'rgba(75,85,99,.36)';
       ctx.strokeRect(object.x + 4, object.y + 4, Math.max(0, object.w - 8), Math.max(0, object.h - 8));
       ctx.setLineDash([]);
+      const iconSize = Math.max(9, Math.min(14, Math.min(object.w / 4, object.h / 4)));
+      const cols = Math.min(3, Math.max(1, fixtures.length));
+      fixtures.slice(0, 6).forEach((fixture, index) => {
+        const col = index % cols;
+        const row = Math.floor(index / cols);
+        const px = object.x + ((col + 1) / (cols + 1)) * object.w;
+        const py = object.y + 14 + row * (iconSize + 6);
+        if (py < object.y + object.h - 8) _drawSanitaryCabinFixtureIcon(ctx, fixture.id, px, py, iconSize);
+      });
       ctx.fillStyle = '#334155';
       ctx.font = '800 9px system-ui, sans-serif';
       ctx.textAlign = 'center';
@@ -4692,6 +4708,78 @@ const MecFormModule = (() => {
     }[id] || String(id || '').slice(0, 3).toUpperCase();
   }
 
+  function _sanitaryCabinFixtureIconText(id) {
+    return {
+      toilet: 'WC',
+      cistern_low: 'C',
+      cistern_high: 'C↑',
+      paper_holder: '◌',
+      sink: 'LV',
+      trash_bin: '⌂',
+      coat_hook: 'J',
+    }[id] || _sanitaryCabinFixtureShort(id);
+  }
+
+  function _drawSanitaryCabinFixtureIcon(ctx, fixtureId, x, y, size = 12) {
+    ctx.save();
+    ctx.strokeStyle = '#334155';
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.lineWidth = 1.3;
+    if (fixtureId === 'toilet') {
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * .48, size * .36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeRect(x - size * .28, y - size * .72, size * .56, size * .22);
+    } else if (fixtureId === 'cistern_low' || fixtureId === 'cistern_high') {
+      const high = fixtureId === 'cistern_high';
+      ctx.strokeRect(x - size * .45, y - (high ? size * .72 : size * .38), size * .9, size * .34);
+      ctx.beginPath();
+      ctx.moveTo(x, y - (high ? size * .38 : size * .04));
+      ctx.lineTo(x, y + size * .48);
+      ctx.stroke();
+    } else if (fixtureId === 'paper_holder') {
+      ctx.beginPath();
+      ctx.arc(x, y, size * .34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, size * .11, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (fixtureId === 'sink') {
+      ctx.beginPath();
+      ctx.ellipse(x, y, size * .48, size * .3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y - size * .3);
+      ctx.lineTo(x, y - size * .55);
+      ctx.stroke();
+    } else if (fixtureId === 'trash_bin') {
+      ctx.beginPath();
+      ctx.rect(x - size * .35, y - size * .35, size * .7, size * .7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x - size * .42, y - size * .44);
+      ctx.lineTo(x + size * .42, y - size * .44);
+      ctx.stroke();
+    } else if (fixtureId === 'coat_hook') {
+      ctx.beginPath();
+      ctx.moveTo(x, y - size * .48);
+      ctx.lineTo(x, y + size * .2);
+      ctx.quadraticCurveTo(x, y + size * .55, x - size * .28, y + size * .36);
+      ctx.stroke();
+    } else {
+      ctx.font = '800 8px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#334155';
+      ctx.fillText(_sanitaryCabinFixtureShort(fixtureId), x, y);
+    }
+    ctx.restore();
+  }
+
   function _resizeSanitaryRoomObject(hit, point) {
     const object = hit?.object;
     const item = hit?.item;
@@ -5466,7 +5554,7 @@ const MecFormModule = (() => {
         ...common,
       },
       damage: {
-        title: 'Ficha de dano estructural',
+        title: 'Ficha de daño estructural',
         typeOptions: ['Humedad', 'Fisura', 'Rotura', 'Desprendimiento', 'Instalacion expuesta', 'Otro'],
         estados: ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'],
         materiales: common.materiales,
@@ -5517,7 +5605,7 @@ const MecFormModule = (() => {
       outlet: { codigo: 'TC', subtipo: 'Simple', estado: 'Bueno', seguridad: 'Seguro' },
       wall: { codigo: 'Pared', subtipo: 'Mamposteria', estado: 'Bueno', estabilidad: 'Estable' },
       light: { codigo: 'Foco', subtipo: 'Foco LED', estado: 'Bueno', funcionamiento: 'Funciona' },
-      damage: { codigo: 'Dano', subtipo: 'Fisura', estado: 'Leve', prioridad: 'Media' },
+      damage: { codigo: 'Daño', subtipo: 'Fisura', estado: 'Leve', prioridad: 'Media' },
       board: { codigo: 'Piz', subtipo: 'Tiza', estado: 'Bueno' },
       stair: { codigo: 'Esc', subtipo: 'Recta', estado: 'Bueno' },
       door: { codigo: 'Pta', subtipo: 'Con puerta madera', estado: 'Bueno', abre_hacia: 'Interior', bisagra: 'Inicio' },
@@ -5543,7 +5631,7 @@ const MecFormModule = (() => {
   function _choiceToneClass(value) {
     const text = String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (text.includes('no existe') || text.includes('no aplica') || text === 'no') return 'mec-choice--muted';
-    if (text.includes('malo') || text.includes('mala') || text.includes('dano') || text.includes('deficiente') || text.includes('fuera') || text.includes('expuesto') || text.includes('riesgo') || text.includes('urgente') || text.includes('no cumple') || text.includes('sin ') || text.includes('no verificable')) return 'mec-choice--danger';
+    if (text.includes('malo') || text.includes('mala') || text.includes('dano') || text.includes('daño') || text.includes('deficiente') || text.includes('fuera') || text.includes('expuesto') || text.includes('riesgo') || text.includes('urgente') || text.includes('no cumple') || text.includes('sin ') || text.includes('no verificable')) return 'mec-choice--danger';
     if (text.includes('regular') || text.includes('intermitente') || text.includes('incompleto') || text.includes('parcial') || text.includes('flojo') || text.includes('moderado')) return 'mec-choice--warning';
     if (text.includes('bueno') || text.includes('buena') || text.includes('adecuada') || text.includes('seguro') || /\bsi\b/.test(text) || text.includes('cumple') || text.includes('completo')) return 'mec-choice--success';
     return 'mec-choice--neutral';

@@ -1044,6 +1044,50 @@
   margin: .45rem 0 .55rem;
 }
 
+.mec-cabin-button-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: .4rem;
+}
+
+.mec-cabin-add-button {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .45rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-cabin-add-button:hover {
+  border-color: #8fb0d3;
+  background: #eef6ff;
+}
+
+.mec-cabin-add-button span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #173f68;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.mec-cabin-add-button strong {
+  min-width: 0;
+  font-size: .72rem;
+  line-height: 1.12;
+}
+
 .mec-cabin-fixture-list {
   display: grid;
   gap: .42rem;

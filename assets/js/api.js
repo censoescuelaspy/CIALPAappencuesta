@@ -136,7 +136,7 @@ const API = (() => {
         { id: `${id}_board`, type: 'board', x: x + 44, y: y + 18, w: 82, h: 24, ficha: { codigo: 'Piz 1', subtipo: 'Acrilico', estado: underConstruction ? 'No tiene' : 'Bueno', material: 'Mixto' } },
         { id: `${id}_outlet`, type: 'outlet', x: x + 136, y: y + 88, r: 5, ficha: { codigo: 'TC 1', subtipo: 'Doble', estado: underConstruction ? 'No verificable' : 'Bueno', seguridad: 'Seguro', tapa: 'Buena', puesta_tierra: 'Tiene', altura_m: '0.45' } },
         { id: `${id}_light`, type: 'light', x: x + 84, y: y + 62, r: 7, ficha: { codigo: 'Foco 1', subtipo: 'Panel', estado: underConstruction ? 'No verificable' : 'Bueno', funcionamiento: underConstruction ? 'No verificable' : 'Funciona' } },
-        ...(underConstruction ? [{ id: `${id}_damage`, type: 'damage', x: x + 134, y: y + 18, w: 24, h: 24, ficha: { codigo: 'Obra', subtipo: 'Instalacion expuesta', estado: 'Moderado', prioridad: 'Media', sector: 'Pared', accion_recomendada: 'Observar', observacion: 'Sector en obra, verificar antes de habilitar.' } }] : []),
+        ...(underConstruction ? [{ id: `${id}_damage`, type: 'damage', x: x + 134, y: y + 18, w: 24, h: 24, ficha: { codigo: 'Daño', subtipo: 'Instalacion expuesta', estado: 'Moderado', prioridad: 'Media', sector: 'Pared', accion_recomendada: 'Observar', observacion: 'Sector en obra, verificar antes de habilitar.' } }] : []),
       ],
     };
   }
