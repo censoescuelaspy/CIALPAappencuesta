@@ -561,6 +561,7 @@ const AppController = (() => {
       if (!isAutoHidden()) return;
       clearTimeout(_sidebarHideTimer);
       document.body.classList.add('sidebar-peek');
+      sidebar.classList.add('sidebar--open');
       toggleBtn?.setAttribute('aria-expanded', 'true');
       toggleBtn?.setAttribute('aria-label', 'Ocultar menu');
     };
@@ -569,6 +570,7 @@ const AppController = (() => {
       clearTimeout(_sidebarHideTimer);
       _sidebarHideTimer = setTimeout(() => {
         document.body.classList.remove('sidebar-peek');
+        sidebar.classList.remove('sidebar--open');
         toggleBtn?.setAttribute('aria-expanded', 'false');
         toggleBtn?.setAttribute('aria-label', 'Mostrar menu');
       }, 360);

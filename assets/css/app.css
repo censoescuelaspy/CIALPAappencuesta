@@ -210,6 +210,16 @@ body.sidebar-auto-hidden #sidebar-hotzone {
   display: block;
 }
 
+body.sidebar-auto-hidden.sidebar-peek #sidebar,
+body.sidebar-auto-hidden #sidebar.sidebar--open {
+  min-width: var(--sidebar-width);
+  width: var(--sidebar-width);
+  opacity: 1;
+  transform: translateX(0) !important;
+  pointer-events: auto;
+  box-shadow: var(--shadow-lg);
+}
+
 .sidebar__logo {
   display: flex;
   align-items: center;
