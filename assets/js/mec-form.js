@@ -2171,6 +2171,32 @@ const MecFormModule = (() => {
     const available = SANITARY_CABIN_FIXTURES.filter(tool => !fixtures.some(item => item.id === tool.id));
     return `
       <details class="mec-sanitary-cabin-panel" open>
+        <summary>${_escape(selected.ficha?.codigo || 'Cabina')} - objetos y estado</summary>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Codigo</label>
+            <input class="form-control" value="${_escape(selected.ficha?.codigo || '')}"
+              oninput="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'codigo', this.value, false)"
+              onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'codigo', this.value)">
+          </div>
+          <div class="form-group">
+            <label>Estado cabina</label>
+            <select class="form-control"
+              onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'estado', this.value)">
+              ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${selected.ficha?.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Puerta</label>
+            <select class="form-control"
+              onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'puerta', this.value)">
+              ${['Con puerta', 'Sin puerta', 'Cortina', 'Danada', 'No verificable'].map(option => `<option value="${_escape(option)}" ${selected.ficha?.puerta === option ? 'selected' : ''}>${_escape(option)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="mec-repeat-toolbar">
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openSanitaryStallFicha('${_escape(item.id)}', '${_escape(selected.id)}')">Abrir ficha emergente</button>
+        </div>
         <summary>${_escape(selected.ficha?.codigo || 'Cabina')} · objetos y estado</summary>
         <div class="mec-cabin-add-row">
           <select class="form-control form-control-sm" onchange="MecFormModule.addSanitaryStallFixture('${_escape(item.id)}', '${_escape(selected.id)}', this.value); this.value = '';">
@@ -2182,6 +2208,81 @@ const MecFormModule = (() => {
           ${fixtures.map(fixture => _renderSanitaryStallFixtureRow(item, selected, fixture)).join('')}
         </div>
       </details>`;
+  }
+
+  function openSanitaryStallFicha(sanitaryId, stallId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
+    if (!item || !stall) {
+      UI.showToast('Seleccione una cabina sanitaria.', 'warning');
+      return;
+    }
+    _selectedSanitaryObjectId = stall.id;
+    stall.ficha = { codigo: 'Cbn', estado: item.estado || 'Bueno', puerta: 'Con puerta', ...(stall.ficha || {}) };
+    const fixtures = _ensureStallFixtures(stall);
+    const available = SANITARY_CABIN_FIXTURES.filter(tool => !fixtures.some(current => current.id === tool.id));
+    const modalId = 'modal-sanitary-stall-ficha';
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeSanitaryStallFicha()"></div>
+      <div class="modal__panel modal__panel--wide">
+        <div class="modal__header">
+          <h3>Ficha de cabina sanitaria - ${_escape(stall.ficha.codigo || 'Cbn')}</h3>
+          <button class="modal__close" onclick="MecFormModule.closeSanitaryStallFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Codigo</label>
+              <input class="form-control" value="${_escape(stall.ficha.codigo || '')}"
+                oninput="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'codigo', this.value, false)"
+                onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'codigo', this.value, false)">
+            </div>
+            <div class="form-group">
+              <label>Estado cabina</label>
+              <select class="form-control"
+                onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'estado', this.value, false)">
+                ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${stall.ficha.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Puerta</label>
+              <select class="form-control"
+                onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'puerta', this.value, false)">
+                ${['Con puerta', 'Sin puerta', 'Cortina', 'Danada', 'No verificable'].map(option => `<option value="${_escape(option)}" ${stall.ficha.puerta === option ? 'selected' : ''}>${_escape(option)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="mec-cabin-add-row">
+            <select class="form-control" onchange="MecFormModule.addSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', this.value); MecFormModule.openSanitaryStallFicha('${_escape(item.id)}', '${_escape(stall.id)}');">
+              <option value="">Agregar componente...</option>
+              ${available.map(tool => `<option value="${_escape(tool.id)}">${_escape(tool.label)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="mec-cabin-fixture-list">
+            ${fixtures.map(fixture => _renderSanitaryStallFixtureRow(item, stall, fixture)).join('')}
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-primary" onclick="MecFormModule.closeSanitaryStallFicha()">Guardar y cerrar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal(modalId);
+  }
+
+  function closeSanitaryStallFicha() {
+    const modal = document.getElementById('modal-sanitary-stall-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 250);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
   }
 
   function _sanitaryObjectLabel(type) {
@@ -2562,6 +2663,7 @@ const MecFormModule = (() => {
         codigo: `Cbn ${next}`,
         artefacto: 'Inodoro',
         estado: item.estado || '',
+        puerta: 'Con puerta',
         cabinId,
         fixtures: _defaultStallFixtures(item),
       },
@@ -2576,6 +2678,7 @@ const MecFormModule = (() => {
     _render();
     renderSchoolPlan();
     UI.showToast('Cabina agregada con puerta y objetos basicos.', 'success');
+    setTimeout(() => openSanitaryStallFicha(item.id, object.id), 120);
   }
 
   function _defaultStallFixtures(item) {
@@ -2647,6 +2750,26 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _render();
     renderSchoolPlan();
+  }
+
+  function setSanitaryStallValue(sanitaryId, stallId, key, value, rerender = true) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
+    if (!item || !stall) return;
+    stall.ficha = { codigo: 'Cbn', estado: item.estado || 'Bueno', puerta: 'Con puerta', ...(stall.ficha || {}) };
+    stall.ficha[key] = String(value || '').trim();
+    if (key === 'codigo') {
+      const door = _sanitaryStallDoor(item, stall);
+      if (door) door.ficha.codigo = `Pta ${stall.ficha.codigo || 'Cbn'}`;
+    }
+    _selectedSanitaryObjectId = stall.id;
+    _saveDraft(false);
+    if (rerender) {
+      _render();
+      renderSchoolPlan();
+    } else {
+      _redrawSanitaryCanvas();
+    }
   }
 
   function setSanitaryStallFixture(sanitaryId, stallId, fixtureId, key, value) {
@@ -3196,6 +3319,8 @@ const MecFormModule = (() => {
     (item.objects || [])
       .filter(object => object.id !== roomObject.id)
       .forEach(object => _drawSanitaryChildObject(ctx, item, object));
+    const selected = (item.objects || []).find(object => object.id === _selectedSanitaryObjectId);
+    if (selected && selected.id !== roomObject.id) _drawObjectMeasurementGuides(ctx, selected, roomObject, _sanitaryScale(item));
     _drawResizeHandles(ctx, roomObject, true);
     ctx.restore();
   }
@@ -3372,6 +3497,9 @@ const MecFormModule = (() => {
     _drawSketchBlockContext(ctx, canvas);
     _data.__classroomSketch.objects.forEach(object => _drawSketchObject(ctx, object));
     _drawSketchSanitaryOverlay(ctx);
+    const selected = _findSketchObjectById(_selectedSketchObjectId);
+    const room = (_data.__classroomSketch.objects || []).find(object => object.type === 'room');
+    if (selected && selected.type !== 'room') _drawObjectMeasurementGuides(ctx, selected, room, _sketchScale());
     if (draftObject) _drawSketchObject(ctx, draftObject, true);
   }
 
@@ -4253,6 +4381,66 @@ const MecFormModule = (() => {
       ctx.stroke();
     });
     ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function _objectMeasureBox(object) {
+    if (!object) return null;
+    if (object.type === 'wall') {
+      const x = Math.min(object.x1, object.x2);
+      const y = Math.min(object.y1, object.y2);
+      return { x, y, w: Math.max(1, Math.abs(object.x2 - object.x1)), h: Math.max(1, Math.abs(object.y2 - object.y1)), cx: (object.x1 + object.x2) / 2, cy: (object.y1 + object.y2) / 2 };
+    }
+    if (object.type === 'pencil') return _pencilBounds(object);
+    if (_isPointSketchObject(object)) return { x: object.x, y: object.y, w: 0, h: 0, cx: object.x, cy: object.y };
+    return { x: object.x, y: object.y, w: object.w || 0, h: object.h || 0, cx: object.x + (object.w || 0) / 2, cy: object.y + (object.h || 0) / 2 };
+  }
+
+  function _drawMeasureLabel(ctx, text, x, y) {
+    if (!text) return;
+    ctx.save();
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(text).width + 10;
+    ctx.fillStyle = 'rgba(255,255,255,.94)';
+    ctx.strokeStyle = 'rgba(232,76,34,.35)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(x - width / 2, y - 9, width, 18);
+    ctx.strokeRect(x - width / 2, y - 9, width, 18);
+    ctx.fillStyle = '#9a3412';
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  function _drawObjectMeasurementGuides(ctx, object, room, scale) {
+    const box = _objectMeasureBox(object);
+    if (!box || !room || !scale) return;
+    const fmt = value => `${Math.max(0, value).toFixed(2)} m`;
+    const left = (box.x - room.x) * scale.x;
+    const right = ((room.x + room.w) - (box.x + box.w)) * scale.x;
+    const top = (box.y - room.y) * scale.y;
+    const bottom = ((room.y + room.h) - (box.y + box.h)) * scale.y;
+    const width = box.w * scale.x;
+    const height = box.h * scale.y;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(232,76,34,.72)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([5, 4]);
+    const yMid = box.cy;
+    const xMid = box.cx;
+    [[room.x, yMid, box.x, yMid, fmt(left)], [box.x + box.w, yMid, room.x + room.w, yMid, fmt(right)], [xMid, room.y, xMid, box.y, fmt(top)], [xMid, box.y + box.h, xMid, room.y + room.h, fmt(bottom)]].forEach(([x1, y1, x2, y2, label]) => {
+      if (Math.hypot(x2 - x1, y2 - y1) < 8) return;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      _drawMeasureLabel(ctx, label, (x1 + x2) / 2, (y1 + y2) / 2);
+    });
+    ctx.setLineDash([]);
+    if (box.w > 4 && box.h > 4 && !['damage'].includes(object.type)) {
+      _drawMeasureLabel(ctx, `${width.toFixed(2)} x ${height.toFixed(2)} m`, box.cx, box.y + box.h + 18);
+    }
     ctx.restore();
   }
 
@@ -7715,8 +7903,11 @@ const MecFormModule = (() => {
     regenerateSanitaryPlan,
     addSanitaryStall,
     addSanitaryStallFixture,
+    setSanitaryStallValue,
     setSanitaryStallFixture,
     removeSanitaryStallFixture,
+    openSanitaryStallFicha,
+    closeSanitaryStallFicha,
     setSanitaryObjectValue,
     setSanitaryObjectEvidence,
     deleteSanitaryStall,
