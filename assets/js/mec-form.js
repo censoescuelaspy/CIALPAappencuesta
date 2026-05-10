@@ -64,6 +64,18 @@ const MecFormModule = (() => {
     { id: 'shower', field: 'duchas', label: 'Ducha', short: 'DU' },
   ];
 
+  const SANITARY_CABIN_FIXTURES = [
+    { id: 'toilet', label: 'Inodoro', defaultState: 'Bueno' },
+    { id: 'cistern_low', label: 'Cisterna baja', defaultState: 'Bueno' },
+    { id: 'cistern_high', label: 'Cisterna alta', defaultState: 'Bueno' },
+    { id: 'paper_holder', label: 'Portapapel higienico', defaultState: 'Bueno' },
+    { id: 'sink', label: 'Lavamanos', defaultState: 'Bueno' },
+    { id: 'trash_bin', label: 'Basurero', defaultState: 'Bueno' },
+    { id: 'coat_hook', label: 'Perchero / gancho', defaultState: 'Bueno' },
+  ];
+
+  const SANITARY_FIXTURE_STATES = ['Bueno', 'Regular', 'Malo', 'No tiene', 'No funciona'];
+
   const SANITARY_EXTRA_TOOLS = SKETCH_TOOLS.filter(tool => !['select', 'door', 'window'].includes(tool.id));
 
   function init() {
@@ -1909,6 +1921,7 @@ const MecFormModule = (() => {
             <canvas id="${canvasId}" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" aria-label="Plano del piso con sanitario activo"></canvas>
           </div>
           ${_renderSanitaryElementTools(item)}
+          ${_renderSanitaryCabinPanel(item)}
           <small id="mec-sanitary-status">${_escape(_sanitaryStatusText(item))}</small>
         </div>
       </div>
@@ -2121,6 +2134,46 @@ const MecFormModule = (() => {
             <span class="mec-sketch-tool__icon" aria-hidden="true">${_sketchToolIcon(tool.id)}</span>
             <span>${_escape(tool.label)}</span>
           </button>`).join('')}
+      </div>`;
+  }
+
+  function _renderSanitaryCabinPanel(item) {
+    const selected = (item.objects || []).find(object => object.id === _selectedSanitaryObjectId && object.type === 'stall');
+    if (!selected) {
+      return `
+        <details class="mec-sanitary-cabin-panel">
+          <summary>Objetos de cabina</summary>
+          <p class="mec-hint">Seleccione una cabina del croquis o pulse + Cbn para cargar inodoro, cisterna, portapapel y estado.</p>
+        </details>`;
+    }
+    const fixtures = _ensureStallFixtures(selected);
+    const available = SANITARY_CABIN_FIXTURES.filter(tool => !fixtures.some(item => item.id === tool.id));
+    return `
+      <details class="mec-sanitary-cabin-panel" open>
+        <summary>${_escape(selected.ficha?.codigo || 'Cabina')} · objetos y estado</summary>
+        <div class="mec-cabin-add-row">
+          <select class="form-control form-control-sm" onchange="MecFormModule.addSanitaryStallFixture('${_escape(item.id)}', '${_escape(selected.id)}', this.value); this.value = '';">
+            <option value="">Agregar objeto...</option>
+            ${available.map(tool => `<option value="${_escape(tool.id)}">${_escape(tool.label)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="mec-cabin-fixture-list">
+          ${fixtures.map(fixture => _renderSanitaryStallFixtureRow(item, selected, fixture)).join('')}
+        </div>
+      </details>`;
+  }
+
+  function _renderSanitaryStallFixtureRow(item, stall, fixture) {
+    const cfg = SANITARY_CABIN_FIXTURES.find(tool => tool.id === fixture.id) || { label: fixture.label || fixture.id };
+    return `
+      <div class="mec-cabin-fixture">
+        <strong>${_escape(cfg.label)}</strong>
+        <select class="form-control form-control-sm"
+          onchange="MecFormModule.setSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', '${_escape(fixture.id)}', 'estado', this.value)">
+          ${SANITARY_FIXTURE_STATES.map(state => `<option value="${_escape(state)}" ${fixture.estado === state ? 'selected' : ''}>${_escape(state)}</option>`).join('')}
+        </select>
+        <button class="btn btn-xs btn-outline" type="button"
+          onclick="MecFormModule.removeSanitaryStallFixture('${_escape(item.id)}', '${_escape(stall.id)}', '${_escape(fixture.id)}')">Quitar</button>
       </div>`;
   }
 
@@ -2356,13 +2409,117 @@ const MecFormModule = (() => {
       y: rect.y,
       w: rect.w,
       h: rect.h,
-      ficha: { codigo: `Cbn ${next}`, artefacto: 'Inodoro', estado: item.estado || '', cabinId },
+      ficha: {
+        codigo: `Cbn ${next}`,
+        artefacto: 'Inodoro',
+        estado: item.estado || '',
+        cabinId,
+        fixtures: _defaultStallFixtures(item),
+      },
     };
     _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
+    item.objects.push(_createSanitaryStallDoor(item, object));
     item.plano.cabinas.push({ id: cabinId, label: `Cbn ${next}`, artefacto: 'Inodoro', estado: item.estado || '' });
     item.inodoros = String(Math.max(Number(item.inodoros || 0), item.plano.cabinas.length, (item.objects || []).filter(child => child.type === 'stall').length));
     _selectedSanitaryObjectId = object.id;
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Cabina agregada con puerta y objetos basicos.', 'success');
+  }
+
+  function _defaultStallFixtures(item) {
+    return ['toilet', 'cistern_low', 'paper_holder'].map(id => {
+      const cfg = SANITARY_CABIN_FIXTURES.find(tool => tool.id === id);
+      return { id, estado: item.estado || cfg?.defaultState || 'Bueno' };
+    });
+  }
+
+  function _ensureStallFixtures(stall) {
+    stall.ficha = stall.ficha || {};
+    stall.ficha.fixtures = Array.isArray(stall.ficha.fixtures)
+      ? stall.ficha.fixtures
+      : _defaultStallFixtures({ estado: stall.ficha.estado || 'Bueno' });
+    stall.ficha.fixtures = stall.ficha.fixtures
+      .filter(fixture => fixture && fixture.id)
+      .map(fixture => ({ id: fixture.id, estado: fixture.estado || 'Bueno' }));
+    return stall.ficha.fixtures;
+  }
+
+  function _createSanitaryStallDoor(item, stall) {
+    const door = {
+      id: `san_door_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: 'door',
+      x: stall.x,
+      y: stall.y,
+      w: 28,
+      h: 8,
+      ficha: {
+        codigo: `Pta ${stall.ficha?.codigo || 'Cbn'}`,
+        subtipo: 'Puerta',
+        estado: item.estado || 'Bueno',
+        abre_hacia: 'Exterior',
+        cabinId: stall.ficha?.cabinId || '',
+        parentStallId: stall.id,
+      },
+    };
+    _syncSanitaryStallDoor(item, stall, door);
+    return door;
+  }
+
+  function _sanitaryStallDoor(item, stall) {
+    return (item.objects || []).find(child => child.type === 'door' && child.ficha?.parentStallId === stall.id) || null;
+  }
+
+  function _syncSanitaryStallDoor(item, stall, door = null) {
+    const target = door || _sanitaryStallDoor(item, stall);
+    if (!target) return null;
+    const width = Math.max(18, Math.min(34, stall.w - 10));
+    target.w = width;
+    target.h = 8;
+    target.x = Math.round(stall.x + stall.w - width - 6);
+    target.y = Math.round(stall.y + stall.h - target.h);
+    target.ficha = target.ficha || {};
+    target.ficha.parentStallId = stall.id;
+    target.ficha.cabinId = stall.ficha?.cabinId || target.ficha.cabinId || '';
+    _orientOpeningToSide(target, 'bottom');
+    return target;
+  }
+
+  function addSanitaryStallFixture(sanitaryId, stallId, fixtureId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
+    const fixture = SANITARY_CABIN_FIXTURES.find(tool => tool.id === fixtureId);
+    if (!item || !stall || !fixture) return;
+    const fixtures = _ensureStallFixtures(stall);
+    if (!fixtures.some(current => current.id === fixtureId)) fixtures.push({ id: fixtureId, estado: item.estado || fixture.defaultState || 'Bueno' });
+    _selectedSanitaryObjectId = stall.id;
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+  }
+
+  function setSanitaryStallFixture(sanitaryId, stallId, fixtureId, key, value) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
+    if (!item || !stall || key !== 'estado') return;
+    const fixture = _ensureStallFixtures(stall).find(current => current.id === fixtureId);
+    if (!fixture) return;
+    fixture.estado = value;
+    _selectedSanitaryObjectId = stall.id;
+    _saveDraft(false);
+    _redrawSanitaryCanvas();
+    renderSchoolPlan();
+  }
+
+  function removeSanitaryStallFixture(sanitaryId, stallId, fixtureId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
+    if (!item || !stall) return;
+    stall.ficha = stall.ficha || {};
+    stall.ficha.fixtures = _ensureStallFixtures(stall).filter(current => current.id !== fixtureId);
+    _selectedSanitaryObjectId = stall.id;
     _saveDraft(false);
     _render();
     renderSchoolPlan();
@@ -2380,7 +2537,7 @@ const MecFormModule = (() => {
     const confirmed = await UI.showConfirm('Eliminar cbn', '¿Confirma eliminar la ultima cbn del croquis sanitario?');
     if (!confirmed) return;
     const removed = stalls[stalls.length - 1];
-    if (removed) item.objects = (item.objects || []).filter(child => child.id !== removed.id);
+    if (removed) item.objects = (item.objects || []).filter(child => child.id !== removed.id && child.ficha?.parentStallId !== removed.id);
     if (item.plano.cabinas.length) item.plano.cabinas.pop();
     item.inodoros = String(Math.max(item.plano.cabinas.length, (item.objects || []).filter(child => child.type === 'stall').length));
     if (_selectedSanitaryObjectId === removed?.id) _selectedSanitaryObjectId = null;
@@ -2912,6 +3069,7 @@ const MecFormModule = (() => {
       return;
     }
     if (object.type === 'stall') {
+      const fixtures = _ensureStallFixtures(object);
       ctx.fillStyle = selected ? 'rgba(107,114,128,.22)' : 'rgba(107,114,128,.12)';
       ctx.strokeStyle = selected ? '#111827' : 'rgba(75,85,99,.78)';
       ctx.lineWidth = selected ? 3 : 2;
@@ -2921,6 +3079,10 @@ const MecFormModule = (() => {
       ctx.strokeStyle = 'rgba(75,85,99,.36)';
       ctx.strokeRect(object.x + 4, object.y + 4, Math.max(0, object.w - 8), Math.max(0, object.h - 8));
       ctx.setLineDash([]);
+      ctx.fillStyle = '#334155';
+      ctx.font = '800 9px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(fixtures.slice(0, 3).map(fixture => _sanitaryCabinFixtureShort(fixture.id)).join(' · '), object.x + object.w / 2, object.y + Math.min(object.h - 10, 24));
       _labelSketchObject(ctx, object, `${object.ficha?.codigo || 'Cbn'} ${_sanitaryDimensionsText(item, object)}`, object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawResizeHandles(ctx, object, true);
       ctx.restore();
@@ -4058,7 +4220,7 @@ const MecFormModule = (() => {
     const item = _activeSanitaryItem();
     if (!item) return null;
     const object = [...(item.objects || [])]
-      .filter(child => child.type !== 'sanitary-room')
+      .filter(child => child.type !== 'sanitary-room' && !child.ficha?.parentStallId)
       .reverse()
       .find(child => _sketchObjectContains(child, point));
     return object ? { item, object } : null;
@@ -4068,7 +4230,7 @@ const MecFormModule = (() => {
     const entry = _sanitaryRoomsForActiveBlockFloor().find(item => item.item.id === _activeSanitaryId);
     const active = _activeSanitaryItem();
     const childHit = active ? [...(active.objects || [])]
-      .filter(child => child.type !== 'sanitary-room' && _isResizableSketchObject(child))
+      .filter(child => child.type !== 'sanitary-room' && !child.ficha?.parentStallId && _isResizableSketchObject(child))
       .reverse()
       .map(child => ({
         item: active,
@@ -4087,7 +4249,7 @@ const MecFormModule = (() => {
     const item = _activeSanitaryItem();
     if (!item) return null;
     return [...(item.objects || [])]
-      .filter(object => object.type === 'door')
+      .filter(object => object.type === 'door' && !object.ficha?.parentStallId)
       .reverse()
       .find(object => {
         if (_doorVariant(object) !== 'door') return false;
@@ -4123,6 +4285,7 @@ const MecFormModule = (() => {
     const object = hit?.object;
     const item = hit?.item;
     if (!object || !item) return;
+    const previous = { x: object.x, y: object.y };
     if (object.type === 'wall') {
       object.x1 = point.x - offset.x1;
       object.y1 = point.y - offset.y1;
@@ -4141,6 +4304,26 @@ const MecFormModule = (() => {
     object.y = point.y - offset.y;
     if (['door', 'window'].includes(object.type)) _clampSanitaryOpeningToRoom(item, object);
     else _clampSanitaryChildToRoom(item, object);
+    if (object.type === 'stall') {
+      const door = _sanitaryStallDoor(item, object);
+      if (door) {
+        door.x += object.x - previous.x;
+        door.y += object.y - previous.y;
+        _syncSanitaryStallDoor(item, object, door);
+      }
+    }
+  }
+
+  function _sanitaryCabinFixtureShort(id) {
+    return {
+      toilet: 'WC',
+      cistern_low: 'CB',
+      cistern_high: 'CA',
+      paper_holder: 'PH',
+      sink: 'LV',
+      trash_bin: 'Bas',
+      coat_hook: 'Gan',
+    }[id] || String(id || '').slice(0, 3).toUpperCase();
   }
 
   function _resizeSanitaryRoomObject(hit, point) {
@@ -4211,6 +4394,7 @@ const MecFormModule = (() => {
       return;
     }
     _clampSanitaryChildToRoom(item, object);
+    if (object.type === 'stall') _syncSanitaryStallDoor(item, object);
   }
 
   function _sanitaryStallBlockers(item, objectId = null) {
@@ -7298,6 +7482,9 @@ const MecFormModule = (() => {
     addSanitaryElement,
     regenerateSanitaryPlan,
     addSanitaryStall,
+    addSanitaryStallFixture,
+    setSanitaryStallFixture,
+    removeSanitaryStallFixture,
     deleteSanitaryStall,
     setSanitaryValue,
     setSanitaryEvidence,

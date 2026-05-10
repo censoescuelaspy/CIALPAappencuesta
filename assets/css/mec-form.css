@@ -1022,6 +1022,49 @@
   background: #fff;
 }
 
+.mec-sanitary-cabin-panel {
+  margin: .65rem 0 .45rem;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.mec-sanitary-cabin-panel summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #172033;
+  font-size: .82rem;
+  font-weight: 900;
+}
+
+.mec-cabin-add-row {
+  margin: .45rem 0 .55rem;
+}
+
+.mec-cabin-fixture-list {
+  display: grid;
+  gap: .42rem;
+}
+
+.mec-cabin-fixture {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 150px) auto;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem;
+  border: 1px solid #edf2f7;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+}
+
+.mec-cabin-fixture strong {
+  color: #27364a;
+  font-size: .78rem;
+}
+
 .school-plan {
   display: grid;
   gap: 1rem;
