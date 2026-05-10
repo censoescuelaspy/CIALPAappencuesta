@@ -6121,7 +6121,6 @@ const MecFormModule = (() => {
     _ensureSanitaries();
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
-    const audit = _schoolPlanAudit();
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
     const canvasHeight = _planCanvasHeight();
     root.dataset.planCanvasId = canvasId;
@@ -6138,10 +6137,9 @@ const MecFormModule = (() => {
           ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
           ${_planKpi('Luces', metrics.lights, _stateSummaryText(metrics.states.light))}
           ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
-          ${_planKpi('Calidad tecnica', `${audit.score}/100`, audit.summaryText)}
         </section>
 
-        ${_renderArchitectAudit(audit)}
+        ${_renderPlanBuilderPanel()}
 
         <section class="school-plan__layout">
           <div class="school-plan__board">
@@ -6206,6 +6204,106 @@ const MecFormModule = (() => {
         <strong>${_escape(value)}</strong>
         <small>${_escape(note || '')}</small>
       </article>`;
+  }
+
+  function _renderPlanBuilderPanel() {
+    const context = _planSelectionContext();
+    return `
+      <section class="school-plan-builder">
+        <div class="school-plan-builder__state">
+          <span>Constructor del plano</span>
+          <strong>${_escape(context.title)}</strong>
+          <small>${_escape(context.detail)}</small>
+        </div>
+        <div class="school-plan-builder__actions">
+          ${context.actions.map(action => `
+            <button class="btn ${_escape(action.tone || 'btn-outline')} btn-sm" type="button" onclick="${_escape(action.onClick)}">
+              ${_escape(action.label)}
+            </button>`).join('')}
+        </div>
+      </section>`;
+  }
+
+  function _planSelectionContext(id = _selectedPlanId) {
+    const fallback = {
+      title: 'Seleccione un bloque, aula, sanitario u objeto',
+      detail: 'Operacion por bloque, piso, ambiente y objeto.',
+      actions: [
+        { label: '+ Nueva aula', tone: 'btn-primary', onClick: 'MecFormModule.newPlanClassroom()' },
+        { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+        { label: 'Aulas', onClick: "MecFormModule.selectModule('aulas')" },
+        { label: 'Sanitarios', onClick: "MecFormModule.selectModule('sanitarios')" },
+      ],
+    };
+    if (!id) return fallback;
+    const raw = String(id);
+    if (raw.startsWith('block::')) {
+      const blockId = raw.replace('block::', '');
+      const block = _blockById(blockId);
+      if (!block) return fallback;
+      const floors = _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
+      return {
+        title: block.bloque_codigo || 'Bloque seleccionado',
+        detail: `${block.estado_bloque || 'Sin estado'} · ${floors.length} piso(s) · ${block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : 'Sin dimensiones'}`,
+        actions: [
+          { label: 'Abrir bloque', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
+          { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+        ],
+      };
+    }
+    if (raw.startsWith('room::')) {
+      const roomId = raw.replace('room::', '');
+      const room = (_data.__classrooms || []).find(item => item.id === roomId);
+      if (!room) return fallback;
+      const block = _blockById(room.blockId);
+      return {
+        title: _classroomHierarchyLabel(room) || room.name || 'Aula seleccionada',
+        detail: `${block?.bloque_codigo || 'Sin bloque'} · ${_normalizeFloor(room.floor || 'Piso 1')} · ${room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin medidas'}`,
+        actions: [
+          { label: 'Abrir aula', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: '+ Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')" },
+          { label: '+ Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')" },
+          { label: '+ Toma', onClick: "MecFormModule.addPlanClassroomElement('outlet')" },
+          { label: '+ Foco', onClick: "MecFormModule.addPlanClassroomElement('light')" },
+          { label: '+ Daño', onClick: "MecFormModule.addPlanClassroomElement('damage')" },
+          { label: '+ Escalera', onClick: "MecFormModule.addPlanClassroomElement('stair')" },
+        ],
+      };
+    }
+    if (raw.startsWith('sanitary::')) {
+      const sanitaryId = raw.replace('sanitary::', '').split('::')[0];
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+      if (!item) return fallback;
+      return {
+        title: item.codigo || 'Sanitario seleccionado',
+        detail: `${_sanitaryBlockLabel(item)} · ${_normalizeFloor(item.planta || 'Piso 1')} · ${item.estado || item.tipo || 'Sin estado'}`,
+        actions: [
+          { label: 'Abrir sanitario', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: '+ Cabina', onClick: 'MecFormModule.addPlanSanitaryStall()' },
+          { label: '+ Inodoro', onClick: "MecFormModule.addPlanSanitaryFixture('toilet')" },
+          { label: '+ Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')" },
+          { label: '+ Puerta', onClick: "MecFormModule.addPlanSanitaryOpening('door')" },
+          { label: '+ Ventana', onClick: "MecFormModule.addPlanSanitaryOpening('window')" },
+        ],
+      };
+    }
+    if (raw.includes('::')) {
+      const [roomId, objectId] = raw.split('::');
+      const room = (_data.__classrooms || []).find(item => item.id === roomId);
+      const object = (room?.objects || []).find(item => item.id === objectId);
+      if (!room || !object) return fallback;
+      return {
+        title: object.ficha?.codigo || _sketchLabel(object.type),
+        detail: `${room.name || 'Aula'} · ${_sketchLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
+        actions: [
+          { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: 'Abrir aula', onClick: `MecFormModule.editPlanClassroom('${_escape(room.id)}')` },
+          { label: 'Eliminar', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
+        ],
+      };
+    }
+    return fallback;
   }
 
   function _planLayerLabel(key) {
@@ -6698,9 +6796,9 @@ const MecFormModule = (() => {
           metersPerPx: floorMetersPerPx,
         }));
         roomItems.forEach(item => {
-          if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h);
+          if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h, floorContentRect);
         });
-        sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h));
+        sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h, floorContentRect));
         _drawSharedWallTicks(ctx, roomItems);
       });
       ctx.restore();
@@ -6913,9 +7011,9 @@ const MecFormModule = (() => {
     return (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
   }
 
-  function _drawPlanSanitaryRoom(ctx, item, x, y, w, h) {
+  function _drawPlanSanitaryRoom(ctx, item, x, y, w, h, floorRect = null) {
     const selected = _selectedPlanId === `sanitary::${item.id}`;
-    _planHitAreas.push({ id: `sanitary::${item.id}`, type: 'sanitary', sanitaryId: item.id, x, y, w, h });
+    _planHitAreas.push({ id: `sanitary::${item.id}`, type: 'sanitary', sanitaryId: item.id, x, y, w, h, floorRect });
     ctx.fillStyle = selected ? 'rgba(128,90,213,.2)' : 'rgba(128,90,213,.1)';
     ctx.strokeStyle = selected ? '#111827' : '#805ad5';
     ctx.lineWidth = selected ? 2.5 : 1.8;
@@ -7021,9 +7119,9 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
-  function _drawPlanClassroom(ctx, room, x, y, w, h) {
+  function _drawPlanClassroom(ctx, room, x, y, w, h, floorRect = null) {
     const selected = _selectedClassroomIdFromPlan() === room.id;
-    _planHitAreas.push({ id: `room::${room.id}`, type: 'room', roomId: room.id, x, y, w, h });
+    _planHitAreas.push({ id: `room::${room.id}`, type: 'room', roomId: room.id, x, y, w, h, floorRect });
     ctx.strokeStyle = selected ? '#111827' : '#2b6cb0';
     ctx.fillStyle = selected ? 'rgba(43,108,176,.18)' : 'rgba(43,108,176,.08)';
     ctx.lineWidth = selected ? 3 : 2;
@@ -7221,8 +7319,195 @@ const MecFormModule = (() => {
     selectModule('sanitarios');
   }
 
+  function _activatePlanSelection(id) {
+    const raw = String(id || '');
+    if (!raw) return;
+    if (raw.startsWith('block::')) {
+      const blockId = raw.replace('block::', '');
+      const block = _blockById(blockId);
+      if (block) {
+        _data.__activeBlockId = block.id;
+        const { id: _id, ...values } = block;
+        _data.bloques = values;
+      }
+      return;
+    }
+    if (raw.startsWith('room::')) {
+      const roomId = raw.replace('room::', '');
+      _activatePlanClassroom(roomId);
+      return;
+    }
+    if (raw.startsWith('sanitary::')) {
+      const parts = raw.split('::');
+      _activatePlanSanitary(parts[1], parts[2] || '');
+      return;
+    }
+    if (raw.includes('::')) {
+      const [roomId, objectId] = raw.split('::');
+      _activatePlanClassroom(roomId, objectId);
+    }
+  }
+
+  function _activatePlanClassroom(roomId, objectId = '') {
+    const room = (_data.__classrooms || []).find(item => item.id === roomId);
+    if (!room) return null;
+    if (_activeClassroomId !== room.id) {
+      _syncActiveClassroomFromSketch();
+      _activeClassroomId = room.id;
+      _loadActiveClassroomIntoSketch();
+    }
+    _setActiveFloor(room.floor || 'Piso 1');
+    if (room.blockId) {
+      _data.__activeBlockId = room.blockId;
+      const block = _blockById(room.blockId);
+      if (block) {
+        const { id: _id, ...values } = block;
+        _data.bloques = values;
+      }
+    }
+    _selectedSketchObjectId = objectId || null;
+    return room;
+  }
+
+  function _activatePlanSanitary(sanitaryId, objectId = '') {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    if (!item) return null;
+    _activeSanitaryId = item.id;
+    _selectedSanitaryObjectId = objectId || null;
+    const block = (_data.__blocks || []).find(candidate => _matchesBlockReference(item.bloque, candidate));
+    if (block) {
+      _data.__activeBlockId = block.id;
+      const { id: _id, ...values } = block;
+      _data.bloques = values;
+    }
+    _setActiveFloor(item.planta || 'Piso 1');
+    return item;
+  }
+
   function selectPlanItem(id) {
     _selectedPlanId = id;
+    _activatePlanSelection(id);
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function openPlanSelection() {
+    const raw = String(_selectedPlanId || '');
+    if (!raw) {
+      UI.showToast('Seleccione una pieza del plano para abrirla.', 'info');
+      return;
+    }
+    if (raw.startsWith('block::')) {
+      const blockId = raw.replace('block::', '');
+      selectModule('bloques');
+      selectBlock(blockId);
+      return;
+    }
+    if (raw.startsWith('room::')) {
+      editPlanClassroom(raw.replace('room::', ''));
+      return;
+    }
+    if (raw.startsWith('sanitary::')) {
+      editPlanSanitary(raw.replace('sanitary::', '').split('::')[0]);
+      return;
+    }
+    if (raw.includes('::')) {
+      editPlanObject(raw);
+    }
+  }
+
+  function _selectedPlanRoomId() {
+    const raw = String(_selectedPlanId || '');
+    if (raw.startsWith('room::')) return raw.replace('room::', '');
+    if (raw && raw.includes('::') && !raw.startsWith('sanitary::')) return raw.split('::')[0];
+    return _activeClassroomId || (_data.__classrooms || [])[0]?.id || '';
+  }
+
+  function _selectedPlanSanitaryId() {
+    const raw = String(_selectedPlanId || '');
+    if (raw.startsWith('sanitary::')) return raw.split('::')[1] || '';
+    return _activeSanitaryId || (_data.__sanitaries || [])[0]?.id || '';
+  }
+
+  function _suggestClassroomElementPoint(type, roomObject) {
+    if (!roomObject) return { x: SKETCH_CANVAS.width / 2, y: SKETCH_CANVAS.height / 2 };
+    const center = { x: roomObject.x + roomObject.w / 2, y: roomObject.y + roomObject.h / 2 };
+    if (type === 'door') return { x: center.x, y: roomObject.y + roomObject.h - 4 };
+    if (type === 'window') return { x: center.x, y: roomObject.y + 4 };
+    if (type === 'board') return { x: center.x, y: roomObject.y + 22 };
+    if (type === 'outlet') return { x: roomObject.x + 22, y: center.y };
+    if (type === 'light') return center;
+    if (type === 'damage') return { x: roomObject.x + roomObject.w - 28, y: roomObject.y + 28 };
+    if (type === 'stair') return { x: roomObject.x + roomObject.w - 54, y: roomObject.y + roomObject.h - 34 };
+    return center;
+  }
+
+  function addPlanClassroomElement(type) {
+    if (!SKETCH_TOOLS.some(tool => tool.id === type) || type === 'select') return;
+    const roomId = _selectedPlanRoomId();
+    const room = _activatePlanClassroom(roomId);
+    if (!room) {
+      UI.showToast('Seleccione un aula para agregar elementos.', 'warning');
+      return;
+    }
+    _ensureSketchObjects();
+    const roomObject = _ensureActiveRoomObject();
+    const point = _suggestClassroomElementPoint(type, roomObject);
+    const previousTool = _sketchTool;
+    _sketchTool = type;
+    _pushSketchHistory();
+    _createSketchObjectAt(point);
+    _sketchTool = previousTool;
+    _syncActiveClassroomFromSketch();
+    _selectedPlanId = `room::${room.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast(`${_sketchToolLabel(type)} agregado al aula.`, 'success');
+  }
+
+  function addPlanSanitaryFixture(fixtureId) {
+    const sanitaryId = _selectedPlanSanitaryId();
+    if (!sanitaryId) {
+      UI.showToast('Seleccione un sanitario para agregar artefactos.', 'warning');
+      return;
+    }
+    _selectedPlanId = `sanitary::${sanitaryId}`;
+    addSanitaryFixture(sanitaryId, fixtureId);
+  }
+
+  function addPlanSanitaryOpening(type) {
+    const sanitaryId = _selectedPlanSanitaryId();
+    if (!sanitaryId) {
+      UI.showToast('Seleccione un sanitario para agregar aberturas.', 'warning');
+      return;
+    }
+    _selectedPlanId = `sanitary::${sanitaryId}`;
+    addSanitaryOpening(sanitaryId, type);
+  }
+
+  function addPlanSanitaryStall() {
+    const sanitaryId = _selectedPlanSanitaryId();
+    if (!sanitaryId) {
+      UI.showToast('Seleccione un sanitario para agregar una cabina.', 'warning');
+      return;
+    }
+    _selectedPlanId = `sanitary::${sanitaryId}`;
+    addSanitaryStall(sanitaryId);
+  }
+
+  function newPlanClassroom() {
+    const raw = String(_selectedPlanId || '');
+    if (raw.startsWith('block::')) _activatePlanSelection(raw);
+    newClassroom();
+    _selectedPlanId = _activeClassroomId ? `room::${_activeClassroomId}` : _selectedPlanId;
+    renderSchoolPlan();
+  }
+
+  function addPlanSanitary() {
+    const raw = String(_selectedPlanId || '');
+    if (raw.startsWith('block::')) _activatePlanSelection(raw);
+    addSanitary();
+    _selectedPlanId = _activeSanitaryId ? `sanitary::${_activeSanitaryId}` : _selectedPlanId;
     renderSchoolPlan();
   }
 
@@ -7280,12 +7565,71 @@ const MecFormModule = (() => {
     UI.showToast('Elemento eliminado.', 'success');
   }
 
+  function _moveRoomObjectWithChildren(room, object, targetX, targetY) {
+    if (!room || !object) return;
+    const bounds = _sketchBlockRect();
+    const next = _clampRectToBounds({ x: targetX, y: targetY, w: object.w, h: object.h }, bounds);
+    const dx = Math.round(next.x - object.x);
+    const dy = Math.round(next.y - object.y);
+    if (!dx && !dy) return;
+    object.x += dx;
+    object.y += dy;
+    (room.objects || []).forEach(child => {
+      if (child.id === object.id) return;
+      if (child.type === 'wall') {
+        child.x1 += dx;
+        child.x2 += dx;
+        child.y1 += dy;
+        child.y2 += dy;
+        return;
+      }
+      if (child.type === 'pencil') {
+        child.points = (child.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
+        return;
+      }
+      if (child.x !== undefined) {
+        child.x += dx;
+        child.y += dy;
+      }
+    });
+    if (_activeClassroomId === room.id) _loadActiveClassroomIntoSketch();
+  }
+
+  function _moveSanitaryRoomWithChildren(item, object, targetX, targetY) {
+    if (!item || !object) return;
+    const bounds = _sketchBlockRect();
+    const next = _clampRectToBounds({ x: targetX, y: targetY, w: object.w, h: object.h }, bounds);
+    const dx = Math.round(next.x - object.x);
+    const dy = Math.round(next.y - object.y);
+    if (!dx && !dy) return;
+    object.x += dx;
+    object.y += dy;
+    (item.objects || []).forEach(child => {
+      if (child.id === object.id) return;
+      if (child.type === 'wall') {
+        child.x1 += dx;
+        child.x2 += dx;
+        child.y1 += dy;
+        child.y2 += dy;
+        return;
+      }
+      if (child.type === 'pencil') {
+        child.points = (child.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
+        return;
+      }
+      if (child.x !== undefined) {
+        child.x += dx;
+        child.y += dy;
+      }
+    });
+  }
+
   function _bindSchoolPlanCanvas() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
     if (canvas.dataset.planBound === 'true') return;
     canvas.dataset.planBound = 'true';
-    let blockDrag = null;
+    let planDrag = null;
     let suppressClick = false;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
@@ -7299,52 +7643,83 @@ const MecFormModule = (() => {
       return [..._planHitAreas].reverse().find(area =>
         point.x >= area.x && point.x <= area.x + area.w && point.y >= area.y && point.y <= area.y + area.h);
     };
-    const updateBlockPlacement = event => {
-      if (!blockDrag) return;
+    const updatePlanPlacement = event => {
+      if (!planDrag) return;
       const point = pointFromEvent(event);
       const next = _clampPlanRect({
-        x: point.x - blockDrag.offsetX,
-        y: point.y - blockDrag.offsetY,
-        w: blockDrag.w,
-        h: blockDrag.h,
+        x: point.x - planDrag.offsetX,
+        y: point.y - planDrag.offsetY,
+        w: planDrag.w,
+        h: planDrag.h,
       }, canvas.width, canvas.height);
-      const block = _blockById(blockDrag.blockId);
-      if (!block) return;
-      block.planPosition = {
-        xRatio: Number((next.x / canvas.width).toFixed(4)),
-        yRatio: Number((next.y / canvas.height).toFixed(4)),
-      };
-      if (block.id === _data.__activeBlockId) _data.bloques = { ...(_data.bloques || {}), planPosition: block.planPosition };
-      _activePlanDrag = { id: `block::${block.id}`, blockId: block.id };
+      if (planDrag.type === 'block') {
+        const block = _blockById(planDrag.blockId);
+        if (!block) return;
+        block.planPosition = {
+          xRatio: Number((next.x / canvas.width).toFixed(4)),
+          yRatio: Number((next.y / canvas.height).toFixed(4)),
+        };
+        if (block.id === _data.__activeBlockId) _data.bloques = { ...(_data.bloques || {}), planPosition: block.planPosition };
+        _activePlanDrag = { id: `block::${block.id}`, blockId: block.id };
+      } else {
+        const floorRect = planDrag.floorRect;
+        if (!floorRect) return;
+        const clamped = _clampRectToBounds({
+          x: point.x - planDrag.offsetX,
+          y: point.y - planDrag.offsetY,
+          w: planDrag.w,
+          h: planDrag.h,
+        }, floorRect);
+        const source = _sketchBlockRect();
+        const targetX = source.x + ((clamped.x - floorRect.x) / Math.max(1, floorRect.w)) * source.w;
+        const targetY = source.y + ((clamped.y - floorRect.y) / Math.max(1, floorRect.h)) * source.h;
+        if (planDrag.type === 'room') {
+          const room = (_data.__classrooms || []).find(item => item.id === planDrag.roomId);
+          const object = _roomObjectForClassroom(room);
+          if (room && object) _moveRoomObjectWithChildren(room, object, targetX, targetY);
+        }
+        if (planDrag.type === 'sanitary') {
+          const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === planDrag.sanitaryId);
+          const object = _sanitaryRoomObject(item);
+          if (item && object) _moveSanitaryRoomWithChildren(item, object, targetX, targetY);
+        }
+        _activePlanDrag = { id: planDrag.id, blockId: planDrag.blockId };
+      }
       suppressClick = true;
       _drawSchoolPlan();
     };
     canvas.addEventListener('pointerdown', event => {
       const area = hit(event);
-      if (!area || area.type !== 'block') return;
+      if (!area || !['block', 'room', 'sanitary'].includes(area.type)) return;
       const point = pointFromEvent(event);
-      blockDrag = {
+      planDrag = {
+        id: area.id,
+        type: area.type,
         blockId: area.blockId,
+        roomId: area.roomId,
+        sanitaryId: area.sanitaryId,
+        floorRect: area.floorRect,
         offsetX: point.x - area.x,
         offsetY: point.y - area.y,
         w: area.w,
         h: area.h,
       };
       _selectedPlanId = area.id;
+      _activatePlanSelection(area.id);
       _activePlanDrag = { id: area.id, blockId: area.blockId };
       canvas.setPointerCapture?.(event.pointerId);
       event.preventDefault();
       _drawSchoolPlan();
     });
     canvas.addEventListener('pointermove', event => {
-      if (!blockDrag) return;
-      updateBlockPlacement(event);
+      if (!planDrag) return;
+      updatePlanPlacement(event);
       event.preventDefault();
     });
     const endDrag = event => {
-      if (!blockDrag) return;
-      updateBlockPlacement(event);
-      blockDrag = null;
+      if (!planDrag) return;
+      updatePlanPlacement(event);
+      planDrag = null;
       _activePlanDrag = null;
       _saveDraft(false);
       renderSchoolPlan();
@@ -8256,6 +8631,13 @@ const MecFormModule = (() => {
     editPlanClassroom,
     editPlanSanitary,
     selectPlanItem,
+    openPlanSelection,
+    addPlanClassroomElement,
+    addPlanSanitaryFixture,
+    addPlanSanitaryOpening,
+    addPlanSanitaryStall,
+    newPlanClassroom,
+    addPlanSanitary,
     deletePlanSelection,
     togglePlanLayer,
     exportPlanJson,

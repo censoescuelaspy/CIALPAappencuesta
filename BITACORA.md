@@ -4,6 +4,33 @@
 
 ---
 
+## Sesión de optimización del registro arquitectónico - 2026-05-10 - v2.5.32
+
+### Enfoque corregido
+- Se reemplaza el enfoque de auditoría visible por mejoras directas al funcionamiento del sistema de registro y construcción del plano.
+- El objetivo de esta versión es acelerar la carga por partes: bloque, piso, aula, sanitario, aberturas, instalaciones y objetos internos.
+
+### Cambios implementados
+- Agregado un **Constructor del plano** contextual en la vista de plano general.
+- Al seleccionar una pieza del plano, el panel ofrece acciones específicas:
+  - bloque: abrir bloque, crear aula, crear sanitario;
+  - aula: abrir aula, agregar puerta, ventana, toma, foco, daño o escalera;
+  - sanitario: abrir sanitario, agregar cabina, inodoro, lavamanos, puerta o ventana;
+  - objeto de aula: abrir ficha, abrir aula o eliminar.
+- La selección del plano general ahora sincroniza automáticamente el bloque, piso, aula o sanitario activo.
+- Las aulas y sanitarios pueden arrastrarse directamente dentro del plano general, no solo los bloques.
+- Al mover un aula o sanitario desde el plano general, sus elementos internos se desplazan junto con el recinto para conservar la relación espacial.
+- Los nuevos objetos agregados desde el plano general se insertan en ubicaciones iniciales coherentes dentro del aula o sanitario seleccionado.
+- Version y cache actualizados a `v2.5.32`.
+
+### Validaciones previstas
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/config.js`
+- `git diff --check`
+- Verificación HTTP de GitHub Pages para `index.html`, `config.js`, `mec-form.js`, `mec-form.css` y `sw.js`.
+
+---
+
 ## Sesión de mejora arquitectónica - 2026-05-10 - v2.5.31
 
 ### Estado publicado
