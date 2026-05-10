@@ -3397,7 +3397,7 @@ const MecFormModule = (() => {
     if (object.type === 'door') {
       return `L${(_openingLengthPixels(object) * (['left', 'right'].includes(_openingSide(object)) ? scale.y : scale.x)).toFixed(2)}m`;
     }
-    if (_isPointSketchObject(object) || object.type === 'pencil' || object.type === 'text') return '';
+    if (_isPointSketchObject(object) || ['damage', 'pencil', 'text'].includes(object.type)) return '';
     if (object.w && object.h) return `${(object.w * scale.x).toFixed(2)} x ${(object.h * scale.y).toFixed(2)}m`;
     return '';
   }
@@ -3435,16 +3435,16 @@ const MecFormModule = (() => {
       return _snapWallObject({ id, type, start, x1: start.x, y1: start.y, x2: end.x, y2: end.y });
     }
     if (type === 'pencil') {
-      return { id, type, points: [start, end], ficha: { codigo: 'Lapiz' } };
+      return { id, type, points: [start, end], ficha: _defaultSketchFicha(type) };
     }
     const x = Math.min(start.x, end.x);
     const y = Math.min(start.y, end.y);
     const w = Math.max(24, Math.abs(end.x - start.x));
     const h = Math.max(18, Math.abs(end.y - start.y));
     if (_isPointSketchObject(type)) {
-      return { id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: {} };
+      return { id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: _defaultSketchFicha(type) };
     }
-    return _clampOpeningToRoom({ id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: {} });
+    return _clampOpeningToRoom({ id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: _defaultSketchFicha(type) });
   }
 
   function _createSketchObjectAt(point) {
@@ -3463,7 +3463,7 @@ const MecFormModule = (() => {
         w: 140,
         h: 36,
         text: 'Texto',
-        ficha: { codigo: 'Texto', observacion: 'Texto' },
+        ficha: _defaultSketchFicha('text'),
       };
     } else if (_sketchTool === 'pencil') {
       object = {
@@ -3473,10 +3473,10 @@ const MecFormModule = (() => {
           { x: point.x - 28, y: point.y },
           { x: point.x + 28, y: point.y },
         ],
-        ficha: { codigo: 'Lapiz' },
+        ficha: _defaultSketchFicha('pencil'),
       };
     } else if (_isPointSketchObject(_sketchTool)) {
-      object = { id, type: _sketchTool, x: point.x, y: point.y, r: _sketchPointRadius(_sketchTool), ficha: {} };
+      object = { id, type: _sketchTool, x: point.x, y: point.y, r: _sketchPointRadius(_sketchTool), ficha: _defaultSketchFicha(_sketchTool) };
     } else {
       const size = _defaultSketchSize(_sketchTool);
       object = {
@@ -3486,7 +3486,7 @@ const MecFormModule = (() => {
         y: Math.round(point.y - size.h / 2),
         w: size.w,
         h: size.h,
-        ficha: {},
+        ficha: _defaultSketchFicha(_sketchTool),
       };
     }
     object = _clampOpeningToRoom(object);
@@ -3503,7 +3503,7 @@ const MecFormModule = (() => {
       window: { w: 86, h: 8 },
       stair: { w: 90, h: 54 },
       board: { w: 112, h: 34 },
-      damage: { w: 58, h: 38 },
+      damage: { w: 24, h: 24 },
       text: { w: 140, h: 36 },
       room: { w: 240, h: 160 },
     }[type] || { w: 54, h: 28 };
@@ -3866,7 +3866,7 @@ const MecFormModule = (() => {
   function _drawDamageObject(ctx, object, selected) {
     const cx = object.x + object.w / 2;
     const cy = object.y + object.h / 2;
-    const radius = Math.max(14, Math.min(object.w, object.h) / 2);
+    const radius = Math.max(9, Math.min(12, Math.min(object.w || 24, object.h || 24) / 2));
     ctx.save();
     ctx.fillStyle = selected ? 'rgba(254,226,226,.95)' : 'rgba(254,242,242,.92)';
     ctx.strokeStyle = selected ? '#111827' : '#c53030';
@@ -3961,7 +3961,7 @@ const MecFormModule = (() => {
 
   function _sketchDimensionsText(object) {
     if (_isPointSketchObject(object)) return '';
-    if (object.type === 'pencil') return '';
+    if (['damage', 'pencil'].includes(object.type)) return '';
     const scale = _sketchScale();
     if (!scale) return '';
     if (object.type === 'wall') {
@@ -4090,7 +4090,7 @@ const MecFormModule = (() => {
   }
 
   function _isResizableSketchObject(object) {
-    return object && !_isPointSketchObject(object) && object.type !== 'pencil';
+    return object && !_isPointSketchObject(object) && !['pencil', 'damage'].includes(object.type);
   }
 
   function _resizeHandles(object) {
@@ -5083,16 +5083,24 @@ const MecFormModule = (() => {
       },
       outlet: {
         title: 'Ficha de toma electrica',
-        typeOptions: ['Simple', 'Doble', 'Multiple', 'No verificable'],
-        extra: [{ key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Flojo', 'Expuesto', 'No funciona'] }],
+        typeOptions: ['Simple', 'Doble', 'Multiple', 'Con puesta a tierra', 'Sin puesta a tierra', 'Industrial', 'No verificable'],
+        extra: [
+          { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Flojo', 'Expuesto', 'No funciona'] },
+          { key: 'tapa', label: 'Tapa / placa', options: ['Buena', 'Regular', 'Rota', 'No tiene'] },
+          { key: 'puesta_tierra', label: 'Puesta a tierra', options: ['Tiene', 'No tiene', 'No verificable'] },
+        ],
         ...common,
       },
       damage: {
-        title: 'Ficha de daño',
+        title: 'Ficha de dano estructural',
         typeOptions: ['Humedad', 'Fisura', 'Rotura', 'Desprendimiento', 'Instalacion expuesta', 'Otro'],
         estados: ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'],
         materiales: common.materiales,
-        extra: [{ key: 'prioridad', label: 'Prioridad', options: ['Baja', 'Media', 'Alta', 'Urgente'] }],
+        extra: [
+          { key: 'prioridad', label: 'Prioridad', options: ['Baja', 'Media', 'Alta', 'Urgente'] },
+          { key: 'sector', label: 'Sector afectado', options: ['Pared', 'Piso', 'Techo', 'Columna', 'Viga', 'Instalacion', 'Otro'] },
+          { key: 'accion_recomendada', label: 'Accion recomendada', options: ['Observar', 'Reparar', 'Aislar area', 'Derivar tecnico'] },
+        ],
       },
       light: {
         title: 'Ficha de iluminacion',
@@ -5128,6 +5136,22 @@ const MecFormModule = (() => {
 
   function _optionTags(options, selected) {
     return options.map(option => `<option value="${_escape(option)}" ${selected === option ? 'selected' : ''}>${_escape(option)}</option>`).join('');
+  }
+
+  function _defaultSketchFicha(type) {
+    const defaults = {
+      outlet: { codigo: 'TC', subtipo: 'Simple', estado: 'Bueno', seguridad: 'Seguro' },
+      light: { codigo: 'Foco', subtipo: 'Foco LED', estado: 'Bueno', funcionamiento: 'Funciona' },
+      damage: { codigo: 'Dano', subtipo: 'Fisura', estado: 'Leve', prioridad: 'Media' },
+      board: { codigo: 'Piz', subtipo: 'Tiza', estado: 'Bueno' },
+      stair: { codigo: 'Esc', subtipo: 'Recta', estado: 'Bueno' },
+      door: { codigo: 'Pta', subtipo: 'Con puerta madera', estado: 'Bueno', abre_hacia: 'Interior', bisagra: 'Inicio' },
+      window: { codigo: 'Vtna', subtipo: 'Corrediza', estado: 'Bueno' },
+      text: { codigo: 'Texto', observacion: 'Texto' },
+      pencil: { codigo: 'Lapiz' },
+      photo: { codigo: 'Foto', estado: 'Bueno' },
+    };
+    return { ...(defaults[type] || {}) };
   }
 
   function _choiceButtons(name, options, selected) {
@@ -5166,6 +5190,7 @@ const MecFormModule = (() => {
     const primaryMeasureLabel = object.type === 'window' ? 'Largo' : 'Ancho';
     const primaryMeasureName = object.type === 'window' ? 'largo_m' : 'ancho_m';
     const compactOpening = ['door', 'window'].includes(object.type);
+    const hasMeasures = !_isPointSketchObject(object) && !['damage', 'text', 'pencil'].includes(object.type);
     const evidenceCount = (object.ficha.evidencias || []).length;
     const modal = document.createElement('div');
     modal.id = modalId;
@@ -5199,20 +5224,31 @@ const MecFormModule = (() => {
                   <label>Material</label>
                   ${_choiceButtons('material', cfg.materiales, object.ficha.material || '')}
                 </div>`}
-              <div class="form-group">
-                <label>${primaryMeasureLabel}</label>
-                <div class="mec-input-with-unit">
-                  <input class="form-control" name="${primaryMeasureName}" type="number" min="0" step="0.01" value="${_escape(lengthM)}">
-                  <span class="mec-unit">m</span>
+              ${hasMeasures ? `
+                <div class="form-group">
+                  <label>${primaryMeasureLabel}</label>
+                  <div class="mec-input-with-unit">
+                    <input class="form-control" name="${primaryMeasureName}" type="number" min="0" step="0.01" value="${_escape(lengthM)}">
+                    <span class="mec-unit">m</span>
+                  </div>
                 </div>
-              </div>
-              <div class="form-group">
-                <label>Alto</label>
-                <div class="mec-input-with-unit">
-                  <input class="form-control" name="alto_m" type="number" min="0" step="0.01" value="${_escape(heightM)}">
-                  <span class="mec-unit">m</span>
+                <div class="form-group">
+                  <label>Alto</label>
+                  <div class="mec-input-with-unit">
+                    <input class="form-control" name="alto_m" type="number" min="0" step="0.01" value="${_escape(heightM)}">
+                    <span class="mec-unit">m</span>
+                  </div>
                 </div>
-              </div>
+              ` : ''}
+              ${object.type === 'outlet' ? `
+                <div class="form-group">
+                  <label>Altura instalada</label>
+                  <div class="mec-input-with-unit">
+                    <input class="form-control" name="altura_m" type="number" min="0" step="0.01" value="${_escape(object.ficha.altura_m || '')}">
+                    <span class="mec-unit">m</span>
+                  </div>
+                </div>
+              ` : ''}
               ${cfg.extra
                 .filter(field => !compactOpening || ['abre_hacia', 'bisagra', 'tiene_reja'].includes(field.key))
                 .map(field => `
@@ -5221,14 +5257,13 @@ const MecFormModule = (() => {
                   ${_choiceButtons(field.key, field.options, object.ficha[field.key] || '')}
                 </div>`).join('')}
             </div>
-            ${compactOpening ? '' : `
-              <div class="form-group">
-                <label>Observacion</label>
-                <textarea class="form-control" name="observacion" rows="3">${_escape(object.ficha.observacion || '')}</textarea>
-              </div>`}
+            <div class="form-group">
+              <label>Observacion</label>
+              <textarea class="form-control" name="observacion" rows="3">${_escape(object.ficha.observacion || '')}</textarea>
+            </div>
             <div class="mec-object-evidence">
               <input id="sketch-object-photo" type="file" accept="image/*" capture="environment" multiple style="display:none;">
-              <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sketch-object-photo')?.click()">Sacar foto</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sketch-object-photo')?.click()">Anexar foto</button>
               <span id="sketch-object-photo-count">${evidenceCount ? `${evidenceCount} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
             </div>
           </form>
@@ -5256,9 +5291,12 @@ const MecFormModule = (() => {
     });
     const input = modal.querySelector('#sketch-object-photo');
     input.addEventListener('change', async () => {
-      object.ficha.evidencias = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _sketchObjectEvidenceContext(object))));
+      const current = object.ficha.evidencias || [];
+      const added = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _sketchObjectEvidenceContext(object))));
+      object.ficha.evidencias = [...current, ...added];
       const count = modal.querySelector('#sketch-object-photo-count');
       if (count) count.textContent = `${object.ficha.evidencias.length} foto(s) asociada(s)`;
+      input.value = '';
       _saveDraft(false);
     });
     UI.openModal(modalId);
@@ -5283,11 +5321,13 @@ const MecFormModule = (() => {
     const object = _findSketchObjectById(data.get('object_id'));
     if (!object) return false;
     object.ficha = object.ficha || {};
-    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'bisagra', 'seguridad', 'pasamanos', 'prioridad', 'funcionamiento', 'observacion']
+    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'altura_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'bisagra', 'seguridad', 'pasamanos', 'prioridad', 'sector', 'accion_recomendada', 'funcionamiento', 'tapa', 'puesta_tierra', 'observacion']
       .forEach(key => {
         if (data.has(key)) object.ficha[key] = String(data.get(key) || '').trim();
       });
-    _applyObjectMeters(object, object.ficha.largo_m || object.ficha.ancho_m, object.ficha.alto_m);
+    if (data.has('largo_m') || data.has('ancho_m') || data.has('alto_m')) {
+      _applyObjectMeters(object, object.ficha.largo_m || object.ficha.ancho_m, object.ficha.alto_m);
+    }
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
@@ -7107,8 +7147,12 @@ const MecFormModule = (() => {
         return;
       }
       if (object.type === 'damage') {
-        parts.push(`<line x1="${_planPrintCoord(rect.x)}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(rect.x + Math.max(2, rect.w))}" y2="${_planPrintCoord(rect.y + Math.max(2, rect.h))}" class="damage-symbol"/>`);
-        parts.push(`<line x1="${_planPrintCoord(rect.x + Math.max(2, rect.w))}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(rect.x)}" y2="${_planPrintCoord(rect.y + Math.max(2, rect.h))}" class="damage-symbol"/>`);
+        const cx = rect.x + Math.max(1, rect.w / 2);
+        const cy = rect.y + Math.max(1, rect.h / 2);
+        const r = 1.6;
+        parts.push(`<circle cx="${_planPrintCoord(cx)}" cy="${_planPrintCoord(cy)}" r="${_planPrintCoord(r)}" class="damage-marker"/>`);
+        parts.push(`<line x1="${_planPrintCoord(cx - r * .55)}" y1="${_planPrintCoord(cy - r * .55)}" x2="${_planPrintCoord(cx + r * .55)}" y2="${_planPrintCoord(cy + r * .55)}" class="damage-symbol"/>`);
+        parts.push(`<line x1="${_planPrintCoord(cx + r * .55)}" y1="${_planPrintCoord(cy - r * .55)}" x2="${_planPrintCoord(cx - r * .55)}" y2="${_planPrintCoord(cy + r * .55)}" class="damage-symbol"/>`);
         return;
       }
       if (object.type === 'stair') {
@@ -7211,6 +7255,7 @@ const MecFormModule = (() => {
               .outlet-symbol{fill:#fff7ed;stroke:#b7791f;stroke-width:.32}
               .light-symbol{fill:#fffbeb;stroke:#d69e2e;stroke-width:.32}
               .light-ray{stroke:#d69e2e;stroke-width:.22}
+              .damage-marker{fill:#fff1f2;stroke:#c53030;stroke-width:.32}
               .damage-symbol{stroke:#c53030;stroke-width:.42}
               .inner-wall{stroke:#172033;stroke-width:1.2;stroke-linecap:round}
               .free-line{fill:none;stroke:#7c2d12;stroke-width:.3;stroke-linecap:round;stroke-linejoin:round}
