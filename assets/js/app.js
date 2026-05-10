@@ -354,8 +354,8 @@ const AppController = (() => {
     sidebar?.classList.remove('sidebar--open');
     const toggleBtn = document.getElementById('sidebar-toggle');
     if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'true');
-      toggleBtn.setAttribute('aria-label', 'Ocultar menu');
+      toggleBtn.setAttribute('aria-expanded', 'false');
+      toggleBtn.setAttribute('aria-label', 'Mostrar menu');
     }
 
     _buildSidebar();
@@ -555,22 +555,42 @@ const AppController = (() => {
     if (!sidebar || !hotzone || sidebar.dataset.autoPeekBound === 'true') return;
     sidebar.dataset.autoPeekBound = 'true';
 
+    const toggleBtn = document.getElementById('sidebar-toggle');
+    const isAutoHidden = () => document.body.classList.contains('sidebar-auto-hidden');
     const show = () => {
-      if (!document.body.classList.contains('sidebar-auto-hidden')) return;
+      if (!isAutoHidden()) return;
       clearTimeout(_sidebarHideTimer);
       document.body.classList.add('sidebar-peek');
+      toggleBtn?.setAttribute('aria-expanded', 'true');
+      toggleBtn?.setAttribute('aria-label', 'Ocultar menu');
     };
     const scheduleHide = () => {
-      if (!document.body.classList.contains('sidebar-auto-hidden')) return;
+      if (!isAutoHidden()) return;
       clearTimeout(_sidebarHideTimer);
-      _sidebarHideTimer = setTimeout(() => document.body.classList.remove('sidebar-peek'), 350);
+      _sidebarHideTimer = setTimeout(() => {
+        document.body.classList.remove('sidebar-peek');
+        toggleBtn?.setAttribute('aria-expanded', 'false');
+        toggleBtn?.setAttribute('aria-label', 'Mostrar menu');
+      }, 360);
     };
 
     hotzone.addEventListener('mouseenter', show);
+    hotzone.addEventListener('mousemove', show);
     hotzone.addEventListener('touchstart', show, { passive: true });
     sidebar.addEventListener('mouseenter', show);
     sidebar.addEventListener('mouseleave', scheduleHide);
     sidebar.addEventListener('touchend', scheduleHide, { passive: true });
+    document.addEventListener('mousemove', event => {
+      if (!isAutoHidden()) return;
+      if (event.clientX <= 32) {
+        show();
+        return;
+      }
+      if (document.body.classList.contains('sidebar-peek') && event.clientX > sidebar.offsetWidth + 36) {
+        scheduleHide();
+      }
+    });
+    window.addEventListener('resize', scheduleHide);
   }
 
   // ── Module router ──────────────────────────────────────────────────────────
