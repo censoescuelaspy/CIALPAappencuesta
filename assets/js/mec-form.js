@@ -989,9 +989,9 @@ const MecFormModule = (() => {
             <div class="mec-sketch__actions">
               <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()">Dibujar aula base</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.editSelectedSketchObject()">Editar ficha</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer cambio</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.flipSelectedDoorSwing()">Cambiar apertura puerta</button>
+              <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+              <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
               <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Eliminar seleccionado</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.clearSketch()">Limpiar plano completo</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">Exportar modelo JSON</button>
@@ -1060,6 +1060,8 @@ const MecFormModule = (() => {
         <div class="mec-selection-dock__actions">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSelectedSketchFicha()">Ficha</button>
           ${object.type === 'door' ? '<button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.flipSelectedDoorSwing()">Apertura</button>' : ''}
+          <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+          <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Eliminar</button>
         </div>
       </div>`;
@@ -7082,6 +7084,8 @@ const MecFormModule = (() => {
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
                 <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.printPlanPdf()">PDF</button>
+                <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+                <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>

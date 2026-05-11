@@ -4,6 +4,25 @@
 
 ---
 
+## Sesion de botones deshacer y rehacer visibles - 2026-05-11 - v2.5.44
+
+### Objetivo
+- Hacer visibles los controles de recuperacion de acciones junto a los botones de eliminacion del editor de planos.
+
+### Cambios implementados
+- En el croquis de aulas, los botones `Deshacer` y `Rehacer` quedan inmediatamente antes de `Eliminar seleccionado`.
+- En la ficha rapida contextual de cada elemento seleccionado tambien aparecen `Deshacer`, `Rehacer` y `Eliminar` juntos.
+- En la vista `Plano escuela`, se agregaron `Deshacer` y `Rehacer` junto al boton `Eliminar`.
+- `Deshacer` usa color naranja (`btn-warning`) y `Rehacer` usa color verde (`btn-success`) para diferenciarlos del boton rojo de eliminacion.
+- Version y cache actualizados a `v2.5.44`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- Parseo con `osascript -l JavaScript` de `config.js`, `api.js`, `auth.js`, `mec-schema.js`, `mec-form.js`, `app.js`, `sw.js` y `gas/Code.gs` sin errores.
+- Servidor local `python3 -m http.server 8025` con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; verificada edicion `v2.5.44`, Inicio activo, cache `cialpa-app-v2.5.44` y botones `Deshacer`/`Rehacer` junto a `Eliminar`.
+
+---
+
 ## Sesion de bloqueo contra movimientos accidentales del plano - 2026-05-11 - v2.5.43
 
 ### Objetivo
