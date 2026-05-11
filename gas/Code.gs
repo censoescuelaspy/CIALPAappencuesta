@@ -13,6 +13,7 @@
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const SPREADSHEET_ID = '1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg'; // Google Sheets ID
+const EVIDENCE_FOLDER_ID = '1MtFgyyCaAF4MyfRmpvFAvwjgzSn75V_-';
 const SHEET_NAMES = {
   ESCUELAS:     'escuelas_seleccionadas',
   USUARIOS:     'usuarios',
@@ -24,6 +25,7 @@ const SHEET_NAMES = {
   CONFIG:       'configuracion',
   AUDITORIA:    'auditoria',
   CATALOGOS:    'catalogos',
+  EVIDENCIAS:   'evidencias',
 };
 
 const ADMIN_USERS = ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'];
@@ -117,6 +119,7 @@ function _handleRequest(e) {
 
       // Incidencias
       case 'saveIncidencia':  return _respond(SheetsService.saveIncidencia(params));
+      case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));
       case 'getIncidencias':  return _respond(SheetsService.getIncidencias(params));
       case 'resolverIncidencia': return _respond(SheetsService.resolverIncidencia(params));
 

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.18
+ * Version: 2.5.41
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -392,24 +392,31 @@ const AppController = (() => {
   // ── Main app shell ─────────────────────────────────────────────────────────
 
   function showApp() {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-shell').style.display = 'flex';
-    const sidebar = document.getElementById('sidebar');
-    document.body.classList.add('sidebar-auto-hidden');
-    document.body.classList.remove('sidebar-peek');
-    sidebar?.classList.remove('sidebar--open');
-    const toggleBtn = document.getElementById('sidebar-toggle');
-    if (toggleBtn) {
-      toggleBtn.setAttribute('aria-expanded', 'false');
-      toggleBtn.setAttribute('aria-label', 'Mostrar menu');
+    const loginScreen = document.getElementById('login-screen');
+    const appShell = document.getElementById('app-shell');
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (appShell) appShell.style.display = 'flex';
+    try {
+      const sidebar = document.getElementById('sidebar');
+      document.body.classList.add('sidebar-auto-hidden');
+      document.body.classList.remove('sidebar-peek');
+      sidebar?.classList.remove('sidebar--open');
+      const toggleBtn = document.getElementById('sidebar-toggle');
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        toggleBtn.setAttribute('aria-label', 'Mostrar menu');
+      }
+
+      _buildSidebar();
+      _renderUserBar();
+      Auth.applyRoleVisibility();
+      _bindGlobalEvents();
+    } catch (err) {
+      console.error('Error inicializando la vista principal:', err);
+      UI.showToast?.('Se restauro la vista Inicio despues de actualizar la app.', 'warning', 6000);
+    } finally {
+      resetToHome();
     }
-
-    _buildSidebar();
-    _renderUserBar();
-    Auth.applyRoleVisibility();
-    _bindGlobalEvents();
-
-    resetToHome();
   }
 
   function _bindLaunchHomeReset() {
@@ -424,10 +431,16 @@ const AppController = (() => {
   }
 
   function resetToHome() {
-    showModule(START_MODULE);
+    try {
+      showModule(START_MODULE);
+    } catch (err) {
+      console.error('No se pudo abrir Inicio por el ruteador:', err);
+      _ensureVisibleModule(START_MODULE, true);
+    }
     requestAnimationFrame(() => {
-      _ensureVisibleModule(START_MODULE);
+      _ensureVisibleModule(START_MODULE, true);
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      setTimeout(() => _ensureVisibleModule(START_MODULE), 120);
     });
   }
 
@@ -693,14 +706,27 @@ const AppController = (() => {
     if (mod) document.title = `${mod.label} — ${APP_CONFIG.APP_NAME}`;
   }
 
-  function _ensureVisibleModule(moduleId = 'inicio') {
+  function _ensureVisibleModule(moduleId = 'inicio', force = false) {
     const active = document.querySelector('.module-panel--active');
     const fallback = document.getElementById(`module-${moduleId}`);
-    if (active || !fallback) return;
+    if (!fallback) return;
+    if (!force && _isVisiblePanel(active)) return;
+    document.querySelectorAll('.module-panel').forEach(panel => panel.classList.remove('module-panel--active'));
     fallback.classList.add('module-panel--active');
     document.querySelectorAll('.nav-item').forEach(item =>
       item.classList.toggle('nav-item--active', item.dataset.module === moduleId));
+    const mod = MODULES[moduleId];
+    if (mod) document.title = `${mod.label} — ${APP_CONFIG.APP_NAME}`;
     _currentModule = moduleId;
+  }
+
+  function _isVisiblePanel(panel) {
+    if (!panel) return false;
+    const style = window.getComputedStyle ? window.getComputedStyle(panel) : null;
+    return panel.classList.contains('module-panel--active')
+      && style?.display !== 'none'
+      && style?.visibility !== 'hidden'
+      && panel.getClientRects().length > 0;
   }
 
   async function _initModule(id) {

@@ -346,6 +346,17 @@ const API = (() => {
       case 'saveEncuestador': return { status: 'ok' };
       case 'deleteEncuestador': return { status: 'ok' };
       case 'saveIncidencia': return { status: 'ok', data: { id_incidencia: 'INC_DEMO_' + Date.now() } };
+      case 'uploadEvidence': return {
+        status: 'ok',
+        data: {
+          id: 'DRV_DEMO_' + Date.now(),
+          url: APP_CONFIG.EVIDENCE_FOLDER_URL || '',
+          name: data.filename || 'evidencia-demo.jpg',
+          folderId: APP_CONFIG.EVIDENCE_FOLDER_ID || '',
+          uploadedAt: new Date().toISOString(),
+          demo: true,
+        },
+      };
       case 'getIncidencias': return { status: 'ok', data: [] };
       case 'resolverIncidencia': return { status: 'ok' };
       case 'getConfig': return { status: 'ok', data: Object.entries(_DEMO_CONFIG).map(([clave, valor]) => ({ clave, valor, descripcion: 'Parametro demo', editable: 'true' })) };
@@ -578,6 +589,7 @@ const API = (() => {
   async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 
   async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
+  async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
   async function getIncidencias(filters = {}) { return call('getIncidencias', 'GET', filters, { skipLoading: true }); }
   async function resolverIncidencia(id, resolucion) { return call('resolverIncidencia', 'POST', { id_incidencia: id, resolucion }); }
 
@@ -607,6 +619,7 @@ const API = (() => {
     saveEncuestador,
     deleteEncuestador,
     saveIncidencia,
+    uploadEvidence,
     getIncidencias,
     resolverIncidencia,
     getConfig,

@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de arranque en Inicio y evidencias en Drive - 2026-05-11 - v2.5.41
+
+### Objetivo
+- Evitar la pantalla en blanco despues de actualizar la app y dejar preparado el guardado real de fotos/evidencias en la carpeta Drive del proyecto.
+
+### Cambios implementados
+- `Inicio` queda activo por defecto en el HTML y tambien se fuerza desde el controlador cuando la app se abre, se reanuda o se actualiza.
+- El arranque de la app ahora captura fallas parciales del shell y vuelve a mostrar `Inicio` como vista segura.
+- La carpeta de evidencias queda configurada con el ID `1MtFgyyCaAF4MyfRmpvFAvwjgzSn75V_-` y su enlace publico.
+- Las fotos adjuntas al cuestionario, aulas, objetos del plano y sanitarios intentan subirse automaticamente a Drive; si el dispositivo esta sin conexion quedan como pendientes en el borrador local y se reintentan al volver la conexion.
+- Cada evidencia guarda nombre indexado, contexto de escuela/bloque/piso/espacio/elemento, estado de subida, ID/URL de Drive y registro en la hoja `evidencias`.
+- Se agrego el endpoint `uploadEvidence` en Google Apps Script usando `DriveApp`, mas la hoja `evidencias` en el setup.
+- Version y cache actualizados a `v2.5.41`.
+
+### Validaciones ejecutadas
+- `git diff --check`.
+- Parseo con `osascript -l JavaScript` de `assets/js/config.js`, `assets/js/api.js`, `assets/js/auth.js`, `assets/js/mec-schema.js`, `assets/js/mec-form.js`, `assets/js/app.js`, `sw.js`, `gas/Code.gs`, `gas/sheets.gs` y `gas/setup.gs`.
+- Servidor local `python3 -m http.server` y `curl` sobre `index.html`, `assets/js/config.js` y `sw.js`, verificando `v2.5.41`, `module-inicio` activo y carpeta Drive configurada.
+
+### Nota operativa
+- Para que la subida real a Drive funcione en produccion, hay que redeplegar el Web App de Apps Script con esta version del codigo.
+
+---
+
 ## Sesion de editor electrico, plano general movil y canvas nitido - 2026-05-11 - v2.5.40
 
 ### Objetivo

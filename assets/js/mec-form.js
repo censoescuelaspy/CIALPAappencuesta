@@ -23,6 +23,8 @@ const MecFormModule = (() => {
   let _selectedPlanId = null;
   let _planHitAreas = [];
   let _activePlanDrag = null;
+  let _evidenceSyncRunning = false;
+  let _evidenceOnlineBound = false;
   const _sketchHistory = [];
   const _sketchRedo = [];
   const _planLayers = {
@@ -90,6 +92,11 @@ const MecFormModule = (() => {
     _prefillGeneralFromSelectedSchool();
     _render();
     _initialized = true;
+    if (!_evidenceOnlineBound && typeof window !== 'undefined') {
+      _evidenceOnlineBound = true;
+      window.addEventListener('online', () => _syncPendingEvidenceUploads());
+    }
+    _syncPendingEvidenceUploads();
   }
 
   function _loadDraft() {
@@ -145,21 +152,169 @@ const MecFormModule = (() => {
     const indexedAt = new Date().toISOString();
     const enrichedContext = _normalizeEvidenceContext(context);
     const label = _evidenceIndexLabel(enrichedContext);
+    const indexedName = _indexedEvidenceFilename(label, file);
     return new Promise(resolve => {
       const reader = new FileReader();
-      reader.onload = () => resolve({
+      reader.onload = async () => {
+        const record = {
+          name: file.name,
+          indexedName,
+          type: file.type || 'image/jpeg',
+          size: file.size,
+          capturedAt: indexedAt,
+          label,
+          indexKey: _slug(label || file.name || 'evidencia'),
+          context: enrichedContext,
+          dataUrl: reader.result,
+          driveStatus: 'pending',
+          driveFolderId: _evidenceFolderId(),
+        };
+        resolve(await _uploadEvidenceRecord(record));
+      };
+      reader.onerror = () => resolve({
         name: file.name,
-        indexedName: `${_slug(label || 'evidencia')}_${Date.now()}_${_slug(file.name || 'foto')}`,
-        type: file.type,
+        indexedName,
+        type: file.type || 'image/jpeg',
         size: file.size,
         capturedAt: indexedAt,
         label,
         indexKey: _slug(label || file.name || 'evidencia'),
         context: enrichedContext,
-        dataUrl: reader.result,
+        driveStatus: 'local',
+        uploadError: 'No se pudo leer el archivo en el dispositivo.',
       });
       reader.readAsDataURL(file);
     });
+  }
+
+  function _indexedEvidenceFilename(label, file) {
+    const original = String(file?.name || 'foto.jpg');
+    const extensionFromName = original.match(/\.[a-z0-9]{2,5}$/i)?.[0]?.toLowerCase();
+    const extensionFromType = file?.type === 'image/png'
+      ? '.png'
+      : file?.type === 'image/webp'
+        ? '.webp'
+        : '.jpg';
+    const extension = extensionFromName || extensionFromType;
+    const baseName = original.replace(/\.[^.]+$/, '') || 'foto';
+    return `${_slug(label || 'evidencia')}_${Date.now()}_${_slug(baseName)}${extension}`;
+  }
+
+  function _evidenceFolderId() {
+    const configured = APP_CONFIG.EVIDENCE_FOLDER_ID || '';
+    if (configured) return configured;
+    const match = String(APP_CONFIG.EVIDENCE_FOLDER_URL || '').match(/folders\/([^/?#]+)/);
+    return match?.[1] || '';
+  }
+
+  async function _uploadEvidenceRecord(record) {
+    const folderId = _evidenceFolderId();
+    if (!record?.dataUrl || record.driveFileId || record.driveStatus === 'uploaded' || record.driveStatus === 'demo') return record;
+    if (!folderId || typeof API === 'undefined' || !API.uploadEvidence) {
+      return { ...record, driveStatus: record.driveStatus || 'local', driveFolderId: folderId };
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return { ...record, driveStatus: 'pending', driveFolderId: folderId };
+    }
+
+    try {
+      const result = await API.uploadEvidence({
+        folderId,
+        filename: record.indexedName || record.name || `evidencia_${Date.now()}.jpg`,
+        name: record.name || '',
+        mimeType: record.type || 'image/jpeg',
+        dataUrl: record.dataUrl,
+        label: record.label || '',
+        context: record.context || {},
+      });
+      if (result.status === 'ok' && result.data) {
+        return {
+          ...record,
+          driveStatus: result.data.demo ? 'demo' : 'uploaded',
+          driveFileId: result.data.id || '',
+          driveUrl: result.data.url || '',
+          driveFolderId: result.data.folderId || folderId,
+          uploadedAt: result.data.uploadedAt || new Date().toISOString(),
+          evidenceId: result.data.evidenceId || '',
+          uploadError: '',
+        };
+      }
+      return {
+        ...record,
+        driveStatus: 'pending',
+        driveFolderId: folderId,
+        uploadError: result.message || 'No se pudo subir a Drive.',
+      };
+    } catch (err) {
+      return {
+        ...record,
+        driveStatus: 'pending',
+        driveFolderId: folderId,
+        uploadError: err.message || 'Error subiendo a Drive.',
+      };
+    }
+  }
+
+  async function _syncPendingEvidenceUploads() {
+    if (_evidenceSyncRunning) return;
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+    if (!_evidenceFolderId()) return;
+    _evidenceSyncRunning = true;
+    let changed = false;
+    let uploaded = 0;
+
+    const syncPhoto = async (photo, fallbackContext = {}) => {
+      if (!photo?.dataUrl || photo.driveFileId || photo.driveStatus === 'uploaded' || photo.driveStatus === 'demo') return photo;
+      const previousId = photo.driveFileId || '';
+      const previousStatus = photo.driveStatus || '';
+      const updated = await _uploadEvidenceRecord({
+        ...photo,
+        context: _normalizeEvidenceContext(photo.context || fallbackContext),
+      });
+      if ((updated.driveFileId || '') !== previousId || (updated.driveStatus || '') !== previousStatus || (updated.uploadError || '') !== (photo.uploadError || '')) {
+        changed = true;
+      }
+      if (!previousId && updated.driveFileId) uploaded += 1;
+      return updated;
+    };
+
+    try {
+      for (const [fieldPath, photos] of Object.entries(_data.__evidence || {})) {
+        _data.__evidence[fieldPath] = await Promise.all((photos || []).map(photo =>
+          syncPhoto(photo, { scope: 'cuestionario', fieldPath })
+        ));
+      }
+      for (const room of (_data.__classrooms || [])) {
+        for (const object of (room.objects || [])) {
+          if (!object.ficha?.evidencias) continue;
+          object.ficha.evidencias = await Promise.all(object.ficha.evidencias.map(photo =>
+            syncPhoto(photo, _sketchObjectEvidenceContext(object, room))
+          ));
+        }
+      }
+      for (const item of (_data.__sanitaries || [])) {
+        if (item.evidencias) {
+          item.evidencias = await Promise.all(item.evidencias.map(photo =>
+            syncPhoto(photo, _sanitaryEvidenceContext(item))
+          ));
+        }
+        for (const object of (item.objects || [])) {
+          if (!object.ficha?.evidencias) continue;
+          object.ficha.evidencias = await Promise.all(object.ficha.evidencias.map(photo =>
+            syncPhoto(photo, {
+              ..._sanitaryEvidenceContext(item),
+              elementType: _sanitaryObjectLabel(object.type),
+              elementLabel: object.ficha?.codigo || _sanitaryObjectShort(object.type),
+              elementId: object.id,
+            })
+          ));
+        }
+      }
+      if (changed) _saveDraft(false);
+      if (uploaded) UI.showToast(`${uploaded} evidencia(s) sincronizada(s) con Drive.`, 'success', 4500);
+    } finally {
+      _evidenceSyncRunning = false;
+    }
   }
 
   function _normalizeEvidenceContext(context = {}) {
@@ -742,8 +897,14 @@ const MecFormModule = (() => {
 
   function _evidenceLabel(photos) {
     if (!photos.length) return 'Sin foto asociada';
-    if (photos.length === 1) return `1 foto: ${photos[0].name || 'evidencia'}`;
-    return `${photos.length} fotos asociadas`;
+    const uploaded = photos.filter(photo => photo.driveUrl || photo.driveStatus === 'uploaded' || photo.driveStatus === 'demo').length;
+    const pending = Math.max(0, photos.length - uploaded);
+    const base = photos.length === 1
+      ? `1 foto: ${photos[0].name || 'evidencia'}`
+      : `${photos.length} fotos asociadas`;
+    if (uploaded) return `${base} - ${uploaded} en Drive${pending ? ` - ${pending} pendiente(s)` : ''}`;
+    if (pending) return `${base} - pendiente Drive`;
+    return base;
   }
 
   function _refreshEvidenceState(key) {
@@ -2021,7 +2182,7 @@ const MecFormModule = (() => {
           <input id="sanitary-photo-${_escape(item.id)}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
             onchange="MecFormModule.setSanitaryEvidence('${_escape(item.id)}', this)">
           <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sanitary-photo-${_escape(item.id)}')?.click()">Sacar foto</button>
-          <span>${(item.evidencias || []).length ? `${item.evidencias.length} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
+          <span>${_escape(_evidenceLabel(item.evidencias || []))}</span>
         </div>
       </details>`;
   }
@@ -2135,7 +2296,7 @@ const MecFormModule = (() => {
           <input id="${evidenceId}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
             onchange="MecFormModule.setSanitaryEvidence('${_escape(item.id)}', this)">
           <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${evidenceId}')?.click()">Sacar foto</button>
-          <span>${(item.evidencias || []).length ? `${item.evidencias.length} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
+          <span>${_escape(_evidenceLabel(item.evidencias || []))}</span>
         </div>
       </article>`;
   }
@@ -2413,7 +2574,7 @@ const MecFormModule = (() => {
           <input id="${evidenceId}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
             onchange="MecFormModule.setSanitaryObjectEvidence('${_escape(item.id)}', '${_escape(selected.id)}', this)">
           <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${evidenceId}')?.click()">Anexar foto</button>
-          <span>${(selected.ficha.evidencias || []).length ? `${selected.ficha.evidencias.length} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
+          <span>${_escape(_evidenceLabel(selected.ficha.evidencias || []))}</span>
         </div>
       </details>`;
   }
@@ -6144,7 +6305,6 @@ const MecFormModule = (() => {
     const primaryMeasureName = object.type === 'window' ? 'largo_m' : 'ancho_m';
     const compactOpening = ['door', 'window'].includes(object.type);
     const hasMeasures = !_isPointSketchObject(object) && !['wall', 'damage', 'text', 'pencil'].includes(object.type);
-    const evidenceCount = (object.ficha.evidencias || []).length;
     const modal = document.createElement('div');
     modal.id = modalId;
     modal.className = 'modal modal--dialog mec-object-modal';
@@ -6217,7 +6377,7 @@ const MecFormModule = (() => {
             <div class="mec-object-evidence">
               <input id="sketch-object-photo" type="file" accept="image/*" capture="environment" multiple style="display:none;">
               <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sketch-object-photo')?.click()">Anexar foto</button>
-              <span id="sketch-object-photo-count">${evidenceCount ? `${evidenceCount} foto(s) asociada(s)` : 'Sin foto asociada'}</span>
+              <span id="sketch-object-photo-count">${_escape(_evidenceLabel(object.ficha.evidencias || []))}</span>
             </div>
           </form>
         </div>
@@ -6249,7 +6409,7 @@ const MecFormModule = (() => {
       const added = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _sketchObjectEvidenceContext(object))));
       object.ficha.evidencias = [...current, ...added];
       const count = modal.querySelector('#sketch-object-photo-count');
-      if (count) count.textContent = `${object.ficha.evidencias.length} foto(s) asociada(s)`;
+      if (count) count.textContent = _evidenceLabel(object.ficha.evidencias);
       input.value = '';
       _saveDraft(false);
     });
@@ -9790,6 +9950,12 @@ const MecFormModule = (() => {
         type: photo.type,
         size: photo.size,
         capturedAt: photo.capturedAt,
+        driveStatus: photo.driveStatus || '',
+        driveFileId: photo.driveFileId || '',
+        driveUrl: photo.driveUrl || '',
+        driveFolderId: photo.driveFolderId || '',
+        uploadedAt: photo.uploadedAt || '',
+        evidenceId: photo.evidenceId || '',
         context: photo.context || {},
       }));
     });
@@ -9804,6 +9970,12 @@ const MecFormModule = (() => {
           type: photo.type,
           size: photo.size,
           capturedAt: photo.capturedAt,
+          driveStatus: photo.driveStatus || '',
+          driveFileId: photo.driveFileId || '',
+          driveUrl: photo.driveUrl || '',
+          driveFolderId: photo.driveFolderId || '',
+          uploadedAt: photo.uploadedAt || '',
+          evidenceId: photo.evidenceId || '',
           context: photo.context || _sketchObjectEvidenceContext(object, room),
         }));
       });
@@ -9818,6 +9990,12 @@ const MecFormModule = (() => {
         type: photo.type,
         size: photo.size,
         capturedAt: photo.capturedAt,
+        driveStatus: photo.driveStatus || '',
+        driveFileId: photo.driveFileId || '',
+        driveUrl: photo.driveUrl || '',
+        driveFolderId: photo.driveFolderId || '',
+        uploadedAt: photo.uploadedAt || '',
+        evidenceId: photo.evidenceId || '',
         context: photo.context || _sanitaryEvidenceContext(item),
       }));
       (item.objects || []).forEach(object => {
@@ -9835,6 +10013,12 @@ const MecFormModule = (() => {
           type: photo.type,
           size: photo.size,
           capturedAt: photo.capturedAt,
+          driveStatus: photo.driveStatus || '',
+          driveFileId: photo.driveFileId || '',
+          driveUrl: photo.driveUrl || '',
+          driveFolderId: photo.driveFolderId || '',
+          uploadedAt: photo.uploadedAt || '',
+          evidenceId: photo.evidenceId || '',
           context: photo.context || _sanitaryEvidenceContext(item),
         }));
       });

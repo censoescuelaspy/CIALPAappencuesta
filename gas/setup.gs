@@ -287,6 +287,7 @@ function _setupSheetsConfigV21_() {
     { name: SHEET_NAMES.MODULOS, headers: _modulosHeadersV21_() },
     { name: SHEET_NAMES.EVENTOS, headers: ['id_evento', 'id_sesion', 'id_escuela', 'usuario', 'tipo_evento', 'fecha_hora', 'detalle'] },
     { name: SHEET_NAMES.INCIDENCIAS, headers: ['id_incidencia', 'id_escuela', 'usuario', 'fecha_hora', 'tipo_incidencia', 'descripcion', 'prioridad', 'estado_resolucion', 'evidencia_url'] },
+    { name: SHEET_NAMES.EVIDENCIAS, headers: ['id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes','drive_file_id','drive_url','folder_id','label','school_code','school_name','scope','block_label','floor_label','space_label','element_type','element_label','element_id','field_path'] },
     { name: SHEET_NAMES.CONFIG, headers: ['clave', 'valor', 'descripcion', 'categoria', 'editable', 'fecha_actualizacion'] },
     { name: SHEET_NAMES.AUDITORIA, headers: ['id_registro', 'usuario', 'accion', 'fecha_hora', 'detalle', 'ip_aproximada'] },
     { name: SHEET_NAMES.CATALOGOS, headers: ['tipo', 'codigo', 'descripcion', 'orden', 'activo'] }

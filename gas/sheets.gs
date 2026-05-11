@@ -408,6 +408,96 @@ const SheetsService = (() => {
     return { status: 'ok', message: 'Incidencia registrada.', data: { id_incidencia: id } };
   }
 
+  function uploadEvidence(params) {
+    const session = params._session;
+    const folderId = params.folderId || EVIDENCE_FOLDER_ID;
+    if (!folderId) return { status: 'error', message: 'Carpeta de evidencias no configurada.' };
+    const dataUrl = String(params.dataUrl || '');
+    const comma = dataUrl.indexOf(',');
+    const base64 = String(params.base64 || (comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl)).trim();
+    if (!base64) return { status: 'error', message: 'Archivo de evidencia vacio.' };
+
+    const mimeType = String(params.mimeType || _mimeFromDataUrl(dataUrl) || 'image/jpeg');
+    const filename = _safeEvidenceFilename(params.filename || params.name || `evidencia_${Date.now()}.jpg`);
+    const bytes = Utilities.base64Decode(base64);
+    const blob = Utilities.newBlob(bytes, mimeType, filename);
+    const folder = DriveApp.getFolderById(folderId);
+    const file = folder.createFile(blob);
+    const now = _timestamp();
+    const context = typeof params.context === 'object'
+      ? params.context
+      : {};
+    file.setDescription(JSON.stringify({
+      app: 'CIALPA',
+      label: params.label || '',
+      uploadedBy: session.usuario,
+      uploadedAt: now,
+      context,
+    }).slice(0, 5000));
+
+    _ensureColumns(SHEET_NAMES.EVIDENCIAS, [
+      'id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes',
+      'drive_file_id','drive_url','folder_id','label','school_code','school_name',
+      'scope','block_label','floor_label','space_label','element_type','element_label',
+      'element_id','field_path'
+    ]);
+    const evidenceId = _genId('EVI');
+    _appendObject(SHEET_NAMES.EVIDENCIAS, [
+      'id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes',
+      'drive_file_id','drive_url','folder_id','label','school_code','school_name',
+      'scope','block_label','floor_label','space_label','element_type','element_label',
+      'element_id','field_path'
+    ], {
+      id_evidencia: evidenceId,
+      fecha_hora: now,
+      usuario: session.usuario,
+      archivo_nombre: filename,
+      mime_type: mimeType,
+      tamano_bytes: bytes.length,
+      drive_file_id: file.getId(),
+      drive_url: file.getUrl(),
+      folder_id: folderId,
+      label: params.label || '',
+      school_code: context.schoolCode || '',
+      school_name: context.schoolName || '',
+      scope: context.scope || '',
+      block_label: context.blockLabel || '',
+      floor_label: context.floorLabel || '',
+      space_label: context.spaceLabel || '',
+      element_type: context.elementType || '',
+      element_label: context.elementLabel || '',
+      element_id: context.elementId || '',
+      field_path: context.fieldPath || ''
+    });
+    AuditService.log('UPLOAD_EVIDENCE', session.usuario, `id: ${evidenceId}, file: ${file.getId()}`);
+    return {
+      status: 'ok',
+      message: 'Evidencia guardada en Drive.',
+      data: {
+        id: file.getId(),
+        url: file.getUrl(),
+        name: filename,
+        folderId,
+        uploadedAt: now,
+        evidenceId,
+      }
+    };
+  }
+
+  function _mimeFromDataUrl(dataUrl) {
+    const match = String(dataUrl || '').match(/^data:([^;]+);base64,/);
+    return match ? match[1] : '';
+  }
+
+  function _safeEvidenceFilename(value) {
+    const cleaned = String(value || 'evidencia.jpg')
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, '_')
+      .replace(/_+/g, '_')
+      .slice(0, 180);
+    return cleaned || `evidencia_${Date.now()}.jpg`;
+  }
+
   function getIncidencias(params) {
     const session = params._session;
     let rows = _sheetToObjects(SHEET_NAMES.INCIDENCIAS);
@@ -886,7 +976,7 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, getIncidencias, resolverIncidencia,
+    saveIncidencia, uploadEvidence, getIncidencias, resolverIncidencia,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };
 })();
