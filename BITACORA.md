@@ -4,6 +4,27 @@
 
 ---
 
+## Sesion de fichas contextuales de plano - 2026-05-11 - v2.5.42
+
+### Objetivo
+- Hacer que todo elemento grande o pequeno del plano muestre controles inmediatos al seleccionarse: ficha, acciones de calidad/tipo y eliminacion con confirmacion.
+
+### Cambios implementados
+- Se agrego una ficha rapida contextual bajo el canvas de aulas: al tocar aula, puerta, ventana, pared, toma, foco, ventilador, aire, texto, lapiz o dano aparecen botones para abrir ficha y eliminar.
+- La seleccion de aula base ahora dirige a la ficha del aula activa; la eliminacion de un aula desde su rectangulo elimina el aula completa con todos sus elementos.
+- Se agrego una ficha rapida contextual bajo el canvas de sanitarios: sanitario activo, cabinas, inodoros, lavamanos, puertas, ventanas y equipos muestran ficha y boton de eliminar.
+- Las puertas de sanitarios ganan accion rapida para invertir apertura desde la seleccion.
+- El plano general ahora permite seleccionar objetos pequenos de aulas y sanitarios, no solo bloques/aulas/sanitarios; desde esa seleccion se puede abrir ficha o eliminar.
+- Los bloques, aulas y sanitarios del plano general incorporan accion de eliminacion en el constructor contextual.
+- Version y cache actualizados a `v2.5.42`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- Parseo con `osascript -l JavaScript` de `config.js`, `api.js`, `auth.js`, `mec-schema.js`, `mec-form.js`, `app.js`, `sw.js` y `gas/Code.gs` sin errores.
+- Servidor local `python3 -m http.server 8025` con `curl` sobre `index.html`, `mec-form.js`, `mec-form.css` y `sw.js`; verificada edicion `v2.5.42`, Inicio activo y fichas contextuales disponibles.
+
+---
+
 ## Sesion de arranque en Inicio y evidencias en Drive - 2026-05-11 - v2.5.41
 
 ### Objetivo
