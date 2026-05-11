@@ -4,6 +4,27 @@
 
 ---
 
+## Sesion de bloqueo contra movimientos accidentales del plano - 2026-05-11 - v2.5.43
+
+### Objetivo
+- Corregir una falla critica del editor de planos: al reabrir o navegar el plano no debe moverse, reordenarse ni guardarse ningun elemento salvo que el usuario arrastre intencionalmente.
+
+### Cambios implementados
+- El plano general queda bloqueado por defecto para navegacion y seleccion; mover bloques ahora requiere activar explicitamente el boton `Mover bloques`.
+- Los modulos inactivos ya no construyen editores escondidos; solo se renderiza el cuerpo del modulo activo para evitar efectos laterales al cambiar de vista.
+- El dibujo del plano general ya no llama funciones que crean o reacomodan sanitarios/aulas durante el render; renderizar el plano pasa a ser una operacion de lectura.
+- Los sanitarios sin geometria previa se muestran con distribucion temporal de vista, sin escribir coordenadas nuevas por solo abrir o imprimir el plano.
+- En los editores de aulas y sanitarios se agrego umbral minimo de arrastre: tocar/seleccionar ya no guarda ni desplaza por micro-movimientos.
+- Se eliminaron escuchas globales persistentes de mouse que quedaban acumuladas entre renders; ahora se crean solo durante el gesto activo.
+- Version y cache actualizados a `v2.5.43`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- Parseo con `osascript -l JavaScript` de `config.js`, `api.js`, `auth.js`, `mec-schema.js`, `mec-form.js`, `app.js`, `sw.js` y `gas/Code.gs` sin errores.
+- Servidor local `python3 -m http.server 8025` con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; verificada edicion `v2.5.43`, Inicio activo, cache `cialpa-app-v2.5.43`, boton `Mover bloques` y render activo sin modulos ocultos.
+
+---
+
 ## Sesion de fichas contextuales de plano - 2026-05-11 - v2.5.42
 
 ### Objetivo

@@ -23,6 +23,7 @@ const MecFormModule = (() => {
   let _selectedPlanId = null;
   let _planHitAreas = [];
   let _activePlanDrag = null;
+  let _planMoveMode = false;
   let _evidenceSyncRunning = false;
   let _evidenceOnlineBound = false;
   const _sketchHistory = [];
@@ -678,8 +679,9 @@ const MecFormModule = (() => {
 
   function _renderModule(module) {
     const planned = module.status === 'planned';
+    const active = module.id === _activeModuleId;
     return `
-      <article class="mec-module ${module.id === _activeModuleId ? 'mec-module--active' : ''}" data-module="${_escape(module.id)}">
+      <article class="mec-module ${active ? 'mec-module--active' : ''}" data-module="${_escape(module.id)}">
         <header class="mec-module__header">
           <div>
             <p class="mec-eyebrow">${planned ? 'Proxima iteracion' : 'Etapa activa'}</p>
@@ -689,7 +691,7 @@ const MecFormModule = (() => {
           <span class="mec-module__badge" data-module-progress="${_escape(module.id)}">${planned ? 'Planificado' : '0/0'}</span>
         </header>
         <div class="mec-module__body ${planned ? 'mec-module__body--planned' : ''}">
-          ${planned ? _renderPlannedModule(module) : _renderActiveModule(module)}
+          ${planned ? _renderPlannedModule(module) : (active ? _renderActiveModule(module) : '')}
         </div>
       </article>`;
   }
@@ -3312,6 +3314,8 @@ const MecFormModule = (() => {
     let rotatingObject = null;
     let moveOffset = null;
     let mutationRecorded = false;
+    let dragStartPoint = null;
+    let dragStarted = false;
     let lastTap = { time: 0, point: null };
     let pinching = false;
     let pinchStartDistance = 0;
@@ -3340,11 +3344,16 @@ const MecFormModule = (() => {
         resizingObject = null;
         rotatingObject = null;
         moveOffset = null;
+        dragStartPoint = null;
+        dragStarted = false;
         return;
       }
       event.preventDefault();
+      if (event.type === 'mousedown') window.addEventListener('mouseup', end, { once: true });
       _ensureSketchObjects();
       const point = pointFromEvent(event);
+      dragStartPoint = point;
+      dragStarted = false;
 
       const rotateHit = _findOpeningRotateHandleAt(point);
       const handleHit = _findResizeHandleAt(point);
@@ -3385,6 +3394,16 @@ const MecFormModule = (() => {
       _drawSketch(ctx, canvas);
       _updateSketchStatus();
     };
+    const dragHasStarted = point => {
+      if (dragStarted) return true;
+      if (!dragStartPoint) {
+        dragStarted = true;
+        return true;
+      }
+      if (Math.hypot(point.x - dragStartPoint.x, point.y - dragStartPoint.y) < 6) return false;
+      dragStarted = true;
+      return true;
+    };
     const move = event => {
       if (pinching) {
         if (event.touches?.length >= 2 && pinchStartDistance > 0) {
@@ -3396,6 +3415,7 @@ const MecFormModule = (() => {
       event.preventDefault();
       const point = pointFromEvent(event);
       if (resizingObject) {
+        if (!dragHasStarted(point)) return;
         if (!mutationRecorded) {
           _pushSketchHistory();
           mutationRecorded = true;
@@ -3406,12 +3426,15 @@ const MecFormModule = (() => {
         return;
       }
       if (movingSanitary) {
+        if (!dragHasStarted(point)) return;
+        mutationRecorded = true;
         _moveSanitaryRoomObject(movingSanitary, point, moveOffset);
         _drawSketch(ctx, canvas);
         _updateSketchStatus();
         return;
       }
       if (movingObject) {
+        if (!dragHasStarted(point)) return;
         if (!mutationRecorded) {
           _pushSketchHistory();
           mutationRecorded = true;
@@ -3435,6 +3458,11 @@ const MecFormModule = (() => {
       if (resizingObject) {
         const changed = resizingObject.object;
         resizingObject = null;
+        if (!mutationRecorded && !dragStarted) {
+          _drawSketch(ctx, canvas);
+          _updateSketchStatus();
+          return;
+        }
         _saveDraft(false);
         _updateSketchStatus();
         _announceOpeningDistances(changed);
@@ -3445,19 +3473,32 @@ const MecFormModule = (() => {
         return;
       }
       if (movingSanitary) {
+        const didMove = mutationRecorded;
         movingSanitary = null;
         moveOffset = null;
-        _saveDraft(false);
-        renderSchoolPlan();
+        dragStartPoint = null;
+        dragStarted = false;
+        if (didMove) {
+          _saveDraft(false);
+          renderSchoolPlan();
+        }
         return;
       }
       if (movingObject) {
         const changed = movingObject;
+        const didMove = mutationRecorded;
         movingObject = null;
         moveOffset = null;
-        _saveDraft(false);
-        _updateSketchStatus();
-        _announceOpeningDistances(changed);
+        dragStartPoint = null;
+        dragStarted = false;
+        if (didMove) {
+          _saveDraft(false);
+          _updateSketchStatus();
+          _announceOpeningDistances(changed);
+        } else {
+          _drawSketch(ctx, canvas);
+          _updateSketchStatus();
+        }
         return;
       }
       if (!drawing || !draftObject) return;
@@ -3549,7 +3590,6 @@ const MecFormModule = (() => {
 
     canvas.addEventListener('mousedown', begin);
     canvas.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
     canvas.addEventListener('dblclick', createAt);
     canvas.addEventListener('touchstart', begin, { passive: false });
     canvas.addEventListener('touchmove', move, { passive: false });
@@ -3567,6 +3607,9 @@ const MecFormModule = (() => {
     let movingObject = null;
     let resizing = null;
     let moveOffset = null;
+    let dragStartPoint = null;
+    let dragStarted = false;
+    let mutationRecorded = false;
     let pinching = false;
     let pinchStartDistance = 0;
     let pinchStartZoom = _sanitaryZoom;
@@ -3591,10 +3634,17 @@ const MecFormModule = (() => {
         movingObject = null;
         resizing = null;
         moveOffset = null;
+        dragStartPoint = null;
+        dragStarted = false;
+        mutationRecorded = false;
         return;
       }
       event.preventDefault();
+      if (event.type === 'mousedown') window.addEventListener('mouseup', end, { once: true });
       const point = pointFromEvent(event);
+      dragStartPoint = point;
+      dragStarted = false;
+      mutationRecorded = false;
       const rotateHit = _findSanitaryOpeningRotateHandleAt(point);
       if (rotateHit && rotateHit.id === _selectedSanitaryObjectId) {
         _selectedSanitaryObjectId = rotateHit.id;
@@ -3642,6 +3692,16 @@ const MecFormModule = (() => {
         _updateSanitaryStatus();
       }
     };
+    const dragHasStarted = point => {
+      if (dragStarted) return true;
+      if (!dragStartPoint) {
+        dragStarted = true;
+        return true;
+      }
+      if (Math.hypot(point.x - dragStartPoint.x, point.y - dragStartPoint.y) < 6) return false;
+      dragStarted = true;
+      return true;
+    };
     const move = event => {
       if (pinching) {
         if (event.touches?.length >= 2 && pinchStartDistance > 0) {
@@ -3653,6 +3713,8 @@ const MecFormModule = (() => {
       if (!movingRoom && !movingObject && !resizing) return;
       event.preventDefault();
       const point = pointFromEvent(event);
+      if (!dragHasStarted(point)) return;
+      mutationRecorded = true;
       if (resizing) {
         if (resizing.scope === 'child') _resizeSanitaryChildObject(resizing, point);
         else _resizeSanitaryRoomObject(resizing, point);
@@ -3675,17 +3737,25 @@ const MecFormModule = (() => {
       }
       if (!movingRoom && !movingObject && !resizing) return;
       event.preventDefault();
+      const didMove = mutationRecorded;
       movingRoom = null;
       movingObject = null;
       resizing = null;
       moveOffset = null;
-      _saveDraft(false);
-      _render();
-      renderSchoolPlan();
+      dragStartPoint = null;
+      dragStarted = false;
+      mutationRecorded = false;
+      if (didMove) {
+        _saveDraft(false);
+        _render();
+        renderSchoolPlan();
+      } else {
+        _drawSanitarySketch(ctx, canvas);
+        _updateSanitaryStatus();
+      }
     };
     canvas.addEventListener('mousedown', begin);
     canvas.addEventListener('mousemove', move);
-    window.addEventListener('mouseup', end);
     canvas.addEventListener('dblclick', event => {
       event.preventDefault();
       const point = pointFromEvent(event);
@@ -6678,14 +6748,12 @@ const MecFormModule = (() => {
   function _moduleProgressText(module) {
     if (module.id === 'bloques') return `${(_data.__blocks || []).length} bloque(s)`;
     if (module.kind === 'classroomSketch') {
-      _ensureClassrooms();
-      const rooms = _data.__classrooms || [];
+      const rooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
       const closed = rooms.filter(room => (room.objects || []).some(object => object.type === 'room') && room.length && room.width).length;
       return `${closed}/${rooms.length} aula(s)`;
     }
     if (module.kind === 'sanitaryList') {
-      _ensureSanitaries();
-      return `${(_data.__sanitaries || []).length} sanitario(s)`;
+      return `${Array.isArray(_data.__sanitaries) ? _data.__sanitaries.length : 0} sanitario(s)`;
     }
     return '';
   }
@@ -6761,8 +6829,7 @@ const MecFormModule = (() => {
     _activeModuleId = moduleId;
     _data.__activeModuleId = moduleId;
     _saveDraft(false);
-    _refreshDynamicState();
-    if (module.kind === 'schoolPlan') renderSchoolPlan();
+    _render();
     document.getElementById('mec-form-root')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -6968,8 +7035,8 @@ const MecFormModule = (() => {
     const root = _activeSchoolPlanRoot();
     if (!root) return;
     const sketch = _data.__classroomSketch || {};
-    _ensureClassrooms();
-    _ensureSanitaries();
+    _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
+    _data.__sanitaries = Array.isArray(_data.__sanitaries) ? _data.__sanitaries : [];
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
@@ -7010,6 +7077,7 @@ const MecFormModule = (() => {
                   <span>${Math.round(_schoolPlanZoom * 100)}%</span>
                   <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(0.15)">+</button>
                 </div>
+                <button class="btn ${_planMoveMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">${_planMoveMode ? 'Mover bloques activo' : 'Mover bloques'}</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
@@ -7219,6 +7287,16 @@ const MecFormModule = (() => {
     if (!(key in _planLayers)) return;
     _planLayers[key] = Boolean(enabled);
     _drawSchoolPlan();
+  }
+
+  function togglePlanMoveMode() {
+    _planMoveMode = !_planMoveMode;
+    _activePlanDrag = null;
+    renderSchoolPlan();
+    UI.showToast(_planMoveMode
+      ? 'Modo mover bloques activo. Arrastre solo los bloques que necesite reubicar.'
+      : 'Plano bloqueado: navegar y seleccionar no mueve elementos.',
+      _planMoveMode ? 'info' : 'success');
   }
 
   function _renderPlanObjectRow(object) {
@@ -7594,8 +7672,8 @@ const MecFormModule = (() => {
   function _drawSchoolPlan() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
-    _ensureSketchObjects();
-    _ensureSanitaries();
+    _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
+    _data.__sanitaries = Array.isArray(_data.__sanitaries) ? _data.__sanitaries : [];
     _applySchoolPlanZoom(canvas);
     const ctx = canvas.getContext('2d');
     _prepareLogicalCanvasContext(ctx, canvas);
@@ -7932,17 +8010,40 @@ const MecFormModule = (() => {
 
   function _planSanitaryItemsFromSketch(items, floorRect) {
     const source = _sketchBlockRect();
-    return (items || []).map(sanitary => {
-      const object = _ensureSanitaryRoomObject(sanitary);
-      if (!object) return null;
-      return {
+    const mapped = [];
+    const fallback = [];
+    (items || []).forEach(sanitary => {
+      const object = _sanitaryRoomObject(sanitary);
+      if (!object) {
+        fallback.push(sanitary);
+        return;
+      }
+      mapped.push({
         sanitary,
         x: floorRect.x + ((object.x - source.x) / source.w) * floorRect.w,
         y: floorRect.y + ((object.y - source.y) / source.h) * floorRect.h,
         w: Math.max(12, (object.w / source.w) * floorRect.w),
         h: Math.max(10, (object.h / source.h) * floorRect.h),
-      };
-    }).filter(Boolean);
+      });
+    });
+    if (!fallback.length) return mapped;
+    const fallbackRooms = fallback.map(item => ({
+      id: item.id,
+      name: item.codigo || 'Sanitario',
+      length: item.largo_m || 3,
+      width: item.ancho_m || 2,
+    }));
+    return [
+      ...mapped,
+      ..._layoutPlanRooms(fallbackRooms, floorRect.x, floorRect.y, floorRect.w, floorRect.h)
+        .map((entry, index) => ({
+          sanitary: fallback[index],
+          x: entry.x,
+          y: entry.y,
+          w: entry.w,
+          h: entry.h,
+        })),
+    ];
   }
 
   function _sanitariesForBlock(block) {
@@ -8787,7 +8888,7 @@ const MecFormModule = (() => {
       pointerCandidate = area;
       pointerStart = pointFromEvent(event);
       canvas.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
+      if (_planMoveMode && area.type === 'block') event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
       if (activePointers.has(event.pointerId)) rememberPointer(event);
@@ -8809,7 +8910,7 @@ const MecFormModule = (() => {
       }
       if (!pointerCandidate) return;
       if (movedTooFar(pointerStart, currentPoint)) {
-        if (pointerCandidate.type === 'block') {
+        if (_planMoveMode && pointerCandidate.type === 'block') {
           blockDrag = {
             blockId: pointerCandidate.blockId,
             rect: { w: pointerCandidate.w, h: pointerCandidate.h },
@@ -9493,7 +9594,7 @@ const MecFormModule = (() => {
     const mapped = [];
     const fallback = [];
     (items || []).forEach(item => {
-      const object = _ensureSanitaryRoomObject(item);
+      const object = _sanitaryRoomObject(item);
       if (!object) {
         fallback.push(item);
         return;
@@ -10348,6 +10449,7 @@ const MecFormModule = (() => {
     addPlanSanitary,
     deletePlanSelection,
     togglePlanLayer,
+    togglePlanMoveMode,
     exportPlanJson,
     exportPlanSvg,
     exportPlanPng,
