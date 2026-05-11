@@ -453,6 +453,7 @@ const MecFormModule = (() => {
                 ${implemented.map(module => `
                   <button class="mec-stage-button ${module.id === _activeModuleId ? 'mec-stage-button--active' : ''}" type="button"
                     data-stage-module="${_escape(module.id)}"
+                    aria-pressed="${module.id === _activeModuleId ? 'true' : 'false'}"
                     onclick="MecFormModule.selectModule('${_escape(module.id)}')">
                     ${_escape(module.title)}
                   </button>`).join('')}
@@ -629,7 +630,9 @@ const MecFormModule = (() => {
         <input id="${id}" class="mec-choice-value" type="hidden" value="${_escape(value)}">
         <div class="mec-choice-buttons">
           ${field.options.map(option => `
-            <button class="mec-choice mec-schema-choice ${_choiceToneClass(option)} ${value === option ? 'mec-choice--active' : ''}" type="button" data-choice-value="${_escape(option)}">
+            <button class="mec-choice mec-schema-choice ${_choiceToneClass(option)} ${value === option ? 'mec-choice--active' : ''}" type="button"
+              aria-pressed="${value === option ? 'true' : 'false'}"
+              data-choice-value="${_escape(option)}">
               ${_escape(option)}
             </button>`).join('')}
         </div>${hint}`);
@@ -2889,7 +2892,11 @@ const MecFormModule = (() => {
           button.addEventListener('click', () => {
             const value = button.dataset.choiceValue || '';
             input.value = value;
-            schemaChoices.forEach(item => item.classList.toggle('mec-choice--active', item === button));
+            schemaChoices.forEach(item => {
+              const active = item === button;
+              item.classList.toggle('mec-choice--active', active);
+              item.setAttribute('aria-pressed', String(active));
+            });
             _setValue(moduleId, fieldId, value);
           });
         });
@@ -5769,6 +5776,7 @@ const MecFormModule = (() => {
         if (!group || !input) return;
         input.value = button.dataset.choiceValue || '';
         group.querySelectorAll('.mec-choice').forEach(item => item.classList.toggle('mec-choice--active', item === button));
+        group.querySelectorAll('.mec-choice').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
         _persistSketchObjectFichaFromForm(false);
       });
     });
@@ -5830,7 +5838,9 @@ const MecFormModule = (() => {
     const stageCurrent = document.querySelector('.mec-stage-current');
     if (stageCurrent && activeModule) stageCurrent.textContent = activeModule.description || activeModule.title || '';
     document.querySelectorAll('.mec-stage-button').forEach(button => {
-      button.classList.toggle('mec-stage-button--active', button.dataset.stageModule === _activeModuleId);
+      const active = button.dataset.stageModule === _activeModuleId;
+      button.classList.toggle('mec-stage-button--active', active);
+      button.setAttribute('aria-pressed', String(active));
     });
 
     MEC_SCHEMA.modules.forEach(module => {
@@ -6260,6 +6270,7 @@ const MecFormModule = (() => {
       <div class="mec-choice-buttons ${_escape(className)}">
         ${options.map(option => `
           <button class="mec-choice ${_choiceToneClass(option)} ${selected === option ? 'mec-choice--active' : ''}" type="button"
+            aria-pressed="${selected === option ? 'true' : 'false'}"
             onclick="${_escape(onClickForOption(option))}">
             ${_escape(option)}
           </button>`).join('')}
@@ -7689,7 +7700,8 @@ const MecFormModule = (() => {
     if (!canvas) return;
     if (canvas.dataset.planBound === 'true') return;
     canvas.dataset.planBound = 'true';
-    let planDrag = null;
+    let pointerCandidate = null;
+    let pointerStart = null;
     let suppressClick = false;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
@@ -7703,95 +7715,43 @@ const MecFormModule = (() => {
       return [..._planHitAreas].reverse().find(area =>
         point.x >= area.x && point.x <= area.x + area.w && point.y >= area.y && point.y <= area.y + area.h);
     };
-    const updatePlanPlacement = event => {
-      if (!planDrag) return;
-      const point = pointFromEvent(event);
-      const next = _clampPlanRect({
-        x: point.x - planDrag.offsetX,
-        y: point.y - planDrag.offsetY,
-        w: planDrag.w,
-        h: planDrag.h,
-      }, canvas.width, canvas.height);
-      if (planDrag.type === 'block') {
-        const block = _blockById(planDrag.blockId);
-        if (!block) return;
-        block.planPosition = {
-          xRatio: Number((next.x / canvas.width).toFixed(4)),
-          yRatio: Number((next.y / canvas.height).toFixed(4)),
-        };
-        if (block.id === _data.__activeBlockId) _data.bloques = { ...(_data.bloques || {}), planPosition: block.planPosition };
-        _activePlanDrag = { id: `block::${block.id}`, blockId: block.id };
-      } else {
-        const floorRect = planDrag.floorRect;
-        if (!floorRect) return;
-        const clamped = _clampRectToBounds({
-          x: point.x - planDrag.offsetX,
-          y: point.y - planDrag.offsetY,
-          w: planDrag.w,
-          h: planDrag.h,
-        }, floorRect);
-        const source = _sketchBlockRect();
-        const targetX = source.x + ((clamped.x - floorRect.x) / Math.max(1, floorRect.w)) * source.w;
-        const targetY = source.y + ((clamped.y - floorRect.y) / Math.max(1, floorRect.h)) * source.h;
-        if (planDrag.type === 'room') {
-          const room = (_data.__classrooms || []).find(item => item.id === planDrag.roomId);
-          const object = _roomObjectForClassroom(room);
-          if (room && object) _moveRoomObjectWithChildren(room, object, targetX, targetY);
-        }
-        if (planDrag.type === 'sanitary') {
-          const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === planDrag.sanitaryId);
-          const object = _sanitaryRoomObject(item);
-          if (item && object) _moveSanitaryRoomWithChildren(item, object, targetX, targetY);
-        }
-        _activePlanDrag = { id: planDrag.id, blockId: planDrag.blockId };
-      }
+    const selectArea = area => {
+      if (!area) return;
       suppressClick = true;
-      _drawSchoolPlan();
+      selectPlanItem(area.id);
+      setTimeout(() => { suppressClick = false; }, 120);
     };
+    const isSelectableArea = area => area && ['block', 'room', 'sanitary'].includes(area.type);
+    const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     canvas.addEventListener('pointerdown', event => {
       const area = hit(event);
-      if (!area || !['block', 'room', 'sanitary'].includes(area.type)) return;
-      const point = pointFromEvent(event);
-      planDrag = {
-        id: area.id,
-        type: area.type,
-        blockId: area.blockId,
-        roomId: area.roomId,
-        sanitaryId: area.sanitaryId,
-        floorRect: area.floorRect,
-        offsetX: point.x - area.x,
-        offsetY: point.y - area.y,
-        w: area.w,
-        h: area.h,
-      };
-      _selectedPlanId = area.id;
-      _activatePlanSelection(area.id);
-      _activePlanDrag = { id: area.id, blockId: area.blockId };
+      if (!isSelectableArea(area)) return;
+      pointerCandidate = area;
+      pointerStart = pointFromEvent(event);
       canvas.setPointerCapture?.(event.pointerId);
       event.preventDefault();
-      _drawSchoolPlan();
     });
     canvas.addEventListener('pointermove', event => {
-      if (!planDrag) return;
-      updatePlanPlacement(event);
-      event.preventDefault();
+      if (!pointerCandidate) return;
+      if (movedTooFar(pointerStart, pointFromEvent(event))) pointerCandidate = null;
     });
-    const endDrag = event => {
-      if (!planDrag) return;
-      updatePlanPlacement(event);
-      planDrag = null;
-      _activePlanDrag = null;
-      _saveDraft(false);
-      renderSchoolPlan();
-      setTimeout(() => { suppressClick = false; }, 80);
-    };
-    canvas.addEventListener('pointerup', endDrag);
-    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('pointerup', event => {
+      const area = pointerCandidate || hit(event);
+      pointerCandidate = null;
+      pointerStart = null;
+      if (!isSelectableArea(area)) return;
+      event.preventDefault();
+      selectArea(area);
+    });
+    canvas.addEventListener('pointercancel', () => {
+      pointerCandidate = null;
+      pointerStart = null;
+    });
     canvas.addEventListener('click', event => {
       if (suppressClick) return;
       const area = hit(event);
-      if (!area) return;
-      selectPlanItem(area.id);
+      if (!isSelectableArea(area)) return;
+      selectArea(area);
     });
     canvas.addEventListener('dblclick', event => {
       const area = hit(event);
@@ -7966,10 +7926,14 @@ const MecFormModule = (() => {
     return {
       width: 277,
       height: 190,
-      planX: 18,
-      planY: 38,
-      planW: 240,
-      planH: 116,
+      planX: 12,
+      planY: 46,
+      planW: 192,
+      planH: 108,
+      sideX: 212,
+      sideY: 46,
+      sideW: 53,
+      sideH: 108,
       footerY: 174,
     };
   }
@@ -8015,6 +7979,171 @@ const MecFormModule = (() => {
     const text = String(value || '');
     if (text.length <= maxChars) return text;
     return `${text.slice(0, Math.max(1, maxChars - 3))}...`;
+  }
+
+  function _planPrintSchoolInfo() {
+    const school = _selectedSchoolFromContext() || _data.__selectedSchool || {};
+    const general = _data.general || {};
+    const code = _firstPresent(school, ['codigo_local', 'codigo_establecimiento', 'codigo', 'id_escuela'])
+      || general.codigo_local || general.codigo_establecimiento || 'Sin codigo';
+    const name = _firstPresent(school, ['nombre', 'nombre_escuela', 'nombre_establecimiento'])
+      || general.nombre_institucion || general.nombre_establecimiento || 'Escuela sin nombre';
+    const department = _firstPresent(school, ['departamento']) || general.departamento || '';
+    const district = _firstPresent(school, ['distrito']) || general.distrito || '';
+    const locality = _firstPresent(school, ['localidad', 'barrio']) || general.localidad || '';
+    const address = _firstPresent(school, ['direccion', 'direccion_referencia', 'referencia']) || general.direccion || '';
+    const zone = _firstPresent(school, ['zona']) || general.zona || '';
+    const lat = _firstPresent(school, ['latitud', 'lat', 'latitude']) || general.latitud || '';
+    const lon = _firstPresent(school, ['longitud', 'lng', 'lon', 'longitude']) || general.longitud || '';
+    return {
+      code,
+      name,
+      department,
+      district,
+      locality,
+      address,
+      zone,
+      director: general.director || _firstPresent(school, ['director', 'responsable']) || '',
+      lat,
+      lon,
+      surveyor: _firstPresent(school, ['encuestador_asignado']) || '',
+      supervisor: _firstPresent(school, ['supervisor_asignado']) || '',
+      locationLine: [department, district, locality].filter(Boolean).join(' / ') || 'Ubicacion no registrada',
+      coordinateLine: lat && lon ? `${lat}, ${lon}` : 'Coordenadas no registradas',
+      mapUrl: lat && lon ? `https://maps.google.com/?q=${encodeURIComponent(`${lat},${lon}`)}` : '',
+    };
+  }
+
+  function _planPrintFloorCount(blocks) {
+    return (blocks || []).reduce((sum, block) => sum + _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []).length, 0);
+  }
+
+  function _planPrintWrapText(value, maxChars, maxLines = 2) {
+    const words = String(value || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    const lines = [];
+    let line = '';
+    words.forEach(word => {
+      const next = line ? `${line} ${word}` : word;
+      if (next.length > maxChars && line) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = next;
+      }
+    });
+    if (line) lines.push(line);
+    if (!lines.length) lines.push('-');
+    if (lines.length > maxLines) {
+      const clipped = lines.slice(0, maxLines);
+      clipped[maxLines - 1] = _planPrintTruncate(clipped[maxLines - 1], Math.max(4, maxChars - 1));
+      return clipped;
+    }
+    return lines;
+  }
+
+  function _planPrintSvgTextBlock(value, x, y, maxChars, maxLines, className = 'meta', lineHeight = 3.6) {
+    const lines = _planPrintWrapText(value, maxChars, maxLines);
+    return `<text x="${_planPrintCoord(x)}" y="${_planPrintCoord(y)}" class="${className}">${lines.map((line, index) => `<tspan x="${_planPrintCoord(x)}" dy="${index ? lineHeight : 0}">${_escape(line)}</tspan>`).join('')}</text>`;
+  }
+
+  function _planPrintLegendSvg(x, y) {
+    const entries = [
+      ['room-key', 'Aula'],
+      ['sanitary-key', 'Sanitario'],
+      ['door-key', 'Puerta'],
+      ['window-key', 'Ventana'],
+      ['outlet-key', 'Toma'],
+      ['light-key', 'Foco'],
+      ['damage-key', 'Daño'],
+      ['stair-key', 'Escalera'],
+    ];
+    return entries.map((entry, index) => {
+      const rowY = y + index * 4.6;
+      return `<g><rect x="${_planPrintCoord(x)}" y="${_planPrintCoord(rowY - 2.4)}" width="3.2" height="3.2" class="${entry[0]}"/><text x="${_planPrintCoord(x + 5)}" y="${_planPrintCoord(rowY)}" class="legend-text">${_escape(entry[1])}</text></g>`;
+    }).join('');
+  }
+
+  function _planPrintNorthArrow(x, y) {
+    return `
+      <g class="north-arrow">
+        <path d="M ${_planPrintCoord(x)} ${_planPrintCoord(y - 8)} L ${_planPrintCoord(x - 4)} ${_planPrintCoord(y + 4)} L ${_planPrintCoord(x)} ${_planPrintCoord(y + 1)} L ${_planPrintCoord(x + 4)} ${_planPrintCoord(y + 4)} Z"/>
+        <text x="${_planPrintCoord(x)}" y="${_planPrintCoord(y + 10)}" class="north-text">N</text>
+      </g>`;
+  }
+
+  function _planPrintCoverSheet(totalSheets, generatedAt, scale) {
+    const info = _planPrintSchoolInfo();
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
+    const metrics = _schoolPlanMetrics(_data.__classroomSketch || {}, _schoolPlanObjects());
+    const audit = _schoolPlanAudit();
+    const floors = _planPrintFloorCount(blocks);
+    const issues = (audit.issues || []).slice(0, 7);
+    return `
+      <section class="print-sheet print-cover">
+        <header class="cover-header">
+          <div>
+            <span>CIALPA / Relevamiento de infraestructura escolar</span>
+            <h1>Plano arquitectonico escolar</h1>
+            <p>${_escape(info.name)}</p>
+          </div>
+          <div class="cover-badge">
+            <strong>${_escape(info.code)}</strong>
+            <small>${_escape(generatedAt)}</small>
+          </div>
+        </header>
+        <main class="cover-grid">
+          <section class="cover-card cover-card--wide">
+            <h2>Datos del local</h2>
+            <dl>
+              <div><dt>Escuela</dt><dd>${_escape(info.name)}</dd></div>
+              <div><dt>Codigo</dt><dd>${_escape(info.code)}</dd></div>
+              <div><dt>Ubicacion</dt><dd>${_escape(info.locationLine)}</dd></div>
+              <div><dt>Direccion</dt><dd>${_escape(info.address || 'Sin direccion registrada')}</dd></div>
+              <div><dt>Coordenadas</dt><dd>${_escape(info.coordinateLine)}</dd></div>
+              ${info.mapUrl ? `<div><dt>Mapa</dt><dd>${_escape(info.mapUrl)}</dd></div>` : ''}
+            </dl>
+          </section>
+          <section class="cover-card">
+            <h2>Resumen del plano</h2>
+            <div class="cover-stats">
+              <b>${metrics.blocks}</b><span>bloques</span>
+              <b>${floors}</b><span>plantas</span>
+              <b>${metrics.rooms}</b><span>aulas</span>
+              <b>${metrics.sanitaries}</b><span>sanitarios</span>
+              <b>${_planPrintFmt(metrics.areaTotal)}</b><span>m2 relevados</span>
+              <b>${metrics.alerts}</b><span>alertas</span>
+            </div>
+          </section>
+          <section class="cover-card">
+            <h2>Control tecnico</h2>
+            <p class="cover-score">${_escape(audit.status)} <strong>${audit.score}/100</strong></p>
+            <p>${_escape(audit.summaryText)}</p>
+            <p>Escala grafica aprox. 1:${_escape(scale.denominator)}. Las distancias del plano general se calculan borde a borde cuando hay geometria y centro a centro en elementos puntuales.</p>
+          </section>
+          <section class="cover-card cover-card--wide">
+            <h2>Observaciones principales</h2>
+            ${issues.length ? `<ol>${issues.map(issue => `<li><strong>${_escape(_auditSeverityLabel(issue.severity))}:</strong> ${_escape(issue.title)}. ${_escape(issue.detail || '')}</li>`).join('')}</ol>` : '<p>No se registran observaciones criticas en el modelo actual.</p>'}
+          </section>
+          <section class="cover-card">
+            <h2>Leyenda</h2>
+            <div class="cover-legend">
+              <span><i class="lg-room"></i>Aula</span>
+              <span><i class="lg-sanitary"></i>Sanitario</span>
+              <span><i class="lg-door"></i>Puerta</span>
+              <span><i class="lg-window"></i>Ventana</span>
+              <span><i class="lg-outlet"></i>Toma</span>
+              <span><i class="lg-light"></i>Foco</span>
+              <span><i class="lg-damage"></i>Daño/obs.</span>
+              <span><i class="lg-stair"></i>Escalera</span>
+            </div>
+          </section>
+          <section class="cover-card">
+            <h2>Documento</h2>
+            <p>Hojas de plano: ${Math.max(0, totalSheets - 1)}. Total del paquete: ${totalSheets}.</p>
+            <p>Version app: ${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version)}.</p>
+          </section>
+        </main>
+      </section>`;
   }
 
   function _planPrintClampRect(rect, bounds) {
@@ -8365,15 +8494,33 @@ const MecFormModule = (() => {
     const emptyNote = !roomItems.length && !sanitaryItems.length
       ? `<text x="${page.width / 2}" y="${page.height / 2}" class="empty-note">Piso sin aulas ni sanitarios asociados</text>`
       : '';
+    const info = _planPrintSchoolInfo();
+    const floorArea = [...floorRooms, ...floorSanitaries].reduce((sum, item) => {
+      const length = Number(item.length || item.largo_m || 0);
+      const width = Number(item.width || item.ancho_m || 0);
+      return sum + length * width;
+    }, 0);
+    const floorSummary = `${floorRooms.length} aula(s), ${floorSanitaries.length} sanitario(s), ${_planPrintFmt(floorArea)} m2`;
+    const sheetTitle = `${block.bloque_codigo || 'Bloque'} - ${floor}`;
     return `
       <section class="print-sheet">
         <svg xmlns="http://www.w3.org/2000/svg" width="${page.width}mm" height="${page.height}mm" viewBox="0 0 ${page.width} ${page.height}" role="img" aria-label="Plano ${_escape(block.bloque_codigo || 'Bloque')} ${_escape(floor)}">
           <defs>
+            <pattern id="minor-grid" width="5" height="5" patternUnits="userSpaceOnUse">
+              <path d="M 5 0 L 0 0 0 5" fill="none" stroke="#d7dee8" stroke-width=".12"/>
+            </pattern>
             <style>
               .page-bg{fill:#ffffff}
-              .title{font:700 5.2px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033}
+              .header-band{fill:#eef4f8}
+              .eyebrow{font:800 2.35px system-ui,-apple-system,Segoe UI,sans-serif;fill:#15546b;letter-spacing:.18px}
+              .title{font:800 5.1px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033}
               .meta{font:500 2.75px system-ui,-apple-system,Segoe UI,sans-serif;fill:#475467}
               .note{font:700 2.55px system-ui,-apple-system,Segoe UI,sans-serif;fill:#7c2d12}
+              .panel{fill:#f8fafc;stroke:#cbd5e1;stroke-width:.35}
+              .panel-title{font:900 2.65px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033;text-transform:uppercase}
+              .panel-strong{font:800 2.45px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033}
+              .legend-text{font:700 2.1px system-ui,-apple-system,Segoe UI,sans-serif;fill:#334155}
+              .floor-grid{fill:url(#minor-grid);opacity:.42}
               .block{fill:#f8fafc;stroke:#172033;stroke-width:.75}
               .block-inner{fill:none;stroke:#172033;stroke-width:.22;opacity:.45}
               .space{stroke-width:.42}
@@ -8407,22 +8554,50 @@ const MecFormModule = (() => {
               .stair-step{stroke:#4b5563;stroke-width:.22}
               .empty-note{font:800 4px system-ui,-apple-system,Segoe UI,sans-serif;fill:#667085;text-anchor:middle}
               .footer{font:600 2.25px system-ui,-apple-system,Segoe UI,sans-serif;fill:#667085}
+              .north-arrow path{fill:#172033}
+              .north-text{font:900 3px system-ui,-apple-system,Segoe UI,sans-serif;fill:#172033;text-anchor:middle}
+              .room-key{fill:#eaf4ff;stroke:#2b6cb0;stroke-width:.35}
+              .sanitary-key{fill:#f2ecff;stroke:#805ad5;stroke-width:.35}
+              .door-key{fill:#dff4e8;stroke:#2f855a;stroke-width:.35}
+              .window-key{fill:#dbeafe;stroke:#2b6cb0;stroke-width:.35}
+              .outlet-key{fill:#fff7ed;stroke:#b7791f;stroke-width:.35}
+              .light-key{fill:#fffbeb;stroke:#d69e2e;stroke-width:.35}
+              .damage-key{fill:#fff1f2;stroke:#c53030;stroke-width:.35}
+              .stair-key{fill:#f8fafc;stroke:#4b5563;stroke-width:.35}
             </style>
           </defs>
           <rect width="${page.width}" height="${page.height}" class="page-bg"/>
-          <text x="12" y="12" class="title">${_escape(`${block.bloque_codigo || 'Bloque'} - ${floor}`)}</text>
-          <text x="12" y="18" class="meta">${_escape(`Plano CIALPA a escala grafica - Bloque ${dimensionsLabel}`)}</text>
-          <text x="12" y="23" class="${blockDimensions.measured ? 'meta' : 'note'}">${_escape(missingNote)}</text>
-          <text x="${page.width - 12}" y="12" class="meta" text-anchor="end">${_escape(`Hoja ${sheetIndex} de ${totalSheets}`)}</text>
-          <text x="${page.width - 12}" y="18" class="meta" text-anchor="end">${_escape(generatedAt)}</text>
+          <rect x="0" y="0" width="${page.width}" height="36" class="header-band"/>
+          <text x="12" y="9" class="eyebrow">CIALPA / PLANO ARQUITECTONICO ESCOLAR</text>
+          ${_planPrintSvgTextBlock(info.name, 12, 16, 66, 2, 'title', 5.3)}
+          <text x="12" y="31" class="meta">${_escape(`Codigo ${info.code} · ${info.locationLine}`)}</text>
+          <text x="${page.width - 12}" y="9" class="meta" text-anchor="end">${_escape(`Hoja ${sheetIndex} de ${totalSheets}`)}</text>
+          <text x="${page.width - 12}" y="15" class="meta" text-anchor="end">${_escape(generatedAt)}</text>
+          <text x="${page.width - 12}" y="21" class="meta" text-anchor="end">${_escape(info.coordinateLine)}</text>
 
           ${_planPrintDimensionLine(floorRect.x, floorRect.y - 5.5, floorRect.x + floorRect.w, floorRect.y - 5.5, `${_planPrintFmt(blockDimensions.length)} m`)}
           ${_planPrintDimensionLine(floorRect.x - 5.5, floorRect.y, floorRect.x - 5.5, floorRect.y + floorRect.h, `${_planPrintFmt(blockDimensions.width)} m`, true)}
           <rect x="${_planPrintCoord(floorRect.x)}" y="${_planPrintCoord(floorRect.y)}" width="${_planPrintCoord(floorRect.w)}" height="${_planPrintCoord(floorRect.h)}" class="block"/>
+          <rect x="${_planPrintCoord(floorRect.x)}" y="${_planPrintCoord(floorRect.y)}" width="${_planPrintCoord(floorRect.w)}" height="${_planPrintCoord(floorRect.h)}" class="floor-grid"/>
           <rect x="${_planPrintCoord(floorRect.x + 1.5)}" y="${_planPrintCoord(floorRect.y + 1.5)}" width="${_planPrintCoord(Math.max(.2, floorRect.w - 3))}" height="${_planPrintCoord(Math.max(.2, floorRect.h - 3))}" class="block-inner"/>
           ${[...roomItems, ...sanitaryItems].map(item => _planPrintSpaceSvg(item, scale.mmPerMeter)).join('')}
           ${emptyNote}
+          <rect x="${page.sideX}" y="${page.sideY}" width="${page.sideW}" height="${page.sideH}" rx="2" class="panel"/>
+          <text x="${page.sideX + 4}" y="${page.sideY + 7}" class="panel-title">Ficha de plano</text>
+          ${_planPrintSvgTextBlock(sheetTitle, page.sideX + 4, page.sideY + 14, 29, 2, 'panel-strong', 3.4)}
+          <text x="${page.sideX + 4}" y="${page.sideY + 25}" class="meta">${_escape(`Bloque: ${dimensionsLabel}`)}</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 30}" class="${blockDimensions.measured ? 'meta' : 'note'}">${_escape(missingNote)}</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 39}" class="panel-title">Contenido</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 46}" class="meta">${_escape(floorSummary)}</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 51}" class="meta">${_escape(`Puertas ${floorRooms.reduce((sum, room) => sum + (room.objects || []).filter(obj => obj.type === 'door').length, 0)}`)} · ${_escape(`Ventanas ${floorRooms.reduce((sum, room) => sum + (room.objects || []).filter(obj => obj.type === 'window').length, 0)}`)}</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 61}" class="panel-title">Ubicacion</text>
+          ${_planPrintSvgTextBlock(info.locationLine, page.sideX + 4, page.sideY + 68, 30, 2, 'meta', 3.5)}
+          <text x="${page.sideX + 4}" y="${page.sideY + 79}" class="meta">${_escape(info.coordinateLine)}</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 89}" class="panel-title">Leyenda</text>
+          ${_planPrintLegendSvg(page.sideX + 4, page.sideY + 96)}
+          ${_planPrintNorthArrow(page.sideX + page.sideW - 9, page.sideY + page.sideH - 14)}
           ${_planPrintScaleBar(scale)}
+          <text x="12" y="${page.footerY + 8}" class="footer">${_escape(`Documento generado desde CIALPA v${typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version}`)}</text>
           <text x="${page.width - 12}" y="${page.footerY + 8}" class="footer" text-anchor="end">CIALPA - Relevamiento Escolar</text>
         </svg>
       </section>`;
@@ -8443,10 +8618,12 @@ const MecFormModule = (() => {
         planPages.push({ block, floor });
       });
     });
-    const totalSheets = Math.max(1, planPages.length);
-    const sheets = planPages.length
-      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 1, totalSheets, scale, generatedAt)).join('')
+    const totalSheets = Math.max(1, planPages.length + 1);
+    const coverSheet = _planPrintCoverSheet(totalSheets, generatedAt, scale);
+    const planSheets = planPages.length
+      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 2, totalSheets, scale, generatedAt)).join('')
       : '<section class="print-sheet"><p class="print-empty">No hay plano cargado para imprimir.</p></section>';
+    const sheets = `${coverSheet}${planSheets}`;
     return `
       <!doctype html>
       <html lang="es">
@@ -8464,6 +8641,42 @@ const MecFormModule = (() => {
           .print-sheet:last-child { break-after: auto; page-break-after: auto; }
           .print-empty { padding: 28mm; font-size: 18px; font-weight: 800; }
           svg { width: 100%; height: 100%; display: block; }
+          .print-cover { display: grid; grid-template-rows: auto 1fr; color: #172033; }
+          .cover-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12mm; padding: 10mm 11mm 6mm; background: #eef4f8; border-bottom: 1px solid #cbd5e1; }
+          .cover-header span { color: #15546b; font-size: 8pt; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; }
+          .cover-header h1 { margin: 2mm 0 1mm; font-size: 22pt; line-height: 1; }
+          .cover-header p { margin: 0; font-size: 11pt; font-weight: 750; color: #475467; }
+          .cover-badge { min-width: 42mm; padding: 4mm; border: 1px solid #9fb5c8; border-radius: 3mm; background: #fff; text-align: right; }
+          .cover-badge strong, .cover-badge small { display: block; }
+          .cover-badge strong { font-size: 15pt; }
+          .cover-badge small { margin-top: 1mm; color: #667085; font-size: 8pt; }
+          .cover-grid { display: grid; grid-template-columns: 1.35fr .85fr .85fr; gap: 4mm; padding: 6mm 11mm 9mm; }
+          .cover-card { min-height: 0; padding: 4mm; border: 1px solid #d7dee8; border-radius: 3mm; background: #fbfdff; }
+          .cover-card--wide { grid-column: span 2; }
+          .cover-card h2 { margin: 0 0 2.5mm; color: #15546b; font-size: 10pt; text-transform: uppercase; letter-spacing: .02em; }
+          .cover-card p, .cover-card li, .cover-card dd { font-size: 8.4pt; line-height: 1.35; }
+          .cover-card p { margin: 0 0 2mm; }
+          .cover-card dl { margin: 0; display: grid; gap: 1.5mm; }
+          .cover-card div { min-width: 0; }
+          .cover-card dt { color: #667085; font-size: 7.5pt; font-weight: 900; text-transform: uppercase; }
+          .cover-card dd { margin: .2mm 0 0; font-weight: 650; overflow-wrap: anywhere; }
+          .cover-stats { display: grid; grid-template-columns: auto 1fr; gap: 1.2mm 2.5mm; align-items: baseline; }
+          .cover-stats b { color: #172033; font-size: 14pt; text-align: right; }
+          .cover-stats span { color: #475467; font-size: 8.5pt; font-weight: 750; }
+          .cover-score { display: flex; align-items: center; justify-content: space-between; gap: 4mm; padding: 2mm 0; border-bottom: 1px solid #e2e8f0; }
+          .cover-score strong { color: #e84c22; font-size: 16pt; }
+          .cover-card ol { margin: 0; padding-left: 4mm; }
+          .cover-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; }
+          .cover-legend span { display: inline-flex; align-items: center; gap: 2mm; font-size: 8pt; font-weight: 800; }
+          .cover-legend i { width: 4mm; height: 4mm; display: inline-block; border: 1px solid #94a3b8; border-radius: 1mm; }
+          .lg-room { background: #eaf4ff; border-color: #2b6cb0 !important; }
+          .lg-sanitary { background: #f2ecff; border-color: #805ad5 !important; }
+          .lg-door { background: #dff4e8; border-color: #2f855a !important; }
+          .lg-window { background: #dbeafe; border-color: #2b6cb0 !important; }
+          .lg-outlet { background: #fff7ed; border-color: #b7791f !important; }
+          .lg-light { background: #fffbeb; border-color: #d69e2e !important; }
+          .lg-damage { background: #fff1f2; border-color: #c53030 !important; }
+          .lg-stair { background: #f8fafc; border-color: #4b5563 !important; }
           @media print {
             html, body { background: #fff; }
             .print-actions { display: none; }

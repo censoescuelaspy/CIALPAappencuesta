@@ -4,6 +4,32 @@
 
 ---
 
+## Sesión de estabilización tablet y PDF técnico - 2026-05-10 - v2.5.34
+
+### Objetivo
+- Corregir comportamientos táctiles extraños en tabletas Android/iPad y elevar la calidad del PDF del plano escolar.
+
+### Cambios implementados
+- La vista `Plano escuela` queda en modo selección: tocar un bloque, aula o sanitario solo selecciona; ya no mueve ni reubica elementos desde el plano general.
+- El movimiento y ajuste de geometrías queda reservado a las vistas específicas de aula y sanitario, reduciendo errores por arrastre accidental en pantallas táctiles.
+- Reforzado el coloreo de botones activos con `aria-pressed`, estados deshabilitados y estilos activos consistentes en:
+  - botones globales de formularios y filtros;
+  - botones de ficha gráfica auxiliar;
+  - botones del formulario MEC y selector de etapas.
+- Añadidos ajustes táctiles para tablet: botones con área mínima de toque, barra del plano fija al desplazar y contención de scroll en paneles/canvas.
+- Mejorado el PDF de plano:
+  - portada técnica con datos de escuela, código, ubicación, dirección, coordenadas, enlace de mapa, resumen y auditoría;
+  - hojas por bloque/piso con cabecera institucional, cajetín lateral, escala gráfica, grilla, norte, leyenda y contenido del piso;
+  - inclusión de métricas: bloques, plantas, aulas, sanitarios, área relevada y alertas.
+- Version y cache actualizados a `v2.5.34`.
+
+### Validaciones ejecutadas
+- `node --check` en módulos JS modificados y módulos principales.
+- `rg` para confirmar versión/cache `v2.5.34`.
+- `git diff --check`.
+
+---
+
 ## Sesión de reemplazo de desplegables por botones - 2026-05-10 - v2.5.33
 
 ### Objetivo

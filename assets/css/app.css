@@ -556,34 +556,47 @@ textarea.form-control { resize: vertical; min-height: 80px; }
   line-height: 1.15;
   cursor: pointer;
   text-align: center;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
 }
 
-.choice-button:hover {
+.choice-button:hover,
+.choice-button:focus-visible {
+  outline: none;
   border-color: var(--color-primary);
   background: #fff7ed;
 }
 
-.choice-button--active {
+.choice-button--active,
+.choice-button[aria-pressed="true"] {
   border-color: var(--color-primary);
-  background: var(--color-primary);
-  color: #fff;
+  background: var(--color-primary) !important;
+  color: #fff !important;
   box-shadow: 0 0 0 2px rgba(232, 76, 34, .14);
 }
 
-.choice-button--danger.choice-button--active {
+.choice-button--danger.choice-button--active,
+.choice-button--danger[aria-pressed="true"] {
   border-color: var(--color-danger);
-  background: var(--color-danger);
+  background: var(--color-danger) !important;
 }
 
-.choice-button--warning.choice-button--active {
+.choice-button--warning.choice-button--active,
+.choice-button--warning[aria-pressed="true"] {
   border-color: var(--color-warning);
-  background: var(--color-warning);
+  background: var(--color-warning) !important;
 }
 
-.choice-button--success.choice-button--active {
+.choice-button--success.choice-button--active,
+.choice-button--success[aria-pressed="true"] {
   border-color: var(--color-success);
-  background: var(--color-success);
+  background: var(--color-success) !important;
+}
+
+.choice-button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
 }
 
 .form-row {
@@ -2420,8 +2433,11 @@ td {
   }
 
   .btn,
+  .choice-button,
   .nav-item > a,
   .map-list-item {
+    min-height: 44px;
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 }

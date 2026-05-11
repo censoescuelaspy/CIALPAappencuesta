@@ -40,8 +40,10 @@
       const target = button.dataset.choiceTarget;
       if (onlyTarget && target !== onlyTarget) return;
       const input = $(target);
-      button.classList.toggle("choice-button--active", Boolean(input) && String(input.value || "") === String(button.dataset.choiceValue || ""));
-      if (input?.disabled) button.disabled = true;
+      const active = Boolean(input) && String(input.value || "") === String(button.dataset.choiceValue || "");
+      button.classList.toggle("choice-button--active", active);
+      button.setAttribute("aria-pressed", String(active));
+      if (input) button.disabled = Boolean(input.disabled || button.dataset.choiceDisabled === "true");
     });
   }
 
@@ -59,6 +61,7 @@
       button.textContent = choice.label;
       button.dataset.choiceTarget = targetId;
       button.dataset.choiceValue = choice.value || "";
+      if (choice.disabled) button.dataset.choiceDisabled = "true";
       button.disabled = Boolean(input.disabled || choice.disabled);
       container.appendChild(button);
     });

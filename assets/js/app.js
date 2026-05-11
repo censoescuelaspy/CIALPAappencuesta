@@ -19,10 +19,11 @@ const UI = (() => {
       document.body.dataset.choiceButtonsBound = 'true';
       document.addEventListener('click', event => {
         const button = event.target.closest('[data-choice-target][data-choice-value]');
-        if (!button) return;
+        if (!button || button.disabled) return;
         setButtonChoice(button.dataset.choiceTarget, button.dataset.choiceValue);
       });
     }
+    requestAnimationFrame(() => refreshButtonChoices(document));
   }
 
   function setLoading(visible, message = 'Cargando...') {
@@ -160,7 +161,7 @@ const UI = (() => {
 
   function setButtonChoice(target, value) {
     const input = _choiceInput(target);
-    if (!input) return;
+    if (!input || input.disabled) return;
     input.value = value || '';
     input.dispatchEvent(new Event('change', { bubbles: true }));
     refreshButtonChoices(document);
@@ -174,7 +175,10 @@ const UI = (() => {
     ];
     buttons.forEach(button => {
       const input = _choiceInput(button.dataset.choiceTarget);
-      button.classList.toggle('choice-button--active', Boolean(input) && String(input.value || '') === String(button.dataset.choiceValue || ''));
+      const active = Boolean(input) && String(input.value || '') === String(button.dataset.choiceValue || '');
+      button.classList.toggle('choice-button--active', active);
+      button.setAttribute('aria-pressed', String(active));
+      if (input) button.disabled = Boolean(input.disabled);
     });
   }
 

@@ -753,19 +753,23 @@
   line-height: 1.16;
   cursor: pointer;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 
-.mec-choice:hover {
+.mec-choice:hover,
+.mec-choice:focus-visible {
+  outline: none;
   border-color: var(--choice-hover-border, #8fb0d3);
   background: var(--choice-hover-bg, #f7fbff);
   transform: translateY(-1px);
 }
 
-.mec-choice--active {
+.mec-choice--active,
+.mec-choice[aria-pressed="true"] {
   border-color: var(--choice-active-border, #2b6cb0);
-  background: var(--choice-active-bg, #eaf4ff);
-  color: var(--choice-active-text, #173f68);
+  background: var(--choice-active-bg, #eaf4ff) !important;
+  color: var(--choice-active-text, #173f68) !important;
   box-shadow: 0 0 0 2px var(--choice-ring, rgba(43, 108, 176, .1));
 }
 
@@ -1474,6 +1478,9 @@
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
   background: #f8fafc;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .school-plan__side {
@@ -1544,16 +1551,21 @@
   color: #27364a;
   text-align: left;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.school-plan-object:hover {
+.school-plan-object:hover,
+.school-plan-object:focus-visible {
+  outline: none;
   border-color: #8fb0d3;
   background: #f1f7ff;
 }
 
 .school-plan-object--active {
-  border-color: #e84c22;
-  background: #fff7ed;
+  border-color: #e84c22 !important;
+  background: #fff7ed !important;
+  color: #172033;
   box-shadow: 0 0 0 2px rgba(232, 76, 34, .13);
 }
 
@@ -2363,8 +2375,10 @@
   .mec-stepper,
   .mec-block-tabs,
   .mec-sketch-canvas-wrap,
+  .school-plan__board,
   .school-plan__list {
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .mec-step,
@@ -2373,5 +2387,26 @@
   .mec-sketch-tool,
   .school-plan-object {
     touch-action: manipulation;
+  }
+
+  .school-plan__toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: .45rem 0;
+    background: #fff;
+  }
+
+  .school-plan__layers label,
+  .school-plan__exports .btn,
+  .mec-stage-button,
+  .mec-choice {
+    min-height: 44px;
+  }
+
+  .school-plan__board canvas {
+    touch-action: manipulation;
+    max-height: 68dvh;
+    object-fit: contain;
   }
 }
