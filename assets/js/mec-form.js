@@ -468,8 +468,10 @@ const MecFormModule = (() => {
               </div>
             </div>
             <span class="mec-stage-current">${_escape(activeModule?.description || `${implemented.length} etapas activas`)}</span>
-            <button class="btn btn-outline btn-sm" onclick="MecFormModule.validate()">Validar</button>
-            <button class="btn btn-primary btn-sm" onclick="MecFormModule.nextModule()">Siguiente</button>
+            <div class="mec-stage-actions">
+              <button class="btn btn-outline btn-sm" onclick="MecFormModule.validate()">Validar</button>
+              <button class="btn btn-primary btn-sm" onclick="MecFormModule.nextModule()">Siguiente</button>
+            </div>
           </div>
           <div id="mec-validation-summary" class="mec-validation-summary"></div>
           ${MEC_SCHEMA.modules.map(_renderModule).join('')}

@@ -213,8 +213,9 @@
   top: 0;
   z-index: 42;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
   gap: .75rem;
   margin-bottom: .75rem;
   padding: .55rem .65rem;
@@ -225,24 +226,42 @@
 }
 
 .mec-stage-toolbar .btn {
+  flex: 0 0 auto;
   min-height: 40px;
 }
 
 .mec-stage-current {
-  flex: 1 1 220px;
+  order: 4;
+  flex: 1 0 100%;
+  min-width: 0;
+  padding: .42rem .55rem 0;
+  border-top: 1px solid #edf2f7;
   color: #66788d;
   font-size: .78rem;
   font-weight: 700;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .mec-stage-picker {
-  flex: 1 1 320px;
+  flex: 1 1 360px;
+  min-width: min(360px, 100%);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: .45rem;
   align-items: center;
   margin: 0;
+}
+
+.mec-stage-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: .45rem;
+  margin-left: auto;
+}
+
+.mec-stage-actions .btn {
+  white-space: nowrap;
 }
 
 .mec-stage-picker span {
@@ -1754,6 +1773,7 @@
 
   .mec-stage-picker {
     flex: 1 1 210px;
+    min-width: 0;
   }
 
   .mec-module__header {
@@ -2129,12 +2149,20 @@
 
   .mec-stage-current {
     flex: 1 1 100%;
+    padding: .35rem .3rem 0;
     font-size: .68rem;
   }
 
   .mec-stage-picker {
     flex: 1 1 100%;
+    min-width: 0;
     grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .mec-stage-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0;
   }
 
   .mec-module__header {

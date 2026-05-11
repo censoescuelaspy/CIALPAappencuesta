@@ -4,6 +4,25 @@
 
 ---
 
+## Sesión de corrección visual en navegación de encuesta - 2026-05-10 - v2.5.37
+
+### Objetivo
+- Corregir el solapamiento de la descripción de etapa con los botones `Validar` y `Siguiente` dentro de la vista de carga de encuesta/cuestionario MEC.
+
+### Cambios implementados
+- Agrupados los botones de acción de la barra de etapas en `.mec-stage-actions`.
+- La descripción de la etapa (`.mec-stage-current`) ahora ocupa una línea propia dentro de la barra, con ajuste de texto y borde separador.
+- La barra superior de etapas permite salto de línea seguro y evita que el texto invada los botones en tablet, escritorio angosto o zoom alto.
+- Ajustados mínimos y anchos responsivos de la botonera de etapas para no romper la navegación horizontal de módulos.
+- Version y cache actualizados a `v2.5.37`.
+
+### Validaciones ejecutadas
+- `node --check` en `mec-form.js` y `config.js`.
+- `rg` para confirmar versión/cache `v2.5.37` y presencia de `.mec-stage-actions`.
+- `git diff --check`.
+
+---
+
 ## Sesión de planificación operativa y estimación de tiempos - 2026-05-10 - v2.5.36
 
 ### Objetivo
