@@ -3001,6 +3001,7 @@ const MecFormModule = (() => {
     let pinching = false;
     let pinchStartDistance = 0;
     let pinchStartZoom = _sketchZoom;
+    let pinchFocus = null;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
       const source = event.touches?.[0] || event.changedTouches?.[0] || event;
@@ -3015,6 +3016,7 @@ const MecFormModule = (() => {
         pinching = true;
         pinchStartDistance = _touchDistance(event);
         pinchStartZoom = _sketchZoom;
+        pinchFocus = _zoomFocusFromClient(canvas, canvas.closest('.mec-sketch-canvas-wrap'), _touchCenter(event));
         drawing = false;
         draftObject = null;
         movingObject = null;
@@ -3071,7 +3073,7 @@ const MecFormModule = (() => {
       if (pinching) {
         if (event.touches?.length >= 2 && pinchStartDistance > 0) {
           event.preventDefault();
-          _setSketchZoomValue(pinchStartZoom * (_touchDistance(event) / pinchStartDistance), false);
+          _setSketchZoomValue(pinchStartZoom * (_touchDistance(event) / pinchStartDistance), pinchFocus || false);
         }
         return;
       }
@@ -3187,6 +3189,7 @@ const MecFormModule = (() => {
         event.preventDefault();
         if (!event.touches || event.touches.length < 2) {
           pinching = false;
+          pinchFocus = null;
           lastTap = { time: 0, point: null };
         }
         return;
@@ -3251,6 +3254,7 @@ const MecFormModule = (() => {
     let pinching = false;
     let pinchStartDistance = 0;
     let pinchStartZoom = _sanitaryZoom;
+    let pinchFocus = null;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
       const source = event.touches?.[0] || event.changedTouches?.[0] || event;
@@ -3265,6 +3269,7 @@ const MecFormModule = (() => {
         pinching = true;
         pinchStartDistance = _touchDistance(event);
         pinchStartZoom = _sanitaryZoom;
+        pinchFocus = _zoomFocusFromClient(canvas, canvas.closest('.mec-sketch-canvas-wrap'), _touchCenter(event));
         movingRoom = null;
         movingObject = null;
         resizing = null;
@@ -3320,7 +3325,7 @@ const MecFormModule = (() => {
       if (pinching) {
         if (event.touches?.length >= 2 && pinchStartDistance > 0) {
           event.preventDefault();
-          _setSanitaryZoomValue(pinchStartZoom * (_touchDistance(event) / pinchStartDistance));
+          _setSanitaryZoomValue(pinchStartZoom * (_touchDistance(event) / pinchStartDistance), pinchFocus || false);
         }
         return;
       }
@@ -3341,7 +3346,10 @@ const MecFormModule = (() => {
     const end = event => {
       if (pinching) {
         event.preventDefault();
-        if (!event.touches || event.touches.length < 2) pinching = false;
+        if (!event.touches || event.touches.length < 2) {
+          pinching = false;
+          pinchFocus = null;
+        }
         return;
       }
       if (!movingRoom && !movingObject && !resizing) return;
@@ -5553,6 +5561,50 @@ const MecFormModule = (() => {
     return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   }
 
+  function _touchCenter(event) {
+    if (!event.touches || event.touches.length < 2) return null;
+    const [a, b] = event.touches;
+    return {
+      x: (a.clientX + b.clientX) / 2,
+      y: (a.clientY + b.clientY) / 2,
+    };
+  }
+
+  function _clientToCanvasPoint(canvas, clientPoint) {
+    if (!canvas || !clientPoint) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return {
+      x: (clientPoint.x - rect.left) * (canvas.width / rect.width),
+      y: (clientPoint.y - rect.top) * (canvas.height / rect.height),
+    };
+  }
+
+  function _clientToWrapPoint(wrap, clientPoint) {
+    if (!wrap || !clientPoint) return null;
+    const rect = wrap.getBoundingClientRect();
+    return {
+      x: clientPoint.x - rect.left,
+      y: clientPoint.y - rect.top,
+    };
+  }
+
+  function _zoomFocusFromClient(canvas, wrap, clientPoint) {
+    return {
+      point: _clientToCanvasPoint(canvas, clientPoint),
+      viewportPoint: _clientToWrapPoint(wrap, clientPoint),
+    };
+  }
+
+  function _canvasViewportCenterPoint(wrap, zoom) {
+    if (!wrap) return null;
+    const scale = zoom || 1;
+    return {
+      x: (wrap.scrollLeft + wrap.clientWidth / 2) / scale,
+      y: (wrap.scrollTop + wrap.clientHeight / 2) / scale,
+    };
+  }
+
   function _applyCanvasZoom(canvas, zoom, width = SKETCH_CANVAS.width, height = SKETCH_CANVAS.height) {
     if (!canvas) return;
     canvas.style.width = `${Math.round(width * zoom)}px`;
@@ -5560,23 +5612,62 @@ const MecFormModule = (() => {
     canvas.style.transform = 'none';
   }
 
+  function _scrollCanvasWrapToPoint(wrap, canvasPoint, zoom, viewportPoint = null) {
+    if (!wrap || !canvasPoint) return;
+    requestAnimationFrame(() => {
+      const anchorX = viewportPoint?.x ?? wrap.clientWidth / 2;
+      const anchorY = viewportPoint?.y ?? wrap.clientHeight / 2;
+      const maxLeft = Math.max(0, wrap.scrollWidth - wrap.clientWidth);
+      const maxTop = Math.max(0, wrap.scrollHeight - wrap.clientHeight);
+      const nextLeft = canvasPoint.x * zoom - anchorX;
+      const nextTop = canvasPoint.y * zoom - anchorY;
+      wrap.scrollLeft = Math.max(0, Math.min(maxLeft, nextLeft));
+      wrap.scrollTop = Math.max(0, Math.min(maxTop, nextTop));
+    });
+  }
+
+  function _sketchObjectFocusPoint(object) {
+    if (!object) return null;
+    if (object.type === 'wall') return { x: (object.x1 + object.x2) / 2, y: (object.y1 + object.y2) / 2 };
+    if (object.type === 'pencil') {
+      const box = _pencilBounds(object);
+      return { x: box.x + box.w / 2, y: box.y + box.h / 2 };
+    }
+    if (_isPointSketchObject(object) || object.x !== undefined && object.w === undefined) return { x: object.x, y: object.y };
+    if (object.x !== undefined && object.w !== undefined) return { x: object.x + object.w / 2, y: object.y + object.h / 2 };
+    return null;
+  }
+
+  function _activeSketchZoomPoint(wrap = document.querySelector('.mec-sketch-canvas-wrap'), zoom = _sketchZoom) {
+    const selected = _findSketchObjectById(_selectedSketchObjectId);
+    const room = (_data.__classroomSketch?.objects || []).find(object => object.type === 'room');
+    return _sketchObjectFocusPoint(selected) || _sketchObjectFocusPoint(room) || _canvasViewportCenterPoint(wrap, zoom);
+  }
+
+  function _activeSanitaryZoomPoint(wrap = document.querySelector('#mec-sanitary-canvas')?.closest('.mec-sketch-canvas-wrap'), zoom = _sanitaryZoom) {
+    const item = _activeSanitaryItem();
+    const selected = (item?.objects || []).find(object => object.id === _selectedSanitaryObjectId);
+    const room = _sanitaryRoomObject(item);
+    return _sketchObjectFocusPoint(selected) || _sketchObjectFocusPoint(room) || _canvasViewportCenterPoint(wrap, zoom);
+  }
+
+  function _activeSchoolPlanZoomPoint(wrap, zoom = _schoolPlanZoom) {
+    const selected = _planHitAreas.find(area => area.id === _selectedPlanId);
+    if (selected) return { x: selected.x + selected.w / 2, y: selected.y + selected.h / 2 };
+    return _canvasViewportCenterPoint(wrap, zoom);
+  }
+
   function _centerSketchOnActiveRoom(force = false) {
     if (!force && !_pendingSketchCenter) return;
     const wrap = document.querySelector('.mec-sketch-canvas-wrap');
     const canvas = document.getElementById('mec-classroom-canvas');
-    const room = (_data.__classroomSketch?.objects || []).find(object => object.type === 'room');
-    if (!wrap || !canvas || !room) {
+    const focus = _activeSketchZoomPoint(wrap, _sketchZoom);
+    if (!wrap || !canvas || !focus) {
       _pendingSketchCenter = false;
       return;
     }
     _pendingSketchCenter = false;
-    requestAnimationFrame(() => {
-      const scale = _sketchZoom || 1;
-      const centerX = (room.x + room.w / 2) * scale;
-      const centerY = (room.y + room.h / 2) * scale;
-      wrap.scrollLeft = Math.max(0, centerX - wrap.clientWidth / 2);
-      wrap.scrollTop = Math.max(0, centerY - wrap.clientHeight / 2);
-    });
+    _scrollCanvasWrapToPoint(wrap, focus, _sketchZoom);
   }
 
   function _updateSketchStatus() {
@@ -5591,10 +5682,19 @@ const MecFormModule = (() => {
     if (zoom) zoom.textContent = `${Math.round(_sketchZoom * 100)}%`;
   }
 
-  function _setSketchZoomValue(value, center = true) {
+  function _setSketchZoomValue(value, focus = true) {
+    const canvas = document.getElementById('mec-classroom-canvas');
+    const wrap = canvas?.closest('.mec-sketch-canvas-wrap');
+    const previousZoom = _sketchZoom;
+    const focusConfig = typeof focus === 'object' && focus !== null ? focus : {};
+    const shouldCenter = focus !== false;
+    const point = shouldCenter
+      ? (focusConfig.point || _activeSketchZoomPoint(wrap, previousZoom))
+      : null;
+    const viewportPoint = focusConfig.viewportPoint || null;
     _sketchZoom = Math.max(.55, Math.min(2.5, Number(value) || 1));
     _applySketchZoom();
-    if (center) _centerSketchOnActiveRoom(true);
+    if (point) _scrollCanvasWrapToPoint(wrap, point, _sketchZoom, viewportPoint);
   }
 
   function setSketchZoom(delta) {
@@ -5608,9 +5708,19 @@ const MecFormModule = (() => {
     if (zoom) zoom.textContent = `${Math.round(_sanitaryZoom * 100)}%`;
   }
 
-  function _setSanitaryZoomValue(value) {
+  function _setSanitaryZoomValue(value, focus = true) {
+    const canvas = document.getElementById('mec-sanitary-canvas');
+    const wrap = canvas?.closest('.mec-sketch-canvas-wrap');
+    const previousZoom = _sanitaryZoom;
+    const focusConfig = typeof focus === 'object' && focus !== null ? focus : {};
+    const shouldCenter = focus !== false;
+    const point = shouldCenter
+      ? (focusConfig.point || _activeSanitaryZoomPoint(wrap, previousZoom))
+      : null;
+    const viewportPoint = focusConfig.viewportPoint || null;
     _sanitaryZoom = Math.max(.55, Math.min(2.5, Number(value) || 1));
     _applySanitaryZoom();
+    if (point) _scrollCanvasWrapToPoint(wrap, point, _sanitaryZoom, viewportPoint);
   }
 
   function setSanitaryZoom(delta) {
@@ -5623,9 +5733,19 @@ const MecFormModule = (() => {
     if (zoom) zoom.textContent = `${Math.round(_schoolPlanZoom * 100)}%`;
   }
 
-  function _setSchoolPlanZoomValue(value) {
+  function _setSchoolPlanZoomValue(value, focus = true) {
+    const canvas = _activeSchoolPlanCanvas();
+    const wrap = canvas?.closest('.school-plan__canvas-wrap');
+    const previousZoom = _schoolPlanZoom;
+    const focusConfig = typeof focus === 'object' && focus !== null ? focus : {};
+    const shouldCenter = focus !== false;
+    const point = shouldCenter
+      ? (focusConfig.point || _activeSchoolPlanZoomPoint(wrap, previousZoom))
+      : null;
+    const viewportPoint = focusConfig.viewportPoint || null;
     _schoolPlanZoom = Math.max(.55, Math.min(2.8, Number(value) || 1));
     _applySchoolPlanZoom();
+    if (point) _scrollCanvasWrapToPoint(wrap, point, _schoolPlanZoom, viewportPoint);
   }
 
   function setSchoolPlanZoom(delta) {
@@ -7894,6 +8014,12 @@ const MecFormModule = (() => {
       if (points.length < 2) return 0;
       return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
     };
+    const pointerCenter = () => {
+      const points = [...activePointers.values()];
+      if (!points.length) return null;
+      const sum = points.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 });
+      return { x: sum.x / points.length, y: sum.y / points.length };
+    };
     const hit = event => {
       const point = pointFromEvent(event);
       return [..._planHitAreas].reverse().find(area =>
@@ -7910,7 +8036,11 @@ const MecFormModule = (() => {
     canvas.addEventListener('pointerdown', event => {
       rememberPointer(event);
       if (event.pointerType === 'touch' && activePointers.size >= 2) {
-        planPinch = { distance: pointerDistance(), zoom: _schoolPlanZoom };
+        planPinch = {
+          distance: pointerDistance(),
+          zoom: _schoolPlanZoom,
+          focus: _zoomFocusFromClient(canvas, canvas.closest('.school-plan__canvas-wrap'), pointerCenter()),
+        };
         pointerCandidate = null;
         pointerStart = null;
         suppressClickUntil = Date.now() + 350;
@@ -7930,7 +8060,7 @@ const MecFormModule = (() => {
       if (planPinch && activePointers.size >= 2) {
         const distance = pointerDistance();
         if (distance > 0 && planPinch.distance > 0) {
-          _setSchoolPlanZoomValue(planPinch.zoom * (distance / planPinch.distance));
+          _setSchoolPlanZoomValue(planPinch.zoom * (distance / planPinch.distance), planPinch.focus || false);
           suppressClickUntil = Date.now() + 350;
         }
         event.preventDefault();
@@ -7980,7 +8110,11 @@ const MecFormModule = (() => {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const direction = event.deltaY > 0 ? -0.12 : 0.12;
-      setSchoolPlanZoom(direction);
+      _setSchoolPlanZoomValue(_schoolPlanZoom + direction, _zoomFocusFromClient(
+        canvas,
+        canvas.closest('.school-plan__canvas-wrap'),
+        { x: event.clientX, y: event.clientY }
+      ));
     }, { passive: false });
   }
 

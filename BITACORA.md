@@ -4,6 +4,26 @@
 
 ---
 
+## Sesion de correccion de foco de zoom en planos - 2026-05-11 - v2.5.39
+
+### Objetivo
+- Corregir el comportamiento observado en tablet/escritorio donde, al hacer zoom sobre un elemento del plano, la vista se desplazaba hacia la esquina superior izquierda en lugar de mantener el elemento o gesto como foco.
+
+### Cambios implementados
+- El zoom del croquis de aula ahora centra el elemento seleccionado; si no hay elemento seleccionado, conserva el centro visible actual.
+- El zoom del plano sanitario ahora centra el objeto sanitario/cabina seleccionada o el recinto sanitario activo.
+- El zoom del plano general ahora centra el bloque, aula, sanitario u objeto seleccionado.
+- El gesto de pinza mantiene como ancla el punto medio de los dedos en aula, sanitario y plano general.
+- El zoom con rueda/trackpad sobre el plano general mantiene como ancla el punto bajo el cursor.
+- Version y cache actualizados a `v2.5.39`.
+
+### Validaciones ejecutadas
+- `osascript -l JavaScript assets/js/mec-form.js`
+- `osascript -l JavaScript assets/js/mec-schema.js assets/js/mec-form.js`
+- `git diff --check`
+
+---
+
 ## Sesion de zoom tactil, distancias por borde y PDF con fotos - 2026-05-10 - v2.5.38
 
 ### Objetivo
