@@ -302,11 +302,19 @@ const CialpaLocalStore = (() => {
   }
 
   function _fieldVisible(field, values) {
-    if (!field.visibleWhen) return true;
-    const [moduleId, fieldId] = String(field.visibleWhen.field || '').split('.');
+    return _visibleRuleMatches(field.visibleWhen, values);
+  }
+
+  function _visibleRuleMatches(rule, values) {
+    if (!rule) return true;
+    if (Array.isArray(rule.all)) return rule.all.every(item => _visibleRuleMatches(item, values));
+    if (Array.isArray(rule.any)) return rule.any.some(item => _visibleRuleMatches(item, values));
+    const [moduleId, fieldId] = String(rule.field || '').split('.');
     const current = values?.[moduleId]?.[fieldId];
-    if ('equals' in field.visibleWhen) return current === field.visibleWhen.equals;
-    if ('not' in field.visibleWhen) return current !== field.visibleWhen.not;
+    if ('equals' in rule) return current === rule.equals;
+    if ('not' in rule) return current !== rule.not;
+    if (Array.isArray(rule.in)) return rule.in.includes(current);
+    if (Array.isArray(rule.notIn)) return !rule.notIn.includes(current);
     return true;
   }
 

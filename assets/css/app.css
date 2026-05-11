@@ -2434,10 +2434,223 @@ td {
 
   .btn,
   .choice-button,
+  .planning-assignee,
   .nav-item > a,
   .map-list-item {
     min-height: 44px;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ── Planificación operativa ─────────────────────────────────────────────── */
+.planning-tabs {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.planning-tabs button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  border-radius: var(--radius-sm);
+  padding: .58rem .85rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.planning-tabs button.active {
+  background: var(--color-secondary);
+  color: #fff;
+  border-color: var(--color-secondary);
+}
+
+.planning-panel { display: none; }
+.planning-panel--active { display: block; }
+
+.planning-settings,
+.planning-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
+.planning-setting label {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: .78rem;
+  font-weight: 800;
+  margin-bottom: .25rem;
+}
+
+.planning-kpis,
+.planning-assignment-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .85rem;
+  margin-bottom: 1rem;
+}
+
+.planning-kpi {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  padding: .85rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.planning-kpi span,
+.planning-kpi small {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: .75rem;
+  font-weight: 750;
+}
+
+.planning-kpi strong {
+  display: block;
+  color: var(--color-secondary);
+  font-size: 1.45rem;
+  line-height: 1.15;
+  margin: .25rem 0;
+}
+
+.planning-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.planning-progress,
+.planning-mini-bar {
+  height: .62rem;
+  border-radius: var(--radius-full);
+  background: #e9edf3;
+  overflow: hidden;
+}
+
+.planning-progress i,
+.planning-mini-bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+}
+
+.planning-state-bars {
+  display: grid;
+  gap: .55rem;
+  margin-top: 1rem;
+}
+
+.planning-state-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 42px;
+  gap: .65rem;
+  align-items: center;
+  font-size: .82rem;
+}
+
+.planning-state-row div {
+  height: .5rem;
+  border-radius: var(--radius-full);
+  background: #edf0f4;
+  overflow: hidden;
+}
+
+.planning-state-row i {
+  display: block;
+  height: 100%;
+}
+
+.planning-readout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .8rem;
+  align-items: center;
+  margin: .75rem 0;
+}
+
+.planning-readout b {
+  color: var(--color-primary);
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.planning-readout span {
+  color: var(--color-secondary);
+  font-weight: 800;
+}
+
+.planning-toolbar {
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
+}
+
+.planning-toolbar__actions,
+.planning-assignee-buttons {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.planning-table-wrapper {
+  max-height: calc(100dvh - 310px);
+  overflow: auto;
+}
+
+.planning-table td:first-child strong,
+.planning-table td:first-child span,
+.planning-table td:first-child small {
+  display: block;
+}
+
+.planning-table td:first-child small {
+  color: var(--color-text-muted);
+}
+
+.planning-row--dirty {
+  background: #fff8eb;
+}
+
+.planning-assignee {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  cursor: pointer;
+  font-size: .76rem;
+  font-weight: 800;
+  min-height: 44px;
+  padding: .35rem .55rem;
+}
+
+.planning-assignee--active {
+  background: #e9f7ef;
+  border-color: #28a745;
+  color: #1d6f34;
+}
+
+@media (max-width: 900px) {
+  .planning-settings,
+  .planning-toolbar,
+  .planning-kpis,
+  .planning-assignment-summary,
+  .planning-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .planning-toolbar__actions,
+  .planning-assignee-buttons {
+    justify-content: flex-start;
+  }
+
+  .planning-table-wrapper {
+    max-height: none;
   }
 }

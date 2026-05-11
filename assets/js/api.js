@@ -293,7 +293,15 @@ const API = (() => {
         if (esc) esc.estado_relevamiento = data.estado;
         return { status: 'ok' };
       }
-      case 'asignarEscuela': return { status: 'ok' };
+      case 'asignarEscuela': {
+        const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.codigo_local);
+        if (esc) {
+          esc.encuestador_asignado = data.encuestador_asignado || data.encuestador || '';
+          esc.usuario_encuestador = data.usuario_encuestador || '';
+          esc.id_encuestador = data.id_encuestador || '';
+        }
+        return { status: 'ok' };
+      }
       case 'iniciarSesion': {
         const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || _DEMO_ESCUELAS[0];
         const now = new Date();

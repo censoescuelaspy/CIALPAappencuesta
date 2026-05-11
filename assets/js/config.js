@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * config.js — Central application configuration
- * Version: 2.5.35
+ * Version: 2.5.36
  */
 
 const APP_CONFIG = {
@@ -17,12 +17,14 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA — Relevamiento Escolar',
-  VERSION: '2.5.35',
-  EDITION_LABEL: 'Edición vigente v2.5.35',
+  VERSION: '2.5.36',
+  EDITION_LABEL: 'Edición vigente v2.5.36',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
   EVIDENCE_FOLDER_URL: 'https://drive.google.com/drive/u/0/search?q=CIALPA%20evidencias',
+  DEFAULT_SCHOOL_ESTIMATE_MINUTES: 45,
+  DEFAULT_WORKDAY_HOURS: 6,
 
   // Map defaults (Paraguay center)
   MAP_CENTER: [-23.4, -58.0],

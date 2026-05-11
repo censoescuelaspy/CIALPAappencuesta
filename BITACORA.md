@@ -4,6 +4,38 @@
 
 ---
 
+## Sesión de planificación operativa y estimación de tiempos - 2026-05-10 - v2.5.36
+
+### Objetivo
+- Agregar una vista de supervisión para cuantificar tiempos mínimos de carga por escuela y administrar la distribución de escuelas entre encuestadores.
+
+### Cambios implementados
+- Nuevo módulo `Planificación` visible para supervisores y administradores.
+- Pestaña `Estimación de tiempos` con:
+  - escuelas totales, pendientes efectivas, tiempo restante mínimo, jornadas-persona, encuestadores activos y días calendario mínimos;
+  - parámetros editables de minutos base por escuela, jornada útil diaria y meta de cierre;
+  - cálculo de encuestadores mínimos necesarios para terminar dentro de la meta definida;
+  - carga estimada por encuestador y barras de avance/carga.
+- Pestaña `Distribución de escuelas` con:
+  - buscador y filtros por estado;
+  - asignación por botones, sin listas desplegables;
+  - balanceo automático de pendientes por minutos estimados;
+  - rebalanceo general y deshacer cambios;
+  - guardado de asignaciones mediante el endpoint existente `asignarEscuela`;
+  - exportación CSV del plan operativo.
+- El modo demo ahora actualiza en memoria la escuela al usar `asignarEscuela`, permitiendo probar la distribución sin backend.
+- Agregados parámetros `DEFAULT_SCHOOL_ESTIMATE_MINUTES` y `DEFAULT_WORKDAY_HOURS` en configuración.
+- El service worker cachea `planning.js`.
+- Se reforzó `local-store.js` para que las métricas offline entiendan reglas de visibilidad `all`, `any`, `in` y `notIn`.
+- Version y cache actualizados a `v2.5.36`.
+
+### Validaciones ejecutadas
+- `node --check` en `planning.js`, `app.js`, `api.js`, `local-store.js` y `config.js`.
+- `rg` para confirmar versión/cache `v2.5.36`, nuevo módulo `Planificación` y cache de `planning.js`.
+- `git diff --check`.
+
+---
+
 ## Sesión de arranque en Inicio y saltos eléctricos MEC/RUE - 2026-05-10 - v2.5.35
 
 ### Objetivo

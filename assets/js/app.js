@@ -326,6 +326,7 @@ const AppController = (() => {
     incidencias: { label: 'Incidencias', icon: '⚠️', minRole: 'encuestador' },
     jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
     estadisticas: { label: 'Panel Estadístico', icon: '📊', minRole: 'supervisor' },
+    planificacion: { label: 'Planificación', icon: '⏱', minRole: 'supervisor' },
     configuracion: { label: 'Configuración', icon: '⚙️', minRole: 'admin' },
     auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
   };
@@ -727,6 +728,9 @@ const AppController = (() => {
         break;
       case 'estadisticas':
         StatsModule.init();
+        break;
+      case 'planificacion':
+        PlanningModule.init();
         break;
       case 'configuracion':
         AdminModule.init();

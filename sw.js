@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.5.35';
+const CACHE_NAME = 'cialpa-app-v2.5.36';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',
@@ -20,6 +20,7 @@ const APP_SHELL = [
   './assets/js/manual.js',
   './assets/js/mec-schema.js',
   './assets/js/mec-form.js',
+  './assets/js/planning.js',
   './assets/js/mec-ficha.js',
   './mec-ficha.html',
   './assets/img/logo.png',

@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.5.35</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.5.36</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.5.35</strong>
+      Edición vigente<br><strong class="app-version">v2.5.36</strong>
     </div>
   </aside>
 
@@ -199,6 +199,7 @@
               <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Migrar datos al RUE-MEC</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Planificación</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
             </div>
           </div>
@@ -206,7 +207,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.5.35</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.5.36</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -626,6 +627,25 @@
       </div>
 
       <!-- ======================================================
+           MODULE: PLANIFICACION OPERATIVA (supervisor/admin)
+           ====================================================== -->
+      <div id="module-planificacion" class="module-panel" data-min-role="supervisor">
+        <div class="page-header">
+          <div>
+            <h2>Planificación operativa</h2>
+            <p class="text-muted">Estimación mínima de tiempos y distribución de escuelas por encuestador.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="PlanningModule.exportCSV()">Exportar CSV</button>
+            <button class="btn btn-sm btn-primary" onclick="PlanningModule.load()">↺ Actualizar</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="planning-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
            MODULE: CONFIGURACIÓN (admin only)
            ====================================================== -->
       <div id="module-configuracion" class="module-panel" data-min-role="admin">
@@ -897,6 +917,7 @@
 <script src="assets/js/mec-schema.js"></script>
 <script src="assets/js/mec-form.js"></script>
 <script src="assets/js/stats.js"></script>
+<script src="assets/js/planning.js"></script>
 <script src="assets/js/admin.js"></script>
 <script src="assets/js/jornada.js"></script>
 <script src="assets/js/manual.js"></script>
