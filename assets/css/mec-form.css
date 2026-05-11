@@ -717,6 +717,7 @@
 
 .mec-sketch-canvas-wrap {
   width: 100%;
+  max-height: 72vh;
   overflow: auto;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
@@ -730,6 +731,7 @@
   background: #fbfcfe;
   touch-action: none;
   transform-origin: top left;
+  max-width: none;
 }
 
 .mec-sketch__board small {
@@ -1467,8 +1469,18 @@
 .school-plan__layers,
 .school-plan__exports {
   display: flex;
+  align-items: center;
   gap: .45rem;
   flex-wrap: wrap;
+}
+
+.school-plan__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: #617083;
+  font-size: .78rem;
+  font-weight: 850;
 }
 
 .school-plan__layers label {
@@ -1490,15 +1502,23 @@
   height: 14px;
 }
 
+.school-plan__canvas-wrap {
+  width: 100%;
+  max-height: 72vh;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
 .school-plan__board canvas {
   width: 100%;
   height: auto;
   display: block;
-  border: 1px solid #cbd5e1;
-  border-radius: var(--radius-md);
   background: #f8fafc;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: none;
+  max-width: none;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -2403,6 +2423,7 @@
   .mec-stepper,
   .mec-block-tabs,
   .mec-sketch-canvas-wrap,
+  .school-plan__canvas-wrap,
   .school-plan__board,
   .school-plan__list {
     -webkit-overflow-scrolling: touch;
@@ -2432,9 +2453,12 @@
     min-height: 44px;
   }
 
-  .school-plan__board canvas {
-    touch-action: manipulation;
+  .school-plan__canvas-wrap {
     max-height: 68dvh;
-    object-fit: contain;
+  }
+
+  .school-plan__board canvas {
+    touch-action: none;
+    max-height: none;
   }
 }

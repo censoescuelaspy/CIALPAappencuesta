@@ -17,6 +17,8 @@ const MecFormModule = (() => {
   let _activeSanitaryId = null;
   let _selectedSanitaryObjectId = null;
   let _sketchZoom = 1;
+  let _sanitaryZoom = 1;
+  let _schoolPlanZoom = 1;
   let _pendingSketchCenter = false;
   let _selectedPlanId = null;
   let _planHitAreas = [];
@@ -835,7 +837,7 @@ const MecFormModule = (() => {
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSketchZoom(0.15)">+</button>
             </div>
             <div class="mec-sketch-canvas-wrap">
-              <canvas id="mec-classroom-canvas" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="transform:scale(${_sketchZoom});" aria-label="Croquis manual del aula"></canvas>
+              <canvas id="mec-classroom-canvas" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="width:${Math.round(SKETCH_CANVAS.width * _sketchZoom)}px;height:${Math.round(SKETCH_CANVAS.height * _sketchZoom)}px;" aria-label="Croquis manual del aula"></canvas>
             </div>
             <div class="mec-sketch-toolset" aria-label="Elementos para insertar en el croquis">
               ${SKETCH_TOOLS.map(tool => `
@@ -1961,8 +1963,13 @@ const MecFormModule = (() => {
           </div>
         </div>
         <div class="mec-sketch__board">
+          <div class="mec-sketch-zoom">
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSanitaryZoom(-0.15)">-</button>
+            <span>${Math.round(_sanitaryZoom * 100)}%</span>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSanitaryZoom(0.15)">+</button>
+          </div>
           <div class="mec-sketch-canvas-wrap">
-            <canvas id="${canvasId}" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" aria-label="Plano del piso con sanitario activo"></canvas>
+            <canvas id="${canvasId}" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="width:${Math.round(SKETCH_CANVAS.width * _sanitaryZoom)}px;height:${Math.round(SKETCH_CANVAS.height * _sanitaryZoom)}px;" aria-label="Plano del piso con sanitario activo"></canvas>
           </div>
           ${_renderSanitaryElementTools(item)}
           ${_renderSanitaryCabinPanel(item)}
@@ -2991,6 +2998,9 @@ const MecFormModule = (() => {
     let moveOffset = null;
     let mutationRecorded = false;
     let lastTap = { time: 0, point: null };
+    let pinching = false;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = _sketchZoom;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
       const source = event.touches?.[0] || event.changedTouches?.[0] || event;
@@ -3000,6 +3010,20 @@ const MecFormModule = (() => {
       };
     };
     const begin = event => {
+      if (event.touches?.length >= 2) {
+        event.preventDefault();
+        pinching = true;
+        pinchStartDistance = _touchDistance(event);
+        pinchStartZoom = _sketchZoom;
+        drawing = false;
+        draftObject = null;
+        movingObject = null;
+        movingSanitary = null;
+        resizingObject = null;
+        rotatingObject = null;
+        moveOffset = null;
+        return;
+      }
       event.preventDefault();
       _ensureSketchObjects();
       const point = pointFromEvent(event);
@@ -3044,6 +3068,13 @@ const MecFormModule = (() => {
       _updateSketchStatus();
     };
     const move = event => {
+      if (pinching) {
+        if (event.touches?.length >= 2 && pinchStartDistance > 0) {
+          event.preventDefault();
+          _setSketchZoomValue(pinchStartZoom * (_touchDistance(event) / pinchStartDistance), false);
+        }
+        return;
+      }
       event.preventDefault();
       const point = pointFromEvent(event);
       if (resizingObject) {
@@ -3152,6 +3183,14 @@ const MecFormModule = (() => {
       _updateSketchStatus();
     };
     const touchEnd = event => {
+      if (pinching) {
+        event.preventDefault();
+        if (!event.touches || event.touches.length < 2) {
+          pinching = false;
+          lastTap = { time: 0, point: null };
+        }
+        return;
+      }
       const now = Date.now();
       const point = pointFromEvent(event);
       const isDoubleTap = lastTap.point &&
@@ -3196,6 +3235,7 @@ const MecFormModule = (() => {
     canvas.addEventListener('touchstart', begin, { passive: false });
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', touchEnd, { passive: false });
+    _applySketchZoom();
     _drawSketch(ctx, canvas);
     _centerSketchOnActiveRoom();
   }
@@ -3208,6 +3248,9 @@ const MecFormModule = (() => {
     let movingObject = null;
     let resizing = null;
     let moveOffset = null;
+    let pinching = false;
+    let pinchStartDistance = 0;
+    let pinchStartZoom = _sanitaryZoom;
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
       const source = event.touches?.[0] || event.changedTouches?.[0] || event;
@@ -3217,6 +3260,17 @@ const MecFormModule = (() => {
       };
     };
     const begin = event => {
+      if (event.touches?.length >= 2) {
+        event.preventDefault();
+        pinching = true;
+        pinchStartDistance = _touchDistance(event);
+        pinchStartZoom = _sanitaryZoom;
+        movingRoom = null;
+        movingObject = null;
+        resizing = null;
+        moveOffset = null;
+        return;
+      }
       event.preventDefault();
       const point = pointFromEvent(event);
       const rotateHit = _findSanitaryOpeningRotateHandleAt(point);
@@ -3263,6 +3317,13 @@ const MecFormModule = (() => {
       }
     };
     const move = event => {
+      if (pinching) {
+        if (event.touches?.length >= 2 && pinchStartDistance > 0) {
+          event.preventDefault();
+          _setSanitaryZoomValue(pinchStartZoom * (_touchDistance(event) / pinchStartDistance));
+        }
+        return;
+      }
       if (!movingRoom && !movingObject && !resizing) return;
       event.preventDefault();
       const point = pointFromEvent(event);
@@ -3278,6 +3339,11 @@ const MecFormModule = (() => {
       _updateSanitaryStatus();
     };
     const end = event => {
+      if (pinching) {
+        event.preventDefault();
+        if (!event.touches || event.touches.length < 2) pinching = false;
+        return;
+      }
       if (!movingRoom && !movingObject && !resizing) return;
       event.preventDefault();
       movingRoom = null;
@@ -3306,11 +3372,13 @@ const MecFormModule = (() => {
     canvas.addEventListener('touchstart', begin, { passive: false });
     canvas.addEventListener('touchmove', move, { passive: false });
     canvas.addEventListener('touchend', end, { passive: false });
+    _applySanitaryZoom();
     _drawSanitarySketch(ctx, canvas);
   }
 
   function _redrawSanitaryCanvas() {
     const canvas = document.getElementById('mec-sanitary-canvas');
+    _applySanitaryZoom();
     if (canvas) _drawSanitarySketch(canvas.getContext('2d'), canvas);
     _updateSanitaryStatus();
   }
@@ -5474,8 +5542,22 @@ const MecFormModule = (() => {
 
   function _redrawSketchCanvas() {
     const canvas = document.getElementById('mec-classroom-canvas');
+    _applySketchZoom();
     if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
     _centerSketchOnActiveRoom();
+  }
+
+  function _touchDistance(event) {
+    if (!event.touches || event.touches.length < 2) return 0;
+    const [a, b] = event.touches;
+    return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  }
+
+  function _applyCanvasZoom(canvas, zoom, width = SKETCH_CANVAS.width, height = SKETCH_CANVAS.height) {
+    if (!canvas) return;
+    canvas.style.width = `${Math.round(width * zoom)}px`;
+    canvas.style.height = `${Math.round(height * zoom)}px`;
+    canvas.style.transform = 'none';
   }
 
   function _centerSketchOnActiveRoom(force = false) {
@@ -5502,13 +5584,52 @@ const MecFormModule = (() => {
     if (status) status.textContent = _sketchStatusText(_data.__classroomSketch || {});
   }
 
-  function setSketchZoom(delta) {
-    _sketchZoom = Math.max(.65, Math.min(1.8, _sketchZoom + delta));
+  function _applySketchZoom() {
     const canvas = document.getElementById('mec-classroom-canvas');
-    if (canvas) canvas.style.transform = `scale(${_sketchZoom})`;
-    const zoom = document.querySelector('.mec-sketch-zoom span');
+    _applyCanvasZoom(canvas, _sketchZoom);
+    const zoom = canvas?.closest('.mec-sketch__board')?.querySelector('.mec-sketch-zoom span');
     if (zoom) zoom.textContent = `${Math.round(_sketchZoom * 100)}%`;
-    _centerSketchOnActiveRoom(true);
+  }
+
+  function _setSketchZoomValue(value, center = true) {
+    _sketchZoom = Math.max(.55, Math.min(2.5, Number(value) || 1));
+    _applySketchZoom();
+    if (center) _centerSketchOnActiveRoom(true);
+  }
+
+  function setSketchZoom(delta) {
+    _setSketchZoomValue(_sketchZoom + delta);
+  }
+
+  function _applySanitaryZoom() {
+    const canvas = document.getElementById('mec-sanitary-canvas');
+    _applyCanvasZoom(canvas, _sanitaryZoom);
+    const zoom = canvas?.closest('.mec-sketch__board')?.querySelector('.mec-sketch-zoom span');
+    if (zoom) zoom.textContent = `${Math.round(_sanitaryZoom * 100)}%`;
+  }
+
+  function _setSanitaryZoomValue(value) {
+    _sanitaryZoom = Math.max(.55, Math.min(2.5, Number(value) || 1));
+    _applySanitaryZoom();
+  }
+
+  function setSanitaryZoom(delta) {
+    _setSanitaryZoomValue(_sanitaryZoom + delta);
+  }
+
+  function _applySchoolPlanZoom(canvas = _activeSchoolPlanCanvas()) {
+    _applyCanvasZoom(canvas, _schoolPlanZoom, canvas?.width || 900, canvas?.height || _planCanvasHeight());
+    const zoom = canvas?.closest('.school-plan__board')?.querySelector('.school-plan__zoom span');
+    if (zoom) zoom.textContent = `${Math.round(_schoolPlanZoom * 100)}%`;
+  }
+
+  function _setSchoolPlanZoomValue(value) {
+    _schoolPlanZoom = Math.max(.55, Math.min(2.8, Number(value) || 1));
+    _applySchoolPlanZoom();
+  }
+
+  function setSchoolPlanZoom(delta) {
+    _setSchoolPlanZoomValue(_schoolPlanZoom + delta);
   }
 
   function _fieldValueForObjectMeters(object, axis) {
@@ -6221,6 +6342,11 @@ const MecFormModule = (() => {
                   </label>`).join('')}
               </div>
               <div class="school-plan__exports">
+                <div class="school-plan__zoom">
+                  <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(-0.15)">-</button>
+                  <span>${Math.round(_schoolPlanZoom * 100)}%</span>
+                  <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(0.15)">+</button>
+                </div>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
@@ -6228,7 +6354,9 @@ const MecFormModule = (() => {
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
-            <canvas id="${canvasId}" data-school-plan-canvas width="900" height="${canvasHeight}" aria-label="Plano general de la escuela"></canvas>
+            <div class="school-plan__canvas-wrap">
+              <canvas id="${canvasId}" data-school-plan-canvas width="900" height="${canvasHeight}" style="width:${Math.round(900 * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
+            </div>
           </div>
           <aside class="school-plan__side">
             <h3>Aulas y elementos</h3>
@@ -6251,6 +6379,7 @@ const MecFormModule = (() => {
       </div>`;
 
     _drawSchoolPlan();
+    _applySchoolPlanZoom();
     _bindSchoolPlanCanvas();
   }
 
@@ -6975,29 +7104,63 @@ const MecFormModule = (() => {
   }
 
   function _nearestPlanDistance(source, candidates) {
-    const sx = source.x + source.w / 2;
-    const sy = source.y + source.h / 2;
     return candidates
       .filter(item => item.id !== source.id)
-      .map(item => {
-        const leftGap = item.x - (source.x + source.w);
-        const rightGap = source.x - (item.x + item.w);
-        const topGap = item.y - (source.y + source.h);
-        const bottomGap = source.y - (item.y + item.h);
-        const dx = leftGap > 0 ? leftGap : (rightGap > 0 ? -rightGap : 0);
-        const dy = topGap > 0 ? topGap : (bottomGap > 0 ? -bottomGap : 0);
-        const tx = item.x + item.w / 2;
-        const ty = item.y + item.h / 2;
-        const distancePx = Math.hypot(dx, dy);
-        return {
-          item,
-          distancePx,
-          from: { x: sx, y: sy },
-          to: { x: tx, y: ty },
-          metersPerPx: (source.metersPerPx + item.metersPerPx) / 2 || source.metersPerPx || 1,
-        };
-      })
+      .map(item => _planEdgeDistance(source, item))
+      .filter(Boolean)
       .sort((a, b) => a.distancePx - b.distancePx)[0] || null;
+  }
+
+  function _rangeMid(a1, a2, b1, b2) {
+    return (Math.max(a1, b1) + Math.min(a2, b2)) / 2;
+  }
+
+  function _planEdgeDistance(source, item) {
+    const ax1 = source.x;
+    const ay1 = source.y;
+    const ax2 = source.x + source.w;
+    const ay2 = source.y + source.h;
+    const bx1 = item.x;
+    const by1 = item.y;
+    const bx2 = item.x + item.w;
+    const by2 = item.y + item.h;
+    const overlapX = Math.min(ax2, bx2) - Math.max(ax1, bx1);
+    const overlapY = Math.min(ay2, by2) - Math.max(ay1, by1);
+    const gapX = bx1 > ax2 ? bx1 - ax2 : (ax1 > bx2 ? ax1 - bx2 : 0);
+    const gapY = by1 > ay2 ? by1 - ay2 : (ay1 > by2 ? ay1 - by2 : 0);
+
+    if (!gapX && !gapY) return null;
+
+    let from;
+    let to;
+    if (gapX && !gapY) {
+      const leftToRight = ax2 <= bx1;
+      const y = _rangeMid(ay1, ay2, by1, by2);
+      from = { x: leftToRight ? ax2 : ax1, y };
+      to = { x: leftToRight ? bx1 : bx2, y };
+    } else if (!gapX && gapY) {
+      const topToBottom = ay2 <= by1;
+      const x = _rangeMid(ax1, ax2, bx1, bx2);
+      from = { x, y: topToBottom ? ay2 : ay1 };
+      to = { x, y: topToBottom ? by1 : by2 };
+    } else {
+      const leftToRight = ax2 <= bx1;
+      const topToBottom = ay2 <= by1;
+      from = { x: leftToRight ? ax2 : ax1, y: topToBottom ? ay2 : ay1 };
+      to = { x: leftToRight ? bx1 : bx2, y: topToBottom ? by1 : by2 };
+    }
+
+    const distancePx = Math.hypot(gapX, gapY);
+    if (!Number.isFinite(distancePx) || distancePx <= 0) return null;
+    return {
+      item,
+      distancePx,
+      from,
+      to,
+      metersPerPx: (source.metersPerPx + item.metersPerPx) / 2 || source.metersPerPx || 1,
+      overlapX,
+      overlapY,
+    };
   }
 
   function _drawPlanDistanceGuides(ctx, items) {
@@ -7021,7 +7184,7 @@ const MecFormModule = (() => {
     ctx.lineTo(nearest.to.x, nearest.to.y);
     ctx.stroke();
     ctx.setLineDash([]);
-    const label = `${meters.toFixed(2)} m`;
+    const label = `${meters.toFixed(2)} m bordes`;
     const x = (nearest.from.x + nearest.to.x) / 2;
     const y = (nearest.from.y + nearest.to.y) / 2;
     ctx.font = '800 10px system-ui, sans-serif';
@@ -7713,12 +7876,23 @@ const MecFormModule = (() => {
     let pointerCandidate = null;
     let pointerStart = null;
     let suppressClick = false;
+    let suppressClickUntil = 0;
+    let planPinch = null;
+    const activePointers = new Map();
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
       return {
         x: (event.clientX - rect.left) * (canvas.width / rect.width),
         y: (event.clientY - rect.top) * (canvas.height / rect.height),
       };
+    };
+    const rememberPointer = event => {
+      activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    };
+    const pointerDistance = () => {
+      const points = [...activePointers.values()];
+      if (points.length < 2) return 0;
+      return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
     };
     const hit = event => {
       const point = pointFromEvent(event);
@@ -7734,6 +7908,16 @@ const MecFormModule = (() => {
     const isSelectableArea = area => area && ['block', 'room', 'sanitary'].includes(area.type);
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     canvas.addEventListener('pointerdown', event => {
+      rememberPointer(event);
+      if (event.pointerType === 'touch' && activePointers.size >= 2) {
+        planPinch = { distance: pointerDistance(), zoom: _schoolPlanZoom };
+        pointerCandidate = null;
+        pointerStart = null;
+        suppressClickUntil = Date.now() + 350;
+        canvas.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+        return;
+      }
       const area = hit(event);
       if (!isSelectableArea(area)) return;
       pointerCandidate = area;
@@ -7742,10 +7926,29 @@ const MecFormModule = (() => {
       event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
+      if (activePointers.has(event.pointerId)) rememberPointer(event);
+      if (planPinch && activePointers.size >= 2) {
+        const distance = pointerDistance();
+        if (distance > 0 && planPinch.distance > 0) {
+          _setSchoolPlanZoomValue(planPinch.zoom * (distance / planPinch.distance));
+          suppressClickUntil = Date.now() + 350;
+        }
+        event.preventDefault();
+        return;
+      }
       if (!pointerCandidate) return;
       if (movedTooFar(pointerStart, pointFromEvent(event))) pointerCandidate = null;
     });
     canvas.addEventListener('pointerup', event => {
+      activePointers.delete(event.pointerId);
+      if (planPinch) {
+        if (activePointers.size < 2) planPinch = null;
+        suppressClickUntil = Date.now() + 350;
+        pointerCandidate = null;
+        pointerStart = null;
+        event.preventDefault();
+        return;
+      }
       const area = pointerCandidate || hit(event);
       pointerCandidate = null;
       pointerStart = null;
@@ -7753,23 +7956,32 @@ const MecFormModule = (() => {
       event.preventDefault();
       selectArea(area);
     });
-    canvas.addEventListener('pointercancel', () => {
+    canvas.addEventListener('pointercancel', event => {
+      activePointers.delete(event.pointerId);
+      if (activePointers.size < 2) planPinch = null;
       pointerCandidate = null;
       pointerStart = null;
     });
     canvas.addEventListener('click', event => {
-      if (suppressClick) return;
+      if (suppressClick || Date.now() < suppressClickUntil) return;
       const area = hit(event);
       if (!isSelectableArea(area)) return;
       selectArea(area);
     });
     canvas.addEventListener('dblclick', event => {
+      if (Date.now() < suppressClickUntil) return;
       const area = hit(event);
       if (!area) return;
       if (area.type === 'room') editPlanClassroom(area.roomId);
       else if (area.type === 'sanitary') editPlanSanitary(area.sanitaryId);
       else editPlanObject(area.id);
     });
+    canvas.addEventListener('wheel', event => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      const direction = event.deltaY > 0 ? -0.12 : 0.12;
+      setSchoolPlanZoom(direction);
+    }, { passive: false });
   }
 
   function _buildSchoolPlanModel() {
@@ -8081,7 +8293,123 @@ const MecFormModule = (() => {
       </g>`;
   }
 
-  function _planPrintCoverSheet(totalSheets, generatedAt, scale) {
+  function _planPrintPhotoMarkerSvg(x, y, number) {
+    if (!number) return '';
+    return `
+      <g class="photo-marker">
+        <circle cx="${_planPrintCoord(x)}" cy="${_planPrintCoord(y)}" r="2.7" class="photo-marker-fill"/>
+        <text x="${_planPrintCoord(x)}" y="${_planPrintCoord(y + .9)}" class="photo-marker-text">${_escape(number)}</text>
+      </g>`;
+  }
+
+  function _planPrintPhotoItems() {
+    const photos = [];
+    const markerNumbers = new Map();
+    const markerNumber = key => {
+      if (!key) return '';
+      if (!markerNumbers.has(key)) markerNumbers.set(key, markerNumbers.size + 1);
+      return markerNumbers.get(key);
+    };
+    const push = (photo, meta = {}) => {
+      if (!photo?.dataUrl) return;
+      const number = markerNumber(meta.markerKey || '');
+      photos.push({
+        markerKey: meta.markerKey || '',
+        markerNumber: number,
+        title: meta.title || photo.label || photo.name || 'Foto',
+        subtitle: meta.subtitle || photo.label || '',
+        dataUrl: photo.dataUrl,
+        name: photo.name || '',
+        capturedAt: photo.capturedAt || '',
+        type: photo.type || '',
+      });
+    };
+
+    Object.entries(_data.__evidence || {}).forEach(([fieldPath, fieldPhotos]) => {
+      (fieldPhotos || []).forEach(photo => push(photo, {
+        title: photo.label || fieldPath,
+        subtitle: 'Evidencia del cuestionario',
+      }));
+    });
+
+    (_data.__classrooms || []).forEach(room => {
+      const roomLabel = _classroomHierarchyLabel(room) || room.name || 'Aula';
+      (room.objects || []).forEach(object => {
+        const title = object.ficha?.codigo || _sketchLabel(object.type);
+        const subtitle = [roomLabel, _sketchLabel(object.type), object.ficha?.estado].filter(Boolean).join(' - ');
+        (object.ficha?.evidencias || []).forEach(photo => push(photo, {
+          markerKey: `${room.id}::${object.id}`,
+          title,
+          subtitle,
+        }));
+      });
+    });
+
+    (_data.__sanitaries || []).forEach(item => {
+      const sanitaryLabel = item.codigo || 'Sanitario';
+      (item.evidencias || []).forEach(photo => push(photo, {
+        markerKey: `sanitary::${item.id}`,
+        title: sanitaryLabel,
+        subtitle: [_sanitaryBlockLabel(item), _normalizeFloor(item.planta || 'Piso 1'), item.estado].filter(Boolean).join(' - '),
+      }));
+      (item.objects || []).forEach(object => {
+        const title = object.ficha?.codigo || _sanitaryObjectLabel(object.type);
+        const subtitle = [sanitaryLabel, _sanitaryObjectLabel(object.type), object.ficha?.estado].filter(Boolean).join(' - ');
+        (object.ficha?.evidencias || []).forEach(photo => push(photo, {
+          markerKey: `sanitary::${item.id}::${object.id}`,
+          title,
+          subtitle,
+        }));
+      });
+    });
+
+    return { photos, markerNumbers };
+  }
+
+  function _planPrintFloorMarkerEntries(floorRooms, floorSanitaries, photos) {
+    const floorKeys = new Set();
+    floorRooms.forEach(room => (room.objects || []).forEach(object => floorKeys.add(`${room.id}::${object.id}`)));
+    floorSanitaries.forEach(item => {
+      floorKeys.add(`sanitary::${item.id}`);
+      (item.objects || []).forEach(object => floorKeys.add(`sanitary::${item.id}::${object.id}`));
+    });
+    const grouped = new Map();
+    photos
+      .filter(photo => photo.markerKey && floorKeys.has(photo.markerKey))
+      .forEach(photo => {
+        if (!grouped.has(photo.markerKey)) {
+          grouped.set(photo.markerKey, {
+            markerNumber: photo.markerNumber,
+            title: photo.title,
+            subtitle: photo.subtitle,
+            count: 0,
+          });
+        }
+        grouped.get(photo.markerKey).count += 1;
+      });
+    return [...grouped.values()].sort((a, b) => Number(a.markerNumber || 0) - Number(b.markerNumber || 0));
+  }
+
+  function _planPrintFloorMarkerListSvg(entries, x, y) {
+    if (!entries.length) return `<text x="${_planPrintCoord(x)}" y="${_planPrintCoord(y)}" class="meta">Sin fotos asociadas en este piso.</text>`;
+    const visible = entries.slice(0, 5);
+    const rows = visible.map((entry, index) => {
+      const rowY = y + index * 6.4;
+      return `
+        <g>
+          <circle cx="${_planPrintCoord(x + 2.3)}" cy="${_planPrintCoord(rowY - .8)}" r="2.2" class="photo-marker-fill"/>
+          <text x="${_planPrintCoord(x + 2.3)}" y="${_planPrintCoord(rowY)}" class="photo-marker-text">${_escape(entry.markerNumber)}</text>
+          <text x="${_planPrintCoord(x + 6)}" y="${_planPrintCoord(rowY - .7)}" class="panel-strong">${_escape(_planPrintTruncate(entry.title, 24))}</text>
+          <text x="${_planPrintCoord(x + 6)}" y="${_planPrintCoord(rowY + 2.8)}" class="meta">${_escape(`${entry.count} foto(s)`)}</text>
+        </g>`;
+    }).join('');
+    const extra = entries.length > visible.length
+      ? `<text x="${_planPrintCoord(x)}" y="${_planPrintCoord(y + visible.length * 6.4 + 1)}" class="meta">+ ${entries.length - visible.length} marcador(es) en hojas de fotos</text>`
+      : '';
+    return `${rows}${extra}`;
+  }
+
+  function _planPrintCoverSheet(totalSheets, generatedAt, scale, photoItems = []) {
     const info = _planPrintSchoolInfo();
     const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const metrics = _schoolPlanMetrics(_data.__classroomSketch || {}, _schoolPlanObjects());
@@ -8121,6 +8449,7 @@ const MecFormModule = (() => {
               <b>${metrics.rooms}</b><span>aulas</span>
               <b>${metrics.sanitaries}</b><span>sanitarios</span>
               <b>${_planPrintFmt(metrics.areaTotal)}</b><span>m2 relevados</span>
+              <b>${photoItems.length}</b><span>fotos</span>
               <b>${metrics.alerts}</b><span>alertas</span>
             </div>
           </section>
@@ -8149,7 +8478,8 @@ const MecFormModule = (() => {
           </section>
           <section class="cover-card">
             <h2>Documento</h2>
-            <p>Hojas de plano: ${Math.max(0, totalSheets - 1)}. Total del paquete: ${totalSheets}.</p>
+            <p>Hojas posteriores: ${Math.max(0, totalSheets - 1)}. Total del paquete: ${totalSheets}.</p>
+            <p>Fotos incluidas: ${photoItems.length}. Los marcadores numerados del plano remiten a las hojas de fotos.</p>
             <p>Version app: ${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version)}.</p>
           </section>
         </main>
@@ -8355,7 +8685,23 @@ const MecFormModule = (() => {
     };
   }
 
-  function _planPrintChildObjectsSvg(parent, sourceObject, objects, mmPerMeter, options = {}) {
+  function _planPrintObjectMarkerSvg(parent, object, rect, markerNumbers, options = {}) {
+    const key = options.sanitary
+      ? `sanitary::${parent.sanitary?.id || ''}::${object.id}`
+      : `${parent.room?.id || ''}::${object.id}`;
+    const number = markerNumbers?.get(key);
+    if (!number) return '';
+    return _planPrintPhotoMarkerSvg(rect.x + Math.max(2.5, (rect.w || 0) / 2), rect.y + Math.max(2.5, (rect.h || 0) / 2), number);
+  }
+
+  function _planPrintSpaceMarkerSvg(item, markerNumbers) {
+    if (item.kind !== 'sanitary') return '';
+    const number = markerNumbers?.get(`sanitary::${item.sanitary?.id || ''}`);
+    if (!number) return '';
+    return _planPrintPhotoMarkerSvg(item.x + Math.max(4, item.w - 4), item.y + 5, number);
+  }
+
+  function _planPrintChildObjectsSvg(parent, sourceObject, objects, mmPerMeter, options = {}, markerNumbers = new Map()) {
     if (!sourceObject) return '';
     const parts = [];
     (objects || []).forEach(object => {
@@ -8383,14 +8729,18 @@ const MecFormModule = (() => {
         const rect = _planPrintMappedChildRect(parent, sourceObject, object);
         const text = object.ficha?.observacion || object.text || 'Texto';
         parts.push(`<text x="${_planPrintCoord(rect.x)}" y="${_planPrintCoord(rect.y + 3)}" class="free-text">${_escape(_planPrintTruncate(text, 24))}</text>`);
+        const marker = _planPrintObjectMarkerSvg(parent, object, rect, markerNumbers, options);
+        if (marker) parts.push(marker);
         return;
       }
       if (!['door', 'window', 'outlet', 'light', 'photo', 'damage', 'stair', 'stall'].includes(object.type)) return;
       const rect = _planPrintMappedChildRect(parent, sourceObject, object);
+      const marker = _planPrintObjectMarkerSvg(parent, object, rect, markerNumbers, options);
       if (object.type === 'door') {
         const variant = _doorVariant(object);
         if (variant !== 'door') {
           parts.push(_planPrintOpeningVariantSvg(rect, object, variant));
+          if (marker) parts.push(marker);
           return;
         }
         const vertical = ['left', 'right'].includes(_openingSide(object));
@@ -8404,6 +8754,7 @@ const MecFormModule = (() => {
         parts.push(`<rect x="${_planPrintCoord(opening.x)}" y="${_planPrintCoord(opening.y)}" width="${_planPrintCoord(opening.w)}" height="${_planPrintCoord(opening.h)}" class="door-slot"/>`);
         parts.push(`<path d="${_planPrintDoorArcPath(hinge, radius, angles)}" class="door-swing"/>`);
         parts.push(`<line x1="${_planPrintCoord(hinge.x)}" y1="${_planPrintCoord(hinge.y)}" x2="${_planPrintCoord(leafX)}" y2="${_planPrintCoord(leafY)}" class="door-leaf"/>`);
+        if (marker) parts.push(marker);
         return;
       }
       if (object.type === 'window') {
@@ -8416,16 +8767,19 @@ const MecFormModule = (() => {
         const y2 = vertical ? rect.y + rect.h : rect.y + rect.h / 2;
         parts.push(`<line x1="${_planPrintCoord(x1)}" y1="${_planPrintCoord(y1)}" x2="${_planPrintCoord(x2)}" y2="${_planPrintCoord(y2)}" class="window-line"/>`);
         if (length > 8) parts.push(`<text x="${_planPrintCoord((x1 + x2) / 2)}" y="${_planPrintCoord((y1 + y2) / 2 - 1.4)}" class="tiny-label">${_escape(label)}</text>`);
+        if (marker) parts.push(marker);
         return;
       }
       if (object.type === 'outlet') {
         parts.push(`<rect x="${_planPrintCoord(rect.x - 1.1)}" y="${_planPrintCoord(rect.y - 1.1)}" width="2.2" height="2.2" class="outlet-symbol"/>`);
+        if (marker) parts.push(marker);
         return;
       }
       if (['light', 'photo'].includes(object.type)) {
         parts.push(`<circle cx="${_planPrintCoord(rect.x)}" cy="${_planPrintCoord(rect.y)}" r="1.4" class="light-symbol"/>`);
         parts.push(`<line x1="${_planPrintCoord(rect.x - 2.2)}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(rect.x + 2.2)}" y2="${_planPrintCoord(rect.y)}" class="light-ray"/>`);
         parts.push(`<line x1="${_planPrintCoord(rect.x)}" y1="${_planPrintCoord(rect.y - 2.2)}" x2="${_planPrintCoord(rect.x)}" y2="${_planPrintCoord(rect.y + 2.2)}" class="light-ray"/>`);
+        if (marker) parts.push(marker);
         return;
       }
       if (object.type === 'damage') {
@@ -8435,6 +8789,7 @@ const MecFormModule = (() => {
         parts.push(`<circle cx="${_planPrintCoord(cx)}" cy="${_planPrintCoord(cy)}" r="${_planPrintCoord(r)}" class="damage-marker"/>`);
         parts.push(`<line x1="${_planPrintCoord(cx - r * .55)}" y1="${_planPrintCoord(cy - r * .55)}" x2="${_planPrintCoord(cx + r * .55)}" y2="${_planPrintCoord(cy + r * .55)}" class="damage-symbol"/>`);
         parts.push(`<line x1="${_planPrintCoord(cx + r * .55)}" y1="${_planPrintCoord(cy - r * .55)}" x2="${_planPrintCoord(cx - r * .55)}" y2="${_planPrintCoord(cy + r * .55)}" class="damage-symbol"/>`);
+        if (marker) parts.push(marker);
         return;
       }
       if (object.type === 'stair') {
@@ -8444,18 +8799,20 @@ const MecFormModule = (() => {
           const x = rect.x + (rect.w / steps) * i;
           parts.push(`<line x1="${_planPrintCoord(x)}" y1="${_planPrintCoord(rect.y)}" x2="${_planPrintCoord(x)}" y2="${_planPrintCoord(rect.y + rect.h)}" class="stair-step"/>`);
         }
+        if (marker) parts.push(marker);
         return;
       }
       if (object.type === 'stall') {
         const label = object.ficha?.codigo || 'Cbn';
         parts.push(`<rect x="${_planPrintCoord(rect.x)}" y="${_planPrintCoord(rect.y)}" width="${_planPrintCoord(rect.w)}" height="${_planPrintCoord(rect.h)}" class="stall-box"/>`);
         parts.push(`<text x="${_planPrintCoord(rect.x + rect.w / 2)}" y="${_planPrintCoord(rect.y + Math.min(rect.h - 1, 3.2))}" class="tiny-label">${_escape(_planPrintTruncate(label, 8))}</text>`);
+        if (marker) parts.push(marker);
       }
     });
     return parts.join('');
   }
 
-  function _planPrintSpaceSvg(item, mmPerMeter) {
+  function _planPrintSpaceSvg(item, mmPerMeter, markerNumbers = new Map()) {
     const isSanitary = item.kind === 'sanitary';
     const label = item.label || (isSanitary ? 'Sanitario' : 'Aula');
     const dims = `${_planPrintFmt(item.lengthM)} x ${_planPrintFmt(item.widthM)} m`;
@@ -8464,8 +8821,9 @@ const MecFormModule = (() => {
     const details = item.h >= 12 ? `<text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + 7.5)}" class="space-detail">${_escape(dims)}</text>` : '';
     const areaText = item.h >= 17 ? `<text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + 11.2)}" class="space-detail">${_escape(area)}</text>` : '';
     const children = isSanitary
-      ? _planPrintChildObjectsSvg(item, item.object, item.sanitary?.objects || [], mmPerMeter, { sanitary: true })
-      : _planPrintChildObjectsSvg(item, item.object, item.room?.objects || [], mmPerMeter);
+      ? _planPrintChildObjectsSvg(item, item.object, item.sanitary?.objects || [], mmPerMeter, { sanitary: true }, markerNumbers)
+      : _planPrintChildObjectsSvg(item, item.object, item.room?.objects || [], mmPerMeter, {}, markerNumbers);
+    const spaceMarker = _planPrintSpaceMarkerSvg(item, markerNumbers);
     return `
       <g>
         <rect x="${_planPrintCoord(item.x)}" y="${_planPrintCoord(item.y)}" width="${_planPrintCoord(item.w)}" height="${_planPrintCoord(item.h)}" class="${isSanitary ? 'space sanitary' : 'space room'}"/>
@@ -8475,10 +8833,11 @@ const MecFormModule = (() => {
         ${areaText}
         ${item.fallback ? `<text x="${_planPrintCoord(item.x + 1.4)}" y="${_planPrintCoord(item.y + Math.max(4, item.h - 1.8))}" class="fallback-note">sin geometria</text>` : ''}
         ${children}
+        ${spaceMarker}
       </g>`;
   }
 
-  function _planPrintFloorSheet(block, floor, sheetIndex, totalSheets, scale, generatedAt) {
+  function _planPrintFloorSheet(block, floor, sheetIndex, totalSheets, scale, generatedAt, photoItems = [], markerNumbers = new Map()) {
     const page = _planPrintPageSpec();
     const rooms = _data.__classrooms || [];
     const sanitaries = _data.__sanitaries || [];
@@ -8511,6 +8870,8 @@ const MecFormModule = (() => {
       return sum + length * width;
     }, 0);
     const floorSummary = `${floorRooms.length} aula(s), ${floorSanitaries.length} sanitario(s), ${_planPrintFmt(floorArea)} m2`;
+    const markerEntries = _planPrintFloorMarkerEntries(floorRooms, floorSanitaries, photoItems);
+    const markerPhotoCount = markerEntries.reduce((sum, item) => sum + item.count, 0);
     const sheetTitle = `${block.bloque_codigo || 'Bloque'} - ${floor}`;
     return `
       <section class="print-sheet">
@@ -8562,6 +8923,8 @@ const MecFormModule = (() => {
               .free-text{font:700 2.1px system-ui,-apple-system,Segoe UI,sans-serif;fill:#7c2d12}
               .stair-box,.stall-box{fill:#f8fafc;stroke:#4b5563;stroke-width:.32}
               .stair-step{stroke:#4b5563;stroke-width:.22}
+              .photo-marker-fill{fill:#facc15;stroke:#111827;stroke-width:.28}
+              .photo-marker-text{font:900 2.25px system-ui,-apple-system,Segoe UI,sans-serif;fill:#111827;text-anchor:middle}
               .empty-note{font:800 4px system-ui,-apple-system,Segoe UI,sans-serif;fill:#667085;text-anchor:middle}
               .footer{font:600 2.25px system-ui,-apple-system,Segoe UI,sans-serif;fill:#667085}
               .north-arrow path{fill:#172033}
@@ -8590,7 +8953,7 @@ const MecFormModule = (() => {
           <rect x="${_planPrintCoord(floorRect.x)}" y="${_planPrintCoord(floorRect.y)}" width="${_planPrintCoord(floorRect.w)}" height="${_planPrintCoord(floorRect.h)}" class="block"/>
           <rect x="${_planPrintCoord(floorRect.x)}" y="${_planPrintCoord(floorRect.y)}" width="${_planPrintCoord(floorRect.w)}" height="${_planPrintCoord(floorRect.h)}" class="floor-grid"/>
           <rect x="${_planPrintCoord(floorRect.x + 1.5)}" y="${_planPrintCoord(floorRect.y + 1.5)}" width="${_planPrintCoord(Math.max(.2, floorRect.w - 3))}" height="${_planPrintCoord(Math.max(.2, floorRect.h - 3))}" class="block-inner"/>
-          ${[...roomItems, ...sanitaryItems].map(item => _planPrintSpaceSvg(item, scale.mmPerMeter)).join('')}
+          ${[...roomItems, ...sanitaryItems].map(item => _planPrintSpaceSvg(item, scale.mmPerMeter, markerNumbers)).join('')}
           ${emptyNote}
           <rect x="${page.sideX}" y="${page.sideY}" width="${page.sideW}" height="${page.sideH}" rx="2" class="panel"/>
           <text x="${page.sideX + 4}" y="${page.sideY + 7}" class="panel-title">Ficha de plano</text>
@@ -8600,17 +8963,61 @@ const MecFormModule = (() => {
           <text x="${page.sideX + 4}" y="${page.sideY + 39}" class="panel-title">Contenido</text>
           <text x="${page.sideX + 4}" y="${page.sideY + 46}" class="meta">${_escape(floorSummary)}</text>
           <text x="${page.sideX + 4}" y="${page.sideY + 51}" class="meta">${_escape(`Puertas ${floorRooms.reduce((sum, room) => sum + (room.objects || []).filter(obj => obj.type === 'door').length, 0)}`)} · ${_escape(`Ventanas ${floorRooms.reduce((sum, room) => sum + (room.objects || []).filter(obj => obj.type === 'window').length, 0)}`)}</text>
-          <text x="${page.sideX + 4}" y="${page.sideY + 61}" class="panel-title">Ubicacion</text>
-          ${_planPrintSvgTextBlock(info.locationLine, page.sideX + 4, page.sideY + 68, 30, 2, 'meta', 3.5)}
-          <text x="${page.sideX + 4}" y="${page.sideY + 79}" class="meta">${_escape(info.coordinateLine)}</text>
-          <text x="${page.sideX + 4}" y="${page.sideY + 89}" class="panel-title">Leyenda</text>
-          ${_planPrintLegendSvg(page.sideX + 4, page.sideY + 96)}
+          <text x="${page.sideX + 4}" y="${page.sideY + 61}" class="panel-title">Fotos y observaciones</text>
+          <text x="${page.sideX + 4}" y="${page.sideY + 68}" class="meta">${_escape(`${markerEntries.length} marcador(es), ${markerPhotoCount} foto(s)`)}</text>
+          ${_planPrintFloorMarkerListSvg(markerEntries, page.sideX + 4, page.sideY + 76)}
+          <text x="${page.sideX + 4}" y="${page.sideY + 113}" class="panel-title">Leyenda</text>
+          ${_planPrintLegendSvg(page.sideX + 4, page.sideY + 120)}
           ${_planPrintNorthArrow(page.sideX + page.sideW - 9, page.sideY + page.sideH - 14)}
           ${_planPrintScaleBar(scale)}
           <text x="12" y="${page.footerY + 8}" class="footer">${_escape(`Documento generado desde CIALPA v${typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version}`)}</text>
           <text x="${page.width - 12}" y="${page.footerY + 8}" class="footer" text-anchor="end">CIALPA - Relevamiento Escolar</text>
         </svg>
       </section>`;
+  }
+
+  function _planPrintPhotoSheets(photoItems, startSheetIndex, totalSheets, generatedAt) {
+    if (!photoItems.length) return '';
+    const info = _planPrintSchoolInfo();
+    const perSheet = 6;
+    const sheets = [];
+    for (let index = 0; index < photoItems.length; index += perSheet) {
+      const sheetPhotos = photoItems.slice(index, index + perSheet);
+      const sheetIndex = startSheetIndex + sheets.length;
+      sheets.push(`
+        <section class="print-sheet photo-sheet">
+          <header class="photo-sheet__header">
+            <div>
+              <span>CIALPA / ANEXO FOTOGRAFICO</span>
+              <h1>Fotos del relevamiento</h1>
+              <p>${_escape(info.name)} - ${_escape(info.locationLine)}</p>
+            </div>
+            <div>
+              <strong>Hoja ${sheetIndex} de ${totalSheets}</strong>
+              <small>${_escape(generatedAt)}</small>
+            </div>
+          </header>
+          <main class="photo-grid">
+            ${sheetPhotos.map(photo => `
+              <figure class="photo-card">
+                <div class="photo-card__image">
+                  <img src="${_escape(photo.dataUrl)}" alt="${_escape(photo.title)}">
+                  ${photo.markerNumber ? `<span class="photo-card__marker">${_escape(photo.markerNumber)}</span>` : ''}
+                </div>
+                <figcaption>
+                  <strong>${_escape(photo.title)}</strong>
+                  <span>${_escape(photo.subtitle || 'Evidencia del relevamiento')}</span>
+                  <small>${_escape(photo.capturedAt ? _formatSavedAt(photo.capturedAt) : photo.name || '')}</small>
+                </figcaption>
+              </figure>`).join('')}
+          </main>
+          <footer class="photo-sheet__footer">
+            <span>Los numeros amarillos corresponden a marcadores ubicados en las hojas de plano.</span>
+            <span>CIALPA - Relevamiento Escolar</span>
+          </footer>
+        </section>`);
+    }
+    return sheets.join('');
   }
 
   function _planPrintHtml() {
@@ -8622,18 +9029,21 @@ const MecFormModule = (() => {
     const version = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version;
     const generatedAt = new Date().toLocaleString('es-PY');
     const scale = _planPrintScaleForBlocks(blocks);
+    const photoIndex = _planPrintPhotoItems();
     const planPages = [];
     blocks.forEach(block => {
       _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []).forEach(floor => {
         planPages.push({ block, floor });
       });
     });
-    const totalSheets = Math.max(1, planPages.length + 1);
-    const coverSheet = _planPrintCoverSheet(totalSheets, generatedAt, scale);
+    const photoSheetCount = Math.ceil(photoIndex.photos.length / 6);
+    const totalSheets = Math.max(1, planPages.length + photoSheetCount + 1);
+    const coverSheet = _planPrintCoverSheet(totalSheets, generatedAt, scale, photoIndex.photos);
     const planSheets = planPages.length
-      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 2, totalSheets, scale, generatedAt)).join('')
+      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 2, totalSheets, scale, generatedAt, photoIndex.photos, photoIndex.markerNumbers)).join('')
       : '<section class="print-sheet"><p class="print-empty">No hay plano cargado para imprimir.</p></section>';
-    const sheets = `${coverSheet}${planSheets}`;
+    const photoSheets = _planPrintPhotoSheets(photoIndex.photos, planPages.length + 2, totalSheets, generatedAt);
+    const sheets = `${coverSheet}${planSheets}${photoSheets}`;
     return `
       <!doctype html>
       <html lang="es">
@@ -8687,6 +9097,24 @@ const MecFormModule = (() => {
           .lg-light { background: #fffbeb; border-color: #d69e2e !important; }
           .lg-damage { background: #fff1f2; border-color: #c53030 !important; }
           .lg-stair { background: #f8fafc; border-color: #4b5563 !important; }
+          .photo-sheet { display: grid; grid-template-rows: auto 1fr auto; }
+          .photo-sheet__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10mm; padding: 7mm 9mm 4mm; border-bottom: 1px dashed #cbd5e1; }
+          .photo-sheet__header span { color: #15546b; font-size: 7.5pt; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; }
+          .photo-sheet__header h1 { margin: 1mm 0 .8mm; font-size: 17pt; line-height: 1; }
+          .photo-sheet__header p { margin: 0; color: #475467; font-size: 9pt; font-weight: 750; }
+          .photo-sheet__header strong, .photo-sheet__header small { display: block; text-align: right; }
+          .photo-sheet__header strong { font-size: 10pt; }
+          .photo-sheet__header small { margin-top: 1mm; color: #667085; font-size: 7.5pt; }
+          .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; padding: 5mm 9mm; min-height: 0; }
+          .photo-card { margin: 0; min-width: 0; display: grid; grid-template-rows: 1fr auto; border: 1px solid #d7dee8; border-radius: 2.5mm; overflow: hidden; background: #fbfdff; }
+          .photo-card__image { position: relative; min-height: 42mm; background: #e5e7eb; display: grid; place-items: center; overflow: hidden; }
+          .photo-card__image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+          .photo-card__marker { position: absolute; left: 2mm; top: 2mm; min-width: 6mm; height: 6mm; display: inline-grid; place-items: center; border: .4mm solid #111827; border-radius: 999px; background: #facc15; color: #111827; font-size: 8pt; font-weight: 950; }
+          .photo-card figcaption { padding: 2.4mm 3mm 2.8mm; display: grid; gap: .7mm; }
+          .photo-card figcaption strong { font-size: 8.5pt; line-height: 1.18; }
+          .photo-card figcaption span { color: #475467; font-size: 7.2pt; line-height: 1.2; }
+          .photo-card figcaption small { color: #667085; font-size: 6.7pt; font-weight: 750; }
+          .photo-sheet__footer { display: flex; justify-content: space-between; gap: 6mm; padding: 0 9mm 5mm; color: #667085; font-size: 7pt; font-weight: 750; border-top: 1px dashed #cbd5e1; }
           @media print {
             html, body { background: #fff; }
             .print-actions { display: none; }
@@ -8853,6 +9281,24 @@ const MecFormModule = (() => {
         capturedAt: photo.capturedAt,
         context: photo.context || _sanitaryEvidenceContext(item),
       }));
+      (item.objects || []).forEach(object => {
+        (object.ficha?.evidencias || []).forEach((photo, photoIndex) => index.push({
+          fieldPath: `sanitarios.${item.id}.${object.id}`,
+          index: photoIndex + 1,
+          name: photo.name,
+          indexedName: photo.indexedName || '',
+          label: photo.label || _evidenceIndexLabel({
+            ..._sanitaryEvidenceContext(item),
+            elementType: _sanitaryObjectLabel(object.type),
+            elementLabel: object.ficha?.codigo || _sanitaryObjectShort(object.type),
+            elementId: object.id,
+          }),
+          type: photo.type,
+          size: photo.size,
+          capturedAt: photo.capturedAt,
+          context: photo.context || _sanitaryEvidenceContext(item),
+        }));
+      });
     });
     return index;
   }
@@ -8929,6 +9375,8 @@ const MecFormModule = (() => {
     exportPlanPng,
     printPlanPdf,
     setSketchZoom,
+    setSanitaryZoom,
+    setSchoolPlanZoom,
     generateRoomSketch,
     undoSketchObject,
     redoSketchObject,

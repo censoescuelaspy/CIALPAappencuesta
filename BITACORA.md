@@ -4,6 +4,34 @@
 
 ---
 
+## Sesion de zoom tactil, distancias por borde y PDF con fotos - 2026-05-10 - v2.5.38
+
+### Objetivo
+- Mejorar el uso del editor de planos en tablet y acercar el PDF impreso a las buenas practicas observadas en `H:\Mi unidad\Celsa Speratti.pdf`, especialmente marcadores numerados y fotos asociadas a elementos.
+
+### Cambios implementados
+- El croquis de aula, el croquis sanitario y el plano general ahora tienen zoom persistente por botones.
+- En pantallas tactiles se agrego gesto de pinza para ampliar/reducir los lienzos sin arrastrar accidentalmente elementos.
+- El zoom ahora aumenta el tamano real del canvas dentro de un contenedor desplazable, evitando el zoom visual falso que no daba area de trabajo.
+- Las guias de distancia del plano general ahora calculan la separacion minima entre bordes de rectangulos, no entre centroides.
+- El PDF impreso incorpora marcadores fotograficos amarillos numerados sobre los elementos con evidencia.
+- Se agregan hojas de anexo fotografico al PDF, con las fotos tomadas desde campos, elementos de aula, sanitarios y objetos sanitarios.
+- Las hojas de plano incluyen resumen de marcadores/fotos del piso, escala grafica, dimensiones y ficha lateral.
+- El indice de evidencias exportado tambien contempla fotos de objetos internos de sanitarios.
+- Version y cache actualizados a `v2.5.38`.
+
+### Validaciones ejecutadas
+- Analisis local del PDF `Celsa Speratti.pdf`: 19 paginas, estructura Magicplan con portada, hojas de plano, fichas y paginas de fotos.
+- `node --check` en `mec-form.js`.
+- `rg` para confirmar zoom, marcadores fotograficos, distancias por bordes y version/cache `v2.5.38`.
+
+### Proximos pasos
+- Probar en tablet Android/iPad el gesto de pinza en aula, sanitario y plano general.
+- Generar un PDF con fotos reales desde una escuela de prueba y comparar contra la referencia Magicplan.
+- Revisar si conviene pasar el PDF final a formato A4 vertical en una iteracion posterior.
+
+---
+
 ## Sesión de corrección visual en navegación de encuesta - 2026-05-10 - v2.5.37
 
 ### Objetivo
