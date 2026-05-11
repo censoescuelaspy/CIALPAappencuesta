@@ -3,8 +3,11 @@
  * Fuente: manual/MANUAL_ENCUESTADOR_CIALPA.md y capturas reales del modulo MEC.
  */
 
+const MEC_ACOMETIDA_PRESENTE = ['Aerea', 'Subterranea', 'Compartida con otro bloque'];
+const MEC_TABLERO_PRESENTE = ['Bueno', 'Regular', 'Malo'];
+
 const MEC_SCHEMA = {
-  version: '0.1.2',
+  version: '0.1.3',
   source: 'manual/MANUAL_ENCUESTADOR_CIALPA.md',
   modules: [
     {
@@ -122,6 +125,8 @@ const MEC_SCHEMA = {
             { id: 'cantidad_plantas', label: 'Cantidad de plantas', type: 'number', required: true, min: 1, step: 1 },
             { id: 'largo_m', label: 'Largo aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
+            { id: 'superficie_m2', label: 'Superficie del bloque relevada en gabinete', type: 'number', min: 0, step: '0.1', unit: 'm2', hint: 'Puede completarse luego con las medidas verificadas en plano o gabinete.' },
+            { id: 'perimetro_m', label: 'Perimetro del bloque relevado en gabinete', type: 'number', min: 0, step: '0.1', unit: 'm', hint: 'Use el perimetro medido o calculado del bloque cuando este disponible.' },
             { id: 'tipo_circulacion', label: 'Circulacion vertical principal', type: 'radio', options: ['Escalera', 'Rampa', 'Ambas', 'No aplica'] },
             { id: 'bloque_observacion', label: 'Observaciones del bloque', type: 'textarea' },
           ],
@@ -130,13 +135,16 @@ const MEC_SCHEMA = {
           id: 'bloque_electricidad',
           title: '2 - Electricidad del bloque',
           fields: [
-            { id: 'tablero_estado', label: 'Estado del tablero electrico del bloque', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del tablero electrico del bloque', options: ['Bueno', 'Regular', 'Malo', 'No existe / no visible'] },
-            { id: 'acometida_tipo', label: 'Acometida del bloque', type: 'radio', evidence: true, evidenceLabel: 'Foto de acometida o punto de ingreso', options: ['Aerea', 'Subterranea', 'Compartida con otro bloque', 'No visible', 'No existe'] },
-            { id: 'medidor_estado', label: 'Medidor o punto de medicion', type: 'radio', options: ['Propio del bloque', 'Compartido', 'No visible', 'No existe'] },
-            { id: 'llave_termomagnetica', label: 'Llave termomagnetica del bloque', type: 'radio', evidence: true, evidenceLabel: 'Foto de protecciones electricas del bloque', options: ['Si', 'No', 'No verificable'] },
-            { id: 'proteccion_diferencial', label: 'Disyuntor diferencial', type: 'radio', options: ['Si', 'No', 'No verificable'] },
-            { id: 'puesta_tierra', label: 'Puesta a tierra visible/verificable', type: 'radio', options: ['Si', 'No', 'No verificable'] },
-            { id: 'circuitos_identificados', label: 'Circuitos identificados/rotulados', type: 'radio', options: ['Si', 'Parcialmente', 'No'] },
+            { id: 'acometida_tipo', label: 'El local/bloque tiene acometida electrica', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto de acometida o punto de ingreso', options: ['Aerea', 'Subterranea', 'Compartida con otro bloque', 'No visible', 'No'], hint: 'Si marca No o No visible, se ocultan las preguntas dependientes de acometida.' },
+            { id: 'medidor_estado', label: 'Medidor o punto de medicion', type: 'radio', required: true, visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Propio del bloque', 'Compartido', 'No visible', 'No existe'] },
+            { id: 'tension_acometida', label: 'Tension de la acometida', type: 'radio', visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Monofasica 220 V', 'Trifasica 380 V', 'No verificable'] },
+            { id: 'tablero_estado', label: 'Estado del tablero electrico del bloque', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del tablero electrico del bloque', visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Bueno', 'Regular', 'Malo', 'No existe / no visible'] },
+            { id: 'llave_termomagnetica', label: 'Llave termomagnetica del bloque', type: 'radio', evidence: true, evidenceLabel: 'Foto de protecciones electricas del bloque', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }] }, options: ['Si', 'No', 'No verificable'] },
+            { id: 'capacidad_llave_principal_a', label: 'Capacidad de la llave principal', type: 'number', min: 0, step: '1', unit: 'A', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }, { field: 'bloques.llave_termomagnetica', equals: 'Si' }] } },
+            { id: 'proteccion_diferencial', label: 'Disyuntor diferencial', type: 'radio', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }] }, options: ['Si', 'No', 'No verificable'] },
+            { id: 'puesta_tierra', label: 'Puesta a tierra visible/verificable', type: 'radio', visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Si', 'No', 'No verificable'] },
+            { id: 'potencia_tm_total_a', label: 'Potencia/capacidad maxima de llaves TM', type: 'number', min: 0, step: '1', unit: 'A', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }] } },
+            { id: 'circuitos_identificados', label: 'Circuitos identificados/rotulados', type: 'radio', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }] }, options: ['Si', 'Parcialmente', 'No'] },
             { id: 'electricidad_observacion', label: 'Observaciones electricas del bloque', type: 'textarea' },
           ],
         },

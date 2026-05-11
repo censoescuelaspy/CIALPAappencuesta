@@ -4,6 +4,35 @@
 
 ---
 
+## Sesión de arranque en Inicio y saltos eléctricos MEC/RUE - 2026-05-10 - v2.5.35
+
+### Objetivo
+- Atender observaciones de prueba de campo RUE/MEC y asegurar que la app arranque siempre en la vista `Inicio`.
+
+### Cambios implementados
+- La app fuerza `Inicio` al cargar una sesión activa y también al volver desde restauración del navegador/PWA, evitando que Android o iPad reabran una vista anterior por caché de navegación.
+- Confirmado como criterio funcional: si `1.3 - El local/bloque tiene acometida eléctrica` se responde como `No` o `No visible`, se ocultan las preguntas dependientes de acometida/tablero/medición, equivalentes al bloque 1.4 a 1.11.
+- El motor de visibilidad del formulario MEC ahora soporta reglas compuestas `all`, `any`, `in` y `notIn`, para saltos condicionales más confiables en tablets.
+- Reordenado el registro eléctrico del bloque: primero se define acometida; medidor, tensión, tablero, llave, capacidad, diferencial, puesta a tierra, potencia y circuitos solo aparecen cuando corresponde.
+- Si existe acometida pero no existe/no se ve el tablero, se omiten los datos específicos de protecciones del tablero.
+- Agregados campos de gabinete para `Superficie del bloque` y `Perímetro del bloque`, de acuerdo con medidas relevadas o calculadas posteriormente.
+- Añadida la opción `Balancín` en la ficha de ventanas/aberturas.
+- La escuela ficticia de ejemplo queda alineada con los nuevos campos de superficie/perímetro y usa `No` para la acometida inexistente.
+- Version y cache actualizados a `v2.5.35`.
+
+### Observaciones de campo incorporadas a próximos pasos
+- Mantener como pauta operativa: nombrar locales con código compatible con MagicPlan.
+- Registrar como definición de instrumento: dependencia/ambiente común sin uso específico.
+- En gestión del relevamiento, sostener comunicación previa con la institución, verificación de ubicación al llegar, cuestionario previo a Dirección, relevamiento general inicial y observaciones para excepciones.
+
+### Validaciones ejecutadas
+- `node --check` en `app.js`, `mec-form.js`, `mec-schema.js`, `api.js` y `config.js`.
+- `rg` para confirmar versión/cache `v2.5.35` y esquema `0.1.3`.
+- `rg -n "<select" index.html mec-ficha.html assets/js assets/css` sin resultados.
+- `git diff --check`.
+
+---
+
 ## Sesión de estabilización tablet y PDF técnico - 2026-05-10 - v2.5.34
 
 ### Objetivo

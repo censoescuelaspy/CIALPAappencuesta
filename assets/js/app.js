@@ -330,11 +330,13 @@ const AppController = (() => {
     auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
   };
 
+  const START_MODULE = 'inicio';
   let _currentModule = null;
   let _mapInitialized = false;
   let _sidebarHideTimer = null;
   let _deferredInstallPrompt = null;
   let _swRegistration = null;
+  let _launchHomeResetBound = false;
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -344,6 +346,7 @@ const AppController = (() => {
     ManualModule.renderModal();
     _applyVersionLabels();
     _bindPwaEvents();
+    _bindLaunchHomeReset();
     _registerServiceWorker();
 
     if (Auth.resumeSession()) {
@@ -405,8 +408,26 @@ const AppController = (() => {
     Auth.applyRoleVisibility();
     _bindGlobalEvents();
 
-    showModule('inicio');
-    requestAnimationFrame(() => _ensureVisibleModule('inicio'));
+    resetToHome();
+  }
+
+  function _bindLaunchHomeReset() {
+    if (_launchHomeResetBound) return;
+    _launchHomeResetBound = true;
+    window.addEventListener('pageshow', event => {
+      if (!event.persisted || !Auth.isLoggedIn()) return;
+      const shell = document.getElementById('app-shell');
+      if (!shell || shell.style.display === 'none') return;
+      resetToHome();
+    });
+  }
+
+  function resetToHome() {
+    showModule(START_MODULE);
+    requestAnimationFrame(() => {
+      _ensureVisibleModule(START_MODULE);
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
   }
 
   function _buildSidebar() {
@@ -644,27 +665,30 @@ const AppController = (() => {
       showLoginScreen();
       return;
     }
+    const targetModuleId = MODULES[moduleId] && Auth.canAccess(MODULES[moduleId].minRole)
+      ? moduleId
+      : START_MODULE;
 
     // Hide all content panels
     document.querySelectorAll('.module-panel').forEach(p => p.classList.remove('module-panel--active'));
 
     // Show target panel
-    const panel = document.getElementById(`module-${moduleId}`);
+    const panel = document.getElementById(`module-${targetModuleId}`);
     if (panel) panel.classList.add('module-panel--active');
 
     // Update nav active state
     document.querySelectorAll('.nav-item').forEach(item =>
-      item.classList.toggle('nav-item--active', item.dataset.module === moduleId));
+      item.classList.toggle('nav-item--active', item.dataset.module === targetModuleId));
 
     // Close sidebar on mobile
     document.getElementById('sidebar')?.classList.remove('sidebar--open');
 
     // Module-specific init
-    _initModule(moduleId);
-    _currentModule = moduleId;
+    _initModule(targetModuleId);
+    _currentModule = targetModuleId;
 
     // Update page title
-    const mod = MODULES[moduleId];
+    const mod = MODULES[targetModuleId];
     if (mod) document.title = `${mod.label} — ${APP_CONFIG.APP_NAME}`;
   }
 

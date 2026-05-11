@@ -318,10 +318,18 @@ const MecFormModule = (() => {
   }
 
   function _fieldVisible(field) {
-    if (!field.visibleWhen) return true;
-    const current = _getValue(field.visibleWhen.field);
-    if ('equals' in field.visibleWhen) return current === field.visibleWhen.equals;
-    if ('not' in field.visibleWhen) return current !== field.visibleWhen.not;
+    return _visibleRuleMatches(field.visibleWhen);
+  }
+
+  function _visibleRuleMatches(rule) {
+    if (!rule) return true;
+    if (Array.isArray(rule.all)) return rule.all.every(_visibleRuleMatches);
+    if (Array.isArray(rule.any)) return rule.any.some(_visibleRuleMatches);
+    const current = _getValue(rule.field);
+    if ('equals' in rule) return current === rule.equals;
+    if ('not' in rule) return current !== rule.not;
+    if (Array.isArray(rule.in)) return rule.in.includes(current);
+    if (Array.isArray(rule.notIn)) return !rule.notIn.includes(current);
     return true;
   }
 
@@ -5535,7 +5543,7 @@ const MecFormModule = (() => {
     return {
       window: {
         title: 'Ficha de ventana',
-        typeOptions: ['Corrediza', 'Batiente', 'Fija', 'Persiana', 'Basculante', 'Otro'],
+        typeOptions: ['Corrediza', 'Batiente', 'Fija', 'Persiana', 'Basculante', 'Balancín', 'Otro'],
         extra: [
           { key: 'tiene_reja', label: 'Tiene reja', options: ['Si', 'No', 'No verificable'] },
           { key: 'ventila', label: 'Permite ventilacion', options: ['Si', 'Parcial', 'No'] },
