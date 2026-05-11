@@ -24,6 +24,7 @@ const MecFormModule = (() => {
   let _planHitAreas = [];
   let _activePlanDrag = null;
   let _planMoveMode = false;
+  let _activeCanvasZoom = 1;
   let _evidenceSyncRunning = false;
   let _evidenceOnlineBound = false;
   const _sketchHistory = [];
@@ -3793,6 +3794,7 @@ const MecFormModule = (() => {
   }
 
   function _drawSanitarySketch(ctx, canvas) {
+    _activeCanvasZoom = _sanitaryZoom;
     _prepareLogicalCanvasContext(ctx, canvas);
     const logical = _canvasLogicalSize(canvas, SKETCH_CANVAS.width, SKETCH_CANVAS.height);
     const surface = { width: logical.width, height: logical.height };
@@ -3838,7 +3840,7 @@ const MecFormModule = (() => {
     ctx.strokeStyle = 'rgba(128,90,213,.42)';
     ctx.lineWidth = 1.2;
     ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
-    _labelSketchObject(ctx, roomObject, `${item.codigo || 'Sanitario'} ${_contextDimensionsText(adapter, roomObject) || _sanitaryDimensionsFromObject(item, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
+    _labelSketchObject(ctx, roomObject, item.codigo || 'Sanitario', roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
     (item.objects || [])
       .filter(object => object.id !== roomObject.id)
       .forEach(object => _drawSanitaryChildObject(ctx, item, object));
@@ -3863,7 +3865,7 @@ const MecFormModule = (() => {
       ctx.lineWidth = selected ? 3 : 2.4;
       ctx.fillRect(object.x, object.y, object.w, object.h);
       ctx.strokeRect(object.x, object.y, object.w, object.h);
-      _labelSketchObject(ctx, object, _sanitaryOpeningCompactDimensionsText(item, object), object.x + object.w / 2, object.y - 12, true);
+      _labelSketchObject(ctx, object, selected ? _sanitaryOpeningCompactDimensionsText(item, object) : 'Vtna', object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawResizeHandles(ctx, object, true);
       ctx.restore();
       return;
@@ -3889,10 +3891,10 @@ const MecFormModule = (() => {
         if (py < object.y + object.h - 8) _drawSanitaryCabinFixtureIcon(ctx, fixture.id, px, py, iconSize);
       });
       ctx.fillStyle = '#334155';
-      ctx.font = '800 9px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 9);
       ctx.textAlign = 'center';
       ctx.fillText(fixtures.slice(0, 3).map(fixture => _sanitaryCabinFixtureShort(fixture.id)).join(' · '), object.x + object.w / 2, object.y + Math.min(object.h - 10, 24));
-      _labelSketchObject(ctx, object, `${object.ficha?.codigo || 'Cbn'} ${_sanitaryDimensionsText(item, object)}`, object.x + object.w / 2, object.y - 12, true);
+      _labelSketchObject(ctx, object, selected ? `${object.ficha?.codigo || 'Cbn'} ${_sanitaryDimensionsText(item, object)}` : (object.ficha?.codigo || 'Cbn'), object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawResizeHandles(ctx, object, true);
       ctx.restore();
       return;
@@ -3914,11 +3916,11 @@ const MecFormModule = (() => {
         ctx.stroke();
       }
       ctx.fillStyle = '#164e63';
-      ctx.font = '900 9px system-ui, sans-serif';
+      ctx.font = _canvasFont(900, 9);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(_sanitaryObjectShort(object.type), object.x + object.w / 2, object.y + object.h / 2);
-      _labelSketchObject(ctx, object, label, object.x + object.w / 2, object.y - 12, true);
+      if (selected) _labelSketchObject(ctx, object, label, object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawResizeHandles(ctx, object, true);
       ctx.restore();
       return;
@@ -3950,7 +3952,7 @@ const MecFormModule = (() => {
     ctx.strokeRect(object.x, object.y, object.w, object.h);
     if (variant !== 'door') {
       _drawOpeningVariantMark(ctx, object, variant);
-      _labelSketchObject(ctx, object, _sanitaryOpeningCompactDimensionsText(item, object), object.x + object.w / 2, object.y - 12, true);
+      _labelSketchObject(ctx, object, selected ? _sanitaryOpeningCompactDimensionsText(item, object) : 'Pta', object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawResizeHandles(ctx, object, true);
       return;
     }
@@ -3969,7 +3971,7 @@ const MecFormModule = (() => {
     ctx.setLineDash([4, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
-    _labelSketchObject(ctx, object, _sanitaryOpeningCompactDimensionsText(item, object), object.x + object.w / 2, object.y - 12, true);
+    _labelSketchObject(ctx, object, selected ? _sanitaryOpeningCompactDimensionsText(item, object) : 'Pta', object.x + object.w / 2, object.y - 12, true);
     if (selected) {
       _drawResizeHandles(ctx, object, true);
       _drawOpeningRotateHandle(ctx, object);
@@ -4008,6 +4010,7 @@ const MecFormModule = (() => {
 
   function _drawSketch(ctx, canvas, draftObject = null) {
     _ensureSketchObjects();
+    _activeCanvasZoom = _sketchZoom;
     _prepareLogicalCanvasContext(ctx, canvas);
     const logical = _canvasLogicalSize(canvas, SKETCH_CANVAS.width, SKETCH_CANVAS.height);
     const surface = { width: logical.width, height: logical.height };
@@ -4053,7 +4056,7 @@ const MecFormModule = (() => {
     ctx.setLineDash([6, 5]);
     ctx.strokeRect(blockRect.x, blockRect.y, blockRect.w, blockRect.h);
     ctx.setLineDash([]);
-    ctx.font = '800 11px system-ui, sans-serif';
+    ctx.font = _canvasFont(800, 11);
     ctx.fillStyle = 'rgba(23,32,51,.66)';
     ctx.textAlign = 'left';
     ctx.fillText(`${block?.bloque_codigo || 'Bloque actual'} · contenedor de aulas`, blockRect.x + 8, blockRect.y - 10);
@@ -4096,7 +4099,7 @@ const MecFormModule = (() => {
     ctx.strokeStyle = 'rgba(128,90,213,.32)';
     ctx.lineWidth = 1;
     ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
-    _labelSketchObject(ctx, roomObject, `${item.codigo || 'Sanitario'} ${_contextDimensionsText(adapter, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
+    _labelSketchObject(ctx, roomObject, item.codigo || 'Sanitario', roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
     (item.objects || [])
       .filter(object => object.id !== roomObject.id)
       .forEach(object => _drawContextSketchObject(ctx, adapter, object));
@@ -4112,11 +4115,11 @@ const MecFormModule = (() => {
     ctx.strokeStyle = 'rgba(43,108,176,.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
-    _labelSketchObject(ctx, roomObject, `${room.name || 'Aula'} ${_contextDimensionsText(room, roomObject)}`, roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
+    _labelSketchObject(ctx, roomObject, room.name || 'Aula', roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
   }
 
   function _drawContextSketchObject(ctx, room, object) {
-    const label = _contextObjectLabel(room, object);
+    const label = _contextObjectShortLabel(room, object);
     ctx.save();
     ctx.lineCap = 'round';
     if (object.type === 'wall') {
@@ -4145,7 +4148,7 @@ const MecFormModule = (() => {
     }
     if (object.type === 'text') {
       ctx.fillStyle = 'rgba(124,45,18,.72)';
-      ctx.font = '800 12px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 12);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(_truncateLabel(ctx, object.ficha?.observacion || object.text || 'Texto', Math.max(24, object.w || 80)), object.x + (object.w || 0) / 2, object.y + (object.h || 0) / 2);
@@ -4217,6 +4220,11 @@ const MecFormModule = (() => {
     const base = object.type === 'room' ? (room.name || _sketchLabel(object.type)) : _sketchLabel(object.type);
     const dimensions = _contextDimensionsText(room, object);
     return dimensions ? `${base} ${dimensions}` : base;
+  }
+
+  function _contextObjectShortLabel(room, object) {
+    if (object.type === 'room') return room.name || _sketchLabel(object.type);
+    return object.ficha?.codigo || object.label || _sketchLabel(object.type);
   }
 
   function _contextDimensionsText(room, object) {
@@ -4386,7 +4394,7 @@ const MecFormModule = (() => {
       ctx.lineTo(object.x2, object.y2);
       ctx.stroke();
       ctx.restore();
-      _labelSketchObject(ctx, object, _sketchObjectLabel(object), (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 18, true);
+      _labelSketchObject(ctx, object, _sketchVisualLabel(object, selected), (object.x1 + object.x2) / 2, ((object.y1 + object.y2) / 2) - 18, true);
       if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
       ctx.restore();
       return;
@@ -4443,7 +4451,7 @@ const MecFormModule = (() => {
     ctx.rect(object.x, object.y, object.w, object.h);
     ctx.fill();
     ctx.stroke();
-    _labelSketchObject(ctx, object, object.type === 'window' ? _openingCompactDimensionsText(object) : _sketchObjectLabel(object), object.x + object.w / 2, object.y - 12, object.type === 'window');
+    _labelSketchObject(ctx, object, object.type === 'window' ? (selected ? _openingCompactDimensionsText(object) : 'Vtna') : _sketchVisualLabel(object, selected), object.x + object.w / 2, object.y - 12, true);
     if (object.type === 'window' && selected) _drawOpeningCornerGuides(ctx, object);
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     if (object.type === 'window' && selected) _drawOpeningRotateHandle(ctx, object);
@@ -4474,7 +4482,7 @@ const MecFormModule = (() => {
 
   function _drawTextObject(ctx, object, selected) {
     ctx.fillStyle = selected ? '#111827' : '#7c2d12';
-    ctx.font = '800 12px system-ui, sans-serif';
+    ctx.font = _canvasFont(800, 12);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const text = object.ficha?.observacion || object.text || object.ficha?.codigo || 'Texto';
@@ -4499,7 +4507,7 @@ const MecFormModule = (() => {
     ctx.strokeStyle = 'rgba(23,32,51,.72)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(object.x + 7, object.y + 7, Math.max(0, object.w - 14), Math.max(0, object.h - 14));
-    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+    _labelSketchObject(ctx, object, _sketchVisualLabel(object, selected), object.x + object.w / 2, object.y - 14);
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
   }
 
@@ -4522,7 +4530,7 @@ const MecFormModule = (() => {
     ctx.strokeRect(object.x, object.y, object.w, object.h);
     if (variant !== 'door') {
       _drawOpeningVariantMark(ctx, object, variant);
-      _labelSketchObject(ctx, object, _openingCompactDimensionsText(object), object.x + object.w / 2, object.y - 12, true);
+      _labelSketchObject(ctx, object, selected ? _openingCompactDimensionsText(object) : 'Pta', object.x + object.w / 2, object.y - 12, true);
       if (selected) _drawOpeningCornerGuides(ctx, object);
       return;
     }
@@ -4543,7 +4551,7 @@ const MecFormModule = (() => {
     ctx.setLineDash([4, 3]);
     ctx.stroke();
     ctx.setLineDash([]);
-    _labelSketchObject(ctx, object, _openingCompactDimensionsText(object), object.x + object.w / 2, object.y - 12, true);
+    _labelSketchObject(ctx, object, selected ? _openingCompactDimensionsText(object) : 'Pta', object.x + object.w / 2, object.y - 12, true);
     if (selected) _drawOpeningCornerGuides(ctx, object);
   }
 
@@ -4605,7 +4613,7 @@ const MecFormModule = (() => {
       ctx.moveTo(object.x + 3, object.y - 3);
       ctx.lineTo(object.x + 3, object.y + 3);
       ctx.stroke();
-      _labelSketchObject(ctx, object, 'TC', object.x, object.y + 16, true);
+      if (selected) _labelSketchObject(ctx, object, 'TC', object.x, object.y + 16, true);
       ctx.restore();
       return;
     }
@@ -4628,7 +4636,7 @@ const MecFormModule = (() => {
         );
         ctx.stroke();
       }
-      _labelSketchObject(ctx, object, 'Vent', object.x, object.y + 18, true);
+      if (selected) _labelSketchObject(ctx, object, 'Vent', object.x, object.y + 18, true);
       ctx.restore();
       return;
     }
@@ -4648,11 +4656,11 @@ const MecFormModule = (() => {
       ctx.lineTo(object.x + 6, object.y + 7);
       ctx.stroke();
       ctx.fillStyle = '#1d4ed8';
-      ctx.font = '800 6px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 6);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('AC', object.x, object.y - 1);
-      _labelSketchObject(ctx, object, 'AA', object.x, object.y + 18, true);
+      if (selected) _labelSketchObject(ctx, object, 'AA', object.x, object.y + 18, true);
       ctx.restore();
       return;
     }
@@ -4675,7 +4683,7 @@ const MecFormModule = (() => {
     ctx.moveTo(object.x, object.y - 4);
     ctx.lineTo(object.x, object.y + 4);
     ctx.stroke();
-    _labelSketchObject(ctx, object, 'Foco', object.x, object.y + 18, true);
+    if (selected) _labelSketchObject(ctx, object, 'Foco', object.x, object.y + 18, true);
     ctx.restore();
   }
 
@@ -4748,7 +4756,7 @@ const MecFormModule = (() => {
     ctx.lineTo(object.x + object.w - 10, object.y + 10);
     ctx.lineTo(object.x + object.w - 10, object.y + 18);
     ctx.stroke();
-    _labelSketchObject(ctx, object, _sketchObjectLabel(object), object.x + object.w / 2, object.y - 14);
+    _labelSketchObject(ctx, object, _sketchVisualLabel(object, selected), object.x + object.w / 2, object.y - 14);
   }
 
   function _drawDamageObject(ctx, object, selected) {
@@ -4777,13 +4785,13 @@ const MecFormModule = (() => {
     ctx.moveTo(cx - radius * .08, cy + radius * .08);
     ctx.lineTo(cx - radius * .48, cy + radius * .34);
     ctx.stroke();
-    ctx.font = '900 12px system-ui, sans-serif';
+    ctx.font = _canvasFont(900, 12);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#991b1b';
     ctx.fillText('!', cx, cy);
     ctx.restore();
-    _labelSketchObject(ctx, object, _sketchObjectLabel(object), cx, object.y - 14);
+    if (selected) _labelSketchObject(ctx, object, _sketchVisualLabel(object, selected), cx, object.y - 14);
   }
 
   function _sketchStyle(type) {
@@ -4834,6 +4842,13 @@ const MecFormModule = (() => {
 
   function _sketchObjectLabel(object) {
     const base = object.type === 'room' ? _sketchLabel(object.type) : (object.ficha?.codigo || object.label || _sketchLabel(object.type));
+    const dimensions = _sketchDimensionsText(object);
+    return dimensions ? `${base} ${dimensions}` : base;
+  }
+
+  function _sketchVisualLabel(object, selected = false) {
+    const base = object.type === 'room' ? _sketchLabel(object.type) : (object.ficha?.codigo || object.label || _sketchLabel(object.type));
+    if (!selected) return base;
     const dimensions = _sketchDimensionsText(object);
     return dimensions ? `${base} ${dimensions}` : base;
   }
@@ -4984,18 +4999,30 @@ const MecFormModule = (() => {
     return { x: object.x, y: object.y, w: object.w || 0, h: object.h || 0, cx: object.x + (object.w || 0) / 2, cy: object.y + (object.h || 0) / 2 };
   }
 
+  function _stableCanvasSize(base, min = 5, max = 18) {
+    const zoom = Math.max(.55, Number(_activeCanvasZoom || 1));
+    const value = Number(base || 0) / zoom;
+    return Math.round(Math.max(min, Math.min(max, value)) * 10) / 10;
+  }
+
+  function _canvasFont(weight, size) {
+    return `${weight} ${_stableCanvasSize(size, Math.max(4.5, size * .42), size)}px system-ui, sans-serif`;
+  }
+
   function _drawMeasureLabel(ctx, text, x, y) {
     if (!text) return;
     ctx.save();
-    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.font = _canvasFont(800, 10);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const width = ctx.measureText(text).width + 10;
+    const pad = _stableCanvasSize(10, 4, 10);
+    const height = _stableCanvasSize(18, 8, 18);
+    const width = ctx.measureText(text).width + pad;
     ctx.fillStyle = 'rgba(255,255,255,.94)';
     ctx.strokeStyle = 'rgba(232,76,34,.35)';
     ctx.lineWidth = 1;
-    ctx.fillRect(x - width / 2, y - 9, width, 18);
-    ctx.strokeRect(x - width / 2, y - 9, width, 18);
+    ctx.fillRect(x - width / 2, y - height / 2, width, height);
+    ctx.strokeRect(x - width / 2, y - height / 2, width, height);
     ctx.fillStyle = '#9a3412';
     ctx.fillText(text, x, y);
     ctx.restore();
@@ -5027,7 +5054,7 @@ const MecFormModule = (() => {
     });
     ctx.setLineDash([]);
     if (box.w > 4 && box.h > 4 && !['damage'].includes(object.type)) {
-      _drawMeasureLabel(ctx, `${width.toFixed(2)} x ${height.toFixed(2)} m`, box.cx, box.y + box.h + 18);
+      _drawMeasureLabel(ctx, `${width.toFixed(2)} x ${height.toFixed(2)} m`, box.cx, box.y + box.h + _stableCanvasSize(18, 9, 18));
     }
     ctx.restore();
   }
@@ -5122,7 +5149,7 @@ const MecFormModule = (() => {
     ctx.lineTo(handle.x + 11, handle.y - 4);
     ctx.lineTo(handle.x + 9, handle.y - 8);
     ctx.stroke();
-    ctx.font = '800 9px system-ui, sans-serif';
+    ctx.font = _canvasFont(800, 9);
     ctx.textAlign = 'center';
     ctx.fillStyle = '#172033';
     ctx.fillText(object.type === 'door' ? 'Abrir' : 'Girar', handle.x, handle.y + 24);
@@ -5131,9 +5158,9 @@ const MecFormModule = (() => {
 
   function _labelSketchObject(ctx, object, label, x, y, small = false) {
     if (!label) return;
-    const fontSize = small ? 9 : 12;
-    const height = small ? 15 : 20;
-    const pad = small ? 7 : 12;
+    const fontSize = _stableCanvasSize(small ? 9 : 12, small ? 5 : 6, small ? 9 : 12);
+    const height = _stableCanvasSize(small ? 15 : 20, small ? 8 : 10, small ? 15 : 20);
+    const pad = _stableCanvasSize(small ? 7 : 12, small ? 4 : 6, small ? 7 : 12);
     ctx.font = `700 ${fontSize}px system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -5343,7 +5370,7 @@ const MecFormModule = (() => {
       ctx.quadraticCurveTo(x, y + size * .55, x - size * .28, y + size * .36);
       ctx.stroke();
     } else {
-      ctx.font = '800 8px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 8);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = '#334155';
@@ -7676,6 +7703,7 @@ const MecFormModule = (() => {
   function _drawSchoolPlan() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
+    _activeCanvasZoom = _schoolPlanZoom;
     _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
     _data.__sanitaries = Array.isArray(_data.__sanitaries) ? _data.__sanitaries : [];
     _applySchoolPlanZoom(canvas);
@@ -7691,7 +7719,7 @@ const MecFormModule = (() => {
     const sanitaries = _data.__sanitaries || [];
     if (!rooms.length && !sanitaries.length) {
       ctx.fillStyle = '#667085';
-      ctx.font = '700 18px system-ui, sans-serif';
+      ctx.font = _canvasFont(700, 18);
       ctx.textAlign = 'center';
       ctx.fillText('Plano general en espera de datos cargados', logical.width / 2, logical.height / 2);
       return;
@@ -7726,11 +7754,11 @@ const MecFormModule = (() => {
       ctx.fillStyle = 'rgba(23,32,51,.06)';
       ctx.fillRect(x + 1, y + 1, w - 2, 30);
       ctx.fillStyle = '#172033';
-      ctx.font = '800 12px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 12);
       ctx.textAlign = 'left';
       ctx.fillText(block.bloque_codigo || 'Bloque', x + 10, y + 14);
       if (block.largo_m && block.ancho_m) {
-        ctx.font = '700 9px system-ui, sans-serif';
+        ctx.font = _canvasFont(700, 9);
         ctx.fillStyle = '#475467';
         ctx.fillText(`${block.largo_m} x ${block.ancho_m} m`, x + 10, y + 26);
       }
@@ -7740,7 +7768,7 @@ const MecFormModule = (() => {
       const floors = _planFloorsForBlock(block, rooms, sanitaries);
       if (!blockRooms.length && !blockSanitaries.length) {
         ctx.fillStyle = '#667085';
-        ctx.font = '700 12px system-ui, sans-serif';
+        ctx.font = _canvasFont(700, 12);
         ctx.fillText('Bloque sin aulas o sanitarios asociados', x + 12, y + 56);
       }
       floors.forEach((floor, floorIndex) => {
@@ -7756,7 +7784,7 @@ const MecFormModule = (() => {
         ctx.fillStyle = 'rgba(71,84,103,.08)';
         ctx.fillRect(floorRect.x + 1, floorRect.y + 1, floorRect.w - 2, 18);
         ctx.fillStyle = '#475467';
-        ctx.font = '800 10px system-ui, sans-serif';
+        ctx.font = _canvasFont(800, 10);
         ctx.fillText(floor, floorRect.x + 8, floorRect.y + 13);
         const roomItems = _planRoomItemsFromSketch(floorRooms, floorContentRect);
         const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorContentRect);
@@ -7963,7 +7991,7 @@ const MecFormModule = (() => {
     const label = `${meters.toFixed(2)} m bordes`;
     const x = (nearest.from.x + nearest.to.x) / 2;
     const y = (nearest.from.y + nearest.to.y) / 2;
-    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.font = _canvasFont(800, 10);
     ctx.textAlign = 'center';
     const width = ctx.measureText(label).width + 10;
     ctx.fillStyle = 'rgba(255,247,237,.94)';
@@ -8067,7 +8095,7 @@ const MecFormModule = (() => {
     ctx.strokeRect(x + 3, y + 3, Math.max(0, w - 6), Math.max(0, h - 6));
     if (_planLayers.etiquetas) {
       ctx.fillStyle = '#44337a';
-      ctx.font = '800 9px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 9);
       ctx.textAlign = 'left';
       ctx.fillText(item.codigo || 'Sanitario', x + 4, y + 12);
     }
@@ -8164,7 +8192,7 @@ const MecFormModule = (() => {
           ctx.strokeRect(ox, oy, ow, oh);
           if (_planLayers.etiquetas) {
             ctx.fillStyle = '#4b5563';
-            ctx.font = '800 7px system-ui, sans-serif';
+            ctx.font = _canvasFont(800, 7);
             ctx.textAlign = 'center';
             ctx.fillText(_truncateLabel(ctx, object.ficha?.codigo || 'Cbn', Math.max(18, ow - 4)), ox + ow / 2, oy + Math.min(12, oh / 2 + 3));
           }
@@ -8238,7 +8266,7 @@ const MecFormModule = (() => {
     ctx.strokeRect(x + 4, y + 4, Math.max(0, w - 8), Math.max(0, h - 8));
     if (_planLayers.etiquetas) {
       ctx.fillStyle = '#173f68';
-      ctx.font = '800 10px system-ui, sans-serif';
+      ctx.font = _canvasFont(800, 10);
       ctx.textAlign = 'left';
       ctx.fillText(room.name || 'Aula', x + 6, y + 14);
     }
@@ -8335,7 +8363,7 @@ const MecFormModule = (() => {
           const oh = Math.max(10, object.h * sy);
           _planHitAreas.push({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
           ctx.fillStyle = '#7c2d12';
-          ctx.font = '700 7px system-ui, sans-serif';
+          ctx.font = _canvasFont(700, 7);
           ctx.textAlign = 'center';
           ctx.fillText(_truncateLabel(ctx, object.ficha?.observacion || object.text || 'Texto', Math.max(16, ow - 4)), ox + ow / 2, oy + oh / 2 + 2);
           return;

@@ -4,6 +4,26 @@
 
 ---
 
+## Sesion de etiquetas inteligentes con zoom - 2026-05-11 - v2.5.45
+
+### Objetivo
+- Evitar que etiquetas, textos y medidas del editor de planos crezcan con el zoom hasta solaparse con los objetos y bloquear la lectura del plano.
+
+### Cambios implementados
+- Las fuentes de etiquetas del croquis, sanitarios y plano general ahora tienen tamano estable en pantalla: al hacer zoom, el objeto aumenta pero la etiqueta no se vuelve invasiva.
+- Las etiquetas de objetos no seleccionados se simplifican: puertas y ventanas muestran `Pta`/`Vtna`, cabinas muestran `Cbn`, puntos electricos y equipos priorizan su icono.
+- Las medidas completas se mantienen disponibles al seleccionar el elemento, junto con las guias de medicion.
+- Las etiquetas de aulas y sanitarios de contexto muestran nombre/codigo corto en lugar de dimensiones completas, reduciendo solapes en bloques cargados.
+- Los textos libres del plano tambien usan fuente estable frente al zoom.
+- Version y cache actualizados a `v2.5.45`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- Parseo con `osascript -l JavaScript` de `config.js`, `api.js`, `auth.js`, `mec-schema.js`, `mec-form.js`, `app.js`, `sw.js` y `gas/Code.gs` sin errores.
+- Servidor local `python3 -m http.server 8025` con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; verificada edicion `v2.5.45`, Inicio activo, cache `cialpa-app-v2.5.45`, fuentes estables y etiquetas compactas por seleccion.
+
+---
+
 ## Sesion de botones deshacer y rehacer visibles - 2026-05-11 - v2.5.44
 
 ### Objetivo
