@@ -1560,6 +1560,8 @@
 .legend-window { background: #2b6cb0; }
 .legend-outlet { background: #b7791f; }
 .legend-light { background: #d69e2e; }
+.legend-fan { background: #0e7490; }
+.legend-ac { background: #2563eb; }
 .legend-damage { background: #c53030; }
 .legend-sanitary { background: #805ad5; }
 

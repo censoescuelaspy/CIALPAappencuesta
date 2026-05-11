@@ -4,6 +4,26 @@
 
 ---
 
+## Sesion de editor electrico, plano general movil y canvas nitido - 2026-05-11 - v2.5.40
+
+### Objetivo
+- Mejorar el editor de planos para tablet/celular: elementos electricos anclados a paredes, nuevos equipos, reordenamiento de bloques en plano general y mayor nitidez con zoom.
+
+### Cambios implementados
+- Las tomas, focos, ventiladores y aires acondicionados ahora se pegan a la pared mas cercana al colocarse y pueden moverse nuevamente por arrastre, incluso cambiando de pared.
+- Se agregaron herramientas de `Ventilador` y `Aire acond.` al croquis de aulas y sanitarios, con iconos, fichas editables, estados, fotos asociadas y conteo en KPIs.
+- El plano general permite arrastrar bloques para acomodarlos manualmente en escala, conservando posiciones relativas y mostrando las guias de distancia durante el movimiento.
+- Se redujo el solapamiento visual de puntos electricos/equipos superpuestos en plano general y PDF mediante desplazamiento controlado de simbolos cercanos.
+- El canvas de aula, sanitario y plano general ahora redibuja con mayor resolucion interna segun zoom y densidad de pantalla, evitando que los elementos se vean borrosos al ampliar.
+- El PDF agrega simbolos y leyenda para ventiladores y aires acondicionados.
+- Version y cache actualizados a `v2.5.40`.
+
+### Validaciones ejecutadas
+- `osascript -l JavaScript` sobre `assets/js/mec-schema.js` y `assets/js/mec-form.js`.
+- `git diff --check`.
+
+---
+
 ## Sesion de correccion de foco de zoom en planos - 2026-05-11 - v2.5.39
 
 ### Objetivo
