@@ -927,6 +927,37 @@
   background: #f8fafc;
 }
 
+.mec-object-note {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: .55rem;
+  align-items: start;
+  margin: .8rem 0;
+  padding: .65rem .75rem;
+  border: 1px solid #bfd3e8;
+  border-radius: var(--radius-md);
+  background: #f7fbff;
+  color: #314158;
+}
+
+.mec-object-note span {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #173b63;
+  color: #ffffff;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.mec-object-note p {
+  margin: 0;
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
 .mec-object-evidence span {
   color: #617083;
   font-size: .84rem;
@@ -1632,11 +1663,13 @@
 .legend-door { background: #2f855a; }
 .legend-window { background: #2b6cb0; }
 .legend-outlet { background: #b7791f; }
+.legend-switchboard { background: #854d0e; }
 .legend-light { background: #d69e2e; }
 .legend-fan { background: #0e7490; }
 .legend-ac { background: #2563eb; }
 .legend-damage { background: #c53030; }
 .legend-sanitary { background: #805ad5; }
+.legend-site { background: #15803d; }
 
 .school-plan__list {
   display: grid;
@@ -1686,6 +1719,11 @@
 .school-plan-object--child {
   min-height: 54px;
   background: #fbfdff;
+}
+
+.school-plan-object--site {
+  border-color: #bbf7d0;
+  background: #f7fef9;
 }
 
 .school-plan-object__type {

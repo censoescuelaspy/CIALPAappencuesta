@@ -122,7 +122,7 @@ const MEC_SCHEMA = {
           fields: [
             { id: 'bloque_codigo', label: 'Bloque', type: 'text', required: true, hint: 'La app enumera automaticamente: Bloque 1, Bloque 2, etc.' },
             { id: 'estado_bloque', label: 'Estado del bloque', type: 'select', required: true, options: ['Operativo', 'En construccion', 'Derrumbado / colapsado', 'Clausurado', 'Sin uso', 'No verificable'] },
-            { id: 'cantidad_plantas', label: 'Cantidad de plantas', type: 'number', required: true, min: 1, step: 1 },
+            { id: 'cantidad_plantas', label: 'Cantidad de pisos / plantas', type: 'number', required: true, min: 1, step: 1, hint: 'Todo bloque debe tener al menos Piso 1, aun si esta en construccion, clausurado o derrumbado.' },
             { id: 'largo_m', label: 'Largo aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'superficie_m2', label: 'Superficie del bloque relevada en gabinete', type: 'number', min: 0, step: '0.1', unit: 'm2', hint: 'Puede completarse luego con las medidas verificadas en plano o gabinete.' },

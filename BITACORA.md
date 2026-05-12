@@ -4,6 +4,32 @@
 
 ---
 
+## Sesion de elementos exteriores, tablero y DXF - 2026-05-12 - v2.5.48
+
+### Objetivo
+- Ampliar el registro arquitectonico para cubrir elementos de aula y del predio que faltaban, y habilitar una primera migracion a formato AutoCAD.
+
+### Cambios implementados
+- Agregado elemento `Tablero` en aulas y sanitarios, con icono, ficha propia, estado, proteccion, rotulado y seguridad.
+- Agregada Nota `(i)` dentro de fichas de objetos, cabinas sanitarias y elementos exteriores para dejar criterios, excepciones o aclaraciones de gabinete.
+- Agregada capa de elementos exteriores del predio: tanque de agua, espacio de recreacion, galeria, espacio libre y pilar.
+- Agregados botones rapidos en el constructor del plano para insertar galerias, espacios, pilares, recreacion y tanques de agua.
+- Los elementos exteriores se ven en el plano general, tienen ficha, aparecen en la lista lateral, pueden moverse con `Mover bloques` activo y participan en guias de distancia.
+- Reforzado que todo bloque mantenga al menos `Piso 1` aunque este en construccion, clausurado o derrumbado.
+- Agregado exportador `DXF` basico para migracion a AutoCAD/LibreCAD con capas de bloques, aulas, sanitarios, aberturas, equipos, tableros, escaleras, danos y exteriores.
+- Version y cache actualizados a `v2.5.48`.
+
+### Validaciones ejecutadas
+- `node --check` en `mec-form.js`, `mec-schema.js`, `config.js` y `app.js`.
+- `git diff --check` sin errores; solo avisos esperados de normalizacion LF/CRLF.
+- `rg` para confirmar version/cache `v2.5.48`, boton `DXF`, elementos exteriores y `switchboard`.
+
+### Proximos pasos
+- Probar en AutoCAD/LibreCAD la escala del DXF y definir si la proxima iteracion debe exportar bloques/pisos como layouts separados.
+- Evaluar si los elementos exteriores requieren fotos directas en ficha, ademas de nota `(i)` y observacion.
+
+---
+
 ## Sesion de colocacion pared/techo, contraste y fichas flotantes - 2026-05-12 - v2.5.47
 
 ### Objetivo
