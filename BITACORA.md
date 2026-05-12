@@ -4,6 +4,31 @@
 
 ---
 
+## Sesion de exteriores multi-plano y bloqueo de aulas - 2026-05-12 - v2.5.49
+
+### Objetivo
+- Permitir que los elementos exteriores del predio puedan incorporarse y ubicarse desde el plano general, el plano de aula y el plano sanitario, y proteger aulas terminadas contra cambios accidentales.
+
+### Cambios implementados
+- Agregados botones de exteriores en los editores de aula y sanitario: galeria, tanque de agua, espacio de recreacion, espacio libre y pilar.
+- Los elementos exteriores ahora se dibujan tambien sobre los lienzos de aula y sanitario, se pueden seleccionar, mover y abrir en ficha desde esas vistas.
+- Reutilizado el mismo modelo de `__siteElements`, evitando duplicar datos entre plano general, aula y sanitario.
+- Agregado boton `Bloquear aula` y `Desbloquear aula`, ambos con confirmacion.
+- Cuando un aula queda bloqueada se deshabilitan edicion de medidas, redibujo, arrastre, redimension, borrado, deshacer/rehacer y modificacion de fichas/fotos de sus objetos.
+- El plano general muestra el estado `Aula bloqueada` y ofrece la accion de bloquear/desbloquear desde el constructor contextual.
+- Version y cache actualizados a `v2.5.49`.
+
+### Validaciones ejecutadas
+- `node --check` en `mec-form.js`, `mec-schema.js`, `config.js`, `app.js` y `sw.js`.
+- `git diff --check` sin errores; solo avisos esperados de normalizacion LF/CRLF.
+- `rg` para confirmar version/cache `v2.5.49`.
+
+### Proximos pasos
+- Probar en tablet Android/iPad el movimiento de exteriores desde aula/sanitario y confirmar que no interfiera con cabinas, puertas o aulas de referencia.
+- Evaluar si conviene agregar una capa visual independiente para ocultar/mostrar exteriores dentro de los planos por aula y sanitario.
+
+---
+
 ## Sesion de elementos exteriores, tablero y DXF - 2026-05-12 - v2.5.48
 
 ### Objetivo

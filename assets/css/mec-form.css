@@ -693,6 +693,22 @@
   line-height: 1;
 }
 
+.mec-sketch-toolset--site {
+  background: #f7fef9;
+  border-color: #bbf7d0;
+}
+
+.mec-sketch-tool--site {
+  border-color: #bbf7d0;
+}
+
+.mec-sketch-tool__icon--site {
+  background: #dcfce7;
+  color: #166534;
+  font-size: .82rem;
+  font-weight: 950;
+}
+
 .mec-sketch-tool--active {
   border-color: #2b6cb0 !important;
   background: #eaf4ff !important;
@@ -703,6 +719,35 @@
 .mec-sketch-tool--active .mec-sketch-tool__icon {
   background: #2b6cb0;
   color: #fff;
+}
+
+.mec-sketch--locked .mec-sketch-canvas-wrap {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .14);
+}
+
+.mec-lock-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: .32rem .62rem;
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  font-size: .75rem;
+  font-weight: 900;
+}
+
+.mec-lock-notice {
+  margin-bottom: .75rem;
+  padding: .65rem .75rem;
+  border: 1px solid #fcd34d;
+  border-radius: var(--radius-md);
+  background: #fffbeb;
+  color: #92400e;
+  font-size: .82rem;
+  font-weight: 800;
 }
 
 .mec-sketch__board {
@@ -1724,6 +1769,11 @@
 .school-plan-object--site {
   border-color: #bbf7d0;
   background: #f7fef9;
+}
+
+.school-plan-object--locked {
+  border-color: #fbbf24;
+  background: #fffbeb;
 }
 
 .school-plan-object__type {
