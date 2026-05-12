@@ -1091,6 +1091,36 @@
   clip-path: polygon(18% 8%, 70% 0, 100% 42%, 82% 92%, 28% 100%, 0 56%);
 }
 
+.mec-shape-button__icon--football,
+.mec-shape-button__icon--basketball,
+.mec-shape-button__icon--tennis {
+  width: 68px;
+  height: 42px;
+  border-width: 2px;
+  background-color: rgba(21, 128, 61, .08);
+}
+
+.mec-shape-button__icon--football {
+  background-image:
+    linear-gradient(90deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%),
+    radial-gradient(circle at 50% 50%, transparent 0 17%, #15803d 18% 21%, transparent 22%),
+    linear-gradient(90deg, transparent 0 12%, #15803d 12% 15%, transparent 15% 85%, #15803d 85% 88%, transparent 88%);
+}
+
+.mec-shape-button__icon--basketball {
+  background-image:
+    linear-gradient(90deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%),
+    radial-gradient(circle at 50% 50%, transparent 0 14%, #15803d 15% 18%, transparent 19%),
+    linear-gradient(90deg, transparent 0 20%, #15803d 20% 23%, transparent 23% 77%, #15803d 77% 80%, transparent 80%);
+}
+
+.mec-shape-button__icon--tennis {
+  background-image:
+    linear-gradient(90deg, transparent 49%, #15803d 49%, #15803d 51%, transparent 51%),
+    linear-gradient(90deg, transparent 21%, #15803d 21%, #15803d 24%, transparent 24% 76%, #15803d 76%, #15803d 79%, transparent 79%),
+    linear-gradient(0deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%);
+}
+
 .mec-object-evidence span {
   color: #617083;
   font-size: .84rem;

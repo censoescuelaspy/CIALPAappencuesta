@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de rotacion y canchas predefinidas - 2026-05-12 - v2.5.60
+
+### Objetivo
+- Permitir que poligonos y figuras exteriores/recreativas puedan rotarse para representar estructuras que no estan alineadas con el resto del plano.
+- Agilizar la carga de areas deportivas con plantillas ya marcadas para canchas.
+
+### Cambios implementados
+- Los elementos exteriores guardan `rotationDeg` y `rotacion_grados` en ficha, con edicion manual desde la ficha.
+- En el panel del plano general, al seleccionar un exterior aparecen acciones rapidas `Girar -15`, `Girar +15` y `Poner 0 grados`.
+- El dibujo de exteriores y recreacion ahora respeta la rotacion en canvas y en la exportacion SVG.
+- Las areas de recreacion agregan plantillas predefinidas: `Cancha futbol`, `Cancha basquetbol` y `Cancha tenis`.
+- Las canchas se dibujan con lineas internas basicas: mitad de cancha, areas/circulos o lineas de servicio segun corresponda.
+- Las plantillas deportivas precargan uso, actividad, largo, ancho, superficie, perimetro y equipamiento de referencia.
+- Al editar largo/ancho de una recreacion, el tamano visible del elemento se actualiza proporcionalmente en el plano.
+- Version y cache actualizados a `v2.5.60`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- Parseo con `osascript -l JavaScript` de `mec-form.js` y `config.js` sin errores.
+- Compilacion con `osacompile -l JavaScript` de `app.js` y `sw.js` sin errores.
+- Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js`, `mec-form.css` y `sw.js`; version visible `v2.5.60` y cache `cialpa-app-v2.5.60`.
+
+---
+
 ## Sesion de actualizacion y datos emergentes controlables - 2026-05-12 - v2.5.59
 
 ### Objetivo

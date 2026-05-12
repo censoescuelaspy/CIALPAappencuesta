@@ -88,6 +88,9 @@ const MecFormModule = (() => {
     { id: 'oval', label: 'Ovalo', short: 'REC', wRatio: .19, hRatio: .1 },
     { id: 'triangle', label: 'Triangulo', short: 'REC', wRatio: .16, hRatio: .12 },
     { id: 'polygon', label: 'Poligono', short: 'REC', wRatio: .18, hRatio: .13 },
+    { id: 'football', label: 'Cancha futbol', short: 'FUT', wRatio: .34, hRatio: .18, court: 'football', lengthM: 40, widthM: 20 },
+    { id: 'basketball', label: 'Cancha basquetbol', short: 'BASQ', wRatio: .24, hRatio: .13, court: 'basketball', lengthM: 28, widthM: 15 },
+    { id: 'tennis', label: 'Cancha tenis', short: 'TEN', wRatio: .2, hRatio: .1, court: 'tennis', lengthM: 24, widthM: 11 },
   ];
 
   const SANITARY_FIXTURES = [
@@ -1929,14 +1932,18 @@ const MecFormModule = (() => {
       const size = _siteElementDefaultSize(type, shape);
       const ficha = { ..._defaultSiteElementFicha(type, index + 1, shape), ...(item.ficha || {}) };
       if (type === 'recreation') ficha.forma = _recreationShapeLabel(shape);
+      const rotationDeg = _normalizeSiteRotation(item.rotationDeg ?? item.rotacion_grados ?? ficha.rotacion_grados);
+      ficha.rotacion_grados = String(rotationDeg);
+      const measuredSize = _siteElementSizeFromFicha(type, shape, ficha);
       return {
         id: item.id || `site_${Date.now()}_${index}`,
         type,
         shape,
         xRatio: Number.isFinite(Number(item.xRatio)) ? Number(item.xRatio) : .08,
         yRatio: Number.isFinite(Number(item.yRatio)) ? Number(item.yRatio) : .78,
-        wRatio: Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : size.wRatio,
-        hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : size.hRatio,
+        wRatio: Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : (measuredSize?.wRatio || size.wRatio),
+        hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : (measuredSize?.hRatio || size.hRatio),
+        rotationDeg,
         ficha,
         locked: Boolean(item.locked),
         lockedAt: item.lockedAt || '',
@@ -1967,16 +1974,80 @@ const MecFormModule = (() => {
     return _recreationShapeConfig(shape).label;
   }
 
+  function _normalizeSiteRotation(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) return 0;
+    const normalized = ((number % 360) + 360) % 360;
+    return Math.round(normalized * 10) / 10;
+  }
+
+  function _siteElementRotationDeg(item) {
+    return _normalizeSiteRotation(item?.rotationDeg ?? item?.rotacion_grados ?? item?.ficha?.rotacion_grados ?? 0);
+  }
+
+  function _recreationShapeDefaults(shape) {
+    const cfg = _recreationShapeConfig(shape);
+    const courtDefaults = {
+      football: {
+        uso: 'Cancha abierta',
+        actividad: 'Futbol / futsal',
+        largo_m: cfg.lengthM || 40,
+        ancho_m: cfg.widthM || 20,
+        cubierta: 'Sin cubierta',
+        piso: 'Cesped',
+        equipamiento: 'Arcos, lineas de cancha',
+      },
+      basketball: {
+        uso: 'Cancha abierta',
+        actividad: 'Basquetbol',
+        largo_m: cfg.lengthM || 28,
+        ancho_m: cfg.widthM || 15,
+        cubierta: 'Sin cubierta',
+        piso: 'Hormigon',
+        equipamiento: 'Aros/tableros, lineas de cancha',
+      },
+      tennis: {
+        uso: 'Cancha abierta',
+        actividad: 'Tenis',
+        largo_m: cfg.lengthM || 24,
+        ancho_m: cfg.widthM || 11,
+        cubierta: 'Sin cubierta',
+        piso: 'Hormigon',
+        equipamiento: 'Red/postes, lineas de cancha',
+      },
+    }[cfg.id] || {};
+    const largo = Number(courtDefaults.largo_m || 0);
+    const ancho = Number(courtDefaults.ancho_m || 0);
+    return {
+      ...courtDefaults,
+      superficie_m2: largo && ancho ? (largo * ancho).toFixed(2) : '',
+      perimetro_m: largo && ancho ? (2 * (largo + ancho)).toFixed(2) : '',
+    };
+  }
+
+  function _siteElementSizeFromFicha(type, shape, ficha = {}) {
+    if (type !== 'recreation') return null;
+    const largo = Number(ficha.largo_m || 0);
+    const ancho = Number(ficha.ancho_m || 0);
+    if (!largo || !ancho) return null;
+    return {
+      wRatio: Math.max(.045, Math.min(.5, largo / 120)),
+      hRatio: Math.max(.035, Math.min(.36, ancho / 120)),
+    };
+  }
+
   function _defaultSiteElementFicha(type, index = 1, shape = '') {
     const cfg = _siteElementConfig(type);
     const ficha = {
       codigo: `${cfg.short} ${index}`,
       subtipo: cfg.label,
       estado: 'Bueno',
+      rotacion_grados: '0',
       nota_i: '',
       observacion: '',
       evidencias: [],
       ..._defaultSiteElementDetails(type),
+      ...(type === 'recreation' ? _recreationShapeDefaults(shape) : {}),
     };
     if (type === 'recreation') ficha.forma = _recreationShapeLabel(shape);
     return ficha;
@@ -2090,6 +2161,7 @@ const MecFormModule = (() => {
       'subtipo',
       'estado',
       'forma',
+      'rotacion_grados',
       'nota_i',
       'observacion',
       ..._siteElementDetailFields(type).map(field => field.key),
@@ -6826,11 +6898,17 @@ const MecFormModule = (() => {
 
   function _siteElementTooltipInfo(element) {
     if (!element) return null;
+    const shape = element.type === 'recreation' ? _recreationShapeLabel(element.shape || element.ficha?.forma) : '';
+    const rotation = _siteElementRotationDeg(element);
     return {
       title: element.ficha?.codigo || _siteElementLabel(element.type),
       subtitle: 'Exterior del predio',
       rows: _tooltipRowsFromFicha(element.ficha || {}, [
         { label: 'Tipo', value: _siteElementLabel(element.type) },
+        { label: 'Figura', value: shape },
+        { label: 'Medidas', value: element.ficha?.largo_m && element.ficha?.ancho_m ? `${element.ficha.largo_m} x ${element.ficha.ancho_m} m` : '' },
+        { label: 'Area', value: _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
+        { label: 'Rotacion', value: rotation ? `${rotation} grados` : '0 grados' },
       ]),
     };
   }
@@ -8980,6 +9058,9 @@ const MecFormModule = (() => {
         detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · exterior del predio`,
         actions: [
           { label: 'Editar ficha', tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
+          { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', -15)` },
+          { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', 15)` },
+          { label: 'Poner 0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', ${-_siteElementRotationDeg(element)})` },
           { label: '+ Tanque', onClick: "MecFormModule.addPlanSiteElement('water_tank')" },
           { label: '+ Recreacion', onClick: "MecFormModule.addPlanSiteElement('recreation')" },
           { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
@@ -9735,58 +9816,140 @@ const MecFormModule = (() => {
     }, logicalWidth, logicalHeight);
   }
 
+  function _rotatedSiteElementBounds(rect, item) {
+    const rotation = (_siteElementRotationDeg(item) * Math.PI) / 180;
+    if (!rotation) return { ...rect };
+    const cos = Math.abs(Math.cos(rotation));
+    const sin = Math.abs(Math.sin(rotation));
+    const w = rect.w * cos + rect.h * sin;
+    const h = rect.w * sin + rect.h * cos;
+    return {
+      x: rect.x + rect.w / 2 - w / 2,
+      y: rect.y + rect.h / 2 - h / 2,
+      w,
+      h,
+    };
+  }
+
+  function _drawRecreationCourtMarkings(ctx, item, rect, shape) {
+    const court = _recreationShapeConfig(shape).court;
+    if (!court) return;
+    const x = rect.x;
+    const y = rect.y;
+    const w = rect.w;
+    const h = rect.h;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(21,128,61,.72)';
+    ctx.lineWidth = Math.max(1, Math.min(w, h) * .018);
+    ctx.setLineDash([]);
+    ctx.strokeRect(x + w * .06, y + h * .08, w * .88, h * .84);
+
+    if (court === 'football') {
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y + h * .08);
+      ctx.lineTo(x + w / 2, y + h * .92);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w * .09, h * .18, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeRect(x + w * .06, y + h * .3, w * .14, h * .4);
+      ctx.strokeRect(x + w * .8, y + h * .3, w * .14, h * .4);
+      ctx.strokeRect(x + w * .06, y + h * .4, w * .055, h * .2);
+      ctx.strokeRect(x + w * .885, y + h * .4, w * .055, h * .2);
+    }
+
+    if (court === 'basketball') {
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y + h * .08);
+      ctx.lineTo(x + w / 2, y + h * .92);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w * .06, h * .16, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.strokeRect(x + w * .06, y + h * .34, w * .18, h * .32);
+      ctx.strokeRect(x + w * .76, y + h * .34, w * .18, h * .32);
+      ctx.beginPath();
+      ctx.ellipse(x + w * .24, y + h / 2, w * .08, h * .16, 0, -Math.PI / 2, Math.PI / 2);
+      ctx.ellipse(x + w * .76, y + h / 2, w * .08, h * .16, 0, Math.PI / 2, Math.PI * 1.5);
+      ctx.stroke();
+    }
+
+    if (court === 'tennis') {
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y + h * .08);
+      ctx.lineTo(x + w / 2, y + h * .92);
+      ctx.moveTo(x + w * .22, y + h * .08);
+      ctx.lineTo(x + w * .22, y + h * .92);
+      ctx.moveTo(x + w * .78, y + h * .08);
+      ctx.lineTo(x + w * .78, y + h * .92);
+      ctx.moveTo(x + w * .22, y + h / 2);
+      ctx.lineTo(x + w * .78, y + h / 2);
+      ctx.moveTo(x + w * .36, y + h * .08);
+      ctx.lineTo(x + w * .36, y + h * .92);
+      ctx.moveTo(x + w * .64, y + h * .08);
+      ctx.lineTo(x + w * .64, y + h * .92);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function _drawSiteElementShape(ctx, item, rect, selected = false, showLabel = true) {
     const cfg = _siteElementConfig(item.type);
+    const rotation = _siteElementRotationDeg(item);
+    const local = { x: -rect.w / 2, y: -rect.h / 2, w: rect.w, h: rect.h };
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
     ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate((rotation * Math.PI) / 180);
     ctx.strokeStyle = selected ? '#111827' : cfg.tone;
     ctx.fillStyle = selected ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.78)';
     ctx.lineWidth = selected ? 3 : 2;
     if (item.type === 'water_tank') {
       ctx.beginPath();
-      ctx.ellipse(rect.x + rect.w / 2, rect.y + rect.h / 2, rect.w / 2, rect.h / 2, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 0, local.w / 2, local.h / 2, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(rect.x + rect.w * .22, rect.y + rect.h * .38);
-      ctx.lineTo(rect.x + rect.w * .78, rect.y + rect.h * .38);
-      ctx.moveTo(rect.x + rect.w * .22, rect.y + rect.h * .62);
-      ctx.lineTo(rect.x + rect.w * .78, rect.y + rect.h * .62);
+      ctx.moveTo(local.x + local.w * .22, local.y + local.h * .38);
+      ctx.lineTo(local.x + local.w * .78, local.y + local.h * .38);
+      ctx.moveTo(local.x + local.w * .22, local.y + local.h * .62);
+      ctx.lineTo(local.x + local.w * .78, local.y + local.h * .62);
       ctx.stroke();
     } else if (item.type === 'pillar') {
       ctx.beginPath();
-      ctx.arc(rect.x + rect.w / 2, rect.y + rect.h / 2, Math.min(rect.w, rect.h) / 2, 0, Math.PI * 2);
+      ctx.arc(0, 0, Math.min(local.w, local.h) / 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     } else if (item.type === 'recreation') {
       const shape = _normalizeRecreationShape(item.shape || item.ficha?.forma);
-      const cx = rect.x + rect.w / 2;
-      const cy = rect.y + rect.h / 2;
+      const court = _recreationShapeConfig(shape).court;
       if (shape === 'circle') {
         ctx.beginPath();
-        ctx.arc(cx, cy, Math.min(rect.w, rect.h) / 2, 0, Math.PI * 2);
+        ctx.arc(0, 0, Math.min(local.w, local.h) / 2, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       } else if (shape === 'oval') {
         ctx.beginPath();
-        ctx.ellipse(cx, cy, rect.w / 2, rect.h / 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, local.w / 2, local.h / 2, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       } else if (shape === 'triangle') {
         ctx.beginPath();
-        ctx.moveTo(cx, rect.y);
-        ctx.lineTo(rect.x + rect.w, rect.y + rect.h);
-        ctx.lineTo(rect.x, rect.y + rect.h);
+        ctx.moveTo(0, local.y);
+        ctx.lineTo(local.x + local.w, local.y + local.h);
+        ctx.lineTo(local.x, local.y + local.h);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
       } else if (shape === 'polygon') {
         const points = [
-          [rect.x + rect.w * .18, rect.y + rect.h * .15],
-          [rect.x + rect.w * .64, rect.y + rect.h * .04],
-          [rect.x + rect.w * .96, rect.y + rect.h * .42],
-          [rect.x + rect.w * .82, rect.y + rect.h * .9],
-          [rect.x + rect.w * .3, rect.y + rect.h * .98],
-          [rect.x + rect.w * .02, rect.y + rect.h * .55],
+          [local.x + local.w * .18, local.y + local.h * .15],
+          [local.x + local.w * .64, local.y + local.h * .04],
+          [local.x + local.w * .96, local.y + local.h * .42],
+          [local.x + local.w * .82, local.y + local.h * .9],
+          [local.x + local.w * .3, local.y + local.h * .98],
+          [local.x + local.w * .02, local.y + local.h * .55],
         ];
         ctx.beginPath();
         points.forEach(([px, py], index) => {
@@ -9797,27 +9960,41 @@ const MecFormModule = (() => {
         ctx.fill();
         ctx.stroke();
       } else {
-        ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+        ctx.fillRect(local.x, local.y, local.w, local.h);
+        ctx.strokeRect(local.x, local.y, local.w, local.h);
       }
+      if (court) _drawRecreationCourtMarkings(ctx, item, local, shape);
     } else {
-      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.fillRect(local.x, local.y, local.w, local.h);
+      ctx.strokeRect(local.x, local.y, local.w, local.h);
       if (item.type === 'gallery') {
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
-        ctx.moveTo(rect.x + 6, rect.y + rect.h / 2);
-        ctx.lineTo(rect.x + rect.w - 6, rect.y + rect.h / 2);
+        ctx.moveTo(local.x + 6, 0);
+        ctx.lineTo(local.x + local.w - 6, 0);
         ctx.stroke();
         ctx.setLineDash([]);
       }
+    }
+    if (selected) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(17,24,39,.55)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(local.x - 5, local.y - 5, local.w + 10, local.h + 10);
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(local.x + local.w + 8, local.y - 8, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#111827';
+      ctx.fill();
+      ctx.restore();
     }
     if (showLabel) {
       ctx.fillStyle = cfg.tone;
       ctx.font = _canvasFont(900, 9);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(_truncateLabel(ctx, item.ficha?.codigo || cfg.short, Math.max(20, rect.w - 4)), rect.x + rect.w / 2, rect.y + rect.h / 2);
+      ctx.fillText(_truncateLabel(ctx, item.ficha?.codigo || cfg.short, Math.max(20, local.w - 4)), 0, 0);
     }
     ctx.restore();
   }
@@ -9838,17 +10015,30 @@ const MecFormModule = (() => {
   function _drawSiteElements(ctx, logical, distanceItems = []) {
     _ensureSiteElements().forEach(item => {
       const rect = _siteElementRect(item, logical.width, logical.height);
+      const hitRect = _rotatedSiteElementBounds(rect, item);
       const selected = _selectedPlanId === `site::${item.id}`;
       const cfg = _siteElementConfig(item.type);
-      _planHitAreas.push({ id: `site::${item.id}`, type: 'site-element', siteId: item.id, x: rect.x, y: rect.y, w: rect.w, h: rect.h });
+      _planHitAreas.push({
+        id: `site::${item.id}`,
+        type: 'site-element',
+        siteId: item.id,
+        x: hitRect.x,
+        y: hitRect.y,
+        w: hitRect.w,
+        h: hitRect.h,
+        baseX: rect.x,
+        baseY: rect.y,
+        baseW: rect.w,
+        baseH: rect.h,
+      });
       distanceItems.push({
         id: `site::${item.id}`,
         type: 'site',
         label: item.ficha?.codigo || cfg.label,
-        x: rect.x,
-        y: rect.y,
-        w: rect.w,
-        h: rect.h,
+        x: hitRect.x,
+        y: hitRect.y,
+        w: hitRect.w,
+        h: hitRect.h,
         metersPerPx: 1,
       });
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
@@ -10773,7 +10963,7 @@ const MecFormModule = (() => {
       : [];
     const siteRects = _ensureSiteElements()
       .filter(item => item.id !== excludeId)
-      .map(item => _inflatePlanRect(_siteElementRect(item, logicalWidth, logicalHeight), 12, logicalWidth, logicalHeight));
+      .map(item => _inflatePlanRect(_rotatedSiteElementBounds(_siteElementRect(item, logicalWidth, logicalHeight), item), 12, logicalWidth, logicalHeight));
     return [...blockRects, ...siteRects];
   }
 
@@ -10903,6 +11093,10 @@ const MecFormModule = (() => {
                 <label>Estado</label>
                 ${_choiceButtons('estado', ['Bueno', 'Regular', 'Malo', 'En construccion', 'No verificable'], element.ficha.estado || 'Bueno')}
               </div>
+              <div class="form-group">
+                <label>Rotacion (grados)</label>
+                <input class="form-control" type="number" name="rotacion_grados" min="0" max="359" step="1" value="${_escape(element.ficha.rotacion_grados || '0')}" inputmode="decimal">
+              </div>
               ${type === 'recreation' ? `
                 <div class="form-group form-group--wide">
                   <label>Forma</label>
@@ -10963,13 +11157,20 @@ const MecFormModule = (() => {
       yRatio: position.yRatio,
       wRatio: position.wRatio,
       hRatio: position.hRatio,
+      rotationDeg: _normalizeSiteRotation(data.get('rotacion_grados')),
       ficha: _defaultSiteElementFicha(type, next, shape),
     };
     _siteElementFichaKeys(type).forEach(key => {
       if (data.has(key)) element.ficha[key] = String(data.get(key) || '').trim();
     });
+    element.ficha.rotacion_grados = String(element.rotationDeg);
     if (type === 'recreation') {
       element.ficha.forma = _recreationShapeLabel(shape);
+      const measuredSize = _siteElementSizeFromFicha(type, shape, element.ficha);
+      if (measuredSize) {
+        element.wRatio = measuredSize.wRatio;
+        element.hRatio = measuredSize.hRatio;
+      }
     }
     elements.push(element);
     closeNewSiteElementFicha();
@@ -10995,6 +11196,7 @@ const MecFormModule = (() => {
       yRatio: position.yRatio,
       wRatio: position.wRatio,
       hRatio: position.hRatio,
+      rotationDeg: 0,
       ficha: _defaultSiteElementFicha(type, next, normalizedShape),
     };
     elements.push(element);
@@ -11020,6 +11222,7 @@ const MecFormModule = (() => {
           <button class="modal__close" onclick="MecFormModule.closeRecreationShapePicker()">&times;</button>
         </div>
         <div class="modal__body">
+          <p class="mec-hint">Elija una forma libre o una cancha predefinida. Luego podra moverla, cambiar largo/ancho y rotarla en el plano general.</p>
           <div class="mec-shape-picker" role="group" aria-label="Forma del espacio de recreacion">
             ${RECREATION_SHAPES.map(shape => `
               <button class="mec-shape-button" type="button" onclick="MecFormModule.chooseRecreationShape('${_escape(shape.id)}', '${_escape(origin)}')">
@@ -11109,6 +11312,10 @@ const MecFormModule = (() => {
                 <label>Estado</label>
                 ${_choiceButtons('estado', ['Bueno', 'Regular', 'Malo', 'En construccion', 'No verificable'], element.ficha.estado || '')}
               </div>
+              <div class="form-group">
+                <label>Rotacion (grados)</label>
+                <input class="form-control" type="number" name="rotacion_grados" min="0" max="359" step="1" value="${_escape(element.ficha.rotacion_grados || String(_siteElementRotationDeg(element)))}" inputmode="decimal" ${disabled}>
+              </div>
               ${element.type === 'recreation' ? `
                 <div class="form-group form-group--wide">
                   <label>Forma</label>
@@ -11180,6 +11387,8 @@ const MecFormModule = (() => {
     _siteElementFichaKeys(element.type).forEach(key => {
       if (data.has(key)) element.ficha[key] = String(data.get(key) || '').trim();
     });
+    element.rotationDeg = _normalizeSiteRotation(element.ficha.rotacion_grados);
+    element.ficha.rotacion_grados = String(element.rotationDeg);
     const typeFromSubtype = SITE_ELEMENT_TYPES.find(item => item.label === element.ficha.subtipo);
     if (typeFromSubtype && typeFromSubtype.id !== element.type) {
       element.type = typeFromSubtype.id;
@@ -11188,7 +11397,7 @@ const MecFormModule = (() => {
         element.shape = _normalizeRecreationShape(element.ficha.forma);
         element.ficha.forma = _recreationShapeLabel(element.shape);
       }
-      const size = _siteElementDefaultSize(element.type, element.shape);
+      const size = _siteElementSizeFromFicha(element.type, element.shape, element.ficha) || _siteElementDefaultSize(element.type, element.shape);
       element.wRatio = size.wRatio;
       element.hRatio = size.hRatio;
     }
@@ -11201,7 +11410,7 @@ const MecFormModule = (() => {
         if (!Number(element.ficha.superficie_m2 || 0)) element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
         if (!Number(element.ficha.perimetro_m || 0)) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
       }
-      const size = _siteElementDefaultSize(element.type, element.shape);
+      const size = _siteElementSizeFromFicha(element.type, element.shape, element.ficha) || _siteElementDefaultSize(element.type, element.shape);
       element.wRatio = size.wRatio;
       element.hRatio = size.hRatio;
     }
@@ -11421,6 +11630,21 @@ const MecFormModule = (() => {
     return clamped;
   }
 
+  function rotatePlanSiteElement(elementId, delta = 15) {
+    const element = _ensureSiteElements().find(item => item.id === elementId);
+    if (!element) {
+      UI.showToast('Seleccione un elemento exterior para rotarlo.', 'warning');
+      return;
+    }
+    if (!_assertSiteElementUnlocked(element, 'rotarlo')) return;
+    element.rotationDeg = _normalizeSiteRotation(_siteElementRotationDeg(element) + Number(delta || 0));
+    element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
+    _selectedPlanId = `site::${element.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast(`Rotacion: ${element.rotationDeg} grados.`, 'success');
+  }
+
   function _bindSchoolPlanCanvas() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
@@ -11539,9 +11763,9 @@ const MecFormModule = (() => {
             type: pointerCandidate.type,
             blockId: pointerCandidate.blockId,
             siteId: pointerCandidate.siteId,
-            rect: { w: pointerCandidate.w, h: pointerCandidate.h },
-            offsetX: pointerStart.x - pointerCandidate.x,
-            offsetY: pointerStart.y - pointerCandidate.y,
+            rect: { w: pointerCandidate.baseW || pointerCandidate.w, h: pointerCandidate.baseH || pointerCandidate.h },
+            offsetX: pointerStart.x - (pointerCandidate.baseX ?? pointerCandidate.x),
+            offsetY: pointerStart.y - (pointerCandidate.baseY ?? pointerCandidate.y),
           };
           if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
           else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
@@ -13038,12 +13262,41 @@ const MecFormModule = (() => {
     _ensureSiteElements().forEach(item => {
       const rect = _siteElementRect(item, 900, height);
       const cfg = _siteElementConfig(item.type);
+      const rotation = _siteElementRotationDeg(item);
+      const cx = rect.x + rect.w / 2;
+      const cy = rect.y + rect.h / 2;
+      parts.push(`<g transform="rotate(${_escape(rotation)} ${cx} ${cy})">`);
       if (item.type === 'water_tank' || item.type === 'pillar') {
         parts.push(`<ellipse cx="${rect.x + rect.w / 2}" cy="${rect.y + rect.h / 2}" rx="${rect.w / 2}" ry="${rect.h / 2}" fill="#ffffff" stroke="${cfg.tone}" stroke-width="2"/>`);
+      } else if (item.type === 'recreation' && _recreationShapeConfig(item.shape || item.ficha?.forma).court) {
+        const x = rect.x;
+        const y = rect.y;
+        const w = rect.w;
+        const h = rect.h;
+        const court = _recreationShapeConfig(item.shape || item.ficha?.forma).court;
+        parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" fill-opacity=".78" stroke="${cfg.tone}" stroke-width="2"/>`);
+        parts.push(`<rect x="${x + w * .06}" y="${y + h * .08}" width="${w * .88}" height="${h * .84}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+        parts.push(`<line x1="${x + w / 2}" y1="${y + h * .08}" x2="${x + w / 2}" y2="${y + h * .92}" stroke="${cfg.tone}" stroke-width="1"/>`);
+        if (court === 'football') {
+          parts.push(`<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w * .09}" ry="${h * .18}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+          parts.push(`<rect x="${x + w * .06}" y="${y + h * .3}" width="${w * .14}" height="${h * .4}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+          parts.push(`<rect x="${x + w * .8}" y="${y + h * .3}" width="${w * .14}" height="${h * .4}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+        }
+        if (court === 'basketball') {
+          parts.push(`<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w * .06}" ry="${h * .16}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+          parts.push(`<rect x="${x + w * .06}" y="${y + h * .34}" width="${w * .18}" height="${h * .32}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+          parts.push(`<rect x="${x + w * .76}" y="${y + h * .34}" width="${w * .18}" height="${h * .32}" fill="none" stroke="${cfg.tone}" stroke-width="1"/>`);
+        }
+        if (court === 'tennis') {
+          parts.push(`<line x1="${x + w * .22}" y1="${y + h * .08}" x2="${x + w * .22}" y2="${y + h * .92}" stroke="${cfg.tone}" stroke-width="1"/>`);
+          parts.push(`<line x1="${x + w * .78}" y1="${y + h * .08}" x2="${x + w * .78}" y2="${y + h * .92}" stroke="${cfg.tone}" stroke-width="1"/>`);
+          parts.push(`<line x1="${x + w * .22}" y1="${y + h / 2}" x2="${x + w * .78}" y2="${y + h / 2}" stroke="${cfg.tone}" stroke-width="1"/>`);
+        }
       } else {
         parts.push(`<rect x="${rect.x}" y="${rect.y}" width="${rect.w}" height="${rect.h}" fill="#ffffff" fill-opacity=".78" stroke="${cfg.tone}" stroke-width="2"/>`);
       }
       parts.push(`<text x="${rect.x + rect.w / 2}" y="${rect.y + rect.h / 2 + 3}" font-family="system-ui" font-size="9" font-weight="900" text-anchor="middle" fill="${cfg.tone}">${_escape(item.ficha?.codigo || cfg.short)}</text>`);
+      parts.push('</g>');
     });
     parts.push('</svg>');
     return parts.join('');
@@ -13303,6 +13556,7 @@ const MecFormModule = (() => {
     saveSiteElementFicha,
     setSiteElementLocked,
     setSiteElementEvidence,
+    rotatePlanSiteElement,
     newPlanClassroom,
     addPlanSanitary,
     deletePlanSelection,
