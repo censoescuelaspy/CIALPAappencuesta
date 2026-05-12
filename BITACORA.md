@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de ubicacion inmediata de exteriores - 2026-05-12 - v2.5.56
+
+### Objetivo
+- Corregir el flujo donde tanque, pilar, espacio libre, galeria o recreacion abrian ficha pero no quedaban visibles ni ubicados en el plano general.
+
+### Cambios implementados
+- Los botones de exteriores ahora crean el objeto y lo ubican inmediatamente en un espacio libre del `Plano escuela`.
+- La ficha emergente se abre despues de crear y seleccionar el objeto, para completar caracteristicas y estado sin perder la ubicacion.
+- Al crear un exterior se fuerza la capa `Exteriores` encendida, evitando que el elemento quede invisible si el filtro estaba desactivado.
+- Se mantiene el modo de movimiento activo y el centrado de la vista para poder arrastrar el elemento recien creado.
+- Para recreacion se conserva la pregunta previa de forma; una vez elegida, se crea el espacio y se abre su ficha.
+- Version y cache actualizados a `v2.5.56`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Proximos pasos
+- Probar en la app publicada que al tocar `+ Tanque`, `+ Pilar` o `+ Espacio` aparezca primero el objeto en el plano general y luego su ficha para completar datos.
+
+---
+
 ## Sesion de KPIs compactos en plano escuela - 2026-05-12 - v2.5.55
 
 ### Objetivo

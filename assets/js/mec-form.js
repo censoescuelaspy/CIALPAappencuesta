@@ -10821,6 +10821,32 @@ const MecFormModule = (() => {
     return true;
   }
 
+  function _createPlanSiteElement(type, origin = 'plan', shape = '') {
+    const cfg = _siteElementConfig(type);
+    if (!cfg) return null;
+    _planLayers.exteriores = true;
+    const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape || 'rectangle') : '';
+    const elements = _ensureSiteElements();
+    const next = elements.filter(item => item.type === type).length + 1;
+    const position = _siteElementBlankPosition(type, origin, normalizedShape);
+    const element = {
+      id: `site_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type,
+      shape: normalizedShape,
+      xRatio: position.xRatio,
+      yRatio: position.yRatio,
+      wRatio: position.wRatio,
+      hRatio: position.hRatio,
+      ficha: _defaultSiteElementFicha(type, next, normalizedShape),
+    };
+    elements.push(element);
+    _saveDraft(false);
+    _showSchoolPlanAfterSiteInsert(element);
+    setTimeout(() => openSiteElementFicha(element.id), 180);
+    UI.showToast(`${cfg.label} ubicado en el plano general. Complete la ficha y luego muevalo si hace falta.`, 'success', 5600);
+    return element;
+  }
+
   function openRecreationShapePicker(origin = 'plan') {
     const modalId = 'modal-recreation-shape-picker';
     document.getElementById(modalId)?.remove();
@@ -10864,15 +10890,19 @@ const MecFormModule = (() => {
   function addPlanSiteElement(type, origin = 'plan', shape = '') {
     const cfg = _siteElementConfig(type);
     if (!cfg) return;
+    if (type === 'recreation' && !shape) {
+      openRecreationShapePicker(origin);
+      return;
+    }
     const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape) : '';
-    const openFicha = () => openNewSiteElementFicha(type, origin, normalizedShape);
+    const createAndEdit = () => _createPlanSiteElement(type, origin, normalizedShape);
     if (_activeModuleId !== 'plano') {
       selectModule('plano');
-      setTimeout(openFicha, 90);
+      setTimeout(createAndEdit, 120);
       return;
     }
     renderSchoolPlan();
-    setTimeout(openFicha, 0);
+    setTimeout(createAndEdit, 0);
   }
 
   function openSiteElementFicha(id) {
