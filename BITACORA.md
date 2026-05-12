@@ -4,6 +4,31 @@
 
 ---
 
+## Sesion de fichas previas y ubicacion libre de exteriores - 2026-05-12 - v2.5.54
+
+### Objetivo
+- Corregir la insercion de pilares, tanques y espacios recreativos para que no queden invisibles o perdidos en el plano, y exigir ficha de caracteristicas/estado antes de crear el elemento.
+
+### Cambios implementados
+- Los botones de elementos exteriores ahora llevan a `Plano escuela` y abren primero una ficha emergente de creacion; el elemento aparece recien al confirmar `Crear y ubicar`.
+- La ubicacion inicial ya no usa una coordenada fija: se calcula un espacio libre evitando bloques y otros exteriores, con seleccion automatica del nuevo objeto.
+- Al crear exteriores se activa el modo de movimiento del plano para poder arrastrar inmediatamente el tanque, pilar, galeria, espacio libre o recreacion.
+- Las fichas de exteriores ahora tienen campos especificos por tipo: tanque con capacidad/material/soporte/tapa/alimentacion; pilar con material/seccion/estabilidad/fisuras; recreacion con forma, uso, cubierta, estructura, piso, cerramiento, drenaje, iluminacion y dimensiones.
+- Los espacios de recreacion conservan botones de forma para rectangulo, circulo, ovalo, triangulo y poligono, y contemplan `Tinglado` como uso principal configurable.
+- Version y cache actualizados a `v2.5.54`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Proximos pasos
+- Probar en tablet la secuencia: tocar `+ Tanque` o `+ Pilar`, completar ficha, crear y arrastrar en plano general.
+- Evaluar un editor real de vertices para poligonos recreativos complejos cuando se necesiten tinglados o patios con geometria irregular exacta.
+
+---
+
 ## Sesion de insercion directa de exteriores y formas de recreacion - 2026-05-12 - v2.5.53
 
 ### Objetivo
