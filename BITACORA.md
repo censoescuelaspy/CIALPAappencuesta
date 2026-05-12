@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de rotacion integral y botones consolidados - 2026-05-12 - v2.5.62
+
+### Objetivo
+- Permitir girar bloques, aulas, sanitarios y otros espacios desde el plano general.
+- Reforzar que bibliotecas, cantinas, tinglados, canchas y espacios especiales se carguen como ambientes editables tipo aula.
+- Reducir botones repetidos en las acciones rapidas del plano.
+
+### Cambios implementados
+- Se agregaron manijas de rotacion para bloques, aulas/otros espacios y sanitarios; tambien quedan acciones rapidas `Girar -15`, `Girar +15` y `0 grados`.
+- La rotacion se guarda como `rotationDeg` y `rotacion_grados`, y se conserva al exportar SVG y en las hojas PDF del plano.
+- Se agrego `Cancha` al selector `+ Otro espacio`, junto con biblioteca, cantina, tinglado, area recreativa, laboratorio, direccion/administracion y deposito.
+- Los hit areas, datos emergentes y guias de distancia toman en cuenta la rotacion para que la seleccion tactil coincida mejor con la figura visible.
+- Se consolido el boton `+ Exterior` en un selector unico, evitando repetir acciones de tanque, galeria, pilar y espacios libres en cada contexto.
+- Version y cache actualizados a `v2.5.62`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- `osacompile -l JavaScript` sobre `mec-form.js`, `app.js`, `config.js` y `sw.js` sin errores.
+- `node --check` no se ejecuto porque `node` no esta instalado en esta maquina.
+- Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; version visible `v2.5.62`, cache `cialpa-app-v2.5.62` y funciones de rotacion/exportacion presentes.
+
+---
+
 ## Sesion de espacios editables, rotacion por esquina y evidencias visibles - 2026-05-12 - v2.5.61
 
 ### Objetivo
