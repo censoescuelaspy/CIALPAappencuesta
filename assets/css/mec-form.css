@@ -458,6 +458,10 @@
 }
 
 .mec-option {
+  --choice-active-bg: #173b63;
+  --choice-active-border: #102a43;
+  --choice-active-text: #ffffff;
+  --choice-ring: rgba(23, 59, 99, .24);
   position: relative;
   min-height: 42px;
   display: flex;
@@ -828,6 +832,10 @@
 }
 
 .mec-choice {
+  --choice-active-bg: #173b63;
+  --choice-active-border: #102a43;
+  --choice-active-text: #ffffff;
+  --choice-ring: rgba(23, 59, 99, .24);
   min-height: 46px;
   padding: .62rem .7rem;
   border: 1px solid var(--choice-border, #d8e0ea);
@@ -2624,10 +2632,13 @@
 
 .mec-step--active,
 .mec-stage-button--active,
-.mec-choice--active,
-.mec-option--active,
 .mec-sketch-tool--active {
   box-shadow: inset 0 0 0 1px rgba(47, 128, 170, .12);
+}
+
+.mec-choice--active,
+.mec-option--active {
+  box-shadow: 0 0 0 2px var(--choice-ring, rgba(23, 59, 99, .24));
 }
 
 .mec-step--active,
@@ -2712,6 +2723,75 @@
   border-color: #d94a24 !important;
   background: #fff7ed !important;
   box-shadow: 0 0 0 2px rgba(217, 74, 36, .12);
+}
+
+.mec-section {
+  border-color: #bdcbe0;
+  border-left-color: #1d5f99;
+  background: #ffffff;
+}
+
+.mec-section:nth-of-type(odd) {
+  background: #f7fbff;
+}
+
+.mec-section:nth-of-type(even) {
+  border-left-color: #b45309;
+  background: #fffaf5;
+}
+
+.mec-field {
+  border-color: #cad6e5;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 1px 0 rgba(23, 32, 51, .04);
+}
+
+.mec-field:focus-within {
+  border-color: #2f80aa;
+  box-shadow: 0 0 0 2px rgba(47, 128, 170, .16);
+}
+
+.mec-canvas-hover-tooltip {
+  position: fixed;
+  z-index: 6000;
+  display: none;
+  width: max-content;
+  max-width: min(250px, calc(100vw - 24px));
+  padding: .55rem .65rem;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 7px;
+  background: #102033;
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .26);
+  pointer-events: none;
+}
+
+.mec-canvas-hover-tooltip--visible {
+  display: grid;
+  gap: .16rem;
+}
+
+.mec-canvas-hover-tooltip small {
+  color: #b9d4f5;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.mec-canvas-hover-tooltip strong {
+  font-size: .88rem;
+  line-height: 1.2;
+}
+
+.mec-canvas-hover-tooltip span {
+  color: #e6edf7;
+  font-size: .75rem;
+  line-height: 1.25;
+}
+
+.mec-canvas-hover-tooltip b {
+  color: #ffffff;
 }
 
 body.mec-drawing-fullscreen-active {

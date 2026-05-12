@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de colocacion pared/techo, contraste y fichas flotantes - 2026-05-12 - v2.5.47
+
+### Objetivo
+- Mejorar la agilidad del registro arquitectonico en campo, especialmente en la colocacion de iluminacion, ventiladores y lectura rapida de datos de cada elemento del plano.
+
+### Cambios implementados
+- Focos e iluminaciones y ventiladores ahora pueden quedar en techo o pared: si se arrastran cerca del borde se pegan a pared, y si se alejan vuelven a ubicacion de techo.
+- Los ventiladores colocados inicialmente en pared ya no quedan atrapados: al arrastrarlos hacia el interior del aula o sanitario se desprenden y se registran como `Techo`.
+- Agregado campo `Ubicacion` en fichas de foco/iluminacion y ventilador, tambien para objetos sanitarios cuando corresponde.
+- Al pasar el cursor sobre elementos del croquis, sanitarios o plano general aparece una ficha flotante compacta con codigo, tipo, estado, ubicacion, observaciones y fotos cuando existen.
+- Reforzado el contraste de secciones, bloques de preguntas y opciones seleccionadas para que la seleccion sea mas evidente en tablet y escritorio.
+- Version y cache actualizados a `v2.5.47`.
+
+### Validaciones ejecutadas
+- `node --check` en `mec-form.js`, `config.js` y `app.js`.
+- `git diff --check` sin errores; solo avisos esperados de normalizacion LF/CRLF.
+- `rg` para confirmar version/cache `v2.5.47` en `index.html`, `config.js` y `sw.js`.
+
+### Proximos pasos
+- Probar en tablet Android/iPad la colocacion de focos y ventiladores con dedo, confirmando que no se pegan a pared salvo al acercarse al borde.
+- Revisar con usuarios si la ficha flotante muestra suficiente informacion o si conviene agregar dimensiones/estado electrico por tipo de objeto.
+
+---
+
 ## Sesion de armonizacion visual y trazado expandido - 2026-05-11 - v2.5.46
 
 ### Objetivo

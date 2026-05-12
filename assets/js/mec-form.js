@@ -66,7 +66,9 @@ const MecFormModule = (() => {
   ];
 
   const POINT_SKETCH_TYPES = ['outlet', 'light', 'photo', 'fan', 'ac'];
-  const WALL_ANCHORED_POINT_TYPES = ['outlet', 'light', 'fan', 'ac'];
+  const WALL_ONLY_POINT_TYPES = ['outlet', 'ac'];
+  const CEILING_OR_WALL_POINT_TYPES = ['light', 'fan'];
+  const WALL_POINT_SNAP_DISTANCE = 18;
 
   const SANITARY_FIXTURES = [
     { id: 'toilet', field: 'inodoros', label: 'Inodoro', short: 'WC' },
@@ -2592,10 +2594,12 @@ const MecFormModule = (() => {
   }
 
   function _defaultSanitaryObjectFicha(item, type) {
+    const sketchDefaults = SKETCH_TOOLS.some(tool => tool.id === type) ? _defaultSketchFicha(type) : {};
     return {
+      ...sketchDefaults,
       codigo: _sanitaryObjectShort(type),
       subtipo: _sanitaryObjectLabel(type),
-      estado: item?.estado || 'Bueno',
+      estado: item?.estado || sketchDefaults.estado || 'Bueno',
       observacion: '',
       evidencias: [],
     };
@@ -2640,6 +2644,17 @@ const MecFormModule = (() => {
               'mec-choice-buttons--compact'
             )}
           </div>
+          ${_isCeilingOrWallPointObject(selected) ? `
+            <div class="form-group">
+              <label>Ubicacion</label>
+              ${_buttonChoiceGroup(
+                ['Techo', 'Pared'],
+                selected.ficha.ubicacion || 'Techo',
+                value => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(selected.id)}', 'ubicacion', '${_escape(value)}')`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+          ` : ''}
         </div>
         <label class="mec-label"><span>Observacion</span></label>
         <textarea class="form-control" rows="2"
@@ -2877,6 +2892,14 @@ const MecFormModule = (() => {
     if (!item || !object) return;
     object.ficha = { ..._defaultSanitaryObjectFicha(item, object.type), ...(object.ficha || {}) };
     object.ficha[key] = String(value || '').trim();
+    if (key === 'ubicacion' && _isCeilingOrWallPointObject(object)) {
+      const room = _sanitaryRoomObject(item);
+      if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
+      else if (room) {
+        object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
+        _clampPointInsideRoom(object, room, 10);
+      }
+    }
     _selectedSanitaryObjectId = object.id;
     _saveDraft(false);
     if (rerender) {
@@ -3336,6 +3359,7 @@ const MecFormModule = (() => {
       };
     };
     const begin = event => {
+      _hideCanvasHoverTooltip();
       if (event.touches?.length >= 2) {
         event.preventDefault();
         pinching = true;
@@ -3419,6 +3443,15 @@ const MecFormModule = (() => {
       }
       event.preventDefault();
       const point = pointFromEvent(event);
+      if (!resizingObject && !movingSanitary && !movingObject && !drawing) {
+        if (event.touches?.length) {
+          _hideCanvasHoverTooltip();
+          return;
+        }
+        _showCanvasHoverTooltip(event, _sketchHoverInfoAt(point));
+        return;
+      }
+      _hideCanvasHoverTooltip();
       if (resizingObject) {
         if (!dragHasStarted(point)) return;
         if (!mutationRecorded) {
@@ -3595,6 +3628,7 @@ const MecFormModule = (() => {
 
     canvas.addEventListener('mousedown', begin);
     canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseleave', _hideCanvasHoverTooltip);
     canvas.addEventListener('dblclick', createAt);
     canvas.addEventListener('touchstart', begin, { passive: false });
     canvas.addEventListener('touchmove', move, { passive: false });
@@ -3629,6 +3663,7 @@ const MecFormModule = (() => {
       };
     };
     const begin = event => {
+      _hideCanvasHoverTooltip();
       if (event.touches?.length >= 2) {
         event.preventDefault();
         pinching = true;
@@ -3715,9 +3750,17 @@ const MecFormModule = (() => {
         }
         return;
       }
-      if (!movingRoom && !movingObject && !resizing) return;
-      event.preventDefault();
       const point = pointFromEvent(event);
+      if (!movingRoom && !movingObject && !resizing) {
+        if (event.touches?.length) {
+          _hideCanvasHoverTooltip();
+          return;
+        }
+        _showCanvasHoverTooltip(event, _sanitaryHoverInfoAt(point));
+        return;
+      }
+      event.preventDefault();
+      _hideCanvasHoverTooltip();
       if (!dragHasStarted(point)) return;
       mutationRecorded = true;
       if (resizing) {
@@ -3761,6 +3804,7 @@ const MecFormModule = (() => {
     };
     canvas.addEventListener('mousedown', begin);
     canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseleave', _hideCanvasHoverTooltip);
     canvas.addEventListener('dblclick', event => {
       event.preventDefault();
       const point = pointFromEvent(event);
@@ -4871,6 +4915,7 @@ const MecFormModule = (() => {
   }
 
   function _sketchDimensionsText(object) {
+    if (!object) return '';
     if (_isPointSketchObject(object)) return '';
     if (['damage', 'pencil'].includes(object.type)) return '';
     const scale = _sketchScale();
@@ -4887,6 +4932,7 @@ const MecFormModule = (() => {
     if (object.type === 'door') {
       return `L${(_openingLengthPixels(object) * (['left', 'right'].includes(_openingSide(object)) ? scale.y : scale.x)).toFixed(2)}m`;
     }
+    if (object.w === undefined || object.h === undefined) return '';
     return `${(object.w * scale.x).toFixed(2)} x ${(object.h * scale.y).toFixed(2)}m`;
   }
 
@@ -5573,6 +5619,176 @@ const MecFormModule = (() => {
     return object && object.type !== 'room';
   }
 
+  function _canvasHoverTooltip() {
+    let tooltip = document.getElementById('mec-canvas-hover-tooltip');
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'mec-canvas-hover-tooltip';
+      tooltip.className = 'mec-canvas-hover-tooltip';
+      tooltip.setAttribute('role', 'status');
+      tooltip.setAttribute('aria-live', 'polite');
+      document.body.appendChild(tooltip);
+    }
+    return tooltip;
+  }
+
+  function _hideCanvasHoverTooltip() {
+    const tooltip = document.getElementById('mec-canvas-hover-tooltip');
+    if (tooltip) tooltip.classList.remove('mec-canvas-hover-tooltip--visible');
+  }
+
+  function _showCanvasHoverTooltip(event, info) {
+    if (!event || !info) {
+      _hideCanvasHoverTooltip();
+      return;
+    }
+    const rows = (info.rows || [])
+      .filter(row => row && row.value !== undefined && row.value !== null && String(row.value).trim() !== '')
+      .slice(0, 6);
+    const tooltip = _canvasHoverTooltip();
+    tooltip.innerHTML = `
+      <small>${_escape(info.subtitle || 'Elemento')}</small>
+      <strong>${_escape(info.title || 'Sin codigo')}</strong>
+      ${rows.map(row => `<span><b>${_escape(row.label)}:</b> ${_escape(row.value)}</span>`).join('')}`;
+    tooltip.classList.add('mec-canvas-hover-tooltip--visible');
+    const gap = 14;
+    const width = tooltip.offsetWidth || 220;
+    const height = tooltip.offsetHeight || 110;
+    const left = Math.min(window.innerWidth - width - 8, event.clientX + gap);
+    const top = Math.min(window.innerHeight - height - 8, event.clientY + gap);
+    tooltip.style.left = `${Math.max(8, left)}px`;
+    tooltip.style.top = `${Math.max(8, top)}px`;
+  }
+
+  function _tooltipValue(value) {
+    if (Array.isArray(value)) return value.length ? `${value.length} foto(s)` : '';
+    return String(value ?? '').trim();
+  }
+
+  function _tooltipRowsFromFicha(ficha = {}, extraRows = []) {
+    const rows = [
+      ...extraRows,
+      { label: 'Codigo', value: ficha.codigo },
+      { label: 'Tipo', value: ficha.subtipo || ficha.artefacto },
+      { label: 'Estado', value: ficha.estado },
+      { label: 'Ubicacion', value: ficha.ubicacion || ficha.sector },
+      { label: 'Funcionamiento', value: ficha.funcionamiento },
+      { label: 'Seguridad', value: ficha.seguridad || ficha.prioridad },
+      { label: 'Obs.', value: ficha.observacion },
+      { label: 'Fotos', value: _tooltipValue(ficha.evidencias) },
+    ];
+    return rows
+      .map(row => ({ ...row, value: _tooltipValue(row.value) }))
+      .filter(row => row.value);
+  }
+
+  function _objectTooltipInfo(object, labeler = _sketchLabel, context = 'Elemento') {
+    if (!object) return null;
+    const ficha = object.ficha || {};
+    const typeLabel = labeler(object.type) || _sketchLabel(object.type);
+    const dimensions = !_isPointSketchObject(object) ? _sketchDimensionsText(object) : '';
+    return {
+      title: ficha.codigo || object.label || typeLabel,
+      subtitle: `${context} - ${typeLabel}`,
+      rows: _tooltipRowsFromFicha(ficha, [
+        { label: 'Medidas', value: dimensions },
+      ]),
+    };
+  }
+
+  function _classroomTooltipInfo(room, object = null) {
+    if (!room) return null;
+    const block = _blockById(room.blockId);
+    return {
+      title: room.name || room.codigo || 'Aula',
+      subtitle: 'Aula',
+      rows: [
+        { label: 'Bloque', value: block?.bloque_codigo || room.blockName || '' },
+        { label: 'Piso', value: room.floor || '' },
+        { label: 'Medidas', value: room.length && room.width ? `${room.length} x ${room.width} m` : _sketchDimensionsText(object || {}) },
+        { label: 'Estado', value: room.estado || '' },
+        { label: 'Uso', value: room.uso || room.tipo || '' },
+      ].filter(row => row.value),
+    };
+  }
+
+  function _sanitaryTooltipInfo(item) {
+    if (!item) return null;
+    return {
+      title: item.codigo || 'Sanitario',
+      subtitle: 'Sanitario',
+      rows: [
+        { label: 'Bloque', value: item.bloque || '' },
+        { label: 'Piso', value: item.planta || '' },
+        { label: 'Medidas', value: item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : '' },
+        { label: 'Estado', value: item.estado || '' },
+        { label: 'Accesible', value: item.accesible || '' },
+      ].filter(row => row.value),
+    };
+  }
+
+  function _activeClassroomTooltipInfo(object = null) {
+    const room = (_data.__classrooms || []).find(item => item.id === _activeClassroomId) || _data.__classroomSketch;
+    return _classroomTooltipInfo(room, object || _activeSketchRoomObject());
+  }
+
+  function _sketchHoverInfoAt(point) {
+    const object = _findSketchObjectAt(point);
+    if (object) return object.type === 'room' ? _activeClassroomTooltipInfo(object) : _objectTooltipInfo(object, _sketchLabel, 'Aula activa');
+    const sanitaryHit = _findContextSanitaryAt(point);
+    if (sanitaryHit) return _sanitaryTooltipInfo(sanitaryHit.item);
+    const classroomHit = _findContextClassroomAt(point);
+    if (classroomHit) return _classroomTooltipInfo(classroomHit.room, classroomHit.object);
+    return null;
+  }
+
+  function _sanitaryHoverInfoAt(point) {
+    const childHit = _findSanitaryChildObjectAt(point);
+    if (childHit) return _objectTooltipInfo(childHit.object, _sanitaryObjectLabel, childHit.item?.codigo || 'Sanitario');
+    const sanitaryHit = _findContextSanitaryAt(point);
+    if (sanitaryHit) return _sanitaryTooltipInfo(sanitaryHit.item);
+    const classroomHit = _findContextClassroomAt(point);
+    if (classroomHit) return _classroomTooltipInfo(classroomHit.room, classroomHit.object);
+    return null;
+  }
+
+  function _planHoverInfo(area) {
+    if (!area) return null;
+    if (area.type === 'block') {
+      const block = _blockById(area.blockId);
+      if (!block) return null;
+      return {
+        title: block.bloque_codigo || 'Bloque',
+        subtitle: 'Bloque',
+        rows: [
+          { label: 'Estado', value: block.estado_bloque || '' },
+          { label: 'Plantas', value: block.cantidad_plantas || '' },
+          { label: 'Medidas', value: block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : '' },
+          { label: 'Circulacion', value: block.tipo_circulacion || '' },
+        ].filter(row => row.value),
+      };
+    }
+    if (area.type === 'room') {
+      const room = (_data.__classrooms || []).find(item => item.id === area.roomId);
+      return _classroomTooltipInfo(room, _roomObjectForClassroom(room));
+    }
+    if (area.type === 'sanitary') {
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === area.sanitaryId);
+      return _sanitaryTooltipInfo(item);
+    }
+    if (area.sanitaryId && area.objectId) {
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === area.sanitaryId);
+      const object = (item?.objects || []).find(child => child.id === area.objectId);
+      return _objectTooltipInfo(object, _sanitaryObjectLabel, item?.codigo || 'Sanitario');
+    }
+    if (area.roomId && area.objectId) {
+      const room = (_data.__classrooms || []).find(item => item.id === area.roomId);
+      const object = (room?.objects || []).find(child => child.id === area.objectId);
+      return _objectTooltipInfo(object, _sketchLabel, room?.name || 'Aula');
+    }
+    return null;
+  }
+
   function _findResizeHandleAt(point) {
     _ensureSketchObjects();
     for (const object of [..._data.__classroomSketch.objects].reverse()) {
@@ -5733,7 +5949,21 @@ const MecFormModule = (() => {
 
   function _isWallAnchoredPointObject(objectOrType) {
     const type = typeof objectOrType === 'string' ? objectOrType : objectOrType?.type;
-    return WALL_ANCHORED_POINT_TYPES.includes(type);
+    if (WALL_ONLY_POINT_TYPES.includes(type)) return true;
+    if (!CEILING_OR_WALL_POINT_TYPES.includes(type)) return false;
+    if (typeof objectOrType === 'string') return true;
+    return objectOrType?.attached?.type === 'wall-point' || objectOrType?.ficha?.ubicacion === 'Pared';
+  }
+
+  function _isCeilingOrWallPointObject(objectOrType) {
+    const type = typeof objectOrType === 'string' ? objectOrType : objectOrType?.type;
+    return CEILING_OR_WALL_POINT_TYPES.includes(type);
+  }
+
+  function _setPointPlacement(object, placement) {
+    if (!object || !_isPointSketchObject(object)) return;
+    object.ficha = object.ficha || _defaultSketchFicha(object.type);
+    object.ficha.ubicacion = placement;
   }
 
   function _clampPointInsideRoom(object, room, padding = 6) {
@@ -5743,9 +5973,12 @@ const MecFormModule = (() => {
     return object;
   }
 
-  function _snapPointToRoomWall(object, room) {
+  function _snapPointToRoomWall(object, room, options = {}) {
     if (!object || !room) return object;
-    if (!_isWallAnchoredPointObject(object)) {
+    const forceWall = Boolean(options.forceWall);
+    const wallOnly = WALL_ONLY_POINT_TYPES.includes(object.type);
+    const wallOrCeiling = _isCeilingOrWallPointObject(object);
+    if (!wallOnly && !wallOrCeiling) {
       object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
       return _clampPointInsideRoom(object, room);
     }
@@ -5757,7 +5990,13 @@ const MecFormModule = (() => {
       { side: 'left', value: Math.abs(px - room.x) },
       { side: 'right', value: Math.abs(px - (room.x + room.w)) },
     ].sort((a, b) => a.value - b.value);
-    const side = distances[0]?.side || object.attached?.side || 'top';
+    const nearest = distances[0];
+    if (wallOrCeiling && !wallOnly && !forceWall && (!nearest || nearest.value > WALL_POINT_SNAP_DISTANCE)) {
+      object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
+      _setPointPlacement(object, 'Techo');
+      return _clampPointInsideRoom(object, room, 10);
+    }
+    const side = nearest?.side || object.attached?.side || 'top';
     if (side === 'top') {
       object.x = Math.round(px);
       object.y = Math.round(room.y);
@@ -5778,6 +6017,7 @@ const MecFormModule = (() => {
       side,
       ratio: axisSize ? Math.max(0, Math.min(1, axisOffset / axisSize)) : 0,
     };
+    _setPointPlacement(object, 'Pared');
     return object;
   }
 
@@ -6492,13 +6732,19 @@ const MecFormModule = (() => {
       light: {
         title: 'Ficha de iluminacion',
         typeOptions: ['Foco LED', 'Tubo fluorescente', 'Panel', 'Artefacto colgante', 'No verificable', 'Otro'],
-        extra: [{ key: 'funcionamiento', label: 'Funcionamiento', options: ['Funciona', 'Intermitente', 'No funciona', 'No verificable'] }],
+        extra: [
+          { key: 'ubicacion', label: 'Ubicacion', options: ['Techo', 'Pared'] },
+          { key: 'funcionamiento', label: 'Funcionamiento', options: ['Funciona', 'Intermitente', 'No funciona', 'No verificable'] },
+        ],
         ...common,
       },
       fan: {
         title: 'Ficha de ventilador',
         typeOptions: ['Techo', 'Pared', 'Pie', 'Extractor', 'No verificable', 'Otro'],
-        extra: [{ key: 'funcionamiento', label: 'Funcionamiento', options: ['Funciona', 'Intermitente', 'No funciona', 'No verificable'] }],
+        extra: [
+          { key: 'ubicacion', label: 'Ubicacion', options: ['Techo', 'Pared'] },
+          { key: 'funcionamiento', label: 'Funcionamiento', options: ['Funciona', 'Intermitente', 'No funciona', 'No verificable'] },
+        ],
         ...common,
       },
       ac: {
@@ -6542,11 +6788,11 @@ const MecFormModule = (() => {
 
   function _defaultSketchFicha(type) {
     const defaults = {
-      outlet: { codigo: 'TC', subtipo: 'Simple', estado: 'Bueno', seguridad: 'Seguro' },
+      outlet: { codigo: 'TC', subtipo: 'Simple', estado: 'Bueno', ubicacion: 'Pared', seguridad: 'Seguro' },
       wall: { codigo: 'Pared', subtipo: 'Mamposteria', estado: 'Bueno', estabilidad: 'Estable' },
-      light: { codigo: 'Foco', subtipo: 'Foco LED', estado: 'Bueno', funcionamiento: 'Funciona' },
-      fan: { codigo: 'Vent', subtipo: 'Techo', estado: 'Bueno', funcionamiento: 'Funciona' },
-      ac: { codigo: 'AA', subtipo: 'Split', estado: 'Bueno', capacidad: '12000 BTU', funcionamiento: 'Funciona' },
+      light: { codigo: 'Foco', subtipo: 'Foco LED', estado: 'Bueno', ubicacion: 'Techo', funcionamiento: 'Funciona' },
+      fan: { codigo: 'Vent', subtipo: 'Techo', estado: 'Bueno', ubicacion: 'Techo', funcionamiento: 'Funciona' },
+      ac: { codigo: 'AA', subtipo: 'Split', estado: 'Bueno', ubicacion: 'Pared', capacidad: '12000 BTU', funcionamiento: 'Funciona' },
       damage: { codigo: 'Daño', subtipo: 'Fisura', estado: 'Leve', prioridad: 'Media' },
       board: { codigo: 'Piz', subtipo: 'Tiza', estado: 'Bueno' },
       stair: { codigo: 'Esc', subtipo: 'Recta', estado: 'Bueno' },
@@ -6726,12 +6972,20 @@ const MecFormModule = (() => {
     const object = _findSketchObjectById(data.get('object_id'));
     if (!object) return false;
     object.ficha = object.ficha || {};
-    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'altura_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'bisagra', 'seguridad', 'pasamanos', 'prioridad', 'sector', 'accion_recomendada', 'funcionamiento', 'tapa', 'puesta_tierra', 'estabilidad', 'observacion']
+    ['codigo', 'subtipo', 'estado', 'material', 'largo_m', 'ancho_m', 'alto_m', 'altura_m', 'tiene_reja', 'ventila', 'cerradura', 'abre_hacia', 'bisagra', 'seguridad', 'pasamanos', 'prioridad', 'sector', 'accion_recomendada', 'ubicacion', 'funcionamiento', 'tapa', 'puesta_tierra', 'estabilidad', 'observacion']
       .forEach(key => {
         if (data.has(key)) object.ficha[key] = String(data.get(key) || '').trim();
       });
     if (data.has('largo_m') || data.has('ancho_m') || data.has('alto_m')) {
       _applyObjectMeters(object, object.ficha.largo_m || object.ficha.ancho_m, object.ficha.alto_m);
+    }
+    if (_isCeilingOrWallPointObject(object) && data.has('ubicacion')) {
+      const room = _activeSketchRoomObject();
+      if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
+      else if (room) {
+        object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
+        _clampPointInsideRoom(object, room, 10);
+      }
     }
     _saveDraft(false);
     _redrawSketchCanvas();
@@ -8657,8 +8911,8 @@ const MecFormModule = (() => {
     if (type === 'window') return { x: center.x, y: roomObject.y + 4 };
     if (type === 'board') return { x: center.x, y: roomObject.y + 22 };
     if (type === 'outlet') return { x: roomObject.x + 22, y: center.y };
-    if (type === 'light') return { x: center.x, y: roomObject.y + 4 };
-    if (type === 'fan') return { x: roomObject.x + roomObject.w - 28, y: roomObject.y + 4 };
+    if (type === 'light') return { x: center.x, y: center.y };
+    if (type === 'fan') return { x: Math.min(roomObject.x + roomObject.w - 28, center.x + 28), y: center.y };
     if (type === 'ac') return { x: roomObject.x + roomObject.w - 28, y: center.y };
     if (type === 'damage') return { x: roomObject.x + roomObject.w - 28, y: roomObject.y + 28 };
     if (type === 'stair') return { x: roomObject.x + roomObject.w - 54, y: roomObject.y + roomObject.h - 34 };
@@ -8940,6 +9194,7 @@ const MecFormModule = (() => {
     const isSelectableArea = area => Boolean(area?.id);
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     canvas.addEventListener('pointerdown', event => {
+      _hideCanvasHoverTooltip();
       rememberPointer(event);
       if (event.pointerType === 'touch' && activePointers.size >= 2) {
         planPinch = {
@@ -8980,7 +9235,11 @@ const MecFormModule = (() => {
         event.preventDefault();
         return;
       }
-      if (!pointerCandidate) return;
+      if (!pointerCandidate) {
+        if (event.pointerType !== 'touch') _showCanvasHoverTooltip(event, _planHoverInfo(hit(event)));
+        return;
+      }
+      _hideCanvasHoverTooltip();
       if (movedTooFar(pointerStart, currentPoint)) {
         if (_planMoveMode && pointerCandidate.type === 'block') {
           blockDrag = {
@@ -9038,6 +9297,7 @@ const MecFormModule = (() => {
       blockDrag = null;
       _activePlanDrag = null;
     });
+    canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);
     canvas.addEventListener('click', event => {
       if (suppressClick || Date.now() < suppressClickUntil) return;
       const area = hit(event);

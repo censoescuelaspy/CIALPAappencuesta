@@ -2863,10 +2863,28 @@ textarea.form-control {
 
 .choice-button--active,
 .choice-button[aria-pressed="true"] {
-  background: #e8f2fb;
-  border-color: #2f80aa;
-  color: #173b63;
-  box-shadow: inset 0 0 0 1px rgba(47, 128, 170, .12);
+  background: #173b63 !important;
+  border-color: #102a43;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 2px rgba(23, 59, 99, .22);
+}
+
+.choice-button--danger.choice-button--active,
+.choice-button--danger[aria-pressed="true"] {
+  border-color: var(--color-danger);
+  background: var(--color-danger) !important;
+}
+
+.choice-button--warning.choice-button--active,
+.choice-button--warning[aria-pressed="true"] {
+  border-color: var(--color-warning);
+  background: var(--color-warning) !important;
+}
+
+.choice-button--success.choice-button--active,
+.choice-button--success[aria-pressed="true"] {
+  border-color: var(--color-success);
+  background: var(--color-success) !important;
 }
 
 .map-layout,
