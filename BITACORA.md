@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de actualizacion y datos emergentes controlables - 2026-05-12 - v2.5.59
+
+### Objetivo
+- Resolver que los cambios de datos emergentes no surtian efecto por estar aplicados sobre una copia local anterior a la version publicada.
+- Publicar la mejora sobre la base vigente `v2.5.58`, conservando los avances recientes de exteriores, recreacion y fichas completas.
+
+### Cambios implementados
+- Se sincronizo la base local con `origin/main` antes de reimplementar cambios, evitando pisar la version publicada.
+- Se agrego la capa `Datos emergentes` en el plano general para activar/desactivar las fichas flotantes.
+- En escritorio, los datos emergen al pasar el cursor sobre elementos del plano general; en tablet/celular aparecen al tocar el elemento.
+- La ficha emergente de bloques ahora incluye datos electricos clave: acometida, medidor, tablero, llave termomagnetica, diferencial y tableros dibujados.
+- Las fichas emergentes de aulas y sanitarios ahora muestran conteos de aberturas, elementos electricos/equipos, danos, artefactos, cabinas, area y evidencias asociadas.
+- Se agrego capa `Sanitarios` para mostrar/ocultar sanitarios en el plano general sin depender de otras capas.
+- Version y cache actualizados a `v2.5.59`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- `node --check` no disponible en este equipo local (`node: command not found`); se uso validacion alternativa.
+- Parseo con `osascript -l JavaScript` de `mec-form.js` y `config.js` sin errores.
+- Compilacion con `osacompile -l JavaScript` de `app.js` y `sw.js` sin errores.
+- Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js`, `mec-form.css` y `sw.js`; version visible `v2.5.59` y cache `cialpa-app-v2.5.59`.
+
+---
+
 ## Sesion de ficha completa para exteriores y recreacion - 2026-05-12 - v2.5.58
 
 ### Objetivo

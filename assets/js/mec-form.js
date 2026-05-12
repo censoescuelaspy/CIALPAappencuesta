@@ -31,11 +31,13 @@ const MecFormModule = (() => {
   const _sketchRedo = [];
   const _planLayers = {
     aulas: true,
+    sanitarios: true,
     aberturas: true,
     electricidad: true,
     danos: true,
     exteriores: true,
     etiquetas: true,
+    datos: true,
   };
 
   const SKETCH_CANVAS = { width: 760, height: 460 };
@@ -6696,7 +6698,7 @@ const MecFormModule = (() => {
     }
     const rows = (info.rows || [])
       .filter(row => row && row.value !== undefined && row.value !== null && String(row.value).trim() !== '')
-      .slice(0, 6);
+      .slice(0, 10);
     const tooltip = _canvasHoverTooltip();
     tooltip.innerHTML = `
       <small>${_escape(info.subtitle || 'Elemento')}</small>
@@ -6735,6 +6737,25 @@ const MecFormModule = (() => {
       .filter(row => row.value);
   }
 
+  function _tooltipEvidenceCount(objects = []) {
+    return (objects || []).reduce((sum, object) => {
+      const evidencias = object?.ficha?.evidencias;
+      return sum + (Array.isArray(evidencias) ? evidencias.length : 0);
+    }, 0);
+  }
+
+  function _tooltipCountText(count, label) {
+    const number = Number(count || 0);
+    return number > 0 ? `${number} ${label}` : '';
+  }
+
+  function _tooltipPlanArea(length, width) {
+    const l = Number(length || 0);
+    const w = Number(width || 0);
+    if (!l || !w) return '';
+    return `${(l * w).toFixed(2)} m2`;
+  }
+
   function _objectTooltipInfo(object, labeler = _sketchLabel, context = 'Elemento') {
     if (!object) return null;
     const ficha = object.ficha || {};
@@ -6752,6 +6773,12 @@ const MecFormModule = (() => {
   function _classroomTooltipInfo(room, object = null) {
     if (!room) return null;
     const block = _blockById(room.blockId);
+    const objects = room.objects || [];
+    const doors = objects.filter(item => item.type === 'door').length;
+    const windows = objects.filter(item => item.type === 'window').length;
+    const electric = objects.filter(item => ['outlet', 'light', 'fan', 'ac', 'switchboard'].includes(item.type)).length;
+    const damages = objects.filter(item => item.type === 'damage').length;
+    const photos = _tooltipEvidenceCount(objects);
     return {
       title: room.name || room.codigo || 'Aula',
       subtitle: 'Aula',
@@ -6759,7 +6786,12 @@ const MecFormModule = (() => {
         { label: 'Bloque', value: block?.bloque_codigo || room.blockName || '' },
         { label: 'Piso', value: room.floor || '' },
         { label: 'Medidas', value: room.length && room.width ? `${room.length} x ${room.width} m` : _sketchDimensionsText(object || {}) },
+        { label: 'Area', value: _tooltipPlanArea(room.length, room.width) },
         { label: 'Estado', value: room.estado || '' },
+        { label: 'Aberturas', value: doors || windows ? `${doors} puerta(s), ${windows} ventana(s)` : '' },
+        { label: 'Electricidad', value: _tooltipCountText(electric, 'elemento(s)') },
+        { label: 'Daños', value: _tooltipCountText(damages, 'marca(s)') },
+        { label: 'Fotos', value: _tooltipCountText(photos, 'evidencia(s)') },
         { label: 'Bloqueo', value: _isClassroomLocked(room) ? 'Bloqueada contra edicion' : '' },
         { label: 'Uso', value: room.uso || room.tipo || '' },
       ].filter(row => row.value),
@@ -6768,6 +6800,12 @@ const MecFormModule = (() => {
 
   function _sanitaryTooltipInfo(item) {
     if (!item) return null;
+    const objects = item.objects || [];
+    const stalls = objects.filter(object => object.type === 'stall').length;
+    const fixtures = objects.filter(object => ['toilet', 'sink', 'urinal', 'shower'].includes(object.type)).length;
+    const doors = objects.filter(object => object.type === 'door').length;
+    const windows = objects.filter(object => object.type === 'window').length;
+    const photos = _tooltipEvidenceCount(objects);
     return {
       title: item.codigo || 'Sanitario',
       subtitle: 'Sanitario',
@@ -6775,8 +6813,13 @@ const MecFormModule = (() => {
         { label: 'Bloque', value: item.bloque || '' },
         { label: 'Piso', value: item.planta || '' },
         { label: 'Medidas', value: item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : '' },
+        { label: 'Area', value: _tooltipPlanArea(item.largo_m, item.ancho_m) },
         { label: 'Estado', value: item.estado || '' },
         { label: 'Accesible', value: item.accesible || '' },
+        { label: 'Cabinas', value: _tooltipCountText(stalls, 'cabina(s)') },
+        { label: 'Artefactos', value: _tooltipCountText(fixtures, 'artefacto(s)') },
+        { label: 'Aberturas', value: doors || windows ? `${doors} puerta(s), ${windows} ventana(s)` : '' },
+        { label: 'Fotos', value: _tooltipCountText(photos, 'evidencia(s)') },
       ].filter(row => row.value),
     };
   }
@@ -6826,6 +6869,11 @@ const MecFormModule = (() => {
     if (area.type === 'block') {
       const block = _blockById(area.blockId);
       if (!block) return null;
+      const blockRooms = (_data.__classrooms || []).filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+      const blockSanitaries = (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
+      const siteElements = (_data.__siteElements || []).length;
+      const doors = blockRooms.reduce((sum, room) => sum + (room.objects || []).filter(object => object.type === 'door').length, 0);
+      const switchboards = blockRooms.reduce((sum, room) => sum + (room.objects || []).filter(object => object.type === 'switchboard').length, 0);
       return {
         title: block.bloque_codigo || 'Bloque',
         subtitle: 'Bloque',
@@ -6833,7 +6881,17 @@ const MecFormModule = (() => {
           { label: 'Estado', value: block.estado_bloque || '' },
           { label: 'Plantas', value: block.cantidad_plantas || '' },
           { label: 'Medidas', value: block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : '' },
+          { label: 'Area base', value: _tooltipPlanArea(block.largo_m, block.ancho_m) },
+          { label: 'Ambientes', value: blockRooms.length ? `${blockRooms.length} aula/espacio(s), ${blockSanitaries.length} sanitario(s)` : '' },
+          { label: 'Exteriores', value: _tooltipCountText(siteElements, 'elemento(s)') },
+          { label: 'Accesos', value: _tooltipCountText(doors, 'puerta(s)') },
           { label: 'Circulacion', value: block.tipo_circulacion || '' },
+          { label: 'Acometida', value: block.acometida_tipo || '' },
+          { label: 'Medidor', value: block.medidor_estado || '' },
+          { label: 'Tablero', value: block.tablero_estado || '' },
+          { label: 'Tableros dibujados', value: _tooltipCountText(switchboards, 'tablero(s)') },
+          { label: 'Llave TM', value: block.llave_termomagnetica || '' },
+          { label: 'Diferencial', value: block.proteccion_diferencial || '' },
         ].filter(row => row.value),
       };
     }
@@ -8950,17 +9008,20 @@ const MecFormModule = (() => {
   function _planLayerLabel(key) {
     return {
       aulas: 'Aulas',
+      sanitarios: 'Sanitarios',
       aberturas: 'Puertas/Ventanas',
       electricidad: 'Electricidad/equipos',
       danos: 'Daños/obs.',
       exteriores: 'Exteriores',
       etiquetas: 'Etiquetas',
+      datos: 'Datos emergentes',
     }[key] || key;
   }
 
   function togglePlanLayer(key, enabled) {
     if (!(key in _planLayers)) return;
     _planLayers[key] = Boolean(enabled);
+    if (key === 'datos' && !_planLayers.datos) _hideCanvasHoverTooltip();
     _drawSchoolPlan();
   }
 
@@ -9588,20 +9649,24 @@ const MecFormModule = (() => {
           h: item.h,
           metersPerPx: floorMetersPerPx,
         }));
-        sanitaryItems.forEach(item => distanceItems.push({
-          id: `sanitary::${item.sanitary.id}`,
-          type: 'sanitary',
-          label: item.sanitary.codigo || 'Sanitario',
-          x: item.x,
-          y: item.y,
-          w: item.w,
-          h: item.h,
-          metersPerPx: floorMetersPerPx,
-        }));
+        if (_planLayers.sanitarios) {
+          sanitaryItems.forEach(item => distanceItems.push({
+            id: `sanitary::${item.sanitary.id}`,
+            type: 'sanitary',
+            label: item.sanitary.codigo || 'Sanitario',
+            x: item.x,
+            y: item.y,
+            w: item.w,
+            h: item.h,
+            metersPerPx: floorMetersPerPx,
+          }));
+        }
         roomItems.forEach(item => {
           if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h, floorContentRect);
         });
-        sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h, floorContentRect));
+        if (_planLayers.sanitarios) {
+          sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h, floorContentRect));
+        }
         _drawSharedWallTicks(ctx, roomItems);
       });
       ctx.restore();
@@ -11451,7 +11516,7 @@ const MecFormModule = (() => {
         return;
       }
       if (!pointerCandidate) {
-        if (event.pointerType !== 'touch') _showCanvasHoverTooltip(event, _planHoverInfo(hit(event)));
+        if (event.pointerType !== 'touch' && _planLayers.datos) _showCanvasHoverTooltip(event, _planHoverInfo(hit(event)));
         return;
       }
       _hideCanvasHoverTooltip();
@@ -11520,6 +11585,7 @@ const MecFormModule = (() => {
       pointerStart = null;
       if (!isSelectableArea(area)) return;
       event.preventDefault();
+      if (event.pointerType === 'touch' && _planLayers.datos) _showCanvasHoverTooltip(event, _planHoverInfo(area));
       selectArea(area);
     });
     canvas.addEventListener('pointercancel', event => {
@@ -11535,6 +11601,7 @@ const MecFormModule = (() => {
       if (suppressClick || Date.now() < suppressClickUntil) return;
       const area = hit(event);
       if (!isSelectableArea(area)) return;
+      if (_planLayers.datos) _showCanvasHoverTooltip(event, _planHoverInfo(area));
       selectArea(area);
     });
     canvas.addEventListener('dblclick', event => {

@@ -3050,7 +3050,9 @@
   z-index: 6000;
   display: none;
   width: max-content;
-  max-width: min(250px, calc(100vw - 24px));
+  max-width: min(310px, calc(100vw - 24px));
+  max-height: min(70vh, 420px);
+  overflow: auto;
   padding: .55rem .65rem;
   border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 7px;
