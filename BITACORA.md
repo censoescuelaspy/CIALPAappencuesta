@@ -4,6 +4,31 @@
 
 ---
 
+## Sesion de espacios editables, rotacion por esquina y evidencias visibles - 2026-05-12 - v2.5.61
+
+### Objetivo
+- Permitir que las figuras de otros espacios puedan girarse desde una esquina, sin depender solo de botones de giro.
+- Incorporar cantinas, bibliotecas, tinglados y otros ambientes especiales como espacios editables con la misma logica de aulas.
+- Hacer visibles las fotos asociadas en fichas y datos emergentes del plano.
+
+### Cambios implementados
+- Se agrego un punto/manija de rotacion en la esquina de cada elemento de `Otros espacios` del plano general; al arrastrarlo gira la figura alrededor de su centro.
+- El navegador del plano ahora separa por `Aulas`, `Sanitarios` y `Otros espacios` dentro de cada piso.
+- Se agrego el selector `+ Otro espacio` con cantina, biblioteca, tinglado, area de recreacion, laboratorio, direccion/administracion y deposito.
+- Los otros espacios se guardan como ambientes del bloque y piso, editables con el mismo croquis de aulas: paredes, puertas, ventanas, electricidad/equipos, texto, lapiz, fotos y ficha.
+- El tanque de agua permanece como infraestructura especial del plano general, fuera del comportamiento de aula.
+- Las fichas emergentes del plano muestran miniaturas de evidencias cuando la foto esta localmente disponible y chips compactos cuando solo queda la referencia indexada.
+- La ficha de elementos del croquis y la ficha de espacios exteriores muestran una grilla de fotos guardadas.
+- Version y cache actualizados a `v2.5.61`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- `osacompile -l JavaScript` sobre `mec-form.js`, `app.js` y `config.js` sin errores.
+- `node --check` no se ejecuto porque `node` no esta instalado en esta maquina.
+- Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; version visible `v2.5.61` y cache `cialpa-app-v2.5.61`.
+
+---
+
 ## Sesion de rotacion y canchas predefinidas - 2026-05-12 - v2.5.60
 
 ### Objetivo

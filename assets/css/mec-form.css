@@ -1121,10 +1121,75 @@
     linear-gradient(0deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%);
 }
 
+.mec-shape-button__icon--space {
+  display: grid;
+  place-items: center;
+  color: #0f5132;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
 .mec-object-evidence span {
   color: #617083;
   font-size: .84rem;
   font-weight: 700;
+}
+
+.mec-object-evidence__preview {
+  flex: 1 1 100%;
+}
+
+.mec-evidence-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: .45rem;
+  width: 100%;
+}
+
+.mec-evidence-preview figure,
+.mec-evidence-preview__chip {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #d8e3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.mec-evidence-preview img {
+  display: block;
+  width: 100%;
+  height: 68px;
+  object-fit: cover;
+}
+
+.mec-evidence-preview figcaption,
+.mec-evidence-preview__chip,
+.mec-evidence-preview__empty {
+  color: #536274;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.mec-evidence-preview figcaption {
+  padding: .28rem .36rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mec-evidence-preview__chip {
+  display: grid;
+  min-height: 68px;
+  align-content: center;
+  padding: .35rem;
+  text-align: center;
+}
+
+.mec-evidence-preview__empty {
+  margin: 0;
+  padding: .35rem 0 0;
 }
 
 .mec-repeat-toolbar {
@@ -1924,6 +1989,22 @@
   background: #f7fef9;
 }
 
+.school-plan-tree__summary--rooms {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.school-plan-tree__summary--sanitaries {
+  border-color: #c4b5fd;
+  background: #fbfaff;
+}
+
+.school-plan-tree__summary--other-space {
+  min-height: 38px;
+  border-color: #bbf7d0;
+  background: #fbfefc;
+}
+
 .school-plan-tree__branch--locked > .school-plan-tree__summary {
   border-color: #fbbf24;
   background: #fffbeb;
@@ -1940,6 +2021,11 @@
 .school-plan-tree__children--floor {
   margin-left: .42rem;
   border-left-color: rgba(23, 32, 51, .16);
+}
+
+.school-plan-tree__children--floor-group {
+  margin-left: .28rem;
+  border-left-color: rgba(23, 32, 51, .12);
 }
 
 .school-plan-tree__empty {
@@ -2005,6 +2091,11 @@
 .school-plan-object--site {
   border-color: #bbf7d0;
   background: #f7fef9;
+}
+
+.school-plan-object--space {
+  border-color: #fed7aa;
+  background: #fffaf5;
 }
 
 .school-plan-object--locked {
@@ -3118,6 +3209,49 @@
 
 .mec-canvas-hover-tooltip b {
   color: #ffffff;
+}
+
+.mec-canvas-hover-tooltip__photos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .32rem;
+  margin-top: .28rem;
+}
+
+.mec-canvas-hover-tooltip__photos figure {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.mec-canvas-hover-tooltip__photos img {
+  display: block;
+  width: 100%;
+  height: 46px;
+  object-fit: cover;
+}
+
+.mec-canvas-hover-tooltip__photos figcaption,
+.mec-canvas-hover-tooltip__photo-chip {
+  display: block;
+  padding: .16rem .22rem;
+  color: #dbeafe;
+  font-size: .58rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mec-canvas-hover-tooltip__photo-chip {
+  min-height: 46px;
+  align-content: center;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
 }
 
 body.mec-drawing-fullscreen-active {

@@ -82,6 +82,17 @@ const MecFormModule = (() => {
     { id: 'pillar', label: 'Pilar', short: 'PIL', tone: '#475569' },
   ];
 
+  const ROOM_SPACE_TYPES = [
+    { id: 'classroom', label: 'Aula', short: 'AUL' },
+    { id: 'canteen', label: 'Cantina', short: 'CAN' },
+    { id: 'library', label: 'Biblioteca', short: 'BIB' },
+    { id: 'covered_court', label: 'Tinglado', short: 'TIN' },
+    { id: 'recreation_room', label: 'Area de recreacion', short: 'REC' },
+    { id: 'lab', label: 'Laboratorio', short: 'LAB' },
+    { id: 'admin', label: 'Direccion/administracion', short: 'ADM' },
+    { id: 'storage', label: 'Deposito', short: 'DEP' },
+  ];
+
   const RECREATION_SHAPES = [
     { id: 'rectangle', label: 'Rectangulo', short: 'REC', wRatio: .18, hRatio: .11 },
     { id: 'circle', label: 'Circulo', short: 'REC', wRatio: .12, hRatio: .12 },
@@ -434,8 +445,8 @@ const MecFormModule = (() => {
 
   function _siteElementEvidenceContext(element) {
     return {
-      scope: 'exterior',
-      spaceLabel: 'Plano general',
+      scope: element?.type === 'water_tank' ? 'infraestructura_especial' : 'otros_espacios',
+      spaceLabel: element?.type === 'water_tank' ? 'Tanque de agua' : 'Otros espacios',
       elementType: _siteElementLabel(element?.type),
       elementLabel: element?.ficha?.codigo || _siteElementLabel(element?.type),
       elementId: element?.id || '',
@@ -977,13 +988,14 @@ const MecFormModule = (() => {
     return `
       <section class="mec-section mec-sketch ${locked ? 'mec-sketch--locked' : ''}">
         <div class="mec-section__header">
-          <h4>Aulas y croquis dimensionales</h4>
-          <p class="mec-hint">Cada aula queda guardada automaticamente como registro independiente. En el plano del bloque puede tocar cualquier aula para activarla, moverla y acomodarla junto a las demas.</p>
+          <h4>Aulas y otros espacios</h4>
+          <p class="mec-hint">Cada aula, cantina, biblioteca, tinglado o espacio especial queda guardado como ambiente independiente. En el plano del bloque puede tocarlo para activarlo, moverlo y editarlo.</p>
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openOtherSpacePicker()">+ Otro espacio</button>
           ${_renderClassroomLockButton(sketch)}
-          <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveClassroom()">Eliminar aula activa</button>
+          <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveClassroom()">Eliminar ambiente activo</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveFloor()">Eliminar piso activo</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveBlock()">Eliminar bloque activo</button>
           <span class="mec-autosave-pill">Autoguardado</span>
@@ -997,13 +1009,13 @@ const MecFormModule = (() => {
               onclick="MecFormModule.selectClassroom('${_escape(room.id)}')">
               <strong>${_escape(_classroomHierarchyLabel(room) || room.name || `Aula ${index + 1}`)}</strong>
               <span>${_escape(_classroomSummary(room))}</span>
-            </button>`).join('') : '<p class="text-muted">Este bloque todavia no tiene aulas. Use + Nueva aula.</p>'}
+            </button>`).join('') : '<p class="text-muted">Este bloque todavia no tiene aulas ni otros espacios. Use + Nueva aula o + Otro espacio.</p>'}
         </div>
         <div class="mec-sketch__layout">
           <div class="mec-sketch__tools">
             <div class="mec-sketch-meta">
               <div class="form-group">
-                <label>Aula</label>
+                <label>${_escape(_roomSpaceLabel(sketch))}</label>
                 <input class="form-control" type="text" value="${_escape(sketch.name || '')}" readonly aria-readonly="true">
               </div>
               <div class="form-group">
@@ -1015,7 +1027,7 @@ const MecFormModule = (() => {
                 <input class="form-control" type="number" min="1" step="1" value="${_escape(String(sketch.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}" data-sketch-field="floorNumber" ${disabled}>
               </div>
               <div class="form-group form-group--wide">
-                <label>Estado del aula</label>
+                <label>Estado del ambiente</label>
                 ${_buttonChoiceGroup(
                   ['Operativa', 'En construccion', 'Derrumbada / colapsada', 'Clausurada', 'Sin uso', 'No verificable'],
                   sketch.estado || '',
@@ -1042,7 +1054,7 @@ const MecFormModule = (() => {
               </div>
             </div>
             <div class="mec-sketch__actions">
-              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()" ${disabled}>Dibujar aula base</button>
+              <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.generateRoomSketch()" ${disabled}>Dibujar base</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.editSelectedSketchObject()">Editar ficha</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.flipSelectedDoorSwing()" ${disabled}>Cambiar apertura puerta</button>
               <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()" ${disabled}>Deshacer</button>
@@ -1086,7 +1098,7 @@ const MecFormModule = (() => {
     return `
       <button class="btn ${locked ? 'btn-warning' : 'btn-outline'} btn-sm" type="button"
         onclick="MecFormModule.setActiveClassroomLocked(${locked ? 'false' : 'true'})">
-        ${locked ? 'Desbloquear aula' : 'Bloquear aula'}
+        ${locked ? 'Desbloquear ambiente' : 'Bloquear ambiente'}
       </button>`;
   }
 
@@ -1185,6 +1197,8 @@ const MecFormModule = (() => {
     }
     _data.__classrooms.forEach((room, index) => {
       room.name = room.name || _numberedLabel('Aula', index);
+      room.spaceKind = _roomSpaceKind(room);
+      room.spaceLabel = _roomSpaceLabel(room);
       room.blockId = room.blockId || _data.__activeBlockId || '';
       room.floor = _normalizeFloor(room.floor || 'Piso 1');
       room.objects = Array.isArray(room.objects) ? room.objects : [];
@@ -1208,6 +1222,8 @@ const MecFormModule = (() => {
       width: '',
       estado: '',
       openings: '',
+      spaceKind: 'classroom',
+      spaceLabel: 'Aula',
       objects: [],
     };
   }
@@ -1241,6 +1257,22 @@ const MecFormModule = (() => {
     return Number(String(_normalizeFloor(floor || 'Piso 1')).match(/\d+/)?.[0] || 1);
   }
 
+  function _roomSpaceConfig(kind = 'classroom') {
+    return ROOM_SPACE_TYPES.find(type => type.id === kind) || ROOM_SPACE_TYPES[0];
+  }
+
+  function _roomSpaceKind(room = {}) {
+    return room.spaceKind || room.roomType || 'classroom';
+  }
+
+  function _roomSpaceLabel(room = {}) {
+    return room.spaceLabel || _roomSpaceConfig(_roomSpaceKind(room)).label || 'Aula';
+  }
+
+  function _isOtherRoomSpace(room = {}) {
+    return _roomSpaceKind(room) !== 'classroom';
+  }
+
   function _classroomHierarchyLabel(room) {
     const block = _blockById(room?.blockId);
     return [block?.bloque_codigo, _normalizeFloor(room?.floor || 'Piso 1'), room?.name]
@@ -1259,11 +1291,15 @@ const MecFormModule = (() => {
         return String(a.id || '').localeCompare(String(b.id || ''), 'es');
       })
       .forEach(room => {
-        const key = `${room.blockId || 'sin_bloque'}::${_normalizeFloor(room.floor || 'Piso 1')}`;
+        const kind = _roomSpaceKind(room);
+        const base = _roomSpaceLabel(room);
+        const key = `${room.blockId || 'sin_bloque'}::${_normalizeFloor(room.floor || 'Piso 1')}::${kind}`;
         groups[key] = (groups[key] || 0) + 1;
-        room.name = `Aula ${groups[key]}`;
+        room.name = `${base} ${groups[key]}`;
         if (room.id === _activeClassroomId && _data.__classroomSketch) {
           _data.__classroomSketch.name = room.name;
+          _data.__classroomSketch.spaceKind = kind;
+          _data.__classroomSketch.spaceLabel = base;
         }
       });
   }
@@ -1275,12 +1311,14 @@ const MecFormModule = (() => {
     return `
       <div class="mec-block-tabs" aria-label="Navegacion de bloques para aulas">
         ${blocks.map(block => {
-          const count = (_data.__classrooms || []).filter(room => room.blockId === block.id).length;
+          const blockRooms = (_data.__classrooms || []).filter(room => room.blockId === block.id);
+          const count = blockRooms.filter(room => !_isOtherRoomSpace(room)).length;
+          const otherCount = blockRooms.length - count;
           return `
             <button class="mec-block-tab ${block.id === _data.__activeBlockId ? 'mec-block-tab--active' : ''}" type="button"
               onclick="MecFormModule.selectBlockForClassrooms('${_escape(block.id)}')">
               <strong>${_escape(block.bloque_codigo || 'Bloque 1')}</strong>
-              <span>${count} aula(s)</span>
+              <span>${count} aula(s) · ${otherCount} otro(s)</span>
             </button>`;
         }).join('')}
       </div>`;
@@ -1305,6 +1343,8 @@ const MecFormModule = (() => {
       name: sketch.name || '',
       blockId: sketch.blockId || _data.__activeBlockId || '',
       floor: _normalizeFloor(sketch.floor),
+      spaceKind: _roomSpaceKind(sketch),
+      spaceLabel: _roomSpaceLabel(sketch),
       length: sketch.length || '',
       width: sketch.width || '',
       estado: sketch.estado || '',
@@ -1372,6 +1412,7 @@ const MecFormModule = (() => {
   function _classroomSummary(room) {
     const objects = room.objects || [];
     const parts = [];
+    if (_isOtherRoomSpace(room)) parts.push(_roomSpaceLabel(room));
     if (_isClassroomLocked(room)) parts.push('Bloqueada');
     if (room.estado) parts.push(room.estado);
     if (room.length && room.width) parts.push(`${room.length} x ${room.width} m`);
@@ -1664,24 +1705,30 @@ const MecFormModule = (() => {
     _render();
   }
 
-  function newClassroom() {
+  function _nextRoomLikeNumber(kind, blockId, floor) {
+    return (_data.__classrooms || [])
+      .filter(room => room.blockId === (blockId || ''))
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === floor)
+      .filter(room => _roomSpaceKind(room) === kind)
+      .length + 1;
+  }
+
+  function _createRoomLikeSpace(kind = 'classroom') {
     if (_activeClassroomId || _data.__classroomSketch?.id) _syncActiveClassroomFromSketch();
     _data.__allowEmptyClassrooms = false;
     const block = _blockById(_data.__activeBlockId);
-    if (!_assertBlockUnlocked(block, 'agregar aulas')) return;
-    const blockLength = Number(block?.largo_m || 0);
-    const blockWidth = Number(block?.ancho_m || 0);
+    const cfg = _roomSpaceConfig(kind);
+    if (!_assertBlockUnlocked(block, `agregar ${cfg.label.toLowerCase()}`)) return;
     const floor = _activeFloor();
-    const nextNumber = (_data.__classrooms || [])
-      .filter(room => room.blockId === (_data.__activeBlockId || ''))
-      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === floor)
-      .length + 1;
-    _activeClassroomId = `aula_${Date.now()}`;
+    const nextNumber = _nextRoomLikeNumber(cfg.id, _data.__activeBlockId || '', floor);
+    _activeClassroomId = `${cfg.id}_${Date.now()}`;
     _data.__classroomSketch = {
       id: _activeClassroomId,
-      name: `Aula ${nextNumber}`,
+      name: `${cfg.label} ${nextNumber}`,
       blockId: _data.__activeBlockId || '',
       floor,
+      spaceKind: cfg.id,
+      spaceLabel: cfg.label,
       length: '',
       width: '',
       estado: 'Operativa',
@@ -1694,7 +1741,54 @@ const MecFormModule = (() => {
     _requestSketchCenter();
     _saveDraft(false);
     _render();
-    UI.showToast('Nueva aula creada sin geometria. Complete estado/medidas y pulse Dibujar aula base si corresponde.', 'success');
+    UI.showToast(`${cfg.label} creada sin geometria. Complete estado/medidas y pulse Dibujar base si corresponde.`, 'success');
+  }
+
+  function newClassroom() {
+    _createRoomLikeSpace('classroom');
+  }
+
+  function openOtherSpacePicker(origin = 'classrooms') {
+    const modalId = 'modal-other-space-picker';
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    const options = ROOM_SPACE_TYPES.filter(type => type.id !== 'classroom');
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeOtherSpacePicker()"></div>
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h3>Agregar otro espacio</h3>
+          <button class="modal__close" onclick="MecFormModule.closeOtherSpacePicker()">&times;</button>
+        </div>
+        <div class="modal__body">
+          <p class="mec-hint">Estos espacios se editan igual que un aula: paredes, puertas, ventanas, instalaciones, fotos y ficha.</p>
+          <div class="mec-shape-picker" role="group" aria-label="Tipos de otros espacios">
+            ${options.map(type => `
+              <button class="mec-shape-button" type="button" onclick="MecFormModule.chooseOtherSpaceType('${_escape(type.id)}', '${_escape(origin)}')">
+                <span class="mec-shape-button__icon mec-shape-button__icon--space" aria-hidden="true">${_escape(type.short)}</span>
+                <strong>${_escape(type.label)}</strong>
+              </button>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal(modalId);
+  }
+
+  function closeOtherSpacePicker() {
+    const modal = document.getElementById('modal-other-space-picker');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 200);
+  }
+
+  function chooseOtherSpaceType(kind, origin = 'classrooms') {
+    closeOtherSpacePicker();
+    if (origin === 'plan' && _activeModuleId !== 'aulas') selectModule('aulas');
+    setTimeout(() => _createRoomLikeSpace(kind), origin === 'plan' ? 120 : 0);
   }
 
   function saveCurrentClassroom() {
@@ -1895,6 +1989,8 @@ const MecFormModule = (() => {
     input.value = '';
     const count = document.getElementById(`site-element-photo-count-${element.id}`);
     if (count) count.textContent = _evidenceLabel(element.ficha.evidencias);
+    const preview = document.getElementById(`site-element-photo-preview-${element.id}`);
+    if (preview) preview.innerHTML = _evidencePreviewGridHtml(element.ficha.evidencias || []);
     _saveDraft(false);
     renderSchoolPlan();
     UI.showToast('Foto asociada al espacio exterior.', 'success');
@@ -6771,11 +6867,13 @@ const MecFormModule = (() => {
     const rows = (info.rows || [])
       .filter(row => row && row.value !== undefined && row.value !== null && String(row.value).trim() !== '')
       .slice(0, 10);
+    const photosHtml = _tooltipPhotosHtml(info.photos || []);
     const tooltip = _canvasHoverTooltip();
     tooltip.innerHTML = `
       <small>${_escape(info.subtitle || 'Elemento')}</small>
       <strong>${_escape(info.title || 'Sin codigo')}</strong>
-      ${rows.map(row => `<span><b>${_escape(row.label)}:</b> ${_escape(row.value)}</span>`).join('')}`;
+      ${rows.map(row => `<span><b>${_escape(row.label)}:</b> ${_escape(row.value)}</span>`).join('')}
+      ${photosHtml}`;
     tooltip.classList.add('mec-canvas-hover-tooltip--visible');
     const gap = 14;
     const width = tooltip.offsetWidth || 220;
@@ -6816,6 +6914,54 @@ const MecFormModule = (() => {
     }, 0);
   }
 
+  function _tooltipPhotosFromList(photos = [], limit = 4) {
+    return (Array.isArray(photos) ? photos : [])
+      .filter(photo => photo && (photo.dataUrl || photo.driveUrl || photo.indexedName || photo.name || photo.label))
+      .slice(0, limit)
+      .map((photo, index) => ({
+        src: photo.dataUrl || '',
+        title: photo.indexedName || photo.name || `Evidencia ${index + 1}`,
+        label: photo.context?.elementLabel || photo.label || photo.name || `Foto ${index + 1}`,
+        status: photo.driveStatus || (photo.driveUrl ? 'Drive' : 'Local'),
+      }));
+  }
+
+  function _tooltipRawPhotosFromObjects(objects = []) {
+    const photos = [];
+    (objects || []).forEach(object => {
+      if (Array.isArray(object?.ficha?.evidencias)) photos.push(...object.ficha.evidencias);
+    });
+    return photos;
+  }
+
+  function _tooltipPhotosFromObjects(objects = [], limit = 4) {
+    return _tooltipPhotosFromList(_tooltipRawPhotosFromObjects(objects), limit);
+  }
+
+  function _tooltipPhotosHtml(photos = []) {
+    const items = (photos || []).slice(0, 4);
+    if (!items.length) return '';
+    return `
+      <div class="mec-canvas-hover-tooltip__photos" aria-label="Evidencias fotograficas">
+        ${items.map((photo, index) => photo.src
+          ? `<figure><img src="${_escape(photo.src)}" alt="${_escape(photo.title || `Foto ${index + 1}`)}"><figcaption>${_escape(photo.status || 'Foto')}</figcaption></figure>`
+          : `<span class="mec-canvas-hover-tooltip__photo-chip">${_escape(photo.title || photo.label || `Foto ${index + 1}`)}</span>`
+        ).join('')}
+      </div>`;
+  }
+
+  function _evidencePreviewGridHtml(photos = [], limit = 6) {
+    const items = _tooltipPhotosFromList(photos, limit);
+    if (!items.length) return '<p class="mec-evidence-preview__empty">Sin fotos guardadas todavia.</p>';
+    return `
+      <div class="mec-evidence-preview" aria-label="Fotos guardadas">
+        ${items.map((photo, index) => photo.src
+          ? `<figure><img src="${_escape(photo.src)}" alt="${_escape(photo.title || `Foto ${index + 1}`)}"><figcaption>${_escape(photo.title || photo.label || `Foto ${index + 1}`)}</figcaption></figure>`
+          : `<span class="mec-evidence-preview__chip">${_escape(photo.title || photo.label || `Foto ${index + 1}`)}</span>`
+        ).join('')}
+      </div>`;
+  }
+
   function _tooltipCountText(count, label) {
     const number = Number(count || 0);
     return number > 0 ? `${number} ${label}` : '';
@@ -6839,6 +6985,7 @@ const MecFormModule = (() => {
       rows: _tooltipRowsFromFicha(ficha, [
         { label: 'Medidas', value: dimensions },
       ]),
+      photos: _tooltipPhotosFromList(ficha.evidencias || []),
     };
   }
 
@@ -6851,9 +6998,10 @@ const MecFormModule = (() => {
     const electric = objects.filter(item => ['outlet', 'light', 'fan', 'ac', 'switchboard'].includes(item.type)).length;
     const damages = objects.filter(item => item.type === 'damage').length;
     const photos = _tooltipEvidenceCount(objects);
+    const typeLabel = _roomSpaceLabel(room);
     return {
-      title: room.name || room.codigo || 'Aula',
-      subtitle: 'Aula',
+      title: room.name || room.codigo || typeLabel,
+      subtitle: typeLabel,
       rows: [
         { label: 'Bloque', value: block?.bloque_codigo || room.blockName || '' },
         { label: 'Piso', value: room.floor || '' },
@@ -6867,6 +7015,7 @@ const MecFormModule = (() => {
         { label: 'Bloqueo', value: _isClassroomLocked(room) ? 'Bloqueada contra edicion' : '' },
         { label: 'Uso', value: room.uso || room.tipo || '' },
       ].filter(row => row.value),
+      photos: _tooltipPhotosFromObjects(objects),
     };
   }
 
@@ -6877,7 +7026,7 @@ const MecFormModule = (() => {
     const fixtures = objects.filter(object => ['toilet', 'sink', 'urinal', 'shower'].includes(object.type)).length;
     const doors = objects.filter(object => object.type === 'door').length;
     const windows = objects.filter(object => object.type === 'window').length;
-    const photos = _tooltipEvidenceCount(objects);
+    const photos = _tooltipEvidenceCount(objects) + (Array.isArray(item.evidencias) ? item.evidencias.length : 0);
     return {
       title: item.codigo || 'Sanitario',
       subtitle: 'Sanitario',
@@ -6893,6 +7042,7 @@ const MecFormModule = (() => {
         { label: 'Aberturas', value: doors || windows ? `${doors} puerta(s), ${windows} ventana(s)` : '' },
         { label: 'Fotos', value: _tooltipCountText(photos, 'evidencia(s)') },
       ].filter(row => row.value),
+      photos: _tooltipPhotosFromList([...(item.evidencias || []), ..._tooltipRawPhotosFromObjects(objects)], 4),
     };
   }
 
@@ -6902,7 +7052,7 @@ const MecFormModule = (() => {
     const rotation = _siteElementRotationDeg(element);
     return {
       title: element.ficha?.codigo || _siteElementLabel(element.type),
-      subtitle: 'Exterior del predio',
+      subtitle: element.type === 'water_tank' ? 'Infraestructura especial' : 'Otro espacio',
       rows: _tooltipRowsFromFicha(element.ficha || {}, [
         { label: 'Tipo', value: _siteElementLabel(element.type) },
         { label: 'Figura', value: shape },
@@ -6910,6 +7060,7 @@ const MecFormModule = (() => {
         { label: 'Area', value: _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
         { label: 'Rotacion', value: rotation ? `${rotation} grados` : '0 grados' },
       ]),
+      photos: _tooltipPhotosFromList(element.ficha?.evidencias || []),
     };
   }
 
@@ -6981,7 +7132,7 @@ const MecFormModule = (() => {
       const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === area.sanitaryId);
       return _sanitaryTooltipInfo(item);
     }
-    if (area.type === 'site-element') {
+    if (area.type === 'site-element' || area.type === 'site-rotate') {
       const element = (_data.__siteElements || []).find(item => item.id === area.siteId);
       return _siteElementTooltipInfo(element);
     }
@@ -8188,6 +8339,9 @@ const MecFormModule = (() => {
               <input id="sketch-object-photo" type="file" accept="image/*" capture="environment" multiple style="display:none;">
               <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sketch-object-photo')?.click()" ${locked ? 'disabled' : ''}>Anexar foto</button>
               <span id="sketch-object-photo-count">${_escape(_evidenceLabel(object.ficha.evidencias || []))}</span>
+              <div id="sketch-object-photo-preview" class="mec-object-evidence__preview">
+                ${_evidencePreviewGridHtml(object.ficha.evidencias || [])}
+              </div>
             </div>
           </form>
         </div>
@@ -8224,6 +8378,8 @@ const MecFormModule = (() => {
       object.ficha.evidencias = [...current, ...added];
       const count = modal.querySelector('#sketch-object-photo-count');
       if (count) count.textContent = _evidenceLabel(object.ficha.evidencias);
+      const preview = modal.querySelector('#sketch-object-photo-preview');
+      if (preview) preview.innerHTML = _evidencePreviewGridHtml(object.ficha.evidencias || []);
       input.value = '';
       _saveDraft(false);
     });
@@ -8737,7 +8893,8 @@ const MecFormModule = (() => {
     const kpis = `
       <section class="school-plan__kpis" aria-label="Resumen del plano">
         ${_planKpi('Area construida relevada', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
-        ${_planKpi('Aulas cargadas', metrics.rooms, 'Ambientes dibujados')}
+        ${_planKpi('Aulas cargadas', metrics.rooms, 'Aulas dibujadas')}
+        ${_planKpi('Otros espacios', metrics.otherSpaces, 'Cantinas, bibliotecas, tinglados y especiales')}
         ${_planKpi('Bloques', metrics.blocks, 'Bloques registrados')}
         ${_planKpi('Sanitarios', metrics.sanitaries, 'Baterias o banos cargados')}
         ${_planKpi('Exteriores', metrics.siteElements, 'Tanques, galerias y recreacion')}
@@ -8950,6 +9107,7 @@ const MecFormModule = (() => {
       actions: [
         { label: '+ Nueva aula', tone: 'btn-primary', onClick: 'MecFormModule.newPlanClassroom()' },
         { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+        { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
         { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
         { label: '+ Espacio', onClick: "MecFormModule.addPlanSiteElement('open_space')" },
         { label: '+ Pilar', onClick: "MecFormModule.addPlanSiteElement('pillar')" },
@@ -8973,6 +9131,7 @@ const MecFormModule = (() => {
           { label: 'Abrir bloque', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
           { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+          { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
           { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
           { label: '+ Espacio', onClick: "MecFormModule.addPlanSiteElement('open_space')" },
           { label: '+ Pilar', onClick: "MecFormModule.addPlanSiteElement('pillar')" },
@@ -8986,11 +9145,12 @@ const MecFormModule = (() => {
       const room = (_data.__classrooms || []).find(item => item.id === roomId);
       if (!room) return fallback;
       const block = _blockById(room.blockId);
+      const typeLabel = _roomSpaceLabel(room);
       return {
         title: _classroomHierarchyLabel(room) || room.name || 'Aula seleccionada',
         detail: `${block?.bloque_codigo || 'Sin bloque'} · ${_normalizeFloor(room.floor || 'Piso 1')} · ${room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin medidas'}`,
         actions: [
-          { label: 'Abrir aula', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: `Abrir ${typeLabel.toLowerCase()}`, tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           { label: '+ Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')" },
           { label: '+ Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')" },
           { label: '+ Toma', onClick: "MecFormModule.addPlanClassroomElement('outlet')" },
@@ -9053,11 +9213,12 @@ const MecFormModule = (() => {
       const elementId = raw.replace('site::', '');
       const element = (_data.__siteElements || []).find(item => item.id === elementId);
       if (!element) return fallback;
+      const isTank = element.type === 'water_tank';
       return {
         title: element.ficha?.codigo || _siteElementLabel(element.type),
-        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · exterior del predio`,
+        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · ${isTank ? 'infraestructura especial' : 'otro espacio editable'}`,
         actions: [
-          { label: 'Editar ficha', tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
+          { label: isTank ? 'Editar tanque' : 'Editar espacio', tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', 15)` },
           { label: 'Poner 0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', ${-_siteElementRotationDeg(element)})` },
@@ -9076,10 +9237,10 @@ const MecFormModule = (() => {
       if (!room || !object) return fallback;
       return {
         title: object.ficha?.codigo || _sketchLabel(object.type),
-        detail: `${room.name || 'Aula'} · ${_sketchLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
+        detail: `${room.name || _roomSpaceLabel(room)} · ${_sketchLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
         actions: [
           { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
-          { label: 'Abrir aula', onClick: `MecFormModule.editPlanClassroom('${_escape(room.id)}')` },
+          { label: `Abrir ${_roomSpaceLabel(room).toLowerCase()}`, onClick: `MecFormModule.editPlanClassroom('${_escape(room.id)}')` },
         ],
       };
     }
@@ -9111,7 +9272,7 @@ const MecFormModule = (() => {
     _activePlanDrag = null;
     renderSchoolPlan();
     UI.showToast(_planMoveMode
-      ? 'Modo mover bloques activo. Arrastre solo los bloques que necesite reubicar.'
+      ? 'Modo mover activo. Arrastre bloques y otros espacios del plano general.'
       : 'Plano bloqueado: navegar y seleccionar no mueve elementos.',
       _planMoveMode ? 'info' : 'success');
   }
@@ -9153,7 +9314,9 @@ const MecFormModule = (() => {
 
   function _renderPlanBlockBranch(block) {
     const context = _selectedPlanTreeContext();
-    const rooms = (_data.__classrooms || []).filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+    const ambiences = (_data.__classrooms || []).filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+    const rooms = ambiences.filter(room => !_isOtherRoomSpace(room));
+    const otherSpaces = ambiences.filter(room => _isOtherRoomSpace(room));
     const sanitaries = _sanitariesForBlock(block);
     const floors = _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
     const open = context.blockId ? context.blockId === block.id : block.id === _data.__activeBlockId;
@@ -9162,7 +9325,7 @@ const MecFormModule = (() => {
       <details class="school-plan-tree__branch ${locked ? 'school-plan-tree__branch--locked' : ''}" ${open ? 'open' : ''}>
         <summary class="school-plan-tree__summary school-plan-tree__summary--block" onclick="MecFormModule.selectPlanItem('block::${_escape(block.id)}')">
           <span>${_escape(block.bloque_codigo || 'Bloque')}</span>
-          <small>${_escape([locked ? 'Bloqueado' : '', `${floors.length} piso(s)`, `${rooms.length} aula(s)`, `${sanitaries.length} sanitario(s)`].filter(Boolean).join(' Â· '))}</small>
+          <small>${_escape([locked ? 'Bloqueado' : '', `${floors.length} piso(s)`, `${rooms.length} aula(s)`, `${sanitaries.length} sanitario(s)`, `${otherSpaces.length} otro(s)`].filter(Boolean).join(' Â· '))}</small>
         </summary>
         <div class="school-plan-tree__children">
           ${floors.map(floor => _renderPlanFloorBranch(block, floor)).join('')}
@@ -9172,20 +9335,58 @@ const MecFormModule = (() => {
 
   function _renderPlanFloorBranch(block, floor) {
     const context = _selectedPlanTreeContext();
-    const floorRooms = (_data.__classrooms || [])
+    const floorAmbiences = (_data.__classrooms || [])
       .filter(room => ((room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque')) && _normalizeFloor(room.floor || 'Piso 1') === floor);
+    const floorRooms = floorAmbiences.filter(room => !_isOtherRoomSpace(room));
+    const floorOtherSpaces = floorAmbiences.filter(room => _isOtherRoomSpace(room));
     const floorSanitaries = _sanitariesForBlock(block)
       .filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
     const open = context.blockId === block.id && context.floor === floor;
+    const roomsGroup = floorRooms.length
+      ? `
+        <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
+          <summary class="school-plan-tree__summary school-plan-tree__summary--rooms">
+            <span>Aulas</span>
+            <small>${_escape(`${floorRooms.length} aula(s) en ${floor}`)}</small>
+          </summary>
+          <div class="school-plan-tree__children school-plan-tree__children--floor-group">
+            ${floorRooms.map(_renderPlanClassroomRow).join('')}
+          </div>
+        </details>`
+      : '';
+    const sanitariesGroup = floorSanitaries.length
+      ? `
+        <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
+          <summary class="school-plan-tree__summary school-plan-tree__summary--sanitaries">
+            <span>Sanitarios</span>
+            <small>${_escape(`${floorSanitaries.length} sanitario(s) en ${floor}`)}</small>
+          </summary>
+          <div class="school-plan-tree__children school-plan-tree__children--floor-group">
+            ${floorSanitaries.map(_renderPlanSanitaryRow).join('')}
+          </div>
+        </details>`
+      : '';
+    const otherSpacesGroup = floorOtherSpaces.length
+      ? `
+        <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
+          <summary class="school-plan-tree__summary school-plan-tree__summary--other-space">
+            <span>Otros espacios</span>
+            <small>${_escape(`${floorOtherSpaces.length} ambiente(s) en ${floor}`)}</small>
+          </summary>
+          <div class="school-plan-tree__children school-plan-tree__children--floor-group">
+            ${floorOtherSpaces.map(_renderPlanClassroomRow).join('')}
+          </div>
+        </details>`
+      : '';
     return `
-      <details class="school-plan-tree__floor" ${open || floorRooms.length || floorSanitaries.length ? 'open' : ''}>
+      <details class="school-plan-tree__floor" ${open || floorAmbiences.length || floorSanitaries.length ? 'open' : ''}>
         <summary class="school-plan-tree__summary school-plan-tree__summary--floor">
           <span>${_escape(floor)}</span>
-          <small>${_escape([`${floorRooms.length} aula(s)`, `${floorSanitaries.length} sanitario(s)`].join(' Â· '))}</small>
+          <small>${_escape([`${floorRooms.length} aula(s)`, `${floorSanitaries.length} sanitario(s)`, `${floorOtherSpaces.length} otro(s)`].join(' Â· '))}</small>
         </summary>
         <div class="school-plan-tree__children school-plan-tree__children--floor">
-          ${floorRooms.length || floorSanitaries.length
-            ? `${floorRooms.map(_renderPlanClassroomRow).join('')}${floorSanitaries.map(_renderPlanSanitaryRow).join('')}`
+          ${floorAmbiences.length || floorSanitaries.length
+            ? `${roomsGroup}${sanitariesGroup}${otherSpacesGroup}`
             : '<p class="school-plan-tree__empty">Piso sin ambientes cargados.</p>'}
         </div>
       </details>`;
@@ -9194,16 +9395,40 @@ const MecFormModule = (() => {
   function _renderPlanExteriorBranch(siteElements = _ensureSiteElements()) {
     if (!siteElements.length) return '';
     const context = _selectedPlanTreeContext();
+    const grouped = SITE_ELEMENT_TYPES
+      .map(type => ({ type, items: siteElements.filter(item => item.type === type.id) }))
+      .filter(group => group.items.length);
+    const unknown = siteElements.filter(item => !SITE_ELEMENT_TYPES.some(type => type.id === item.type));
+    if (unknown.length) grouped.push({ type: { id: 'otros', label: 'Otros', short: 'OTR' }, items: unknown });
     return `
       <details class="school-plan-tree__branch school-plan-tree__branch--site" ${context.type === 'site' ? 'open' : ''}>
         <summary class="school-plan-tree__summary school-plan-tree__summary--site">
-          <span>Predio exterior</span>
-          <small>${_escape(`${siteElements.length} elemento(s): galerias, tanques, recreacion y espacios libres`)}</small>
+          <span>Otros espacios</span>
+          <small>${_escape(`${siteElements.length} espacio(s): canchas, galerias, tanques y areas libres`)}</small>
         </summary>
         <div class="school-plan-tree__children">
-          ${siteElements.map(_renderPlanSiteElementRowEnhanced).join('')}
+          ${grouped.map(group => `
+            <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
+              <summary class="school-plan-tree__summary school-plan-tree__summary--other-space">
+                <span>${_escape(_siteElementGroupLabel(group.type.id, group.type.label))}</span>
+                <small>${_escape(`${group.items.length} elemento(s)`)}</small>
+              </summary>
+              <div class="school-plan-tree__children school-plan-tree__children--floor-group">
+                ${group.items.map(_renderPlanSiteElementRowEnhanced).join('')}
+              </div>
+            </details>
+          `).join('')}
         </div>
       </details>`;
+  }
+
+  function _siteElementGroupLabel(type, fallback = '') {
+    if (type === 'water_tank') return 'Tanques de agua';
+    if (type === 'recreation') return 'Recreacion y canchas';
+    if (type === 'gallery') return 'Galerias';
+    if (type === 'open_space') return 'Espacios libres y especiales';
+    if (type === 'pillar') return 'Pilares / estructuras';
+    return fallback || 'Otros espacios';
   }
 
   function _renderPlanObjectRow(object) {
@@ -9224,19 +9449,21 @@ const MecFormModule = (() => {
     const block = _blockById(room.blockId);
     const active = _selectedClassroomIdFromPlan() === room.id;
     const locked = _isClassroomLocked(room);
+    const typeLabel = _roomSpaceLabel(room);
+    const otherSpace = _isOtherRoomSpace(room);
     const children = _schoolPlanObjects().filter(object => object.classroomId === room.id && object.type !== 'room');
     return `
       <article class="school-plan-group ${active ? 'school-plan-group--open' : ''}">
-        <button class="school-plan-object school-plan-object--room ${locked ? 'school-plan-object--locked' : ''} ${active ? 'school-plan-object--active' : ''}" type="button"
+        <button class="school-plan-object ${otherSpace ? 'school-plan-object--space' : 'school-plan-object--room'} ${locked ? 'school-plan-object--locked' : ''} ${active ? 'school-plan-object--active' : ''}" type="button"
           ondblclick="MecFormModule.editPlanClassroom('${_escape(room.id)}')"
           onclick="MecFormModule.selectPlanItem('room::${_escape(room.id)}')">
-          <span class="school-plan-object__type">${locked ? 'Aula bloqueada' : 'Aula'}</span>
+          <span class="school-plan-object__type">${locked ? `${typeLabel} bloqueado` : typeLabel}</span>
           <strong>${_escape(_classroomHierarchyLabel(room) || room.name || `Aula ${index + 1}`)}</strong>
           <small>${_escape([locked ? 'Bloqueada' : '', block?.bloque_codigo, room.floor, room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin dimensiones'].filter(Boolean).join(' · '))}</small>
         </button>
         ${active ? `
           <div class="school-plan-group__children">
-            ${children.length ? children.map(_renderPlanObjectRow).join('') : '<p class="text-muted">Esta aula aun no tiene elementos dibujados.</p>'}
+            ${children.length ? children.map(_renderPlanObjectRow).join('') : `<p class="text-muted">Este ${_escape(typeLabel.toLowerCase())} aun no tiene elementos dibujados.</p>`}
           </div>` : ''}
       </article>`;
   }
@@ -9294,18 +9521,30 @@ const MecFormModule = (() => {
     const id = `site::${item.id}`;
     const locked = _isSiteElementLocked(item);
     const active = _selectedPlanId === id;
+    const isTank = item.type === 'water_tank';
+    const label = item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`;
+    const detail = [
+      _siteElementLabel(item.type),
+      item.type === 'recreation' ? _recreationShapeLabel(item.shape || item.ficha?.forma) : '',
+      item.ficha?.estado || 'Sin estado',
+      item.ficha?.largo_m && item.ficha?.ancho_m ? `${item.ficha.largo_m} x ${item.ficha.ancho_m} m` : '',
+      Array.isArray(item.ficha?.evidencias) && item.ficha.evidencias.length ? `${item.ficha.evidencias.length} foto(s)` : '',
+    ].filter(Boolean).join(' - ');
     return `
       <article class="school-plan-group ${active ? 'school-plan-group--open' : ''}">
         <button class="school-plan-object school-plan-object--site ${locked ? 'school-plan-object--locked' : ''} ${active ? 'school-plan-object--active' : ''}" type="button"
           ondblclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')"
           onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
-          <span class="school-plan-object__type">${locked ? 'Exterior bloqueado' : 'Exterior'}</span>
-          <strong>${_escape(item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`)}</strong>
-          <small>${_escape([_siteElementLabel(item.type), item.ficha?.estado || 'Sin estado', item.ficha?.uso || item.ficha?.nota_i || item.ficha?.observacion || 'Sin nota'].filter(Boolean).join(' - '))}</small>
+          <span class="school-plan-object__type">${locked ? 'Espacio bloqueado' : (isTank ? 'Infraestructura especial' : 'Otro espacio')}</span>
+          <strong>${_escape(label)}</strong>
+          <small>${_escape(detail || 'Sin ficha cargada')}</small>
         </button>
         ${active ? `
           <div class="school-plan-group__children school-plan-group__children--actions">
-            <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')">Editar ficha</button>
+            <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')">${isTank ? 'Editar tanque' : 'Editar espacio'}</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', -15)">Girar -15</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', 15)">Girar +15</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', ${-_siteElementRotationDeg(item)})">0 grados</button>
             <button class="btn ${locked ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSiteElementLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
           </div>` : ''}
       </article>`;
@@ -9321,6 +9560,8 @@ const MecFormModule = (() => {
 
   function _schoolPlanMetrics(sketch, objects) {
     const classrooms = _data.__classrooms || [];
+    const classroomRooms = classrooms.filter(room => !_isOtherRoomSpace(room));
+    const otherRooms = classrooms.filter(room => _isOtherRoomSpace(room));
     const sanitaries = _data.__sanitaries || [];
     const siteElements = _ensureSiteElements();
     const sanitaryObjects = sanitaries.flatMap(item => item.objects || []).filter(object => object.type !== 'sanitary-room');
@@ -9337,7 +9578,8 @@ const MecFormModule = (() => {
     });
     return {
       areaTotal,
-      rooms: classrooms.length,
+      rooms: classroomRooms.length,
+      otherSpaces: otherRooms.length,
       blocks: (_data.__blocks || []).length,
       sanitaries: sanitaries.length,
       siteElements: siteElements.length,
@@ -9831,6 +10073,26 @@ const MecFormModule = (() => {
     };
   }
 
+  function _rotatePointAround(center, point, deg) {
+    const rad = (Number(deg || 0) * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    return {
+      x: center.x + dx * cos - dy * sin,
+      y: center.y + dx * sin + dy * cos,
+    };
+  }
+
+  function _siteElementRotateHandle(item, rect) {
+    if (!item || !rect) return null;
+    const center = { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 };
+    const localCorner = { x: rect.x + rect.w + 10, y: rect.y - 10 };
+    const point = _rotatePointAround(center, localCorner, _siteElementRotationDeg(item));
+    return { ...point, size: 24, center };
+  }
+
   function _drawRecreationCourtMarkings(ctx, item, rect, shape) {
     const court = _recreationShapeConfig(shape).court;
     if (!court) return;
@@ -9984,9 +10246,16 @@ const MecFormModule = (() => {
       ctx.strokeRect(local.x - 5, local.y - 5, local.w + 10, local.h + 10);
       ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.arc(local.x + local.w + 8, local.y - 8, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#111827';
+      ctx.arc(local.x + local.w + 10, local.y - 10, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
       ctx.fill();
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(local.x + local.w + 7, local.y - 10);
+      ctx.arc(local.x + local.w + 10, local.y - 10, 3, Math.PI, Math.PI * 1.65);
+      ctx.stroke();
       ctx.restore();
     }
     if (showLabel) {
@@ -10041,6 +10310,26 @@ const MecFormModule = (() => {
         h: hitRect.h,
         metersPerPx: 1,
       });
+      if (selected) {
+        const handle = _siteElementRotateHandle(item, rect);
+        if (handle) {
+          _planHitAreas.push({
+            id: `site::${item.id}`,
+            type: 'site-rotate',
+            siteId: item.id,
+            x: handle.x - handle.size / 2,
+            y: handle.y - handle.size / 2,
+            w: handle.size,
+            h: handle.size,
+            centerX: handle.center.x,
+            centerY: handle.center.y,
+            baseX: rect.x,
+            baseY: rect.y,
+            baseW: rect.w,
+            baseH: rect.h,
+          });
+        }
+      }
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
     });
   }
@@ -11340,6 +11629,9 @@ const MecFormModule = (() => {
                 onchange="MecFormModule.setSiteElementEvidence('${_escape(element.id)}', this)" ${disabled}>
               <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('site-element-photo-${_escape(element.id)}')?.click()" ${disabled}>Anexar foto</button>
               <span id="site-element-photo-count-${_escape(element.id)}">${_escape(_evidenceLabel(element.ficha.evidencias || []))}</span>
+              <div id="site-element-photo-preview-${_escape(element.id)}" class="mec-object-evidence__preview">
+                ${_evidencePreviewGridHtml(element.ficha.evidencias || [])}
+              </div>
             </div>
           </form>
         </div>
@@ -11653,6 +11945,7 @@ const MecFormModule = (() => {
     let pointerCandidate = null;
     let pointerStart = null;
     let blockDrag = null;
+    let rotateDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
     let planPinch = null;
@@ -11696,6 +11989,7 @@ const MecFormModule = (() => {
     };
     const isSelectableArea = area => Boolean(area?.id);
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
+    const angleFromCenter = (center, point) => (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
     canvas.addEventListener('pointerdown', event => {
       _hideCanvasHoverTooltip();
       rememberPointer(event);
@@ -11708,6 +12002,7 @@ const MecFormModule = (() => {
         pointerCandidate = null;
         pointerStart = null;
         blockDrag = null;
+        rotateDrag = null;
         suppressClickUntil = Date.now() + 350;
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
@@ -11715,9 +12010,29 @@ const MecFormModule = (() => {
       }
       const area = hit(event);
       if (!isSelectableArea(area)) return;
-      pointerCandidate = area;
       pointerStart = pointFromEvent(event);
       canvas.setPointerCapture?.(event.pointerId);
+      if (area.type === 'site-rotate') {
+        const element = _ensureSiteElements().find(item => item.id === area.siteId);
+        if (!_assertSiteElementUnlocked(element, 'rotarlo')) {
+          pointerStart = null;
+          event.preventDefault();
+          return;
+        }
+        const center = { x: area.centerX, y: area.centerY };
+        rotateDrag = {
+          siteId: area.siteId,
+          center,
+          startAngle: angleFromCenter(center, pointerStart),
+          startRotation: _siteElementRotationDeg(element),
+        };
+        pointerCandidate = null;
+        _selectedPlanId = `site::${area.siteId}`;
+        _activatePlanSelection(_selectedPlanId);
+        event.preventDefault();
+        return;
+      }
+      pointerCandidate = area;
       if (_planMoveMode && ['block', 'site-element'].includes(area.type)) event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
@@ -11732,6 +12047,29 @@ const MecFormModule = (() => {
         return;
       }
       const currentPoint = pointFromEvent(event);
+      if (rotateDrag) {
+        const element = _ensureSiteElements().find(item => item.id === rotateDrag.siteId);
+        if (!element) {
+          rotateDrag = null;
+          return;
+        }
+        const angle = angleFromCenter(rotateDrag.center, currentPoint);
+        const rotation = _normalizeSiteRotation(rotateDrag.startRotation + angle - rotateDrag.startAngle);
+        element.rotationDeg = rotation;
+        element.ficha = { ...(element.ficha || {}), rotacion_grados: String(rotation) };
+        _activePlanDrag = {
+          id: `site::${element.id}`,
+          siteId: element.id,
+          x: (element.xRatio || 0) * 900,
+          y: (element.yRatio || 0) * _planCanvasHeight(),
+          w: 0,
+          h: 0,
+        };
+        _drawSchoolPlan();
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
       if (blockDrag) {
         if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
         else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
@@ -11785,6 +12123,21 @@ const MecFormModule = (() => {
         pointerCandidate = null;
         pointerStart = null;
         blockDrag = null;
+        rotateDrag = null;
+        event.preventDefault();
+        return;
+      }
+      if (rotateDrag) {
+        const siteId = rotateDrag.siteId;
+        rotateDrag = null;
+        pointerCandidate = null;
+        pointerStart = null;
+        _activePlanDrag = null;
+        _selectedPlanId = `site::${siteId}`;
+        _activatePlanSelection(_selectedPlanId);
+        _saveDraft(false);
+        renderSchoolPlan();
+        suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
       }
@@ -11818,6 +12171,7 @@ const MecFormModule = (() => {
       pointerCandidate = null;
       pointerStart = null;
       blockDrag = null;
+      rotateDrag = null;
       _activePlanDrag = null;
     });
     canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);
@@ -11834,6 +12188,7 @@ const MecFormModule = (() => {
       if (!area) return;
       if (area.type === 'room') editPlanClassroom(area.roomId);
       else if (area.type === 'sanitary') editPlanSanitary(area.sanitaryId);
+      else if (area.type === 'site-element' || area.type === 'site-rotate') openSiteElementFicha(area.siteId);
       else if (String(area.id).startsWith('sanitary::')) {
         _selectedPlanId = area.id;
         _activatePlanSelection(area.id);
@@ -12480,6 +12835,7 @@ const MecFormModule = (() => {
               <b>${metrics.blocks}</b><span>bloques</span>
               <b>${floors}</b><span>plantas</span>
               <b>${metrics.rooms}</b><span>aulas</span>
+              <b>${metrics.otherSpaces}</b><span>otros espacios</span>
               <b>${metrics.sanitaries}</b><span>sanitarios</span>
               <b>${metrics.siteElements}</b><span>exteriores</span>
               <b>${_planPrintFmt(metrics.areaTotal)}</b><span>m2 relevados</span>
@@ -13496,6 +13852,9 @@ const MecFormModule = (() => {
     setPlanBlockLocked,
     selectClassroom,
     newClassroom,
+    openOtherSpacePicker,
+    closeOtherSpacePicker,
+    chooseOtherSpaceType,
     saveCurrentClassroom,
     setActiveClassroomLocked,
     setPlanClassroomLocked,
