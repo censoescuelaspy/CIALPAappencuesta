@@ -1026,6 +1026,71 @@
   display: block;
 }
 
+.mec-shape-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: .7rem;
+}
+
+.mec-shape-button {
+  min-height: 104px;
+  display: grid;
+  place-items: center;
+  gap: .45rem;
+  padding: .75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #173f68;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  touch-action: manipulation;
+}
+
+.mec-shape-button:hover,
+.mec-shape-button:focus-visible {
+  outline: none;
+  border-color: #2b6cb0;
+  background: #f1f7ff;
+  box-shadow: 0 0 0 3px rgba(43, 108, 176, .14);
+}
+
+.mec-shape-button__icon {
+  width: 54px;
+  height: 42px;
+  display: block;
+  border: 3px solid #15803d;
+  background: rgba(21, 128, 61, .08);
+}
+
+.mec-shape-button__icon--circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+}
+
+.mec-shape-button__icon--oval {
+  width: 62px;
+  height: 38px;
+  border-radius: 999px;
+}
+
+.mec-shape-button__icon--triangle {
+  width: 0;
+  height: 0;
+  border-left: 30px solid transparent;
+  border-right: 30px solid transparent;
+  border-bottom: 52px solid rgba(21, 128, 61, .75);
+  background: transparent;
+}
+
+.mec-shape-button__icon--polygon {
+  width: 56px;
+  height: 48px;
+  clip-path: polygon(18% 8%, 70% 0, 100% 42%, 82% 92%, 28% 100%, 0 56%);
+}
+
 .mec-object-evidence span {
   color: #617083;
   font-size: .84rem;

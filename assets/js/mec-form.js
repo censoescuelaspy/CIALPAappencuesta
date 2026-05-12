@@ -80,6 +80,14 @@ const MecFormModule = (() => {
     { id: 'pillar', label: 'Pilar', short: 'PIL', tone: '#475569' },
   ];
 
+  const RECREATION_SHAPES = [
+    { id: 'rectangle', label: 'Rectangulo', short: 'REC', wRatio: .18, hRatio: .11 },
+    { id: 'circle', label: 'Circulo', short: 'REC', wRatio: .12, hRatio: .12 },
+    { id: 'oval', label: 'Ovalo', short: 'REC', wRatio: .19, hRatio: .1 },
+    { id: 'triangle', label: 'Triangulo', short: 'REC', wRatio: .16, hRatio: .12 },
+    { id: 'polygon', label: 'Poligono', short: 'REC', wRatio: .18, hRatio: .13 },
+  ];
+
   const SANITARY_FIXTURES = [
     { id: 'toilet', field: 'inodoros', label: 'Inodoro', short: 'WC' },
     { id: 'sink', field: 'lavamanos', label: 'Lavamanos', short: 'LV' },
@@ -1878,17 +1886,25 @@ const MecFormModule = (() => {
 
   function _ensureSiteElements() {
     _data.__siteElements = Array.isArray(_data.__siteElements) ? _data.__siteElements : [];
-    _data.__siteElements = _data.__siteElements.map((item, index) => ({
-      id: item.id || `site_${Date.now()}_${index}`,
-      type: item.type || 'open_space',
-      xRatio: Number.isFinite(Number(item.xRatio)) ? Number(item.xRatio) : .08,
-      yRatio: Number.isFinite(Number(item.yRatio)) ? Number(item.yRatio) : .78,
-      wRatio: Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : _siteElementDefaultSize(item.type || 'open_space').wRatio,
-      hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : _siteElementDefaultSize(item.type || 'open_space').hRatio,
-      ficha: { ..._defaultSiteElementFicha(item.type || 'open_space', index + 1), ...(item.ficha || {}) },
-      locked: Boolean(item.locked),
-      lockedAt: item.lockedAt || '',
-    }));
+    _data.__siteElements = _data.__siteElements.map((item, index) => {
+      const type = item.type || 'open_space';
+      const shape = _normalizeRecreationShape(item.shape || item.ficha?.forma);
+      const size = _siteElementDefaultSize(type, shape);
+      const ficha = { ..._defaultSiteElementFicha(type, index + 1, shape), ...(item.ficha || {}) };
+      if (type === 'recreation') ficha.forma = _recreationShapeLabel(shape);
+      return {
+        id: item.id || `site_${Date.now()}_${index}`,
+        type,
+        shape,
+        xRatio: Number.isFinite(Number(item.xRatio)) ? Number(item.xRatio) : .08,
+        yRatio: Number.isFinite(Number(item.yRatio)) ? Number(item.yRatio) : .78,
+        wRatio: Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : size.wRatio,
+        hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : size.hRatio,
+        ficha,
+        locked: Boolean(item.locked),
+        lockedAt: item.lockedAt || '',
+      };
+    });
     return _data.__siteElements;
   }
 
@@ -1900,9 +1916,23 @@ const MecFormModule = (() => {
     return _siteElementConfig(type)?.label || 'Elemento exterior';
   }
 
-  function _defaultSiteElementFicha(type, index = 1) {
+  function _recreationShapeConfig(shape) {
+    const normalized = String(shape || '').trim().toLowerCase();
+    return RECREATION_SHAPES.find(item => item.id === normalized || item.label.toLowerCase() === normalized)
+      || RECREATION_SHAPES[0];
+  }
+
+  function _normalizeRecreationShape(shape) {
+    return _recreationShapeConfig(shape).id;
+  }
+
+  function _recreationShapeLabel(shape) {
+    return _recreationShapeConfig(shape).label;
+  }
+
+  function _defaultSiteElementFicha(type, index = 1, shape = '') {
     const cfg = _siteElementConfig(type);
-    return {
+    const ficha = {
       codigo: `${cfg.short} ${index}`,
       subtipo: cfg.label,
       estado: 'Bueno',
@@ -1910,9 +1940,15 @@ const MecFormModule = (() => {
       observacion: '',
       evidencias: [],
     };
+    if (type === 'recreation') ficha.forma = _recreationShapeLabel(shape);
+    return ficha;
   }
 
-  function _siteElementDefaultSize(type) {
+  function _siteElementDefaultSize(type, shape = '') {
+    if (type === 'recreation') {
+      const cfg = _recreationShapeConfig(shape);
+      return { wRatio: cfg.wRatio, hRatio: cfg.hRatio };
+    }
     return {
       water_tank: { wRatio: .052, hRatio: .075 },
       recreation: { wRatio: .18, hRatio: .11 },
@@ -9413,7 +9449,7 @@ const MecFormModule = (() => {
   }
 
   function _siteElementRect(item, logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
-    const size = _siteElementDefaultSize(item.type);
+    const size = _siteElementDefaultSize(item.type, item.shape);
     const wRatio = Number(item.wRatio || size.wRatio);
     const hRatio = Number(item.hRatio || size.hRatio);
     const w = Math.max(item.type === 'pillar' ? 18 : 30, wRatio * logicalWidth);
@@ -9448,6 +9484,49 @@ const MecFormModule = (() => {
       ctx.arc(rect.x + rect.w / 2, rect.y + rect.h / 2, Math.min(rect.w, rect.h) / 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    } else if (item.type === 'recreation') {
+      const shape = _normalizeRecreationShape(item.shape || item.ficha?.forma);
+      const cx = rect.x + rect.w / 2;
+      const cy = rect.y + rect.h / 2;
+      if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.min(rect.w, rect.h) / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (shape === 'oval') {
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, rect.w / 2, rect.h / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(cx, rect.y);
+        ctx.lineTo(rect.x + rect.w, rect.y + rect.h);
+        ctx.lineTo(rect.x, rect.y + rect.h);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else if (shape === 'polygon') {
+        const points = [
+          [rect.x + rect.w * .18, rect.y + rect.h * .15],
+          [rect.x + rect.w * .64, rect.y + rect.h * .04],
+          [rect.x + rect.w * .96, rect.y + rect.h * .42],
+          [rect.x + rect.w * .82, rect.y + rect.h * .9],
+          [rect.x + rect.w * .3, rect.y + rect.h * .98],
+          [rect.x + rect.w * .02, rect.y + rect.h * .55],
+        ];
+        ctx.beginPath();
+        points.forEach(([px, py], index) => {
+          if (index) ctx.lineTo(px, py);
+          else ctx.moveTo(px, py);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      }
     } else {
       ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
       ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
@@ -10398,9 +10477,9 @@ const MecFormModule = (() => {
     addSanitaryStall(sanitaryId);
   }
 
-  function _nextSiteElementPosition(type, origin = 'plan') {
+  function _nextSiteElementPosition(type, origin = 'plan', shape = '') {
     const index = _ensureSiteElements().length;
-    const size = _siteElementDefaultSize(type);
+    const size = _siteElementDefaultSize(type, shape);
     const col = index % 3;
     const row = Math.floor(index / 3) % 4;
     const originOffset = origin === 'sanitario' ? .18 : origin === 'aula' ? .1 : 0;
@@ -10411,29 +10490,94 @@ const MecFormModule = (() => {
     };
   }
 
-  function addPlanSiteElement(type, origin = 'plan') {
+  function _showSchoolPlanAfterSiteInsert(element) {
+    _selectedPlanId = `site::${element.id}`;
+    if (_activeModuleId !== 'plano') {
+      selectModule('plano');
+    } else {
+      _saveDraft(false);
+      _render();
+    }
+    setTimeout(() => {
+      renderSchoolPlan();
+      const canvas = _activeSchoolPlanCanvas();
+      const rect = canvas ? _siteElementRect(element, 900, _planCanvasHeight()) : null;
+      if (canvas && rect) {
+        _scrollCanvasWrapToPoint(
+          canvas.closest('.school-plan__canvas-wrap'),
+          { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
+          _schoolPlanZoom,
+          { x: 180, y: 160 }
+        );
+      }
+    }, 80);
+  }
+
+  function openRecreationShapePicker(origin = 'plan') {
+    const modalId = 'modal-recreation-shape-picker';
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeRecreationShapePicker()"></div>
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h3>Forma del espacio de recreacion</h3>
+          <button class="modal__close" onclick="MecFormModule.closeRecreationShapePicker()">&times;</button>
+        </div>
+        <div class="modal__body">
+          <div class="mec-shape-picker" role="group" aria-label="Forma del espacio de recreacion">
+            ${RECREATION_SHAPES.map(shape => `
+              <button class="mec-shape-button" type="button" onclick="MecFormModule.chooseRecreationShape('${_escape(shape.id)}', '${_escape(origin)}')">
+                <span class="mec-shape-button__icon mec-shape-button__icon--${_escape(shape.id)}" aria-hidden="true"></span>
+                <strong>${_escape(shape.label)}</strong>
+              </button>`).join('')}
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal(modalId);
+  }
+
+  function closeRecreationShapePicker() {
+    const modal = document.getElementById('modal-recreation-shape-picker');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 200);
+  }
+
+  function chooseRecreationShape(shape, origin = 'plan') {
+    closeRecreationShapePicker();
+    addPlanSiteElement('recreation', origin, shape);
+  }
+
+  function addPlanSiteElement(type, origin = 'plan', shape = '') {
     const cfg = _siteElementConfig(type);
     if (!cfg) return;
+    if (type === 'recreation' && !shape) {
+      openRecreationShapePicker(origin);
+      return;
+    }
     const elements = _ensureSiteElements();
     const next = elements.filter(item => item.type === type).length + 1;
-    const position = _nextSiteElementPosition(type, origin);
+    const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape) : '';
+    const position = _nextSiteElementPosition(type, origin, normalizedShape);
     const element = {
       id: `site_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type,
+      shape: normalizedShape,
       xRatio: position.xRatio,
       yRatio: position.yRatio,
       wRatio: position.wRatio,
       hRatio: position.hRatio,
-      ficha: _defaultSiteElementFicha(type, next),
+      ficha: _defaultSiteElementFicha(type, next, normalizedShape),
     };
     elements.push(element);
-    _selectedPlanId = `site::${element.id}`;
     _saveDraft(false);
-    renderSchoolPlan();
-    _redrawSketchCanvas();
-    _redrawSanitaryCanvas();
-    UI.showToast(`${cfg.label} agregado al plano exterior.`, 'success');
-    setTimeout(() => openSiteElementFicha(element.id), 220);
+    _showSchoolPlanAfterSiteInsert(element);
+    UI.showToast(`${cfg.label} agregado al plano general. Muevalo a su ubicacion real.`, 'success', 5200);
   }
 
   function openSiteElementFicha(id) {
@@ -10477,6 +10621,11 @@ const MecFormModule = (() => {
                 <label>Estado</label>
                 ${_choiceButtons('estado', ['Bueno', 'Regular', 'Malo', 'En construccion', 'No verificable'], element.ficha.estado || '')}
               </div>
+              ${element.type === 'recreation' ? `
+                <div class="form-group form-group--wide">
+                  <label>Forma</label>
+                  ${_choiceButtons('forma', RECREATION_SHAPES.map(shape => shape.label), element.ficha.forma || _recreationShapeLabel(element.shape))}
+                </div>` : ''}
             </div>
             <div class="mec-object-note" role="note">
               <span aria-hidden="true">i</span>
@@ -10541,13 +10690,24 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === data.get('element_id'));
     if (!element) return false;
     if (!_assertSiteElementUnlocked(element, 'editar la ficha')) return false;
-    ['codigo', 'subtipo', 'estado', 'nota_i', 'observacion'].forEach(key => {
+    ['codigo', 'subtipo', 'estado', 'forma', 'nota_i', 'observacion'].forEach(key => {
       if (data.has(key)) element.ficha[key] = String(data.get(key) || '').trim();
     });
     const typeFromSubtype = SITE_ELEMENT_TYPES.find(item => item.label === element.ficha.subtipo);
     if (typeFromSubtype && typeFromSubtype.id !== element.type) {
       element.type = typeFromSubtype.id;
-      const size = _siteElementDefaultSize(element.type);
+      if (element.type === 'recreation') {
+        element.shape = _normalizeRecreationShape(element.ficha.forma);
+        element.ficha.forma = _recreationShapeLabel(element.shape);
+      }
+      const size = _siteElementDefaultSize(element.type, element.shape);
+      element.wRatio = size.wRatio;
+      element.hRatio = size.hRatio;
+    }
+    if (element.type === 'recreation') {
+      element.shape = _normalizeRecreationShape(element.ficha.forma);
+      element.ficha.forma = _recreationShapeLabel(element.shape);
+      const size = _siteElementDefaultSize(element.type, element.shape);
       element.wRatio = size.wRatio;
       element.hRatio = size.hRatio;
     }
@@ -11274,8 +11434,8 @@ const MecFormModule = (() => {
     _ensureSiteElements().forEach(element => {
       const x = offsetX + Number(element.xRatio || 0) * 70;
       const y = Number(element.yRatio || 0) * 50;
-      const w = Number(element.wRatio || _siteElementDefaultSize(element.type).wRatio) * 70;
-      const h = Number(element.hRatio || _siteElementDefaultSize(element.type).hRatio) * 50;
+      const w = Number(element.wRatio || _siteElementDefaultSize(element.type, element.shape).wRatio) * 70;
+      const h = Number(element.hRatio || _siteElementDefaultSize(element.type, element.shape).hRatio) * 50;
       if (element.type === 'water_tank' || element.type === 'pillar') _dxfPushCircle(parts, 'EXTERIORES', x + w / 2, y + h / 2, Math.max(.25, Math.min(w, h) / 2));
       else _dxfPushRect(parts, 'EXTERIORES', x, y, Math.max(.4, w), Math.max(.4, h));
       _dxfPushText(parts, 'ETIQUETAS', x, y + Math.max(.6, h + .4), `${element.ficha?.codigo || _siteElementLabel(element.type)} ${_siteElementLabel(element.type)}`, .28);
@@ -12613,6 +12773,9 @@ const MecFormModule = (() => {
     addPlanSanitaryElement,
     addPlanSanitaryStall,
     addPlanSiteElement,
+    openRecreationShapePicker,
+    closeRecreationShapePicker,
+    chooseRecreationShape,
     openSiteElementFicha,
     closeSiteElementFicha,
     saveSiteElementFicha,

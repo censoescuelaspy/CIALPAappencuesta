@@ -4,6 +4,31 @@
 
 ---
 
+## Sesion de insercion directa de exteriores y formas de recreacion - 2026-05-12 - v2.5.53
+
+### Objetivo
+- Corregir la insercion de tanque de agua y espacios de recreacion para que siempre aparezcan de inmediato en el plano general, y permitir definir la forma del espacio recreativo antes de ubicarlo.
+
+### Cambios implementados
+- Los botones de elementos exteriores ahora crean el elemento, cambian automaticamente a `Plano escuela`, seleccionan el nuevo objeto y centran la vista para moverlo.
+- El tanque de agua se incorpora directamente en el plano general sin abrir una ficha que interrumpa el arrastre inicial.
+- El espacio de recreacion abre primero un selector emergente con botones de forma: rectangulo, circulo, ovalo, triangulo y poligono.
+- La forma elegida queda guardada en la ficha del espacio recreativo y puede modificarse luego desde botones dentro de la ficha.
+- El dibujo del plano general representa la forma elegida para recreacion, incluyendo circulo, ovalo, triangulo y poligono.
+- Version y cache actualizados a `v2.5.53`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Proximos pasos
+- Probar en tablet que el salto automatico al plano general no desoriente y que el objeto quede suficientemente visible para moverlo.
+- Evaluar un editor de vertices para poligonos libres si campo necesita registrar patios o canchas con forma irregular real.
+
+---
+
 ## Sesion de colisiones sanitarias, pisos visibles y criterios de formulario - 2026-05-12 - v2.5.52
 
 ### Objetivo
