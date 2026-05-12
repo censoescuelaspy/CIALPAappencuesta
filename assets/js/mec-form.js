@@ -1004,6 +1004,7 @@ const MecFormModule = (() => {
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSketchZoom(-0.15)">-</button>
               <span>${Math.round(_sketchZoom * 100)}%</span>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSketchZoom(0.15)">+</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.toggleSketchFullscreen()" title="Pantalla completa" aria-label="Pantalla completa">&#x26F6;</button>
             </div>
             <div class="mec-sketch-canvas-wrap">
               <canvas id="mec-classroom-canvas" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="width:${Math.round(SKETCH_CANVAS.width * _sketchZoom)}px;height:${Math.round(SKETCH_CANVAS.height * _sketchZoom)}px;" aria-label="Croquis manual del aula"></canvas>
@@ -2177,6 +2178,7 @@ const MecFormModule = (() => {
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSanitaryZoom(-0.15)">-</button>
             <span>${Math.round(_sanitaryZoom * 100)}%</span>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSanitaryZoom(0.15)">+</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.toggleSanitaryFullscreen()" title="Pantalla completa" aria-label="Pantalla completa">&#x26F6;</button>
           </div>
           <div class="mec-sketch-canvas-wrap">
             <canvas id="${canvasId}" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="width:${Math.round(SKETCH_CANVAS.width * _sanitaryZoom)}px;height:${Math.round(SKETCH_CANVAS.height * _sanitaryZoom)}px;" aria-label="Plano del piso con sanitario activo"></canvas>
@@ -6355,6 +6357,43 @@ const MecFormModule = (() => {
     _setSchoolPlanZoomValue(_schoolPlanZoom + delta);
   }
 
+  function _toggleBoardFullscreen(canvasSelector, redraw = null) {
+    const canvas = document.querySelector(canvasSelector);
+    const board = canvas?.closest('.mec-sketch__board, .school-plan__board');
+    if (!board) return;
+    const active = board.classList.toggle('mec-drawing-board--fullscreen');
+    document.body.classList.toggle('mec-drawing-fullscreen-active', active);
+    requestAnimationFrame(() => {
+      if (canvas && typeof redraw === 'function') redraw(canvas);
+      if (canvas?.id === 'mec-classroom-canvas') _applySketchZoom();
+      if (canvas?.id === 'mec-sanitary-canvas') _applySanitaryZoom();
+      if (canvas?.dataset?.schoolPlanCanvas !== undefined) _applySchoolPlanZoom(canvas);
+    });
+  }
+
+  function toggleSketchFullscreen() {
+    _toggleBoardFullscreen('.mec-module--active #mec-classroom-canvas, #mec-classroom-canvas', canvas => {
+      _drawSketch(canvas.getContext('2d'), canvas);
+    });
+  }
+
+  function toggleSanitaryFullscreen() {
+    _toggleBoardFullscreen('.mec-module--active #mec-sanitary-canvas, #mec-sanitary-canvas', canvas => {
+      _drawSanitarySketch(canvas.getContext('2d'), canvas);
+    });
+  }
+
+  function toggleSchoolPlanFullscreen() {
+    const board = _activeSchoolPlanCanvas()?.closest('.school-plan__board');
+    if (!board) return;
+    const active = board.classList.toggle('mec-drawing-board--fullscreen');
+    document.body.classList.toggle('mec-drawing-fullscreen-active', active);
+    requestAnimationFrame(() => {
+      _applySchoolPlanZoom();
+      _drawSchoolPlan();
+    });
+  }
+
   function _fieldValueForObjectMeters(object, axis) {
     const scale = _sketchScale();
     if (!scale || !object || object.w === undefined) return '';
@@ -7105,6 +7144,7 @@ const MecFormModule = (() => {
                   <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(-0.15)">-</button>
                   <span>${Math.round(_schoolPlanZoom * 100)}%</span>
                   <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(0.15)">+</button>
+                  <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.toggleSchoolPlanFullscreen()" title="Pantalla completa" aria-label="Pantalla completa">&#x26F6;</button>
                 </div>
                 <button class="btn ${_planMoveMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">${_planMoveMode ? 'Mover bloques activo' : 'Mover bloques'}</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
@@ -10489,6 +10529,9 @@ const MecFormModule = (() => {
     setSketchZoom,
     setSanitaryZoom,
     setSchoolPlanZoom,
+    toggleSketchFullscreen,
+    toggleSanitaryFullscreen,
+    toggleSchoolPlanFullscreen,
     generateRoomSketch,
     undoSketchObject,
     redoSketchObject,

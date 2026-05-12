@@ -2654,3 +2654,246 @@ td {
     max-height: none;
   }
 }
+
+/* Visual harmonization v2.5.46 */
+:root {
+  --color-primary: #d94a24;
+  --color-primary-dark: #b83a18;
+  --color-primary-light: #ef7a55;
+  --color-secondary: #173b63;
+  --color-secondary-dark: #102842;
+  --color-secondary-light: #285f8f;
+  --color-bg: #f3f6fa;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8fafc;
+  --color-border: #d8e1eb;
+  --color-text: #1f2933;
+  --color-text-muted: #607085;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, .06);
+  --shadow-md: 0 8px 18px rgba(16, 24, 40, .09);
+  --shadow-lg: 0 18px 42px rgba(16, 24, 40, .14);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+#login-screen {
+  background: #eef3f8;
+}
+
+.login-card {
+  border: 1px solid #d8e1eb;
+  border-radius: 8px;
+  box-shadow: 0 18px 44px rgba(16, 24, 40, .14);
+}
+
+.login-card__logo {
+  margin-bottom: 1.1rem;
+}
+
+.login-card__title,
+.login-card__subtitle {
+  letter-spacing: 0;
+}
+
+#sidebar {
+  background: #173b63;
+  border-right: 1px solid rgba(255,255,255,.08);
+}
+
+.sidebar__logo {
+  min-height: 64px;
+  border-bottom-color: rgba(255,255,255,.12);
+}
+
+#sidebar-nav {
+  padding: .55rem .5rem;
+}
+
+.nav-item > a {
+  min-height: 42px;
+  margin: .08rem 0;
+  padding: .62rem .72rem;
+  border-radius: 7px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+
+.nav-item > a:hover {
+  background: rgba(255,255,255,.1);
+}
+
+.nav-item--active > a {
+  background: #d94a24;
+  box-shadow: inset 3px 0 0 rgba(255,255,255,.55);
+}
+
+#app-header {
+  min-height: 58px;
+  box-shadow: none;
+}
+
+#sidebar-toggle {
+  min-width: 38px;
+  min-height: 38px;
+  border: 1px solid transparent;
+}
+
+#sidebar-toggle:hover,
+#sidebar-toggle:focus-visible {
+  background: #f1f5f9;
+  border-color: #d8e1eb;
+}
+
+#page-title {
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.page-header {
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+}
+
+.page-header h2 {
+  font-size: 1.22rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.page-content {
+  padding: 1.15rem;
+}
+
+.card,
+.chart-card,
+.survey-card,
+.map-info-card,
+.user-card,
+.module-card {
+  border-color: #d8e1eb;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card__header {
+  min-height: 34px;
+  gap: .75rem;
+  padding-bottom: .55rem;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.card__title {
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.kpi-card {
+  min-height: 104px;
+  border-top-width: 3px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  letter-spacing: 0;
+}
+
+.kpi-label {
+  font-weight: 750;
+}
+
+.btn,
+.choice-button,
+.planning-assignee {
+  border-radius: 7px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.btn {
+  min-height: 38px;
+  border-width: 1px;
+}
+
+.btn-sm {
+  min-height: 34px;
+}
+
+.btn-primary {
+  box-shadow: 0 1px 2px rgba(217, 74, 36, .18);
+}
+
+.btn-outline {
+  background: #ffffff;
+  border-color: #b8c6d6;
+  color: #173b63;
+}
+
+.btn-outline:hover:not(:disabled) {
+  background: #edf5fb;
+  border-color: #6f8eaa;
+  color: #102842;
+}
+
+.form-control,
+.form-control-sm,
+textarea.form-control {
+  border-radius: 7px;
+  border-color: #cfd9e5;
+  background: #fff;
+}
+
+.form-control:focus {
+  border-color: #2f80aa;
+  box-shadow: 0 0 0 3px rgba(47, 128, 170, .14);
+}
+
+.choice-button {
+  min-height: 40px;
+  background: #ffffff;
+}
+
+.choice-button--active,
+.choice-button[aria-pressed="true"] {
+  background: #e8f2fb;
+  border-color: #2f80aa;
+  color: #173b63;
+  box-shadow: inset 0 0 0 1px rgba(47, 128, 170, .12);
+}
+
+.map-layout,
+.inicio-grid,
+.kpi-grid,
+.charts-grid {
+  gap: .85rem;
+}
+
+.table-wrapper.card,
+.map-sidebar,
+.map-main,
+.planning-table-wrapper {
+  border-radius: 8px;
+  border-color: #d8e1eb;
+}
+
+@media (max-width: 700px) {
+  .page-content {
+    padding: .75rem;
+  }
+
+  .page-header {
+    padding: .8rem .85rem;
+  }
+
+  .card {
+    padding: .9rem;
+  }
+}

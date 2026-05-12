@@ -2556,3 +2556,194 @@
     max-height: none;
   }
 }
+
+/* Visual harmonization v2.5.46 */
+.mec-command,
+.mec-stage-toolbar,
+.mec-section,
+.mec-planned,
+.mec-sketch-meta,
+.mec-sketch-toolset,
+.mec-sketch-canvas-wrap,
+.mec-sanitary-card,
+.mec-sanitary-plan,
+.mec-sanitary-cabin-panel,
+.school-plan-kpi,
+.school-plan-builder,
+.school-plan-audit,
+.school-plan__board,
+.school-plan__side,
+.school-plan__canvas-wrap {
+  border-color: #d8e1eb;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-command,
+.mec-section,
+.school-plan-builder,
+.school-plan-audit,
+.school-plan__board,
+.school-plan__side {
+  background: #ffffff;
+}
+
+.mec-section__header,
+.mec-stage-toolbar,
+.mec-sketch-meta,
+.mec-sketch-toolset,
+.mec-sanitary-cabin-panel {
+  background: #f8fafc;
+}
+
+.mec-eyebrow,
+.mec-section__header span,
+.school-plan-builder__state span,
+.school-plan-audit__header span,
+.school-plan-kpi span {
+  letter-spacing: .04em;
+}
+
+.mec-command h3,
+.mec-section__header h3,
+.school-plan__side h3,
+.school-plan-builder__state strong,
+.school-plan-audit__header strong {
+  letter-spacing: 0;
+}
+
+.mec-step,
+.mec-stage-button,
+.mec-choice,
+.mec-option,
+.mec-sketch-tool,
+.school-plan-object,
+.school-plan__layers label {
+  border-radius: 7px;
+}
+
+.mec-step--active,
+.mec-stage-button--active,
+.mec-choice--active,
+.mec-option--active,
+.mec-sketch-tool--active {
+  box-shadow: inset 0 0 0 1px rgba(47, 128, 170, .12);
+}
+
+.mec-step--active,
+.mec-stage-button--active {
+  border-color: #2f80aa;
+  background: #e8f2fb;
+  color: #173b63;
+}
+
+.mec-step--active .mec-step__number,
+.mec-stage-button--active {
+  background: #173b63;
+  color: #ffffff;
+}
+
+.mec-sketch__layout,
+.school-plan__layout {
+  gap: .85rem;
+}
+
+.mec-sketch-tool {
+  min-height: 62px;
+  background: #ffffff;
+}
+
+.mec-sketch-tool__icon {
+  border-radius: 7px;
+  background: #eef3f8;
+}
+
+.mec-sketch-canvas-wrap,
+.school-plan__canvas-wrap {
+  background:
+    linear-gradient(rgba(23, 59, 99, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 59, 99, .045) 1px, transparent 1px),
+    #fbfdff;
+  background-size: 20px 20px;
+}
+
+.mec-sketch__board canvas,
+.school-plan__board canvas {
+  background-color: transparent;
+}
+
+.mec-sketch-zoom,
+.school-plan__zoom {
+  min-height: 34px;
+  padding: .18rem .25rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.mec-sketch-zoom .btn-sm,
+.school-plan__zoom .btn-sm {
+  min-width: 34px;
+  padding-inline: .55rem;
+}
+
+.school-plan-kpi {
+  min-height: 92px;
+  padding: .75rem;
+}
+
+.school-plan-kpi strong {
+  margin: .22rem 0 .14rem;
+  font-size: 1.22rem;
+}
+
+.school-plan__legend {
+  padding: .55rem;
+  border: 1px solid #edf2f7;
+  border-radius: 7px;
+  background: #fbfdff;
+}
+
+.school-plan-object {
+  background: #fbfdff;
+}
+
+.school-plan-object--active {
+  border-color: #d94a24 !important;
+  background: #fff7ed !important;
+  box-shadow: 0 0 0 2px rgba(217, 74, 36, .12);
+}
+
+body.mec-drawing-fullscreen-active {
+  overflow: hidden;
+}
+
+.mec-drawing-board--fullscreen {
+  position: fixed !important;
+  inset: 10px;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: .85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+}
+
+.mec-drawing-board--fullscreen .mec-sketch-zoom,
+.mec-drawing-board--fullscreen .school-plan__toolbar {
+  flex: 0 0 auto;
+}
+
+.mec-drawing-board--fullscreen .mec-sketch-canvas-wrap,
+.mec-drawing-board--fullscreen .school-plan__canvas-wrap {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+}
+
+.mec-drawing-board--fullscreen small {
+  flex: 0 0 auto;
+}

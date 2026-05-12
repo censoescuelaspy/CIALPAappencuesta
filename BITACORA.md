@@ -4,6 +4,31 @@
 
 ---
 
+## Sesion de armonizacion visual y trazado expandido - 2026-05-11 - v2.5.46
+
+### Objetivo
+- Generar una version mas ordenada, pulcra y armonica de la app web, montada sobre la rama publicada mas reciente sin perder las mejoras funcionales ya subidas hasta `v2.5.45`.
+
+### Cambios implementados
+- Ajustada la capa visual general: fondos, bordes, radios, sombras, botones, tarjetas, formularios y estados activos con un lenguaje mas consistente.
+- Pulido especifico del cuestionario MEC, editor de aulas, editor sanitario y plano general para reducir ruido visual y mejorar lectura en campo.
+- Agregado boton de pantalla completa en las zonas de trazado para trabajar el plano con mas superficie util.
+- Conservadas las mejoras remotas recientes: inicio por defecto, evidencias, fichas contextuales, bloqueo de movimientos accidentales, deshacer/rehacer visible y etiquetas estables con zoom.
+- Version y cache actualizados a `v2.5.46`.
+
+### Validaciones ejecutadas
+- `node --check` en `mec-form.js`, `config.js` y `app.js`.
+- `git diff --check`.
+- `rg` para confirmar version/cache `v2.5.46`, modo expandido, leyendas y estilos visuales.
+- Servidor local HTTP en `http://127.0.0.1:8080/` para servir la build y verificar recursos principales.
+
+### Proximos pasos
+- Probar en tablet Android/iPad el modo pantalla completa y la lectura del plano con etiquetas compactas.
+- Validar con usuarios de campo si la nueva jerarquia visual acelera la carga de elementos y fichas.
+- Revisar si conviene reemplazar texto de botones secundarios por iconos en mas zonas, ahora que la base visual esta estabilizada.
+
+---
+
 ## Sesion de etiquetas inteligentes con zoom - 2026-05-11 - v2.5.45
 
 ### Objetivo
