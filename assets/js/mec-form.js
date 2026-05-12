@@ -337,6 +337,12 @@ const MecFormModule = (() => {
           ));
         }
       }
+      for (const element of (_data.__siteElements || [])) {
+        if (!element.ficha?.evidencias) continue;
+        element.ficha.evidencias = await Promise.all(element.ficha.evidencias.map(photo =>
+          syncPhoto(photo, _siteElementEvidenceContext(element))
+        ));
+      }
       if (changed) _saveDraft(false);
       if (uploaded) UI.showToast(`${uploaded} evidencia(s) sincronizada(s) con Drive.`, 'success', 4500);
     } finally {
@@ -418,6 +424,16 @@ const MecFormModule = (() => {
       elementType: 'Sanitario',
       elementLabel: item?.codigo || 'Sanitario',
       elementId: item?.id || '',
+    };
+  }
+
+  function _siteElementEvidenceContext(element) {
+    return {
+      scope: 'exterior',
+      spaceLabel: 'Plano general',
+      elementType: _siteElementLabel(element?.type),
+      elementLabel: element?.ficha?.codigo || _siteElementLabel(element?.type),
+      elementId: element?.id || '',
     };
   }
 
@@ -1860,6 +1876,25 @@ const MecFormModule = (() => {
     UI.showToast(next ? 'Espacio bloqueado.' : 'Espacio desbloqueado para edicion.', 'success');
   }
 
+  async function setSiteElementEvidence(id, input) {
+    const element = _ensureSiteElements().find(item => item.id === id);
+    if (!element || !input) return;
+    if (!_assertSiteElementUnlocked(element, 'anexar fotos')) {
+      input.value = '';
+      return;
+    }
+    element.ficha = { ..._defaultSiteElementFicha(element.type, 1, element.shape), ...(element.ficha || {}) };
+    const current = element.ficha.evidencias || [];
+    const added = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _siteElementEvidenceContext(element))));
+    element.ficha.evidencias = [...current, ...added];
+    input.value = '';
+    const count = document.getElementById(`site-element-photo-count-${element.id}`);
+    if (count) count.textContent = _evidenceLabel(element.ficha.evidencias);
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Foto asociada al espacio exterior.', 'success');
+  }
+
   function _ensureBlocks() {
     _data.__blocks = _data.__blocks || [];
     _data.bloques = _data.bloques || {};
@@ -1956,13 +1991,25 @@ const MecFormModule = (() => {
       },
       recreation: {
         uso: 'Tinglado',
+        actividad: 'Recreacion',
+        largo_m: '',
+        ancho_m: '',
+        superficie_m2: '',
+        perimetro_m: '',
+        capacidad_personas: '',
         cubierta: 'Chapa metalica',
         estructura: 'Metalica',
         piso: 'Hormigon',
         cerramiento: 'Abierto',
         drenaje: 'Bueno',
         iluminacion: 'No verificada',
-        dimensiones_m: '',
+        electricidad: 'No verificada',
+        ventilacion: 'Natural',
+        equipamiento: '',
+        seguridad: 'Sin riesgo visible',
+        accesibilidad: 'No verificada',
+        uso_compartido: 'No',
+        mantenimiento: 'Bueno',
       },
       gallery: {
         cubierta: 'Chapa metalica',
@@ -1995,13 +2042,25 @@ const MecFormModule = (() => {
       ],
       recreation: [
         { key: 'uso', label: 'Uso principal', options: ['Tinglado', 'Cancha abierta', 'Patio', 'Parque infantil', 'Area verde', 'Otro'] },
+        { key: 'actividad', label: 'Actividad registrada', options: ['Recreacion', 'Educacion fisica', 'Actos', 'Comedor ocasional', 'Circulacion cubierta', 'Otro'] },
+        { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 18' },
+        { key: 'ancho_m', label: 'Ancho aprox. (m)', type: 'number', placeholder: 'Ej. 12' },
+        { key: 'superficie_m2', label: 'Superficie aprox. (m2)', type: 'number', placeholder: 'Ej. 216' },
+        { key: 'perimetro_m', label: 'Perimetro aprox. (m)', type: 'number', placeholder: 'Ej. 60' },
+        { key: 'capacidad_personas', label: 'Capacidad aprox. de uso', type: 'number', placeholder: 'Personas' },
         { key: 'cubierta', label: 'Cubierta', options: ['Sin cubierta', 'Chapa metalica', 'Teja', 'Losa', 'Malla sombra', 'Otro'] },
         { key: 'estructura', label: 'Estructura', options: ['Metalica', 'Hormigon', 'Madera', 'Mixta', 'No verificable'] },
         { key: 'piso', label: 'Piso', options: ['Hormigon', 'Tierra', 'Cesped', 'Ceramica', 'Sintetico', 'Otro'] },
         { key: 'cerramiento', label: 'Cerramiento', options: ['Abierto', 'Parcial', 'Perimetral', 'Sin cerramiento'] },
         { key: 'drenaje', label: 'Drenaje', options: ['Bueno', 'Regular', 'Malo', 'No verificable'] },
         { key: 'iluminacion', label: 'Iluminacion', options: ['Tiene y funciona', 'Tiene con fallas', 'No tiene', 'No verificada'] },
-        { key: 'dimensiones_m', label: 'Dimensiones relevadas', placeholder: 'Ej. 18 x 12 m', wide: true },
+        { key: 'electricidad', label: 'Instalacion electrica', options: ['Tiene y funciona', 'Tiene con fallas', 'No tiene', 'No verificada'] },
+        { key: 'ventilacion', label: 'Ventilacion', options: ['Natural', 'Mecanica', 'Deficiente', 'No aplica'] },
+        { key: 'seguridad', label: 'Seguridad estructural', options: ['Sin riesgo visible', 'Riesgo leve', 'Riesgo moderado', 'Riesgo alto', 'No verificable'] },
+        { key: 'accesibilidad', label: 'Accesibilidad', options: ['Adecuada', 'Parcial', 'No accesible', 'No verificable'] },
+        { key: 'uso_compartido', label: 'Uso comunitario/compartido', options: ['No', 'Si', 'No verificable'] },
+        { key: 'mantenimiento', label: 'Mantenimiento', options: ['Bueno', 'Regular', 'Malo', 'No verificable'] },
+        { key: 'equipamiento', label: 'Equipamiento observado', placeholder: 'Ej. arcos, bancos, graderia, luminarias', wide: true },
       ],
       gallery: [
         { key: 'cubierta', label: 'Cubierta', options: ['Chapa metalica', 'Teja', 'Losa', 'Sin cubierta', 'Otro'] },
@@ -9000,7 +9059,7 @@ const MecFormModule = (() => {
           <small>${_escape(`${siteElements.length} elemento(s): galerias, tanques, recreacion y espacios libres`)}</small>
         </summary>
         <div class="school-plan-tree__children">
-          ${siteElements.map(_renderPlanSiteElementRow).join('')}
+          ${siteElements.map(_renderPlanSiteElementRowEnhanced).join('')}
         </div>
       </details>`;
   }
@@ -9087,6 +9146,27 @@ const MecFormModule = (() => {
         <strong>${_escape(item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`)}</strong>
         <small>${_escape([_siteElementLabel(item.type), item.ficha?.estado || 'Sin estado', item.ficha?.nota_i || item.ficha?.observacion || 'Sin nota'].filter(Boolean).join(' · '))}</small>
       </button>`;
+  }
+
+  function _renderPlanSiteElementRowEnhanced(item, index) {
+    const id = `site::${item.id}`;
+    const locked = _isSiteElementLocked(item);
+    const active = _selectedPlanId === id;
+    return `
+      <article class="school-plan-group ${active ? 'school-plan-group--open' : ''}">
+        <button class="school-plan-object school-plan-object--site ${locked ? 'school-plan-object--locked' : ''} ${active ? 'school-plan-object--active' : ''}" type="button"
+          ondblclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')"
+          onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
+          <span class="school-plan-object__type">${locked ? 'Exterior bloqueado' : 'Exterior'}</span>
+          <strong>${_escape(item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`)}</strong>
+          <small>${_escape([_siteElementLabel(item.type), item.ficha?.estado || 'Sin estado', item.ficha?.uso || item.ficha?.nota_i || item.ficha?.observacion || 'Sin nota'].filter(Boolean).join(' - '))}</small>
+        </button>
+        ${active ? `
+          <div class="school-plan-group__children school-plan-group__children--actions">
+            <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')">Editar ficha</button>
+            <button class="btn ${locked ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSiteElementLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
+          </div>` : ''}
+      </article>`;
   }
 
   function _selectedClassroomIdFromPlan() {
@@ -10983,6 +11063,12 @@ const MecFormModule = (() => {
               <label>Observacion</label>
               <textarea class="form-control" name="observacion" rows="3" ${disabled}>${_escape(element.ficha.observacion || '')}</textarea>
             </div>
+            <div class="mec-object-evidence">
+              <input id="site-element-photo-${_escape(element.id)}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
+                onchange="MecFormModule.setSiteElementEvidence('${_escape(element.id)}', this)" ${disabled}>
+              <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('site-element-photo-${_escape(element.id)}')?.click()" ${disabled}>Anexar foto</button>
+              <span id="site-element-photo-count-${_escape(element.id)}">${_escape(_evidenceLabel(element.ficha.evidencias || []))}</span>
+            </div>
           </form>
         </div>
         <div class="modal__footer">
@@ -11000,7 +11086,7 @@ const MecFormModule = (() => {
         return false;
     });
     modal.querySelectorAll('#form-site-element-ficha input, #form-site-element-ficha textarea').forEach(input => {
-      if (input.type === 'hidden') return;
+      if (input.type === 'hidden' || input.type === 'file') return;
       input.addEventListener('input', () => _persistSiteElementFicha(false));
       input.addEventListener('change', () => _persistSiteElementFicha(false));
     });
@@ -11044,6 +11130,12 @@ const MecFormModule = (() => {
     if (element.type === 'recreation') {
       element.shape = _normalizeRecreationShape(element.ficha.forma);
       element.ficha.forma = _recreationShapeLabel(element.shape);
+      const largo = Number(element.ficha.largo_m || 0);
+      const ancho = Number(element.ficha.ancho_m || 0);
+      if (largo > 0 && ancho > 0) {
+        if (!Number(element.ficha.superficie_m2 || 0)) element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
+        if (!Number(element.ficha.perimetro_m || 0)) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
+      }
       const size = _siteElementDefaultSize(element.type, element.shape);
       element.wRatio = size.wRatio;
       element.hRatio = size.hRatio;
@@ -11306,7 +11398,11 @@ const MecFormModule = (() => {
     const selectArea = area => {
       if (!area) return;
       suppressClick = true;
+      const alreadySelected = _selectedPlanId === area.id;
       selectPlanItem(area.id);
+      if (area.type === 'site-element' && alreadySelected) {
+        setTimeout(() => openSiteElementFicha(area.siteId), 80);
+      }
       setTimeout(() => { suppressClick = false; }, 120);
     };
     const isSelectableArea = area => Boolean(area?.id);
@@ -13029,6 +13125,25 @@ const MecFormModule = (() => {
         }));
       });
     });
+    (_data.__siteElements || []).forEach(element => {
+      (element.ficha?.evidencias || []).forEach((photo, photoIndex) => index.push({
+        fieldPath: `exteriores.${element.id}`,
+        index: photoIndex + 1,
+        name: photo.name,
+        indexedName: photo.indexedName || '',
+        label: photo.label || _evidenceIndexLabel(_siteElementEvidenceContext(element)),
+        type: photo.type,
+        size: photo.size,
+        capturedAt: photo.capturedAt,
+        driveStatus: photo.driveStatus || '',
+        driveFileId: photo.driveFileId || '',
+        driveUrl: photo.driveUrl || '',
+        driveFolderId: photo.driveFolderId || '',
+        uploadedAt: photo.uploadedAt || '',
+        evidenceId: photo.evidenceId || '',
+        context: photo.context || _siteElementEvidenceContext(element),
+      }));
+    });
     return index;
   }
 
@@ -13120,6 +13235,7 @@ const MecFormModule = (() => {
     closeSiteElementFicha,
     saveSiteElementFicha,
     setSiteElementLocked,
+    setSiteElementEvidence,
     newPlanClassroom,
     addPlanSanitary,
     deletePlanSelection,

@@ -1933,6 +1933,12 @@
   border-left: 2px solid rgba(43, 108, 176, .18);
 }
 
+.school-plan-group__children--actions {
+  display: flex;
+  flex-wrap: wrap;
+  padding: .4rem 0 0 .75rem;
+}
+
 .school-plan-object {
   width: 100%;
   min-height: 62px;

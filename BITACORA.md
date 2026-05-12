@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de ficha completa para exteriores y recreacion - 2026-05-12 - v2.5.58
+
+### Objetivo
+- Permitir que los elementos exteriores no solo se ubiquen y muevan, sino que puedan editarse con una ficha completa, especialmente los espacios de recreacion tipo tinglado/cancha/patio.
+
+### Cambios implementados
+- Al seleccionar un exterior en el arbol aparece un boton explicito `Editar ficha`, ademas de bloqueo/desbloqueo.
+- En el plano, un segundo toque/clic sobre el mismo exterior seleccionado abre su ficha, evitando depender del doble clic en tablet.
+- La ficha de `Espacio recreacion` ahora registra uso, actividad, largo, ancho, superficie, perimetro, capacidad, cubierta, estructura, piso, cerramiento, drenaje, iluminacion, electricidad, ventilacion, seguridad, accesibilidad, uso compartido, mantenimiento y equipamiento.
+- Al cargar largo y ancho de recreacion, se calculan automaticamente superficie y perimetro si estaban vacios.
+- Las fichas de exteriores ahora permiten anexar fotos, se guardan en la ficha y entran al indice de evidencias/exportacion.
+- Version y cache actualizados a `v2.5.58`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- Selenium/Chrome headless local: se creo `recreation`, se abrio ficha, se verificaron campos extendidos, control de foto y boton `Editar ficha`.
+- Selenium/Chrome headless local: al guardar largo `18` y ancho `12`, quedaron guardados `superficie_m2 = 216.00` y `perimetro_m = 60.00`.
+
+### Proximos pasos
+- Probar en tablet el flujo: insertar recreacion, moverla, tocarla de nuevo o usar `Editar ficha`, y registrar sus datos como ambiente exterior complejo.
+
+---
+
 ## Sesion de correccion real de insercion de exteriores - 2026-05-12 - v2.5.57
 
 ### Objetivo
