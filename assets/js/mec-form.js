@@ -8620,15 +8620,25 @@ const MecFormModule = (() => {
   }
 
   function _activeSchoolPlanRoot() {
-    return document.querySelector('.mec-module--active #mec-school-plan-root')
+    return document.querySelector('#module-plano.module-panel--active #school-plan-root')
+      || document.querySelector('#module-mec.module-panel--active .mec-module--active #mec-school-plan-root')
+      || document.querySelector('.module-panel--active [data-school-plan-root]')
+      || document.querySelector('.mec-module--active #mec-school-plan-root')
       || document.getElementById('school-plan-root')
       || document.getElementById('mec-school-plan-root');
   }
 
   function _activeSchoolPlanCanvas() {
-    return document.querySelector('.mec-module--active [data-school-plan-canvas]')
+    return document.querySelector('#module-plano.module-panel--active [data-school-plan-canvas]')
+      || document.querySelector('#module-mec.module-panel--active .mec-module--active [data-school-plan-canvas]')
+      || document.querySelector('.module-panel--active [data-school-plan-canvas]')
+      || document.querySelector('.mec-module--active [data-school-plan-canvas]')
       || document.getElementById(PLAN_CANVAS_ID)
       || document.getElementById('mec-school-plan-canvas');
+  }
+
+  function _isStandaloneSchoolPlanActive() {
+    return Boolean(document.querySelector('#module-plano.module-panel--active #school-plan-root'));
   }
 
   function _planKpi(label, value, note) {
@@ -10667,7 +10677,10 @@ const MecFormModule = (() => {
   function _showSchoolPlanAfterSiteInsert(element) {
     _selectedPlanId = `site::${element.id}`;
     _planMoveMode = true;
-    if (_activeModuleId !== 'plano') {
+    if (_isStandaloneSchoolPlanActive()) {
+      _saveDraft(false);
+      renderSchoolPlan();
+    } else if (_activeModuleId !== 'plano') {
       selectModule('plano');
     } else {
       _saveDraft(false);
@@ -10794,9 +10807,9 @@ const MecFormModule = (() => {
     const shape = type === 'recreation'
       ? _normalizeRecreationShape(data.get('forma') || data.get('shape_seed') || 'rectangle')
       : '';
-    const elements = _ensureSiteElements();
-    const next = elements.filter(item => item.type === type).length + 1;
+    const next = _ensureSiteElements().filter(item => item.type === type).length + 1;
     const position = _siteElementBlankPosition(type, origin, shape);
+    const elements = _ensureSiteElements();
     const element = {
       id: `site_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type,
@@ -10826,9 +10839,9 @@ const MecFormModule = (() => {
     if (!cfg) return null;
     _planLayers.exteriores = true;
     const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape || 'rectangle') : '';
-    const elements = _ensureSiteElements();
-    const next = elements.filter(item => item.type === type).length + 1;
+    const next = _ensureSiteElements().filter(item => item.type === type).length + 1;
     const position = _siteElementBlankPosition(type, origin, normalizedShape);
+    const elements = _ensureSiteElements();
     const element = {
       id: `site_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type,
@@ -10896,6 +10909,11 @@ const MecFormModule = (() => {
     }
     const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape) : '';
     const createAndEdit = () => _createPlanSiteElement(type, origin, normalizedShape);
+    if (_isStandaloneSchoolPlanActive()) {
+      renderSchoolPlan();
+      setTimeout(createAndEdit, 0);
+      return;
+    }
     if (_activeModuleId !== 'plano') {
       selectModule('plano');
       setTimeout(createAndEdit, 120);

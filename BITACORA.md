@@ -4,6 +4,28 @@
 
 ---
 
+## Sesion de correccion real de insercion de exteriores - 2026-05-12 - v2.5.57
+
+### Objetivo
+- Resolver definitivamente que tanque, pilar, galeria, espacio libre y recreacion no quedaban insertados en el plano general aunque el flujo de ficha respondiera.
+
+### Cambios implementados
+- El plano visible ahora se prioriza correctamente: en la vista principal `Plano escuela` se usa `#school-plan-root` activo, evitando dibujar en el plano interno oculto del cuestionario.
+- La insercion desde `Plano escuela` ya no cambia innecesariamente el modulo interno MEC; crea el elemento sobre el canvas visible.
+- Se corrigio la causa principal del guardado en cero: el calculo de espacio libre normalizaba `__siteElements` y dejaba obsoleta la referencia del arreglo donde luego se hacia `push`.
+- Tras calcular posicion, el codigo vuelve a tomar la lista vigente y recien ahi inserta el elemento.
+- Version y cache actualizados a `v2.5.57`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- Selenium/Chrome headless local: `+ Tanque` en `Plano escuela` guardo `__siteElements.length = 1`, tipo `water_tank`, canvas visible `school-plan-canvas`, ficha visible y fila exterior en el arbol.
+- Selenium/Chrome headless local: `+ Pilar`, `+ Espacio`, `+ Galeria` y `+ Recreacion` guardaron 4 elementos y 4 filas exteriores en el plano visible.
+
+### Proximos pasos
+- Probar en la app publicada con URL cache-buster que los botones de exteriores creen el elemento visible antes de completar ficha.
+
+---
+
 ## Sesion de ubicacion inmediata de exteriores - 2026-05-12 - v2.5.56
 
 ### Objetivo
