@@ -147,6 +147,11 @@ const MecFormModule = (() => {
 
   function _setValue(moduleId, fieldId, value) {
     _data[moduleId] = _data[moduleId] || {};
+    if (moduleId === 'bloques' && _isBlockLocked(_blockById(_data.__activeBlockId))) {
+      UI.showToast('Bloque bloqueado. Desbloqueelo con confirmacion antes de editar sus datos.', 'warning', 5200);
+      _render();
+      return;
+    }
     _data[moduleId][fieldId] = value;
     if (moduleId === 'bloques') _syncActiveBlock();
     _saveDraft(false);
@@ -739,12 +744,16 @@ const MecFormModule = (() => {
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newBlock()">+ Nuevo bloque</button>
+          <button class="btn ${_isBlockLocked(_blockById(_data.__activeBlockId)) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setActiveBlockLocked(${_isBlockLocked(_blockById(_data.__activeBlockId)) ? 'false' : 'true'})">
+            ${_isBlockLocked(_blockById(_data.__activeBlockId)) ? 'Desbloquear bloque' : 'Bloquear bloque'}
+          </button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveBlock()">Eliminar bloque activo</button>
           <span class="mec-autosave-pill">Autoguardado</span>
+          ${_isBlockLocked(_blockById(_data.__activeBlockId)) ? '<span class="mec-lock-pill">Bloque bloqueado</span>' : ''}
         </div>
         <div class="mec-repeat-list">
           ${(_data.__blocks || []).map(block => `
-            <button class="mec-repeat-item ${block.id === _data.__activeBlockId ? 'mec-repeat-item--active' : ''}" type="button"
+            <button class="mec-repeat-item ${block.id === _data.__activeBlockId ? 'mec-repeat-item--active' : ''} ${_isBlockLocked(block) ? 'school-plan-object--locked' : ''}" type="button"
               onclick="MecFormModule.selectBlock('${_escape(block.id)}')">
               <strong>${_escape(block.bloque_codigo || 'Bloque 1')}</strong>
               <span>${_escape(_blockSummary(block))}</span>
@@ -1595,6 +1604,7 @@ const MecFormModule = (() => {
     if (_activeClassroomId || _data.__classroomSketch?.id) _syncActiveClassroomFromSketch();
     _data.__allowEmptyClassrooms = false;
     const block = _blockById(_data.__activeBlockId);
+    if (!_assertBlockUnlocked(block, 'agregar aulas')) return;
     const blockLength = Number(block?.largo_m || 0);
     const blockWidth = Number(block?.ancho_m || 0);
     const floor = _activeFloor();
@@ -1670,6 +1680,143 @@ const MecFormModule = (() => {
     await setActiveClassroomLocked(locked);
   }
 
+  function _isBlockLocked(block) {
+    return Boolean(block?.locked);
+  }
+
+  function _assertBlockUnlocked(block = _blockById(_data.__activeBlockId), action = 'modificar este bloque') {
+    if (!_isBlockLocked(block)) return true;
+    UI.showToast(`Bloque bloqueado. Desbloqueelo con confirmacion antes de ${action}.`, 'warning', 5200);
+    return false;
+  }
+
+  function _setBlockLockState(blockId, locked) {
+    const block = _blockById(blockId);
+    if (!block) return null;
+    block.locked = Boolean(locked);
+    block.lockedAt = locked ? new Date().toISOString() : '';
+    if (block.id === _data.__activeBlockId) {
+      _data.bloques = {
+        ...(_data.bloques || {}),
+        locked: block.locked,
+        lockedAt: block.lockedAt,
+      };
+    }
+    return block;
+  }
+
+  async function setActiveBlockLocked(locked) {
+    _syncActiveBlock();
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('No hay bloque activo para bloquear.', 'warning');
+      return;
+    }
+    const next = Boolean(locked);
+    if (_isBlockLocked(block) === next) {
+      UI.showToast(next ? 'El bloque ya esta bloqueado.' : 'El bloque ya esta desbloqueado.', 'info');
+      return;
+    }
+    const title = next ? 'Bloquear bloque' : 'Desbloquear bloque';
+    const message = next
+      ? `Confirma bloquear ${_escape(block.bloque_codigo || 'este bloque')} para evitar cambios accidentales en sus datos, posicion y ambientes?`
+      : `Confirma desbloquear ${_escape(block.bloque_codigo || 'este bloque')} y permitir cambios nuevamente?`;
+    const confirmed = await UI.showConfirm(title, message);
+    if (!confirmed) return;
+    _setBlockLockState(block.id, next);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast(next ? 'Bloque bloqueado.' : 'Bloque desbloqueado para edicion.', 'success');
+  }
+
+  async function setPlanBlockLocked(id, locked) {
+    const block = _blockById(id);
+    if (!block) {
+      UI.showToast('Seleccione un bloque valido.', 'warning');
+      return;
+    }
+    if (_data.__activeBlockId !== block.id) {
+      _syncActiveBlock();
+      _data.__activeBlockId = block.id;
+      const { id: _id, ...values } = block;
+      _data.bloques = values;
+    }
+    await setActiveBlockLocked(locked);
+  }
+
+  function _isSanitaryLocked(item) {
+    return Boolean(item?.locked);
+  }
+
+  function _assertSanitaryUnlocked(item, action = 'modificar este sanitario') {
+    if (!_isSanitaryLocked(item)) return true;
+    UI.showToast(`Sanitario bloqueado. Desbloqueelo con confirmacion antes de ${action}.`, 'warning', 5200);
+    return false;
+  }
+
+  async function setSanitaryLocked(id, locked) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) {
+      UI.showToast('Seleccione un sanitario valido.', 'warning');
+      return;
+    }
+    const next = Boolean(locked);
+    if (_isSanitaryLocked(item) === next) {
+      UI.showToast(next ? 'El sanitario ya esta bloqueado.' : 'El sanitario ya esta desbloqueado.', 'info');
+      return;
+    }
+    const title = next ? 'Bloquear sanitario' : 'Desbloquear sanitario';
+    const message = next
+      ? `Confirma bloquear ${_escape(item.codigo || 'este sanitario')} para evitar ediciones accidentales?`
+      : `Confirma desbloquear ${_escape(item.codigo || 'este sanitario')} y permitir cambios nuevamente?`;
+    const confirmed = await UI.showConfirm(title, message);
+    if (!confirmed) return;
+    item.locked = next;
+    item.lockedAt = next ? new Date().toISOString() : '';
+    if (_activeSanitaryId === item.id && next) _selectedSanitaryObjectId = null;
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast(next ? 'Sanitario bloqueado.' : 'Sanitario desbloqueado para edicion.', 'success');
+  }
+
+  function _isSiteElementLocked(element) {
+    return Boolean(element?.locked);
+  }
+
+  function _assertSiteElementUnlocked(element, action = 'modificar este espacio') {
+    if (!_isSiteElementLocked(element)) return true;
+    UI.showToast(`Espacio bloqueado. Desbloqueelo con confirmacion antes de ${action}.`, 'warning', 5200);
+    return false;
+  }
+
+  async function setSiteElementLocked(id, locked) {
+    const element = _ensureSiteElements().find(item => item.id === id);
+    if (!element) {
+      UI.showToast('Seleccione un espacio valido.', 'warning');
+      return;
+    }
+    const next = Boolean(locked);
+    if (_isSiteElementLocked(element) === next) {
+      UI.showToast(next ? 'El espacio ya esta bloqueado.' : 'El espacio ya esta desbloqueado.', 'info');
+      return;
+    }
+    const title = next ? 'Bloquear espacio' : 'Desbloquear espacio';
+    const message = next
+      ? `Confirma bloquear ${_escape(element.ficha?.codigo || _siteElementLabel(element.type))} para evitar cambios accidentales?`
+      : `Confirma desbloquear ${_escape(element.ficha?.codigo || _siteElementLabel(element.type))} y permitir cambios nuevamente?`;
+    const confirmed = await UI.showConfirm(title, message);
+    if (!confirmed) return;
+    element.locked = next;
+    element.lockedAt = next ? new Date().toISOString() : '';
+    _saveDraft(false);
+    renderSchoolPlan();
+    _redrawSketchCanvas();
+    _redrawSanitaryCanvas();
+    UI.showToast(next ? 'Espacio bloqueado.' : 'Espacio desbloqueado para edicion.', 'success');
+  }
+
   function _ensureBlocks() {
     _data.__blocks = _data.__blocks || [];
     _data.bloques = _data.bloques || {};
@@ -1704,6 +1851,8 @@ const MecFormModule = (() => {
       wRatio: Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : _siteElementDefaultSize(item.type || 'open_space').wRatio,
       hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : _siteElementDefaultSize(item.type || 'open_space').hRatio,
       ficha: { ..._defaultSiteElementFicha(item.type || 'open_space', index + 1), ...(item.ficha || {}) },
+      locked: Boolean(item.locked),
+      lockedAt: item.lockedAt || '',
     }));
     return _data.__siteElements;
   }
@@ -1784,6 +1933,7 @@ const MecFormModule = (() => {
 
   function _blockSummary(block) {
     return [
+      _isBlockLocked(block) ? 'Bloqueado' : '',
       block.estado_bloque || '',
       block.cantidad_plantas ? `${block.cantidad_plantas} planta(s)` : '',
       block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : '',
@@ -1899,6 +2049,7 @@ const MecFormModule = (() => {
       UI.showToast('No hay bloque activo para eliminar piso.', 'warning');
       return;
     }
+    if (!_assertBlockUnlocked(block, 'eliminar pisos')) return;
     const floor = _activeFloor();
     const floorNumber = _floorNumberValue(floor);
     const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === floor);
@@ -1907,6 +2058,11 @@ const MecFormModule = (() => {
     const lockedRooms = rooms.filter(_isClassroomLocked);
     if (lockedRooms.length) {
       UI.showToast(`No se puede eliminar el piso: ${lockedRooms.length} aula(s) bloqueada(s). Desbloqueelas primero.`, 'warning', 6200);
+      return;
+    }
+    const lockedSanitaries = sanitaries.filter(_isSanitaryLocked);
+    if (lockedSanitaries.length) {
+      UI.showToast(`No se puede eliminar el piso: ${lockedSanitaries.length} sanitario(s) bloqueado(s). Desbloqueelos primero.`, 'warning', 6200);
       return;
     }
     if (!rooms.length && !sanitaries.length && configuredFloors <= 1) {
@@ -1953,11 +2109,17 @@ const MecFormModule = (() => {
       UI.showToast('No hay bloque activo para eliminar.', 'warning');
       return;
     }
+    if (!_assertBlockUnlocked(block, 'eliminarlo')) return;
     const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id);
     const sanitaries = (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
     const lockedRooms = rooms.filter(_isClassroomLocked);
     if (lockedRooms.length) {
       UI.showToast(`No se puede eliminar el bloque: ${lockedRooms.length} aula(s) bloqueada(s). Desbloqueelas primero.`, 'warning', 6200);
+      return;
+    }
+    const lockedSanitaries = sanitaries.filter(_isSanitaryLocked);
+    if (lockedSanitaries.length) {
+      UI.showToast(`No se puede eliminar el bloque: ${lockedSanitaries.length} sanitario(s) bloqueado(s). Desbloqueelos primero.`, 'warning', 6200);
       return;
     }
     const confirmed = await UI.showConfirm(
@@ -2328,12 +2490,13 @@ const MecFormModule = (() => {
 
   function _renderSanitaryListItem(item, index) {
     const active = item.id === _activeSanitaryId;
+    const locked = _isSanitaryLocked(item);
     const roomObject = _sanitaryRoomObject(item);
     const dims = item.largo_m && item.ancho_m
       ? `${item.largo_m} x ${item.ancho_m} m`
       : (roomObject ? _sanitaryDimensionsFromObject(item, roomObject) : 'Sin medidas');
     return `
-      <button class="mec-repeat-item ${active ? 'mec-repeat-item--active' : ''}" type="button"
+      <button class="mec-repeat-item ${active ? 'mec-repeat-item--active' : ''} ${locked ? 'school-plan-object--locked' : ''}" type="button"
         onclick="MecFormModule.selectSanitary('${_escape(item.id)}')">
         <strong>${_escape([_sanitaryBlockLabel(item), item.planta, item.codigo || `Sanitario ${index + 1}`].filter(Boolean).join(' · '))}</strong>
         <span>${_escape([dims, item.uso, item.genero, item.estado].filter(Boolean).join(' · '))}</span>
@@ -2343,6 +2506,8 @@ const MecFormModule = (() => {
   function _renderSanitaryFloorEditor(item) {
     const canvasId = 'mec-sanitary-canvas';
     const dims = item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : 'Sin medidas';
+    const locked = _isSanitaryLocked(item);
+    const disabled = locked ? 'disabled' : '';
     return `
       <div class="mec-sketch__layout mec-sanitary-editor">
         <div class="mec-sketch__tools">
@@ -2353,10 +2518,14 @@ const MecFormModule = (() => {
             </div>
           </div>
           <div class="mec-sketch__actions">
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'door')">+ Puerta</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'window')">+ Ventana</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')">+ Cbn</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')">Eliminar cbn</button>
+            <button class="btn ${locked ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear sanitario' : 'Bloquear sanitario'}</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openSelectedSanitaryFicha()">Ficha sanitario</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'door')" ${disabled}>+ Puerta</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'window')" ${disabled}>+ Ventana</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryStall('${_escape(item.id)}')" ${disabled}>+ Cbn</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.deleteSanitaryStall('${_escape(item.id)}')" ${disabled}>Eliminar cbn</button>
+            <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+            <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
             <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')">Eliminar sanitario</button>
           </div>
         </div>
@@ -2373,12 +2542,10 @@ const MecFormModule = (() => {
           ${_renderSanitarySelectionPanel(item)}
           ${_renderSanitaryElementTools(item)}
           ${_renderSiteElementToolset('sanitario')}
-          ${_renderSanitaryCabinPanel(item)}
-          ${_renderSanitaryObjectPanel(item)}
           <small id="mec-sanitary-status">${_escape(_sanitaryStatusText(item))}</small>
         </div>
       </div>
-      <details class="mec-sanitary-details">
+      <details class="mec-sanitary-details" hidden>
         <summary>Ficha del sanitario</summary>
         <div class="form-grid">
           <div class="form-group">
@@ -2434,6 +2601,9 @@ const MecFormModule = (() => {
           </div>
           <div class="mec-selection-dock__actions">
             <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSelectedSanitaryFicha()">Ficha sanitario</button>
+            <button class="btn ${_isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})">${_isSanitaryLocked(item) ? 'Desbloquear' : 'Bloquear'}</button>
+            <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+            <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
             <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')">Eliminar</button>
           </div>
         </div>`;
@@ -2449,6 +2619,8 @@ const MecFormModule = (() => {
         <div class="mec-selection-dock__actions">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSelectedSanitaryObjectFicha()">Ficha</button>
           ${selected.type === 'door' ? '<button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.flipSelectedSanitaryDoorSwing()">Apertura</button>' : ''}
+          <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+          <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSelectedSanitaryObject()">Eliminar</button>
         </div>
       </div>`;
@@ -2613,12 +2785,13 @@ const MecFormModule = (() => {
   }
 
   function _renderSanitaryElementTools(item) {
+    const disabled = _isSanitaryLocked(item) ? 'disabled' : '';
     return `
       <div class="mec-sketch-toolset mec-sketch-toolset--sanitary" aria-label="Elementos para insertar en el sanitario">
         ${SANITARY_EXTRA_TOOLS.map(tool => `
           <button class="mec-sketch-tool" type="button"
             title="${_escape(tool.label)}"
-            onclick="MecFormModule.addSanitaryElement('${_escape(item.id)}', '${_escape(tool.id)}')">
+            onclick="MecFormModule.addSanitaryElement('${_escape(item.id)}', '${_escape(tool.id)}')" ${disabled}>
             <span class="mec-sketch-tool__icon" aria-hidden="true">${_sketchToolIcon(tool.id)}</span>
             <span>${_escape(tool.label)}</span>
           </button>`).join('')}
@@ -2960,6 +3133,8 @@ const MecFormModule = (() => {
 
   function addSanitary() {
     _ensureSanitaries();
+    const block = _blockById(_data.__activeBlockId);
+    if (!_assertBlockUnlocked(block, 'agregar sanitarios')) return;
     const next = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || []).length + 1;
     const item = _sanitaryTemplate(next);
     _ensureSanitaryPlan(item, true);
@@ -2975,6 +3150,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     const fixture = SANITARY_FIXTURES.find(tool => tool.id === fixtureId);
     if (!item || !fixture) return;
+    if (!_assertSanitaryUnlocked(item, 'agregar artefactos')) return;
     const next = Math.max(0, Number(item[fixture.field] || 0)) + 1;
     item[fixture.field] = String(next);
     const room = _ensureSanitaryRoomObject(item);
@@ -3020,6 +3196,7 @@ const MecFormModule = (() => {
   function addSanitaryOpening(id, type) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item || !['door', 'window'].includes(type)) return;
+    if (!_assertSanitaryUnlocked(item, 'agregar aberturas')) return;
     const room = _ensureSanitaryRoomObject(item);
     if (!room) return;
     const size = _defaultSketchSize(type);
@@ -3048,6 +3225,7 @@ const MecFormModule = (() => {
   function addSanitaryElement(id, type) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item || !SANITARY_EXTRA_TOOLS.some(tool => tool.id === type)) return;
+    if (!_assertSanitaryUnlocked(item, 'agregar elementos')) return;
     const room = _ensureSanitaryRoomObject(item);
     if (!room) return;
     const center = { x: room.x + room.w / 2, y: room.y + room.h / 2 };
@@ -3101,6 +3279,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const object = item?.objects?.find(child => child.id === objectId);
     if (!item || !object) return;
+    if (!_assertSanitaryUnlocked(item, 'editar fichas')) return;
     object.ficha = { ..._defaultSanitaryObjectFicha(item, object.type), ...(object.ficha || {}) };
     object.ficha[key] = String(value || '').trim();
     if (key === 'ubicacion' && _isCeilingOrWallPointObject(object)) {
@@ -3125,6 +3304,10 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const object = item?.objects?.find(child => child.id === objectId);
     if (!item || !object) return;
+    if (!_assertSanitaryUnlocked(item, 'anexar fotos')) {
+      input.value = '';
+      return;
+    }
     object.ficha = { ..._defaultSanitaryObjectFicha(item, object.type), ...(object.ficha || {}) };
     const current = object.ficha.evidencias || [];
     const context = {
@@ -3145,6 +3328,10 @@ const MecFormModule = (() => {
   function setSanitaryValue(id, key, value, rerender = true) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'editar la ficha')) {
+      if (rerender) _render();
+      return;
+    }
     item[key] = key === 'planta' ? _normalizeFloor(value) : value;
     if (key === 'planta') _setActiveFloor(item[key]);
     if (key === 'bloque') {
@@ -3166,6 +3353,7 @@ const MecFormModule = (() => {
   function regenerateSanitaryPlan(id) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'regenerar el croquis')) return;
     _ensureSanitaryPlan(item, true);
     _saveDraft(false);
     _render();
@@ -3175,6 +3363,7 @@ const MecFormModule = (() => {
   function addSanitaryStall(id) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'agregar cabinas')) return;
     _ensureSanitaryPlan(item);
     const room = _ensureSanitaryRoomObject(item);
     const next = item.plano.cabinas.length + 1;
@@ -3275,6 +3464,7 @@ const MecFormModule = (() => {
     const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
     const fixture = SANITARY_CABIN_FIXTURES.find(tool => tool.id === fixtureId);
     if (!item || !stall || !fixture) return;
+    if (!_assertSanitaryUnlocked(item, 'agregar componentes de cabina')) return;
     const fixtures = _ensureStallFixtures(stall);
     if (!fixtures.some(current => current.id === fixtureId)) fixtures.push({ id: fixtureId, estado: item.estado || fixture.defaultState || 'Bueno' });
     _selectedSanitaryObjectId = stall.id;
@@ -3287,6 +3477,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
     if (!item || !stall) return;
+    if (!_assertSanitaryUnlocked(item, 'editar la cabina')) return;
     stall.ficha = { codigo: 'Cbn', estado: item.estado || 'Bueno', puerta: 'Con puerta', nota_i: '', ...(stall.ficha || {}) };
     stall.ficha[key] = String(value || '').trim();
     if (key === 'codigo') {
@@ -3307,6 +3498,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
     if (!item || !stall || key !== 'estado') return;
+    if (!_assertSanitaryUnlocked(item, 'editar componentes de cabina')) return;
     const fixture = _ensureStallFixtures(stall).find(current => current.id === fixtureId);
     if (!fixture) return;
     fixture.estado = value;
@@ -3320,6 +3512,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
     if (!item || !stall) return;
+    if (!_assertSanitaryUnlocked(item, 'quitar componentes de cabina')) return;
     stall.ficha = stall.ficha || {};
     stall.ficha.fixtures = _ensureStallFixtures(stall).filter(current => current.id !== fixtureId);
     _selectedSanitaryObjectId = stall.id;
@@ -3331,6 +3524,7 @@ const MecFormModule = (() => {
   async function deleteSanitaryStall(id) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'eliminar cabinas')) return;
     _ensureSanitaryPlan(item);
     const stalls = (item.objects || []).filter(child => child.type === 'stall');
     if (!item.plano.cabinas.length && !stalls.length) {
@@ -3352,6 +3546,10 @@ const MecFormModule = (() => {
   async function setSanitaryEvidence(id, input) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'anexar fotos')) {
+      input.value = '';
+      return;
+    }
     const current = item.evidencias || [];
     const added = await Promise.all([...input.files].map(file => _readEvidenceFile(file, _sanitaryEvidenceContext(item))));
     item.evidencias = [...current, ...added];
@@ -3362,13 +3560,84 @@ const MecFormModule = (() => {
   }
 
   function openSelectedSanitaryFicha() {
-    const details = document.querySelector('.mec-sanitary-details');
-    if (details) {
-      details.open = true;
-      details.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      details.classList.add('mec-selection-pulse');
-      setTimeout(() => details.classList.remove('mec-selection-pulse'), 1100);
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
+    if (!item) {
+      UI.showToast('Seleccione un sanitario para editar su ficha.', 'warning');
+      return;
     }
+    const locked = _isSanitaryLocked(item);
+    const modalId = 'modal-sanitary-ficha';
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeSanitaryFicha()"></div>
+      <div class="modal__panel modal__panel--wide">
+        <div class="modal__header">
+          <h3>Ficha sanitaria - ${_escape(item.codigo || 'Sanitario')}</h3>
+          <button class="modal__close" onclick="MecFormModule.closeSanitaryFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          ${locked ? '<div class="mec-lock-notice">Sanitario bloqueado: desbloqueelo con confirmacion para modificar datos o mover elementos.</div>' : ''}
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Sanitario</label>
+              <input class="form-control" type="text" value="${_escape(item.codigo || '')}" readonly aria-readonly="true">
+            </div>
+            ${_sanitaryInput(item, 'bloque', 'Bloque', 'text')}
+            ${_sanitaryInput(item, 'planta', 'Piso', 'number')}
+            ${_sanitaryInput(item, 'tipo', 'Tipo', 'text')}
+            ${_sanitaryInput(item, 'largo_m', 'Largo', 'number', '0.1')}
+            ${_sanitaryInput(item, 'ancho_m', 'Ancho', 'number', '0.1')}
+            ${_sanitaryInput(item, 'inodoros', 'Inodoros', 'number')}
+            ${_sanitaryInput(item, 'lavamanos', 'Lavamanos', 'number')}
+            ${_sanitaryInput(item, 'urinarios', 'Urinarios', 'number')}
+            ${_sanitaryInput(item, 'duchas', 'Duchas', 'number')}
+          </div>
+          <div class="mec-sanitary-groups">
+            <div><label class="mec-label"><span>Uso principal</span></label>${_renderSanitaryChoice('uso', item.id, ['Estudiantes', 'Docentes', 'Administrativo', 'Publico', 'Otro'], item.uso)}</div>
+            <div><label class="mec-label"><span>Genero / destino</span></label>${_renderSanitaryChoice('genero', item.id, ['Mujeres', 'Varones', 'Mixto', 'Inclusivo', 'No definido'], item.genero)}</div>
+            <div><label class="mec-label"><span>Accesible</span></label>${_renderSanitaryChoice('accesible', item.id, ['Si, cumple', 'Si, parcial', 'No', 'No verificable'], item.accesible)}</div>
+            <div><label class="mec-label"><span>Cuenta con agua</span></label>${_renderSanitaryChoice('agua', item.id, ['Si', 'Intermitente', 'No'], item.agua)}</div>
+            <div><label class="mec-label"><span>Estado general</span></label>${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}</div>
+            <div><label class="mec-label"><span>Limpieza</span></label>${_renderSanitaryChoice('limpieza', item.id, ['Buena', 'Regular', 'Mala', 'No verificable'], item.limpieza)}</div>
+            <div><label class="mec-label"><span>Privacidad</span></label>${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}</div>
+            <div><label class="mec-label"><span>Desague</span></label>${_renderSanitaryChoice('desague', item.id, ['Red cloacal', 'Camara septica', 'Pozo ciego', 'Letrina', 'Otro', 'No verificable'], item.desague)}</div>
+          </div>
+          <div class="mec-object-note" role="note">
+            <span aria-hidden="true">i</span>
+            <p>Nota (i): registre excepciones, estado operativo, privacidad, agua, desague o pendientes para gabinete.</p>
+          </div>
+          <label class="mec-label"><span>Observacion</span></label>
+          <textarea class="form-control" rows="3"
+            oninput="MecFormModule.setSanitaryValue('${_escape(item.id)}', 'observacion', this.value, false)"
+            onchange="MecFormModule.setSanitaryValue('${_escape(item.id)}', 'observacion', this.value)">${_escape(item.observacion || '')}</textarea>
+          <div class="mec-object-evidence">
+            <input id="sanitary-modal-photo-${_escape(item.id)}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
+              onchange="MecFormModule.setSanitaryEvidence('${_escape(item.id)}', this)">
+            <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('sanitary-modal-photo-${_escape(item.id)}')?.click()" ${locked ? 'disabled' : ''}>Sacar foto</button>
+            <span>${_escape(_evidenceLabel(item.evidencias || []))}</span>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
+          <button class="btn btn-primary" onclick="MecFormModule.closeSanitaryFicha()">Cerrar ficha</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal(modalId);
+  }
+
+  function closeSanitaryFicha() {
+    const modal = document.getElementById('modal-sanitary-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 250);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
   }
 
   function openSelectedSanitaryObjectFicha() {
@@ -3382,12 +3651,97 @@ const MecFormModule = (() => {
       openSanitaryStallFicha(item.id, object.id);
       return;
     }
-    const panel = document.querySelector('.mec-sanitary-cabin-panel[open]');
-    if (panel) {
-      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      panel.classList.add('mec-selection-pulse');
-      setTimeout(() => panel.classList.remove('mec-selection-pulse'), 1100);
-    }
+    object.ficha = { ..._defaultSanitaryObjectFicha(item, object.type), ...(object.ficha || {}) };
+    const locked = _isSanitaryLocked(item);
+    const modalId = 'modal-sanitary-object-ficha';
+    const evidenceId = `sanitary-object-modal-photo-${_escape(item.id)}-${_escape(object.id)}`;
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeSanitaryObjectFicha()"></div>
+      <div class="modal__panel modal__panel--wide">
+        <div class="modal__header">
+          <h3>Ficha objeto sanitario - ${_escape(object.ficha.codigo || _sanitaryObjectShort(object.type))}</h3>
+          <button class="modal__close" onclick="MecFormModule.closeSanitaryObjectFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          ${locked ? '<div class="mec-lock-notice">Sanitario bloqueado: desbloqueelo con confirmacion para modificar esta ficha.</div>' : ''}
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Codigo</label>
+              <input class="form-control" value="${_escape(object.ficha.codigo || '')}"
+                oninput="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'codigo', this.value, false)"
+                onchange="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'codigo', this.value, false)" ${locked ? 'disabled' : ''}>
+            </div>
+            <div class="form-group">
+              <label>Tipo</label>
+              ${_buttonChoiceGroup(
+                [_sanitaryObjectLabel(object.type), object.ficha.subtipo || 'Estandar', 'Otro'].filter((value, index, list) => value && list.indexOf(value) === index),
+                object.ficha.subtipo || _sanitaryObjectLabel(object.type),
+                option => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'subtipo', '${_escape(option)}', false)`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+            <div class="form-group">
+              <label>Estado</label>
+              ${_buttonChoiceGroup(
+                SANITARY_FIXTURE_STATES,
+                object.ficha.estado || '',
+                state => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'estado', '${_escape(state)}', false)`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+            ${_isCeilingOrWallPointObject(object) ? `
+              <div class="form-group">
+                <label>Ubicacion</label>
+                ${_buttonChoiceGroup(
+                  ['Techo', 'Pared'],
+                  object.ficha.ubicacion || 'Techo',
+                  value => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'ubicacion', '${_escape(value)}', false)`,
+                  'mec-choice-buttons--compact'
+                )}
+              </div>` : ''}
+          </div>
+          <div class="mec-object-note" role="note">
+            <span aria-hidden="true">i</span>
+            <p>Nota (i): registre condicion, ubicacion precisa, faltantes, excepciones o requerimientos de reparacion.</p>
+          </div>
+          <label class="mec-label"><span>Observacion</span></label>
+          <textarea class="form-control" rows="3"
+            oninput="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'observacion', this.value, false)"
+            onchange="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'observacion', this.value, false)" ${locked ? 'disabled' : ''}>${_escape(object.ficha.observacion || '')}</textarea>
+          <label class="mec-label"><span>Nota (i)</span></label>
+          <textarea class="form-control" rows="2"
+            oninput="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'nota_i', this.value, false)"
+            onchange="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'nota_i', this.value, false)" ${locked ? 'disabled' : ''}>${_escape(object.ficha.nota_i || '')}</textarea>
+          <div class="mec-object-evidence">
+            <input id="${evidenceId}" type="file" accept="image/*" capture="environment" multiple style="display:none;"
+              onchange="MecFormModule.setSanitaryObjectEvidence('${_escape(item.id)}', '${_escape(object.id)}', this)">
+            <button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${evidenceId}')?.click()" ${locked ? 'disabled' : ''}>Anexar foto</button>
+            <span>${_escape(_evidenceLabel(object.ficha.evidencias || []))}</span>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-outline" onclick="MecFormModule.flipSelectedSanitaryDoorSwing()" ${object.type === 'door' && !locked ? '' : 'disabled'}>Apertura</button>
+          <button class="btn btn-danger" onclick="MecFormModule.deleteSelectedSanitaryObject()" ${locked ? 'disabled' : ''}>Eliminar</button>
+          <button class="btn btn-primary" onclick="MecFormModule.closeSanitaryObjectFicha()">Cerrar ficha</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal(modalId);
+  }
+
+  function closeSanitaryObjectFicha() {
+    const modal = document.getElementById('modal-sanitary-object-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 250);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
   }
 
   function flipSelectedSanitaryDoorSwing() {
@@ -3417,6 +3771,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const object = (item?.objects || []).find(child => child.id === objectId && child.type !== 'sanitary-room');
     if (!item || !object) return;
+    if (!_assertSanitaryUnlocked(item, 'eliminar elementos')) return;
     const label = object.ficha?.codigo || _sanitaryObjectLabel(object.type);
     const confirmed = await UI.showConfirm('Eliminar elemento sanitario', `¿Confirma eliminar ${_escape(label)} de ${_escape(item.codigo || 'este sanitario')}?`);
     if (!confirmed) return;
@@ -3439,6 +3794,8 @@ const MecFormModule = (() => {
   }
 
   async function deleteSanitary(id) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (item && !_assertSanitaryUnlocked(item, 'eliminarlo')) return;
     const confirmed = await UI.showConfirm('Eliminar sanitario', '¿Desea quitar este sanitario del relevamiento?');
     if (!confirmed) return;
     _data.__sanitaries = (_data.__sanitaries || []).filter(sanitary => sanitary.id !== id);
@@ -3632,14 +3989,24 @@ const MecFormModule = (() => {
         resizingObject = handleHit;
         mutationRecorded = false;
       } else if (sanitaryHit) {
+        _selectedPlanId = `sanitary::${sanitaryHit.item.id}`;
+        if (!_assertSanitaryUnlocked(sanitaryHit.item, 'moverlo')) {
+          _drawSketch(ctx, canvas);
+          _updateSketchStatus();
+          return;
+        }
         movingSanitary = sanitaryHit;
         moveOffset = { x: point.x - sanitaryHit.object.x, y: point.y - sanitaryHit.object.y };
-        _selectedPlanId = `sanitary::${sanitaryHit.item.id}`;
         mutationRecorded = false;
       } else if (siteHit) {
+        _selectedPlanId = `site::${siteHit.item.id}`;
+        if (!_assertSiteElementUnlocked(siteHit.item, 'moverlo')) {
+          _drawSketch(ctx, canvas);
+          _updateSketchStatus();
+          return;
+        }
         movingSite = siteHit;
         moveOffset = { x: point.x - siteHit.rect.x, y: point.y - siteHit.rect.y };
-        _selectedPlanId = `site::${siteHit.item.id}`;
         mutationRecorded = false;
       } else if (selected) {
         if (!_assertClassroomUnlocked(_activeClassroomRecord(), 'mover el aula o sus elementos')) {
@@ -3978,11 +4345,13 @@ const MecFormModule = (() => {
       if (event.type === 'mousedown') window.addEventListener('mouseup', end, { once: true });
       const point = pointFromEvent(event);
       const logical = _canvasLogicalSize(canvas, SKETCH_CANVAS.width, SKETCH_CANVAS.height);
+      const activeItem = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
       dragStartPoint = point;
       dragStarted = false;
       mutationRecorded = false;
       const rotateHit = _findSanitaryOpeningRotateHandleAt(point);
       if (rotateHit && rotateHit.id === _selectedSanitaryObjectId) {
+        if (!_assertSanitaryUnlocked(activeItem, 'cambiar apertura')) return;
         _selectedSanitaryObjectId = rotateHit.id;
         _flipOpeningSwing(rotateHit);
         _saveDraft(false);
@@ -3995,6 +4364,7 @@ const MecFormModule = (() => {
       if (handleHit) {
         const resizeSelectedChild = handleHit.scope === 'child' && handleHit.object.id === _selectedSanitaryObjectId;
         if (handleHit.scope === 'room' || resizeSelectedChild || !objectHit) {
+          if (!_assertSanitaryUnlocked(activeItem, 'redimensionar el sanitario o sus objetos')) return;
           resizing = handleHit;
           if (handleHit.scope === 'child') _selectedSanitaryObjectId = handleHit.object.id;
           else _selectedSanitaryObjectId = null;
@@ -4005,6 +4375,11 @@ const MecFormModule = (() => {
       }
       if (objectHit) {
         _selectedSanitaryObjectId = objectHit.object.id;
+        if (!_assertSanitaryUnlocked(activeItem, 'mover elementos')) {
+          _drawSanitarySketch(ctx, canvas);
+          _updateSanitaryStatus();
+          return;
+        }
         movingObject = objectHit;
         moveOffset = _moveOffsetForObject(objectHit.object, point);
         _drawSanitarySketch(ctx, canvas);
@@ -4015,6 +4390,11 @@ const MecFormModule = (() => {
       if (hit) {
         _activeSanitaryId = hit.item.id;
         _selectedSanitaryObjectId = null;
+        if (!_assertSanitaryUnlocked(hit.item, 'mover el sanitario')) {
+          _drawSanitarySketch(ctx, canvas);
+          _updateSanitaryStatus();
+          return;
+        }
         movingRoom = hit;
         moveOffset = { x: point.x - hit.object.x, y: point.y - hit.object.y };
         _drawSanitarySketch(ctx, canvas);
@@ -4030,9 +4410,14 @@ const MecFormModule = (() => {
       }
       const siteHit = _findSiteElementAt(point, logical);
       if (siteHit) {
+        _selectedPlanId = `site::${siteHit.item.id}`;
+        if (!_assertSiteElementUnlocked(siteHit.item, 'moverlo')) {
+          _drawSanitarySketch(ctx, canvas);
+          _updateSanitaryStatus();
+          return;
+        }
         movingSite = siteHit;
         moveOffset = { x: point.x - siteHit.rect.x, y: point.y - siteHit.rect.y };
-        _selectedPlanId = `site::${siteHit.item.id}`;
         _drawSanitarySketch(ctx, canvas);
         _updateSanitaryStatus();
       }
@@ -4120,6 +4505,8 @@ const MecFormModule = (() => {
       const logical = _canvasLogicalSize(canvas, SKETCH_CANVAS.width, SKETCH_CANVAS.height);
       const objectHit = _findSanitaryChildObjectAt(point);
       if (objectHit?.object?.type === 'door') {
+        const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
+        if (!_assertSanitaryUnlocked(item, 'cambiar apertura')) return;
         _selectedSanitaryObjectId = objectHit.object.id;
         _flipOpeningSwing(objectHit.object);
         _saveDraft(false);
@@ -5614,6 +6001,7 @@ const MecFormModule = (() => {
     const item = hit?.item;
     const rect = hit?.rect || (item ? _siteElementRect(item, logical.width, logical.height) : null);
     if (!item || !rect) return;
+    if (!_assertSiteElementUnlocked(item, 'moverlo')) return;
     const width = logical.width || SKETCH_CANVAS.width;
     const height = logical.height || SKETCH_CANVAS.height;
     const clamped = _clampPlanRect({
@@ -5678,6 +6066,7 @@ const MecFormModule = (() => {
     const object = hit?.object;
     const item = hit?.item;
     if (!object || !item) return;
+    if (!_assertSanitaryUnlocked(item, 'moverlo')) return;
     const previous = { x: object.x, y: object.y };
     const rect = _snapSanitaryRoomRect(item, { x: point.x - offset.x, y: point.y - offset.y, w: object.w, h: object.h });
     object.x = rect.x;
@@ -5701,6 +6090,7 @@ const MecFormModule = (() => {
     const object = hit?.object;
     const item = hit?.item;
     if (!object || !item) return;
+    if (!_assertSanitaryUnlocked(item, 'mover elementos')) return;
     const previous = { x: object.x, y: object.y };
     if (object.type === 'wall') {
       object.x1 = point.x - offset.x1;
@@ -7667,6 +8057,91 @@ const MecFormModule = (() => {
     openSelectedSketchFicha();
   }
 
+  function openClassroomFicha() {
+    const room = _activeClassroomRecord();
+    if (!room) {
+      UI.showToast('Seleccione un aula para abrir su ficha.', 'warning');
+      return;
+    }
+    const locked = _isClassroomLocked(room);
+    const modalId = 'modal-classroom-ficha';
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closeClassroomFicha()"></div>
+      <div class="modal__panel modal__panel--wide">
+        <div class="modal__header">
+          <h3>Ficha de aula - ${_escape(_classroomHierarchyLabel(room) || room.name || 'Aula')}</h3>
+          <button class="modal__close" onclick="MecFormModule.closeClassroomFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          ${locked ? '<div class="mec-lock-notice">Aula bloqueada: desbloqueela con confirmacion para modificar datos o mover elementos.</div>' : ''}
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Aula</label>
+              <input class="form-control" type="text" value="${_escape(room.name || '')}" readonly aria-readonly="true">
+            </div>
+            <div class="form-group">
+              <label>Piso</label>
+              <input class="form-control" type="number" min="1" step="1" value="${_escape(String(room.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}"
+                onchange="MecFormModule.setSketchField('floorNumber', this.value)" ${locked ? 'disabled' : ''}>
+            </div>
+            <div class="form-group">
+              <label>Largo</label>
+              <div class="mec-input-with-unit">
+                <input class="form-control" type="number" min="0" step="0.1" value="${_escape(room.length || '')}"
+                  onchange="MecFormModule.setSketchField('length', this.value)" ${locked ? 'disabled' : ''}>
+                <span class="mec-unit">m</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Ancho</label>
+              <div class="mec-input-with-unit">
+                <input class="form-control" type="number" min="0" step="0.1" value="${_escape(room.width || '')}"
+                  onchange="MecFormModule.setSketchField('width', this.value)" ${locked ? 'disabled' : ''}>
+                <span class="mec-unit">m</span>
+              </div>
+            </div>
+            <div class="form-group form-group--wide">
+              <label>Estado del aula</label>
+              ${_buttonChoiceGroup(
+                ['Operativa', 'En construccion', 'Derrumbada / colapsada', 'Clausurada', 'Sin uso', 'No verificable'],
+                room.estado || '',
+                option => `MecFormModule.setSketchField('estado', '${_escape(option)}')`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+          </div>
+          <div class="mec-object-note" role="note">
+            <span aria-hidden="true">i</span>
+            <p>Nota (i): registre condiciones especiales, obra, clausura, faltantes o cualquier criterio que deba revisarse en gabinete.</p>
+          </div>
+          <label class="mec-label"><span>Aberturas / observacion</span></label>
+          <textarea class="form-control" rows="3"
+            onchange="MecFormModule.setSketchField('openings', this.value)" ${locked ? 'disabled' : ''}>${_escape(room.openings || '')}</textarea>
+        </div>
+        <div class="modal__footer">
+          <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setActiveClassroomLocked(${locked ? 'false' : 'true'})">${locked ? 'Desbloquear aula' : 'Bloquear aula'}</button>
+          <button class="btn btn-primary" onclick="MecFormModule.closeClassroomFicha()">Cerrar ficha</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal(modalId);
+  }
+
+  function closeClassroomFicha() {
+    const modal = document.getElementById('modal-classroom-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 250);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+  }
+
   function openSelectedSketchFicha() {
     const object = _findSketchObjectById(_selectedSketchObjectId);
     if (!object) {
@@ -7674,11 +8149,7 @@ const MecFormModule = (() => {
       return;
     }
     if (object.type === 'room') {
-      const panel = document.querySelector('.mec-sketch-meta');
-      panel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      panel?.classList.add('mec-selection-pulse');
-      setTimeout(() => panel?.classList.remove('mec-selection-pulse'), 1100);
-      UI.showToast('Ficha del aula activa: estado, medidas, bloque, piso y observaciones.', 'info');
+      openClassroomFicha();
       return;
     }
     openSketchObjectFicha(object.id);
@@ -7935,6 +8406,8 @@ const MecFormModule = (() => {
           <small>${_escape(context.detail)}</small>
         </div>
         <div class="school-plan-builder__actions">
+          <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
+          <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
           ${context.actions.map(action => `
             <button class="btn ${_escape(action.tone || 'btn-outline')} btn-sm" type="button" onclick="${_escape(action.onClick)}">
               ${_escape(action.label)}
@@ -7971,6 +8444,7 @@ const MecFormModule = (() => {
         detail: `${block.estado_bloque || 'Sin estado'} · ${floors.length} piso(s) · ${block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : 'Sin dimensiones'}`,
         actions: [
           { label: 'Abrir bloque', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: _isBlockLocked(block) ? 'Desbloquear bloque' : 'Bloquear bloque', tone: _isBlockLocked(block) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setPlanBlockLocked('${_escape(block.id)}', ${_isBlockLocked(block) ? 'false' : 'true'})` },
           { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
           { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
           { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
@@ -8026,6 +8500,7 @@ const MecFormModule = (() => {
           actions: [
             { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
             { label: 'Abrir sanitario', onClick: `MecFormModule.editPlanSanitary('${_escape(item.id)}')` },
+            { label: _isSanitaryLocked(item) ? 'Desbloquear sanitario' : 'Bloquear sanitario', tone: _isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})` },
             { label: 'Eliminar', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
           ],
         };
@@ -8035,6 +8510,7 @@ const MecFormModule = (() => {
         detail: `${_sanitaryBlockLabel(item)} · ${_normalizeFloor(item.planta || 'Piso 1')} · ${item.estado || item.tipo || 'Sin estado'}`,
         actions: [
           { label: 'Abrir sanitario', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: _isSanitaryLocked(item) ? 'Desbloquear sanitario' : 'Bloquear sanitario', tone: _isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})` },
           { label: '+ Cabina', onClick: 'MecFormModule.addPlanSanitaryStall()' },
           { label: '+ Inodoro', onClick: "MecFormModule.addPlanSanitaryFixture('toilet')" },
           { label: '+ Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')" },
@@ -8063,6 +8539,7 @@ const MecFormModule = (() => {
         detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · exterior del predio`,
         actions: [
           { label: 'Editar ficha', tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
+          { label: _isSiteElementLocked(element) ? 'Desbloquear espacio' : 'Bloquear espacio', tone: _isSiteElementLocked(element) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setSiteElementLocked('${_escape(element.id)}', ${_isSiteElementLocked(element) ? 'false' : 'true'})` },
           { label: '+ Tanque', onClick: "MecFormModule.addPlanSiteElement('water_tank')" },
           { label: '+ Recreacion', onClick: "MecFormModule.addPlanSiteElement('recreation')" },
           { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
@@ -8154,11 +8631,12 @@ const MecFormModule = (() => {
 
   function _renderPlanSanitaryRow(item, index) {
     const id = `sanitary::${item.id}`;
+    const locked = _isSanitaryLocked(item);
     return `
-      <button class="school-plan-object school-plan-object--sanitary ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
+      <button class="school-plan-object school-plan-object--sanitary ${locked ? 'school-plan-object--locked' : ''} ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
         ondblclick="MecFormModule.editPlanSanitary('${_escape(item.id)}')"
         onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
-        <span class="school-plan-object__type">Sanitario</span>
+        <span class="school-plan-object__type">${locked ? 'Sanitario bloqueado' : 'Sanitario'}</span>
         <strong>${_escape(item.codigo || `Sanitario ${index + 1}`)}</strong>
         <small>${_escape([item.bloque, item.planta, item.inodoros ? `${item.inodoros} inod.` : '', item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : 'Sin medidas'].filter(Boolean).join(' · '))}</small>
       </button>`;
@@ -8166,11 +8644,12 @@ const MecFormModule = (() => {
 
   function _renderPlanSiteElementRow(item, index) {
     const id = `site::${item.id}`;
+    const locked = _isSiteElementLocked(item);
     return `
-      <button class="school-plan-object school-plan-object--site ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
+      <button class="school-plan-object school-plan-object--site ${locked ? 'school-plan-object--locked' : ''} ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
         ondblclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')"
         onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
-        <span class="school-plan-object__type">Exterior</span>
+        <span class="school-plan-object__type">${locked ? 'Exterior bloqueado' : 'Exterior'}</span>
         <strong>${_escape(item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`)}</strong>
         <small>${_escape([_siteElementLabel(item.type), item.ficha?.estado || 'Sin estado', item.ficha?.nota_i || item.ficha?.observacion || 'Sin nota'].filter(Boolean).join(' · '))}</small>
       </button>`;
@@ -9675,6 +10154,8 @@ const MecFormModule = (() => {
     _selectedPlanId = `site::${element.id}`;
     element.ficha = { ..._defaultSiteElementFicha(element.type), ...(element.ficha || {}) };
     const cfg = _siteElementConfig(element.type);
+    const locked = _isSiteElementLocked(element);
+    const disabled = locked ? 'disabled' : '';
     const modalId = 'modal-site-element-ficha';
     document.getElementById(modalId)?.remove();
     const modal = document.createElement('div');
@@ -9689,12 +10170,13 @@ const MecFormModule = (() => {
           <button class="modal__close" onclick="MecFormModule.closeSiteElementFicha()">&times;</button>
         </div>
         <div class="modal__body">
+          ${locked ? '<div class="mec-lock-notice">Espacio bloqueado: desbloqueelo con confirmacion para modificar ficha o posicion.</div>' : ''}
           <form id="form-site-element-ficha" class="mec-object-form">
             <input type="hidden" name="element_id" value="${_escape(element.id)}">
             <div class="form-grid">
               <div class="form-group">
                 <label>Codigo corto</label>
-                <input class="form-control" name="codigo" value="${_escape(element.ficha.codigo || cfg.short)}" maxlength="18">
+                <input class="form-control" name="codigo" value="${_escape(element.ficha.codigo || cfg.short)}" maxlength="18" ${disabled}>
               </div>
               <div class="form-group">
                 <label>Tipo</label>
@@ -9711,22 +10193,27 @@ const MecFormModule = (() => {
             </div>
             <div class="form-group">
               <label>Nota (i)</label>
-              <textarea class="form-control" name="nota_i" rows="2">${_escape(element.ficha.nota_i || '')}</textarea>
+              <textarea class="form-control" name="nota_i" rows="2" ${disabled}>${_escape(element.ficha.nota_i || '')}</textarea>
             </div>
             <div class="form-group">
               <label>Observacion</label>
-              <textarea class="form-control" name="observacion" rows="3">${_escape(element.ficha.observacion || '')}</textarea>
+              <textarea class="form-control" name="observacion" rows="3" ${disabled}>${_escape(element.ficha.observacion || '')}</textarea>
             </div>
           </form>
         </div>
         <div class="modal__footer">
+          <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setSiteElementLocked('${_escape(element.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
           <button class="btn btn-outline" onclick="MecFormModule.closeSiteElementFicha()">Cancelar</button>
-          <button class="btn btn-primary" onclick="MecFormModule.saveSiteElementFicha()">Guardar ficha</button>
+          <button class="btn btn-primary" onclick="MecFormModule.saveSiteElementFicha()" ${disabled}>Guardar ficha</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
     modal.querySelectorAll('.mec-choice').forEach(button => {
       button.addEventListener('click', () => {
+        if (_isSiteElementLocked(element)) {
+          _assertSiteElementUnlocked(element, 'editar la ficha');
+          return;
+        }
         const group = button.closest('.mec-choice-buttons');
         const input = group?.previousElementSibling;
         if (!group || !input) return;
@@ -9762,6 +10249,7 @@ const MecFormModule = (() => {
     const data = new FormData(form);
     const element = _ensureSiteElements().find(item => item.id === data.get('element_id'));
     if (!element) return false;
+    if (!_assertSiteElementUnlocked(element, 'editar la ficha')) return false;
     ['codigo', 'subtipo', 'estado', 'nota_i', 'observacion'].forEach(key => {
       if (data.has(key)) element.ficha[key] = String(data.get(key) || '').trim();
     });
@@ -9835,6 +10323,7 @@ const MecFormModule = (() => {
       }
       const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
       if (!item) return;
+      if (!_assertSanitaryUnlocked(item, 'eliminarlo')) return;
       const confirmed = await UI.showConfirm('Eliminar sanitario', `¿Confirma eliminar ${_escape(item.codigo || 'este sanitario')} del plano y del relevamiento?`);
       if (!confirmed) return;
       _data.__sanitaries = (_data.__sanitaries || []).filter(sanitary => sanitary.id !== sanitaryId);
@@ -9848,6 +10337,7 @@ const MecFormModule = (() => {
       const elementId = String(_selectedPlanId).replace('site::', '');
       const element = (_data.__siteElements || []).find(item => item.id === elementId);
       if (!element) return;
+      if (!_assertSiteElementUnlocked(element, 'eliminarlo')) return;
       const confirmed = await UI.showConfirm('Eliminar elemento exterior', `¿Confirma eliminar ${_escape(element.ficha?.codigo || _siteElementLabel(element.type))}?`);
       if (!confirmed) return;
       _data.__siteElements = (_data.__siteElements || []).filter(item => item.id !== elementId);
@@ -9910,6 +10400,7 @@ const MecFormModule = (() => {
 
   function _moveSanitaryRoomWithChildren(item, object, targetX, targetY) {
     if (!item || !object) return;
+    if (!_assertSanitaryUnlocked(item, 'moverlo')) return;
     const bounds = _sketchBlockRect();
     const next = _clampRectToBounds({ x: targetX, y: targetY, w: object.w, h: object.h }, bounds);
     const dx = Math.round(next.x - object.x);
@@ -9940,6 +10431,7 @@ const MecFormModule = (() => {
   function _movePlanBlock(blockId, targetX, targetY, rect) {
     const block = _blockById(blockId);
     if (!block || !rect) return null;
+    if (!_assertBlockUnlocked(block, 'moverlo')) return null;
     const logicalWidth = 900;
     const logicalHeight = _planCanvasHeight();
     const clamped = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
@@ -9964,6 +10456,7 @@ const MecFormModule = (() => {
   function _movePlanSiteElement(elementId, targetX, targetY, rect) {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
+    if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
     const logicalWidth = 900;
     const logicalHeight = _planCanvasHeight();
     const clamped = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
@@ -10078,6 +10571,19 @@ const MecFormModule = (() => {
       _hideCanvasHoverTooltip();
       if (movedTooFar(pointerStart, currentPoint)) {
         if (_planMoveMode && ['block', 'site-element'].includes(pointerCandidate.type)) {
+          if (pointerCandidate.type === 'block' && !_assertBlockUnlocked(_blockById(pointerCandidate.blockId), 'moverlo')) {
+            pointerCandidate = null;
+            event.preventDefault();
+            return;
+          }
+          if (pointerCandidate.type === 'site-element') {
+            const element = _ensureSiteElements().find(item => item.id === pointerCandidate.siteId);
+            if (!_assertSiteElementUnlocked(element, 'moverlo')) {
+              pointerCandidate = null;
+              event.preventDefault();
+              return;
+            }
+          }
           blockDrag = {
             type: pointerCandidate.type,
             blockId: pointerCandidate.blockId,
@@ -11761,11 +12267,15 @@ const MecFormModule = (() => {
     newBlock,
     saveCurrentBlock,
     deleteActiveBlock,
+    setActiveBlockLocked,
+    setPlanBlockLocked,
     selectClassroom,
     newClassroom,
     saveCurrentClassroom,
     setActiveClassroomLocked,
     setPlanClassroomLocked,
+    openClassroomFicha,
+    closeClassroomFicha,
     deleteActiveClassroom,
     deleteActiveFloor,
     addSanitary,
@@ -11780,7 +12290,10 @@ const MecFormModule = (() => {
     setSanitaryStallFixture,
     removeSanitaryStallFixture,
     openSelectedSanitaryFicha,
+    closeSanitaryFicha,
     openSelectedSanitaryObjectFicha,
+    closeSanitaryObjectFicha,
+    setSanitaryLocked,
     flipSelectedSanitaryDoorSwing,
     deleteSelectedSanitaryObject,
     openSanitaryStallFicha,
@@ -11810,6 +12323,7 @@ const MecFormModule = (() => {
     openSiteElementFicha,
     closeSiteElementFicha,
     saveSiteElementFicha,
+    setSiteElementLocked,
     newPlanClassroom,
     addPlanSanitary,
     deletePlanSelection,

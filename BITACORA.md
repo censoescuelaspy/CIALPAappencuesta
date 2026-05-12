@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de fichas flotantes y bloqueo integral - 2026-05-12 - v2.5.50
+
+### Objetivo
+- Hacer que las fichas de edicion del registro arquitectonico se abran siempre como ventanas flotantes y ampliar el bloqueo/desbloqueo con confirmacion a bloques, sanitarios y espacios exteriores.
+
+### Cambios implementados
+- La ficha de aula seleccionada ahora abre en modal flotante; ya no desplaza al panel de datos lateral.
+- La ficha general del sanitario y la ficha de cada objeto sanitario ahora abren como modales flotantes.
+- Los paneles incrustados de cabina/objeto sanitario dejaron de mostrarse bajo el lienzo; la edicion se centraliza en `Ficha`.
+- Se agrego bloqueo/desbloqueo con confirmacion para bloques, sanitarios y espacios exteriores.
+- El bloqueo impide edicion, movimiento, borrado, fotos y cambios accidentales desde botones, inputs y arrastre.
+- Deshacer/Rehacer quedan visibles en el constructor contextual del plano y tambien junto a las acciones de ficha/eliminar en el sanitario.
+- Version y cache actualizados a `v2.5.50`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `rg` para confirmar modales de aula/sanitario/objeto sanitario, funciones de bloqueo y cache/version `v2.5.50`.
+
+### Proximos pasos
+- Probar en tablet Android/iPad que los modales flotantes no tapen controles criticos y que el bloqueo sea claro antes de trabajo de campo.
+- Evaluar historial independiente de deshacer/rehacer para sanitarios y elementos exteriores; hoy el historial principal sigue centrado en el croquis de aula.
+
+---
+
 ## Sesion de exteriores multi-plano y bloqueo de aulas - 2026-05-12 - v2.5.49
 
 ### Objetivo
