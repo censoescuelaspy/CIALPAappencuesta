@@ -1425,35 +1425,44 @@
 
 .school-plan__kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: .75rem;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: .4rem;
 }
 
 .school-plan-kpi {
-  min-height: 104px;
-  padding: .85rem;
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: .12rem;
+  padding: .48rem .58rem;
   border: 1px solid #dbe5f1;
-  border-radius: var(--radius-md);
-  background: #fff;
-  box-shadow: var(--shadow-sm);
+  border-radius: 8px;
+  background: #fbfdff;
+  box-shadow: none;
 }
 
 .school-plan-kpi span {
   display: block;
   color: #667085;
-  font-size: .76rem;
+  font-size: .62rem;
   font-weight: 800;
+  line-height: 1.1;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .school-plan-kpi strong {
   display: block;
-  margin: .3rem 0 .22rem;
+  margin: 0;
   color: #172033;
-  font-size: 1.42rem;
+  font-size: 1.02rem;
+  line-height: 1.05;
 }
 
 .school-plan-kpi small {
+  display: none;
   color: #718096;
   line-height: 1.25;
 }
@@ -2387,21 +2396,21 @@
   }
 
   .school-plan__kpis {
-    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
-    gap: .45rem;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: .35rem;
   }
 
   .school-plan-kpi {
-    min-height: 74px;
-    padding: .55rem;
+    min-height: 48px;
+    padding: .4rem .48rem;
   }
 
   .school-plan-kpi span {
-    font-size: .66rem;
+    font-size: .58rem;
   }
 
   .school-plan-kpi strong {
-    font-size: 1.08rem;
+    font-size: .94rem;
   }
 
   .school-plan-builder {
@@ -2711,16 +2720,16 @@
   }
 
   .school-plan__kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .school-plan-kpi {
-    min-height: 64px;
-    padding: .45rem;
+    min-height: 44px;
+    padding: .35rem .42rem;
   }
 
   .school-plan-kpi strong {
-    font-size: .96rem;
+    font-size: .88rem;
   }
 
   .school-plan__toolbar {
@@ -2978,13 +2987,13 @@
 }
 
 .school-plan-kpi {
-  min-height: 92px;
-  padding: .75rem;
+  min-height: 54px;
+  padding: .48rem .58rem;
 }
 
 .school-plan-kpi strong {
-  margin: .22rem 0 .14rem;
-  font-size: 1.22rem;
+  margin: 0;
+  font-size: 1.02rem;
 }
 
 .school-plan__legend {

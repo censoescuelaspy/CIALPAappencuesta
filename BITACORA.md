@@ -4,6 +4,28 @@
 
 ---
 
+## Sesion de KPIs compactos en plano escuela - 2026-05-12 - v2.5.55
+
+### Objetivo
+- Evitar que los KPIs de `Plano escuela` ocupen demasiado espacio vertical y retrasen el acceso al area de trazado.
+
+### Cambios implementados
+- Los KPIs del plano se movieron desde la cabecera de la vista hacia el final, debajo del plano y del arbol de elementos.
+- Las tarjetas de KPIs se compactaron: menor altura, menor relleno, tipografia reducida y notas secundarias ocultas dentro de la tarjeta.
+- Las notas de cada KPI se conservan como ayuda emergente al pasar el cursor.
+- Version y cache actualizados a `v2.5.55`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Proximos pasos
+- Probar en tablet que el primer pantallazo del `Plano escuela` deje visible el constructor y la zona de dibujo sin obligar a desplazarse por los KPIs.
+
+---
+
 ## Sesion de fichas previas y ubicacion libre de exteriores - 2026-05-12 - v2.5.54
 
 ### Objetivo

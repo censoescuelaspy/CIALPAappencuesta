@@ -8539,25 +8539,25 @@ const MecFormModule = (() => {
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
     const canvasHeight = _planCanvasHeight();
     root.dataset.planCanvasId = canvasId;
+    const kpis = `
+      <section class="school-plan__kpis" aria-label="Resumen del plano">
+        ${_planKpi('Area construida relevada', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
+        ${_planKpi('Aulas cargadas', metrics.rooms, 'Ambientes dibujados')}
+        ${_planKpi('Bloques', metrics.blocks, 'Bloques registrados')}
+        ${_planKpi('Sanitarios', metrics.sanitaries, 'Baterias o banos cargados')}
+        ${_planKpi('Exteriores', metrics.siteElements, 'Tanques, galerias y recreacion')}
+        ${_planKpi('Puertas', metrics.doors, _stateSummaryText(metrics.states.door))}
+        ${_planKpi('Ventanas', metrics.windows, _stateSummaryText(metrics.states.window))}
+        ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
+        ${_planKpi('Tableros aula', metrics.switchboards, _stateSummaryText(metrics.states.switchboard))}
+        ${_planKpi('Luces', metrics.lights, _stateSummaryText(metrics.states.light))}
+        ${_planKpi('Ventiladores', metrics.fans, _stateSummaryText(metrics.states.fan))}
+        ${_planKpi('Aires', metrics.acs, _stateSummaryText(metrics.states.ac))}
+        ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
+      </section>`;
 
     root.innerHTML = `
       <div class="school-plan">
-        <section class="school-plan__kpis">
-          ${_planKpi('Area construida relevada', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
-          ${_planKpi('Aulas cargadas', metrics.rooms, 'Ambientes dibujados')}
-          ${_planKpi('Bloques', metrics.blocks, 'Bloques registrados')}
-          ${_planKpi('Sanitarios', metrics.sanitaries, 'Baterias o banos cargados')}
-          ${_planKpi('Exteriores', metrics.siteElements, 'Tanques, galerias y recreacion')}
-          ${_planKpi('Puertas', metrics.doors, _stateSummaryText(metrics.states.door))}
-          ${_planKpi('Ventanas', metrics.windows, _stateSummaryText(metrics.states.window))}
-          ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
-          ${_planKpi('Tableros aula', metrics.switchboards, _stateSummaryText(metrics.states.switchboard))}
-          ${_planKpi('Luces', metrics.lights, _stateSummaryText(metrics.states.light))}
-          ${_planKpi('Ventiladores', metrics.fans, _stateSummaryText(metrics.states.fan))}
-          ${_planKpi('Aires', metrics.acs, _stateSummaryText(metrics.states.ac))}
-          ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
-        </section>
-
         ${_renderPlanBuilderPanel()}
 
         <section class="school-plan__layout">
@@ -8611,6 +8611,7 @@ const MecFormModule = (() => {
             ${_renderPlanHierarchyTree()}
           </aside>
         </section>
+        ${kpis}
       </div>`;
 
     _drawSchoolPlan();
@@ -8632,7 +8633,7 @@ const MecFormModule = (() => {
 
   function _planKpi(label, value, note) {
     return `
-      <article class="school-plan-kpi">
+      <article class="school-plan-kpi" title="${_escape(note || '')}">
         <span>${_escape(label)}</span>
         <strong>${_escape(value)}</strong>
         <small>${_escape(note || '')}</small>
