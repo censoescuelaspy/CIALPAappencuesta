@@ -1003,6 +1003,29 @@
   line-height: 1.35;
 }
 
+.mec-criteria-help {
+  display: grid;
+  gap: .32rem;
+  padding: .65rem .75rem;
+  border: 1px solid #c7d7ea;
+  border-left: 4px solid #2b6cb0;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #344054;
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.mec-criteria-help strong {
+  color: #173f68;
+  font-size: .78rem;
+  text-transform: uppercase;
+}
+
+.mec-criteria-help span {
+  display: block;
+}
+
 .mec-object-evidence span {
   color: #617083;
   font-size: .84rem;
@@ -1719,6 +1742,109 @@
 .school-plan__list {
   display: grid;
   gap: .5rem;
+}
+
+.school-plan-tree {
+  display: grid;
+  gap: .58rem;
+}
+
+.school-plan-tree__branch,
+.school-plan-tree__floor {
+  position: relative;
+}
+
+.school-plan-tree__summary {
+  min-height: 46px;
+  display: grid;
+  gap: .1rem;
+  padding: .58rem .66rem .58rem 1.9rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #27364a;
+  cursor: pointer;
+  list-style: none;
+  touch-action: manipulation;
+}
+
+.school-plan-tree__summary::-webkit-details-marker {
+  display: none;
+}
+
+.school-plan-tree__summary::before {
+  content: ">";
+  position: absolute;
+  left: .72rem;
+  top: .62rem;
+  color: #2b6cb0;
+  font-size: 1rem;
+  font-weight: 900;
+  transition: transform .16s ease;
+}
+
+.school-plan-tree__branch[open] > .school-plan-tree__summary::before,
+.school-plan-tree__floor[open] > .school-plan-tree__summary::before {
+  transform: rotate(90deg);
+}
+
+.school-plan-tree__summary span,
+.school-plan-tree__summary small {
+  display: block;
+}
+
+.school-plan-tree__summary span {
+  color: #172033;
+  font-size: .88rem;
+  font-weight: 900;
+}
+
+.school-plan-tree__summary small {
+  color: #667085;
+  font-size: .74rem;
+  line-height: 1.25;
+}
+
+.school-plan-tree__summary--block {
+  border-color: #c7d7ea;
+  background: #f1f7ff;
+}
+
+.school-plan-tree__summary--floor {
+  min-height: 40px;
+  background: #fff;
+}
+
+.school-plan-tree__summary--site {
+  border-color: #bbf7d0;
+  background: #f7fef9;
+}
+
+.school-plan-tree__branch--locked > .school-plan-tree__summary {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.school-plan-tree__children {
+  display: grid;
+  gap: .45rem;
+  margin: .44rem 0 0 .72rem;
+  padding-left: .78rem;
+  border-left: 2px solid rgba(43, 108, 176, .22);
+}
+
+.school-plan-tree__children--floor {
+  margin-left: .42rem;
+  border-left-color: rgba(23, 32, 51, .16);
+}
+
+.school-plan-tree__empty {
+  margin: 0;
+  padding: .42rem .52rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #667085;
+  font-size: .78rem;
 }
 
 .school-plan-group {

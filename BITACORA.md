@@ -4,6 +4,57 @@
 
 ---
 
+## Sesion de colisiones sanitarias, pisos visibles y criterios de formulario - 2026-05-12 - v2.5.52
+
+### Objetivo
+- Impedir que los sanitarios se superpongan con aulas u otros sanitarios del mismo piso, reforzar la lectura de pisos en el plano global y considerar los criterios del documento `R00_CRITERIOS DE FORMULARIO.docx` dentro del flujo de registro.
+
+### Cambios implementados
+- El movimiento y redimensionado del sanitario ahora usa una busqueda de rectangulo libre y vuelve a la ultima posicion valida si el area invade otra aula o sanitario del mismo piso.
+- La colocacion programatica desde el plano general tambien valida choques antes de mover el sanitario con sus objetos internos.
+- Cada piso del plano global ahora se dibuja como una tarjeta separada con borde propio, encabezado `Bloque - Piso` y resaltado de seleccion.
+- Se agregaron ayudas de criterio de campo dentro de fichas de puertas, ventanas, tomacorrientes, aire acondicionado y escaleras/rampas.
+- Las mismas ayudas se muestran tambien en fichas de objetos sanitarios cuando corresponden.
+- Version y cache actualizados a `v2.5.52`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Proximos pasos
+- Probar en tablet el arrastre de sanitarios entre aulas contiguas para confirmar que el bloqueo de superposicion se siente natural.
+- Convertir criterios restantes del documento en ayudas especificas cuando se agreguen campos de pintura de aula y accesibilidad general al modelo.
+
+---
+
+## Sesion de arbol jerarquico y acciones rapidas - 2026-05-12 - v2.5.51
+
+### Objetivo
+- Ordenar el constructor del plano para que el encuestador vea claramente la relacion bloque > piso > aula/sanitario > elementos, y reunir bloqueo/desbloqueo con las acciones rapidas de deshacer, rehacer y eliminar.
+
+### Cambios implementados
+- El panel lateral del plano general ahora muestra un arbol desplegable por bloques, pisos, aulas, sanitarios y predio exterior.
+- Los sanitarios despliegan sus objetos internos cuando estan seleccionados, igual que las aulas con sus elementos.
+- Predio exterior agrupa galerias, tanques, recreacion, espacios libres y pilares en una rama propia.
+- El boton Bloquear/Desbloquear se movio junto a Deshacer, Rehacer y Eliminar en el plano general, constructor contextual, aula y sanitario.
+- Se elimino la repeticion de acciones de eliminacion dentro del grupo contextual para que la barra rapida sea el punto unico de acciones criticas.
+- Agregado estilo visual de ramas, sangrias y estados bloqueados para mejorar lectura en escritorio y tablet.
+- Version y cache actualizados a `v2.5.51`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Proximos pasos
+- Probar el arbol en tablet con tactil para ajustar densidad, apertura de ramas y seleccion accidental si fuera necesario.
+- Evaluar persistir ramas abiertas por usuario para que el panel recuerde el punto exacto de trabajo entre cambios de vista.
+
+---
+
 ## Sesion de fichas flotantes y bloqueo integral - 2026-05-12 - v2.5.50
 
 ### Objetivo

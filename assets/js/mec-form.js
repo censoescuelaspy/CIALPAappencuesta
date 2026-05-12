@@ -1113,6 +1113,7 @@ const MecFormModule = (() => {
           ${object.type === 'door' ? '<button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.flipSelectedDoorSwing()">Apertura</button>' : ''}
           <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
           <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
+          <button class="btn ${_isClassroomLocked(_activeClassroomRecord()) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setActiveClassroomLocked(${_isClassroomLocked(_activeClassroomRecord()) ? 'false' : 'true'})">${_isClassroomLocked(_activeClassroomRecord()) ? 'Desbloquear' : 'Bloquear'}</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSelectedSketchObject()">Eliminar</button>
         </div>
       </div>`;
@@ -1515,6 +1516,40 @@ const MecFormModule = (() => {
       .filter(candidate => !blockers.some(other => _rectsOverlap(candidate, other, gap)))
       .sort((a, b) => _rectDistance(a, desired) - _rectDistance(b, desired));
     return valid[0] || desired;
+  }
+
+  function _rectOverlapsAny(rect, blockers = [], gap = 0) {
+    return (blockers || []).some(other => _rectsOverlap(rect, other, gap));
+  }
+
+  function _nearestFreeRectInBounds(rect, blockers = [], bounds = _sketchBlockRect(), gap = 0) {
+    const desired = _clampRectToBounds(rect, bounds);
+    if (!_rectOverlapsAny(desired, blockers, gap)) return desired;
+    const candidates = [
+      desired,
+      { ...desired, x: bounds.x, y: bounds.y },
+      { ...desired, x: bounds.x + bounds.w - desired.w, y: bounds.y },
+      { ...desired, x: bounds.x, y: bounds.y + bounds.h - desired.h },
+      { ...desired, x: bounds.x + bounds.w - desired.w, y: bounds.y + bounds.h - desired.h },
+    ];
+    blockers.forEach(other => {
+      candidates.push(
+        { ...desired, x: other.x - desired.w - gap, y: other.y },
+        { ...desired, x: other.x + other.w + gap, y: other.y },
+        { ...desired, x: other.x, y: other.y - desired.h - gap },
+        { ...desired, x: other.x, y: other.y + other.h + gap },
+      );
+    });
+    const step = Math.max(10, Math.min(18, Math.round(Math.min(desired.w, desired.h) / 2)));
+    for (let y = bounds.y; y <= bounds.y + bounds.h - desired.h; y += step) {
+      for (let x = bounds.x; x <= bounds.x + bounds.w - desired.w; x += step) {
+        candidates.push({ ...desired, x, y });
+      }
+    }
+    return candidates
+      .map(candidate => _clampRectToBounds(candidate, bounds))
+      .filter(candidate => !_rectOverlapsAny(candidate, blockers, gap))
+      .sort((a, b) => _rectDistance(a, desired) - _rectDistance(b, desired))[0] || null;
   }
 
   function _clampRectToBlock(rect) {
@@ -2252,11 +2287,19 @@ const MecFormModule = (() => {
     return [...sameFloorRooms, ...sameFloorSanitaries];
   }
 
-  function _snapSanitaryRoomRect(item, rect) {
+  function _snapSanitaryRoomRect(item, rect, fallbackRect = null) {
     const bounds = _sketchBlockRect();
     const blockers = _sanitaryRoomBlockers(item);
     const snapped = _snapRectToGuides(rect, bounds, blockers, 14);
-    return _resolveRectOverlapInBounds(snapped, blockers, bounds, 0);
+    const resolved = _resolveRectOverlapInBounds(snapped, blockers, bounds, 2);
+    if (!_rectOverlapsAny(resolved, blockers, 2)) return resolved;
+    const free = _nearestFreeRectInBounds(snapped, blockers, bounds, 2);
+    if (free) return free;
+    if (fallbackRect) {
+      const fallback = _clampRectToBounds(fallbackRect, bounds);
+      if (!_rectOverlapsAny(fallback, blockers, 2)) return fallback;
+    }
+    return _clampRectToBounds(rect, bounds);
   }
 
   function _suggestSanitaryRect(item, size) {
@@ -2279,11 +2322,12 @@ const MecFormModule = (() => {
         candidates.push({ x, y });
       }
     }
-    const free = candidates.find(candidate => {
-      const rect = _clampRectToBlock({ ...candidate, ...rectSize });
-      return !blockers.some(other => _rectsOverlap(rect, other, 0));
-    }) || { x: blockRect.x + padding, y: blockRect.y + padding };
-    return _snapSanitaryRoomRect(item, { ...free, ...rectSize });
+    const free = candidates
+      .map(candidate => _clampRectToBlock({ ...candidate, ...rectSize }))
+      .find(rect => !_rectOverlapsAny(rect, blockers, 2))
+      || _nearestFreeRectInBounds({ x: blockRect.x + padding, y: blockRect.y + padding, ...rectSize }, blockers, blockRect, 2)
+      || { x: blockRect.x + padding, y: blockRect.y + padding, ...rectSize };
+    return _snapSanitaryRoomRect(item, free);
   }
 
   function _ensureSanitaryRoomObject(item, resizeFromDimensions = false) {
@@ -2310,9 +2354,17 @@ const MecFormModule = (() => {
     }
     object.type = 'sanitary-room';
     if (resizeFromDimensions) {
+      const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
       object.w = size.w;
       object.h = size.h;
-      const rect = _snapSanitaryRoomRect(item, object);
+      const rect = _snapSanitaryRoomRect(item, object, previous);
+      if (_rectOverlapsAny(rect, _sanitaryRoomBlockers(item), 2)) {
+        object.x = previous.x;
+        object.y = previous.y;
+        object.w = previous.w;
+        object.h = previous.h;
+        return object;
+      }
       object.x = rect.x;
       object.y = rect.y;
       object.w = rect.w;
@@ -2601,9 +2653,9 @@ const MecFormModule = (() => {
           </div>
           <div class="mec-selection-dock__actions">
             <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSelectedSanitaryFicha()">Ficha sanitario</button>
-            <button class="btn ${_isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})">${_isSanitaryLocked(item) ? 'Desbloquear' : 'Bloquear'}</button>
             <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
             <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
+            <button class="btn ${_isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})">${_isSanitaryLocked(item) ? 'Desbloquear' : 'Bloquear'}</button>
             <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')">Eliminar</button>
           </div>
         </div>`;
@@ -2621,6 +2673,7 @@ const MecFormModule = (() => {
           ${selected.type === 'door' ? '<button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.flipSelectedSanitaryDoorSwing()">Apertura</button>' : ''}
           <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
           <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
+          <button class="btn ${_isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})">${_isSanitaryLocked(item) ? 'Desbloquear' : 'Bloquear'}</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSelectedSanitaryObject()">Eliminar</button>
         </div>
       </div>`;
@@ -3694,6 +3747,7 @@ const MecFormModule = (() => {
                 'mec-choice-buttons--compact'
               )}
             </div>
+            ${_renderSketchCriteriaHelp(object.type)}
             ${_isCeilingOrWallPointObject(object) ? `
               <div class="form-group">
                 <label>Ubicacion</label>
@@ -6067,8 +6121,9 @@ const MecFormModule = (() => {
     const item = hit?.item;
     if (!object || !item) return;
     if (!_assertSanitaryUnlocked(item, 'moverlo')) return;
-    const previous = { x: object.x, y: object.y };
-    const rect = _snapSanitaryRoomRect(item, { x: point.x - offset.x, y: point.y - offset.y, w: object.w, h: object.h });
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const rect = _snapSanitaryRoomRect(item, { x: point.x - offset.x, y: point.y - offset.y, w: object.w, h: object.h }, previous);
+    if (_rectOverlapsAny(rect, _sanitaryRoomBlockers(item), 2)) return;
     object.x = rect.x;
     object.y = rect.y;
     const dx = object.x - previous.x;
@@ -6211,6 +6266,7 @@ const MecFormModule = (() => {
     if (!object || !item || !handle) return;
     const minW = 24;
     const minH = 18;
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
     const right = object.x + object.w;
     const bottom = object.y + object.h;
     if (handle.name.includes('w')) {
@@ -6225,7 +6281,14 @@ const MecFormModule = (() => {
       object.y = Math.round(newY);
     }
     if (handle.name.includes('s')) object.h = Math.max(minH, Math.round(point.y - object.y));
-    const rect = _snapSanitaryRoomRect(item, object);
+    const rect = _snapSanitaryRoomRect(item, object, previous);
+    if (_rectOverlapsAny(rect, _sanitaryRoomBlockers(item), 2)) {
+      object.x = previous.x;
+      object.y = previous.y;
+      object.w = previous.w;
+      object.h = previous.h;
+      return;
+    }
     object.x = rect.x;
     object.y = rect.y;
     object.w = rect.w;
@@ -7634,6 +7697,48 @@ const MecFormModule = (() => {
     return 'mec-choice--neutral';
   }
 
+  function _criteriaHelpForSketch(type) {
+    const help = {
+      door: [
+        'Bueno: abre/cierra sin dificultad; herrajes, cerradura, hoja y marco operativos.',
+        'Regular: roces, desalineacion leve, herrajes flojos, oxido/humedad o pintura deteriorada.',
+        'Malo: no abre/cierra, cerradura inutilizable, hoja o marco roto, partes faltantes o riesgo.',
+      ],
+      window: [
+        'Bueno: abre/cierra, vidrios completos, herrajes y marco firmes, sin filtraciones.',
+        'Regular: dificultad de uso, herrajes flojos, fisuras menores, sellos o pintura deteriorados.',
+        'Malo: no abre/cierra, vidrio roto/faltante, marco suelto, filtraciones importantes o riesgo.',
+      ],
+      outlet: [
+        'Bueno: suministra energia, placa firme, sin chispas, calentamiento ni cables expuestos.',
+        'Regular: falso contacto ocasional, placa floja, desgaste o calentamiento leve.',
+        'Malo: no funciona, chispas, cortocircuito, sobrecalentamiento, cables expuestos o rotura.',
+      ],
+      ac: [
+        'Bueno: enciende, enfria/calienta, flujo normal, sin ruidos extranos ni perdidas de agua.',
+        'Regular: enfria poco, flujo debil, filtros sucios, ruido leve, vibracion o goteo ocasional.',
+        'Malo: no enciende, no enfria, fuga constante, ruido fuerte, partes faltantes o falla electrica.',
+      ],
+      stair: [
+        'Rampa accesible: pendiente recomendada maxima 8%, ancho minimo 1.20 m y descansos 1.50 x 1.50 m en cambios de direccion.',
+        'Revisar superficie antideslizante, sin acumulacion de agua, y barandas entre 0.75 y 0.90 m.',
+      ],
+    };
+    return help[type] || [];
+  }
+
+  function _renderSketchCriteriaHelp(type) {
+    const lines = _criteriaHelpForSketch(type);
+    if (!lines.length) return '';
+    return `
+      <div class="form-group form-group--wide">
+        <div class="mec-criteria-help">
+          <strong>Criterio de campo</strong>
+          ${lines.map(line => `<span>${_escape(line)}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
   function openSketchObjectFicha(id) {
     const object = _findSketchObjectById(id || _selectedSketchObjectId);
     if (!object || !_hasSketchFicha(object)) {
@@ -7680,6 +7785,7 @@ const MecFormModule = (() => {
                 <label>Estado</label>
                 ${_choiceButtons('estado', cfg.estados, object.ficha.estado || '')}
               </div>
+              ${_renderSketchCriteriaHelp(object.type)}
               ${compactOpening ? '' : `
                 <div class="form-group">
                   <label>Material</label>
@@ -8326,6 +8432,7 @@ const MecFormModule = (() => {
                 <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.printPlanPdf()">PDF</button>
                 <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
                 <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
+                ${_renderSelectedPlanLockButton('btn-sm')}
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
@@ -8348,12 +8455,7 @@ const MecFormModule = (() => {
               <span><i class="legend-sanitary"></i>Sanitario</span>
               <span><i class="legend-site"></i>Exterior</span>
             </div>
-            <div class="school-plan__list">
-              ${(_data.__classrooms || []).map(_renderPlanClassroomRow).join('')}
-              ${(_data.__sanitaries || []).map(_renderPlanSanitaryRow).join('')}
-              ${(_data.__siteElements || []).map(_renderPlanSiteElementRow).join('')}
-              ${!(_data.__classrooms || []).length && !objects.length && !(_data.__siteElements || []).length ? '<p class="text-muted">Todavia no hay elementos cargados. Genere el aula base desde el Cuestionario MEC.</p>' : ''}
-            </div>
+            ${_renderPlanHierarchyTree()}
           </aside>
         </section>
       </div>`;
@@ -8408,12 +8510,78 @@ const MecFormModule = (() => {
         <div class="school-plan-builder__actions">
           <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
           <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
+          ${_renderSelectedPlanLockButton('btn-sm')}
+          ${_selectedPlanId ? '<button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>' : ''}
           ${context.actions.map(action => `
             <button class="btn ${_escape(action.tone || 'btn-outline')} btn-sm" type="button" onclick="${_escape(action.onClick)}">
               ${_escape(action.label)}
             </button>`).join('')}
         </div>
       </section>`;
+  }
+
+  function _selectedPlanLockAction(id = _selectedPlanId) {
+    const raw = String(id || '');
+    if (!raw) return null;
+    if (raw.startsWith('block::')) {
+      const block = _blockById(raw.replace('block::', ''));
+      if (!block) return null;
+      const locked = _isBlockLocked(block);
+      return {
+        label: locked ? 'Desbloquear bloque' : 'Bloquear bloque',
+        tone: locked ? 'btn-warning' : 'btn-outline',
+        onClick: `MecFormModule.setPlanBlockLocked('${_escape(block.id)}', ${locked ? 'false' : 'true'})`,
+      };
+    }
+    if (raw.startsWith('room::')) {
+      const room = _classroomById(raw.replace('room::', ''));
+      if (!room) return null;
+      const locked = _isClassroomLocked(room);
+      return {
+        label: locked ? 'Desbloquear aula' : 'Bloquear aula',
+        tone: locked ? 'btn-warning' : 'btn-outline',
+        onClick: `MecFormModule.setPlanClassroomLocked('${_escape(room.id)}', ${locked ? 'false' : 'true'})`,
+      };
+    }
+    if (raw.startsWith('sanitary::')) {
+      const sanitaryId = raw.split('::')[1] || '';
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+      if (!item) return null;
+      const locked = _isSanitaryLocked(item);
+      return {
+        label: locked ? 'Desbloquear sanitario' : 'Bloquear sanitario',
+        tone: locked ? 'btn-warning' : 'btn-outline',
+        onClick: `MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})`,
+      };
+    }
+    if (raw.startsWith('site::')) {
+      const element = _ensureSiteElements().find(item => item.id === raw.replace('site::', ''));
+      if (!element) return null;
+      const locked = _isSiteElementLocked(element);
+      return {
+        label: locked ? 'Desbloquear espacio' : 'Bloquear espacio',
+        tone: locked ? 'btn-warning' : 'btn-outline',
+        onClick: `MecFormModule.setSiteElementLocked('${_escape(element.id)}', ${locked ? 'false' : 'true'})`,
+      };
+    }
+    if (raw.includes('::')) {
+      const [roomId] = raw.split('::');
+      const room = _classroomById(roomId);
+      if (!room) return null;
+      const locked = _isClassroomLocked(room);
+      return {
+        label: locked ? 'Desbloquear aula' : 'Bloquear aula',
+        tone: locked ? 'btn-warning' : 'btn-outline',
+        onClick: `MecFormModule.setPlanClassroomLocked('${_escape(room.id)}', ${locked ? 'false' : 'true'})`,
+      };
+    }
+    return null;
+  }
+
+  function _renderSelectedPlanLockButton(sizeClass = 'btn-sm') {
+    const action = _selectedPlanLockAction();
+    if (!action) return '';
+    return `<button class="btn ${_escape(action.tone)} ${_escape(sizeClass)}" type="button" onclick="${_escape(action.onClick)}">${_escape(action.label)}</button>`;
   }
 
   function _planSelectionContext(id = _selectedPlanId) {
@@ -8444,7 +8612,6 @@ const MecFormModule = (() => {
         detail: `${block.estado_bloque || 'Sin estado'} · ${floors.length} piso(s) · ${block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : 'Sin dimensiones'}`,
         actions: [
           { label: 'Abrir bloque', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
-          { label: _isBlockLocked(block) ? 'Desbloquear bloque' : 'Bloquear bloque', tone: _isBlockLocked(block) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setPlanBlockLocked('${_escape(block.id)}', ${_isBlockLocked(block) ? 'false' : 'true'})` },
           { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
           { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
           { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
@@ -8452,7 +8619,6 @@ const MecFormModule = (() => {
           { label: '+ Pilar', onClick: "MecFormModule.addPlanSiteElement('pillar')" },
           { label: '+ Recreacion', onClick: "MecFormModule.addPlanSiteElement('recreation')" },
           { label: '+ Tanque', onClick: "MecFormModule.addPlanSiteElement('water_tank')" },
-          { label: 'Eliminar bloque', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
         ],
       };
     }
@@ -8466,7 +8632,6 @@ const MecFormModule = (() => {
         detail: `${block?.bloque_codigo || 'Sin bloque'} · ${_normalizeFloor(room.floor || 'Piso 1')} · ${room.length && room.width ? `${room.length} x ${room.width} m` : 'Sin medidas'}`,
         actions: [
           { label: 'Abrir aula', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
-          { label: room.locked ? 'Desbloquear aula' : 'Bloquear aula', tone: room.locked ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setPlanClassroomLocked('${_escape(room.id)}', ${room.locked ? 'false' : 'true'})` },
           { label: '+ Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')" },
           { label: '+ Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')" },
           { label: '+ Toma', onClick: "MecFormModule.addPlanClassroomElement('outlet')" },
@@ -8481,7 +8646,6 @@ const MecFormModule = (() => {
           { label: '+ Pilar', onClick: "MecFormModule.addPlanSiteElement('pillar')" },
           { label: '+ Recreacion', onClick: "MecFormModule.addPlanSiteElement('recreation')" },
           { label: '+ Tanque', onClick: "MecFormModule.addPlanSiteElement('water_tank')" },
-          { label: 'Eliminar aula', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
         ],
       };
     }
@@ -8500,8 +8664,6 @@ const MecFormModule = (() => {
           actions: [
             { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
             { label: 'Abrir sanitario', onClick: `MecFormModule.editPlanSanitary('${_escape(item.id)}')` },
-            { label: _isSanitaryLocked(item) ? 'Desbloquear sanitario' : 'Bloquear sanitario', tone: _isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})` },
-            { label: 'Eliminar', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
           ],
         };
       }
@@ -8510,7 +8672,6 @@ const MecFormModule = (() => {
         detail: `${_sanitaryBlockLabel(item)} · ${_normalizeFloor(item.planta || 'Piso 1')} · ${item.estado || item.tipo || 'Sin estado'}`,
         actions: [
           { label: 'Abrir sanitario', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
-          { label: _isSanitaryLocked(item) ? 'Desbloquear sanitario' : 'Bloquear sanitario', tone: _isSanitaryLocked(item) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${_isSanitaryLocked(item) ? 'false' : 'true'})` },
           { label: '+ Cabina', onClick: 'MecFormModule.addPlanSanitaryStall()' },
           { label: '+ Inodoro', onClick: "MecFormModule.addPlanSanitaryFixture('toilet')" },
           { label: '+ Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')" },
@@ -8526,7 +8687,6 @@ const MecFormModule = (() => {
           { label: '+ Pilar', onClick: "MecFormModule.addPlanSiteElement('pillar')" },
           { label: '+ Recreacion', onClick: "MecFormModule.addPlanSiteElement('recreation')" },
           { label: '+ Tanque', onClick: "MecFormModule.addPlanSiteElement('water_tank')" },
-          { label: 'Eliminar sanitario', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
         ],
       };
     }
@@ -8539,13 +8699,11 @@ const MecFormModule = (() => {
         detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · exterior del predio`,
         actions: [
           { label: 'Editar ficha', tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
-          { label: _isSiteElementLocked(element) ? 'Desbloquear espacio' : 'Bloquear espacio', tone: _isSiteElementLocked(element) ? 'btn-warning' : 'btn-outline', onClick: `MecFormModule.setSiteElementLocked('${_escape(element.id)}', ${_isSiteElementLocked(element) ? 'false' : 'true'})` },
           { label: '+ Tanque', onClick: "MecFormModule.addPlanSiteElement('water_tank')" },
           { label: '+ Recreacion', onClick: "MecFormModule.addPlanSiteElement('recreation')" },
           { label: '+ Galeria', onClick: "MecFormModule.addPlanSiteElement('gallery')" },
           { label: '+ Espacio', onClick: "MecFormModule.addPlanSiteElement('open_space')" },
           { label: '+ Pilar', onClick: "MecFormModule.addPlanSiteElement('pillar')" },
-          { label: 'Eliminar', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
         ],
       };
     }
@@ -8560,7 +8718,6 @@ const MecFormModule = (() => {
         actions: [
           { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           { label: 'Abrir aula', onClick: `MecFormModule.editPlanClassroom('${_escape(room.id)}')` },
-          { label: 'Eliminar', tone: 'btn-danger', onClick: 'MecFormModule.deletePlanSelection()' },
         ],
       };
     }
@@ -8592,6 +8749,96 @@ const MecFormModule = (() => {
       ? 'Modo mover bloques activo. Arrastre solo los bloques que necesite reubicar.'
       : 'Plano bloqueado: navegar y seleccionar no mueve elementos.',
       _planMoveMode ? 'info' : 'success');
+  }
+
+  function _selectedPlanTreeContext(id = _selectedPlanId) {
+    const raw = String(id || '');
+    if (!raw) return { blockId: _data.__activeBlockId || '', floor: _activeFloor(), type: '' };
+    if (raw.startsWith('block::')) return { blockId: raw.replace('block::', ''), floor: _activeFloor(), type: 'block' };
+    if (raw.startsWith('room::')) {
+      const room = _classroomById(raw.replace('room::', ''));
+      return { blockId: room?.blockId || '', floor: _normalizeFloor(room?.floor || _activeFloor()), type: 'room' };
+    }
+    if (raw.startsWith('sanitary::')) {
+      const sanitaryId = raw.split('::')[1] || '';
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+      const block = (_data.__blocks || []).find(candidate => _matchesBlockReference(item?.bloque, candidate));
+      return { blockId: block?.id || _data.__activeBlockId || '', floor: _normalizeFloor(item?.planta || _activeFloor()), type: 'sanitary' };
+    }
+    if (raw.startsWith('site::')) return { blockId: '', floor: '', type: 'site' };
+    if (raw.includes('::')) {
+      const [roomId] = raw.split('::');
+      const room = _classroomById(roomId);
+      return { blockId: room?.blockId || '', floor: _normalizeFloor(room?.floor || _activeFloor()), type: 'classroom-object' };
+    }
+    return { blockId: _data.__activeBlockId || '', floor: _activeFloor(), type: '' };
+  }
+
+  function _renderPlanHierarchyTree() {
+    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const siteElements = _ensureSiteElements();
+    const hasModel = blocks.length || (_data.__classrooms || []).length || (_data.__sanitaries || []).length || siteElements.length;
+    if (!hasModel) return '<p class="text-muted">Todavia no hay elementos cargados. Genere el aula base desde el Cuestionario MEC.</p>';
+    return `
+      <div class="school-plan-tree" aria-label="Jerarquia del plano escolar">
+        ${blocks.map(block => _renderPlanBlockBranch(block)).join('')}
+        ${_renderPlanExteriorBranch(siteElements)}
+      </div>`;
+  }
+
+  function _renderPlanBlockBranch(block) {
+    const context = _selectedPlanTreeContext();
+    const rooms = (_data.__classrooms || []).filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+    const sanitaries = _sanitariesForBlock(block);
+    const floors = _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
+    const open = context.blockId ? context.blockId === block.id : block.id === _data.__activeBlockId;
+    const locked = _isBlockLocked(block);
+    return `
+      <details class="school-plan-tree__branch ${locked ? 'school-plan-tree__branch--locked' : ''}" ${open ? 'open' : ''}>
+        <summary class="school-plan-tree__summary school-plan-tree__summary--block" onclick="MecFormModule.selectPlanItem('block::${_escape(block.id)}')">
+          <span>${_escape(block.bloque_codigo || 'Bloque')}</span>
+          <small>${_escape([locked ? 'Bloqueado' : '', `${floors.length} piso(s)`, `${rooms.length} aula(s)`, `${sanitaries.length} sanitario(s)`].filter(Boolean).join(' Â· '))}</small>
+        </summary>
+        <div class="school-plan-tree__children">
+          ${floors.map(floor => _renderPlanFloorBranch(block, floor)).join('')}
+        </div>
+      </details>`;
+  }
+
+  function _renderPlanFloorBranch(block, floor) {
+    const context = _selectedPlanTreeContext();
+    const floorRooms = (_data.__classrooms || [])
+      .filter(room => ((room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque')) && _normalizeFloor(room.floor || 'Piso 1') === floor);
+    const floorSanitaries = _sanitariesForBlock(block)
+      .filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
+    const open = context.blockId === block.id && context.floor === floor;
+    return `
+      <details class="school-plan-tree__floor" ${open || floorRooms.length || floorSanitaries.length ? 'open' : ''}>
+        <summary class="school-plan-tree__summary school-plan-tree__summary--floor">
+          <span>${_escape(floor)}</span>
+          <small>${_escape([`${floorRooms.length} aula(s)`, `${floorSanitaries.length} sanitario(s)`].join(' Â· '))}</small>
+        </summary>
+        <div class="school-plan-tree__children school-plan-tree__children--floor">
+          ${floorRooms.length || floorSanitaries.length
+            ? `${floorRooms.map(_renderPlanClassroomRow).join('')}${floorSanitaries.map(_renderPlanSanitaryRow).join('')}`
+            : '<p class="school-plan-tree__empty">Piso sin ambientes cargados.</p>'}
+        </div>
+      </details>`;
+  }
+
+  function _renderPlanExteriorBranch(siteElements = _ensureSiteElements()) {
+    if (!siteElements.length) return '';
+    const context = _selectedPlanTreeContext();
+    return `
+      <details class="school-plan-tree__branch school-plan-tree__branch--site" ${context.type === 'site' ? 'open' : ''}>
+        <summary class="school-plan-tree__summary school-plan-tree__summary--site">
+          <span>Predio exterior</span>
+          <small>${_escape(`${siteElements.length} elemento(s): galerias, tanques, recreacion y espacios libres`)}</small>
+        </summary>
+        <div class="school-plan-tree__children">
+          ${siteElements.map(_renderPlanSiteElementRow).join('')}
+        </div>
+      </details>`;
   }
 
   function _renderPlanObjectRow(object) {
@@ -8632,13 +8879,36 @@ const MecFormModule = (() => {
   function _renderPlanSanitaryRow(item, index) {
     const id = `sanitary::${item.id}`;
     const locked = _isSanitaryLocked(item);
+    const raw = String(_selectedPlanId || '');
+    const active = raw === id || raw.startsWith(`${id}::`);
+    const children = (item.objects || []).filter(object =>
+      object.type !== 'sanitary-room' && !object.ficha?.parentStallId);
     return `
-      <button class="school-plan-object school-plan-object--sanitary ${locked ? 'school-plan-object--locked' : ''} ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
+      <article class="school-plan-group ${active ? 'school-plan-group--open' : ''}">
+        <button class="school-plan-object school-plan-object--sanitary ${locked ? 'school-plan-object--locked' : ''} ${active ? 'school-plan-object--active' : ''}" type="button"
         ondblclick="MecFormModule.editPlanSanitary('${_escape(item.id)}')"
         onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
         <span class="school-plan-object__type">${locked ? 'Sanitario bloqueado' : 'Sanitario'}</span>
         <strong>${_escape(item.codigo || `Sanitario ${index + 1}`)}</strong>
         <small>${_escape([item.bloque, item.planta, item.inodoros ? `${item.inodoros} inod.` : '', item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : 'Sin medidas'].filter(Boolean).join(' · '))}</small>
+        </button>
+        ${active ? `
+          <div class="school-plan-group__children">
+            ${children.length ? children.map(object => _renderPlanSanitaryObjectRow(item, object)).join('') : '<p class="text-muted">Este sanitario aun no tiene objetos internos.</p>'}
+          </div>` : ''}
+      </article>`;
+  }
+
+  function _renderPlanSanitaryObjectRow(item, object) {
+    const id = `sanitary::${item.id}::${object.id}`;
+    const label = object.ficha?.codigo || _sanitaryObjectShort(object.type);
+    return `
+      <button class="school-plan-object school-plan-object--child ${_selectedPlanId === id ? 'school-plan-object--active' : ''}" type="button"
+        ondblclick="MecFormModule.editPlanObject('${_escape(id)}')"
+        onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
+        <span class="school-plan-object__type">${_escape(_sanitaryObjectLabel(object.type))}</span>
+        <strong>${_escape(label)}</strong>
+        <small>${_escape([item.codigo || 'Sanitario', object.ficha?.estado || 'Sin estado', _sketchDimensionsText(object)].filter(Boolean).join(' - '))}</small>
       </button>`;
   }
 
@@ -9060,16 +9330,7 @@ const MecFormModule = (() => {
         const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
         const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
         const floorContentRect = _planFloorContentRect(floorRect);
-        ctx.fillStyle = 'rgba(255,255,255,.68)';
-        ctx.fillRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
-        ctx.strokeStyle = 'rgba(71,84,103,.28)';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
-        ctx.fillStyle = 'rgba(71,84,103,.08)';
-        ctx.fillRect(floorRect.x + 1, floorRect.y + 1, floorRect.w - 2, 18);
-        ctx.fillStyle = '#475467';
-        ctx.font = _canvasFont(800, 10);
-        ctx.fillText(floor, floorRect.x + 8, floorRect.y + 13);
+        _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex);
         const roomItems = _planRoomItemsFromSketch(floorRooms, floorContentRect);
         const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorContentRect);
         const floorMetersPerPx = _planFloorMetersPerPx(block, floorContentRect);
@@ -9119,6 +9380,36 @@ const MecFormModule = (() => {
       w: Math.max(40, blockW - 28),
       h: Math.max(28, bandH),
     };
+  }
+
+  function _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex = 0) {
+    const selectedContext = _selectedPlanTreeContext();
+    const active = selectedContext.blockId === block.id && selectedContext.floor === floor;
+    const label = `${block.bloque_codigo || 'Bloque'} - ${floor}`;
+    ctx.save();
+    ctx.shadowColor = 'rgba(15,23,42,.12)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 1;
+    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.fillRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = active ? '#e84c22' : '#6b8fb9';
+    ctx.lineWidth = active ? 2.4 : 1.4;
+    ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
+    ctx.fillStyle = active ? '#fff7ed' : (floorIndex % 2 ? '#eef6ff' : '#edf2f7');
+    ctx.fillRect(floorRect.x + 1, floorRect.y + 1, floorRect.w - 2, 20);
+    ctx.strokeStyle = active ? 'rgba(232,76,34,.42)' : 'rgba(107,143,185,.38)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(floorRect.x, floorRect.y + 21);
+    ctx.lineTo(floorRect.x + floorRect.w, floorRect.y + 21);
+    ctx.stroke();
+    ctx.fillStyle = active ? '#9a3412' : '#334155';
+    ctx.font = _canvasFont(900, 10);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(_truncateLabel(ctx, label, Math.max(32, floorRect.w - 16)), floorRect.x + 8, floorRect.y + 14);
+    ctx.restore();
   }
 
   function _siteElementRect(item, logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
@@ -10402,7 +10693,9 @@ const MecFormModule = (() => {
     if (!item || !object) return;
     if (!_assertSanitaryUnlocked(item, 'moverlo')) return;
     const bounds = _sketchBlockRect();
-    const next = _clampRectToBounds({ x: targetX, y: targetY, w: object.w, h: object.h }, bounds);
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const next = _snapSanitaryRoomRect(item, { x: targetX, y: targetY, w: object.w, h: object.h }, previous);
+    if (_rectOverlapsAny(next, _sanitaryRoomBlockers(item), 2)) return;
     const dx = Math.round(next.x - object.x);
     const dy = Math.round(next.y - object.y);
     if (!dx && !dy) return;
