@@ -79,6 +79,7 @@ const MecFormModule = (() => {
     { id: 'water_tank', label: 'Tanque de agua', short: 'TQ', tone: '#0e7490' },
     { id: 'recreation', label: 'Espacio recreacion', short: 'REC', tone: '#15803d' },
     { id: 'gallery', label: 'Galeria', short: 'GAL', tone: '#7c3aed' },
+    { id: 'walkway', label: 'Caminero', short: 'CAM', tone: '#64748b' },
     { id: 'open_space', label: 'Espacio libre', short: 'ESP', tone: '#b45309' },
     { id: 'pillar', label: 'Pilar', short: 'PIL', tone: '#475569' },
   ];
@@ -1132,7 +1133,7 @@ const MecFormModule = (() => {
           <button class="modal__close" onclick="MecFormModule.closeSiteElementTypePicker()">&times;</button>
         </div>
         <div class="modal__body">
-          <p class="mec-hint">Use este selector para elementos del predio general: tanque, galeria, pilar, espacio libre o area recreativa exterior.</p>
+          <p class="mec-hint">Use este selector para elementos del predio general: tanque, galeria, caminero, pilar, espacio libre o area recreativa exterior.</p>
           <div class="mec-shape-picker" role="group" aria-label="Tipos de elementos exteriores">
             ${SITE_ELEMENT_TYPES.map(type => `
               <button class="mec-shape-button" type="button" onclick="MecFormModule.chooseSiteElementType('${_escape(type.id)}', '${_escape(origin)}')">
@@ -2158,6 +2159,9 @@ const MecFormModule = (() => {
       const size = _siteElementDefaultSize(type, shape);
       const ficha = { ..._defaultSiteElementFicha(type, index + 1, shape), ...(item.ficha || {}) };
       if (type === 'recreation') ficha.forma = _recreationShapeLabel(shape);
+      if (type === 'pillar' && !item.ficha?.forma_pilar && item.ficha?.seccion) {
+        ficha.forma_pilar = String(item.ficha.seccion).toLowerCase().includes('cuad') ? 'Cuadrado' : 'Redondo';
+      }
       const rotationDeg = _normalizeSiteRotation(item.rotationDeg ?? item.rotacion_grados ?? ficha.rotacion_grados);
       ficha.rotacion_grados = String(rotationDeg);
       const measuredSize = _siteElementSizeFromFicha(type, shape, ficha);
@@ -2252,14 +2256,51 @@ const MecFormModule = (() => {
   }
 
   function _siteElementSizeFromFicha(type, shape, ficha = {}) {
-    if (type !== 'recreation') return null;
-    const largo = Number(ficha.largo_m || 0);
+    if (type === 'pillar') {
+      const square = String(ficha.forma_pilar || ficha.seccion || '').toLowerCase().includes('cuad');
+      const measure = Number(square ? (ficha.lado_m || ficha.diametro_m) : (ficha.diametro_m || ficha.lado_m));
+      if (!measure) return null;
+      const logicalHeight = typeof _planCanvasHeight === 'function' ? _planCanvasHeight() : 620;
+      const px = Math.max(18, Math.min(72, measure * 42));
+      return {
+        wRatio: px / 900,
+        hRatio: px / logicalHeight,
+      };
+    }
+    const acceptsMeasures = ['recreation', 'gallery', 'walkway', 'open_space'].includes(type);
+    if (!acceptsMeasures) return null;
+    const largo = Number(ficha.largo_m || ficha.longitud_m || 0);
     const ancho = Number(ficha.ancho_m || 0);
     if (!largo || !ancho) return null;
+    const slender = type === 'gallery' || type === 'walkway';
     return {
-      wRatio: Math.max(.045, Math.min(.5, largo / 120)),
-      hRatio: Math.max(.035, Math.min(.36, ancho / 120)),
+      wRatio: Math.max(slender ? .055 : .045, Math.min(.62, largo / 120)),
+      hRatio: Math.max(slender ? .012 : .035, Math.min(slender ? .16 : .36, ancho / 120)),
     };
+  }
+
+  function _updateSiteElementDerivedFields(element) {
+    if (!element) return;
+    element.ficha = element.ficha || {};
+    if (element.type === 'pillar') {
+      const current = element.ficha.forma_pilar || element.ficha.seccion || 'Redondo';
+      element.ficha.forma_pilar = String(current).toLowerCase().includes('cuad') ? 'Cuadrado' : 'Redondo';
+    }
+    if (element.type === 'recreation') {
+      element.shape = _normalizeRecreationShape(element.ficha.forma || element.shape);
+      element.ficha.forma = _recreationShapeLabel(element.shape);
+    }
+    const largo = Number(element.ficha.largo_m || 0);
+    const ancho = Number(element.ficha.ancho_m || 0);
+    if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space'].includes(element.type)) {
+      element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
+      if (element.ficha.perimetro_m !== undefined) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
+    }
+    const size = _siteElementSizeFromFicha(element.type, element.shape, element.ficha);
+    if (size) {
+      element.wRatio = size.wRatio;
+      element.hRatio = size.hRatio;
+    }
   }
 
   function _defaultSiteElementFicha(type, index = 1, shape = '') {
@@ -2311,19 +2352,39 @@ const MecFormModule = (() => {
         mantenimiento: 'Bueno',
       },
       gallery: {
+        largo_m: '10',
+        ancho_m: '2',
+        superficie_m2: '',
+        ubicacion_relativa: 'Adosada a bloque',
         cubierta: 'Chapa metalica',
         estructura: 'Metalica',
         piso: 'Hormigon',
         drenaje: 'Bueno',
       },
+      walkway: {
+        largo_m: '12',
+        ancho_m: '1.5',
+        superficie_m2: '',
+        ubicacion_relativa: 'Exterior entre bloques',
+        superficie: 'Hormigon',
+        borde: 'Sin cordon',
+        drenaje: 'Bueno',
+        accesibilidad: 'Parcial',
+      },
       open_space: {
         uso: 'Circulacion',
+        largo_m: '',
+        ancho_m: '',
+        superficie_m2: '',
         superficie: 'Tierra compactada',
         drenaje: 'Bueno',
       },
       pillar: {
+        forma_pilar: 'Redondo',
+        diametro_m: '0.40',
+        lado_m: '0.40',
+        alto_m: '',
         material: 'Hormigon',
-        seccion: 'Circular',
         estabilidad: 'Estable',
         fisuras: 'No',
       },
@@ -2362,19 +2423,39 @@ const MecFormModule = (() => {
         { key: 'equipamiento', label: 'Equipamiento observado', placeholder: 'Ej. arcos, bancos, graderia, luminarias', wide: true },
       ],
       gallery: [
+        { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 10' },
+        { key: 'ancho_m', label: 'Ancho aprox. (m)', type: 'number', placeholder: 'Ej. 2' },
+        { key: 'superficie_m2', label: 'Superficie aprox. (m2)', type: 'number', placeholder: 'Auto' },
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque/aula', options: ['Adosada a bloque', 'Dentro de bloque', 'Entre bloques', 'Exterior independiente', 'Otro'] },
         { key: 'cubierta', label: 'Cubierta', options: ['Chapa metalica', 'Teja', 'Losa', 'Sin cubierta', 'Otro'] },
         { key: 'estructura', label: 'Estructura', options: ['Metalica', 'Hormigon', 'Madera', 'Mixta', 'No verificable'] },
         { key: 'piso', label: 'Piso', options: ['Hormigon', 'Ceramica', 'Tierra', 'Otro'] },
         { key: 'drenaje', label: 'Drenaje', options: ['Bueno', 'Regular', 'Malo', 'No verificable'] },
       ],
+      walkway: [
+        { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 12' },
+        { key: 'ancho_m', label: 'Ancho aprox. (m)', type: 'number', placeholder: 'Ej. 1.5' },
+        { key: 'superficie_m2', label: 'Superficie aprox. (m2)', type: 'number', placeholder: 'Auto' },
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque/aula', options: ['Exterior entre bloques', 'Adosado a bloque', 'Dentro de bloque', 'Borde de aula', 'Otro'] },
+        { key: 'superficie', label: 'Superficie', options: ['Hormigon', 'Ceramica', 'Tierra compactada', 'Ripio', 'Otro'] },
+        { key: 'borde', label: 'Borde/cordon', options: ['Sin cordon', 'Con cordon', 'Con baranda', 'No verificable'] },
+        { key: 'drenaje', label: 'Drenaje', options: ['Bueno', 'Regular', 'Malo', 'No verificable'] },
+        { key: 'accesibilidad', label: 'Accesibilidad', options: ['Adecuada', 'Parcial', 'No accesible', 'No verificable'] },
+      ],
       open_space: [
         { key: 'uso', label: 'Uso principal', options: ['Circulacion', 'Patio libre', 'Estacionamiento', 'Area verde', 'Reserva', 'Otro'] },
+        { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 8' },
+        { key: 'ancho_m', label: 'Ancho aprox. (m)', type: 'number', placeholder: 'Ej. 5' },
+        { key: 'superficie_m2', label: 'Superficie aprox. (m2)', type: 'number', placeholder: 'Auto' },
         { key: 'superficie', label: 'Superficie', options: ['Tierra compactada', 'Cesped', 'Hormigon', 'Ripio', 'Otro'] },
         { key: 'drenaje', label: 'Drenaje', options: ['Bueno', 'Regular', 'Malo', 'No verificable'] },
       ],
       pillar: [
+        { key: 'forma_pilar', label: 'Forma del pilar', options: ['Redondo', 'Cuadrado'] },
+        { key: 'diametro_m', label: 'Diametro si es redondo (m)', type: 'number', placeholder: 'Ej. 0.40' },
+        { key: 'lado_m', label: 'Lado si es cuadrado (m)', type: 'number', placeholder: 'Ej. 0.40' },
+        { key: 'alto_m', label: 'Alto aprox. (m)', type: 'number', placeholder: 'Ej. 3.20' },
         { key: 'material', label: 'Material', options: ['Hormigon', 'Metal', 'Madera', 'Mamposteria', 'Otro'] },
-        { key: 'seccion', label: 'Seccion', options: ['Circular', 'Rectangular', 'Cuadrada', 'Irregular'] },
         { key: 'estabilidad', label: 'Estabilidad', options: ['Estable', 'Fisuras leves', 'Fisuras severas', 'Desplazado', 'No verificable'] },
         { key: 'fisuras', label: 'Fisuras visibles', options: ['No', 'Leves', 'Severas', 'No verificable'] },
       ],
@@ -2429,8 +2510,9 @@ const MecFormModule = (() => {
       water_tank: { wRatio: .052, hRatio: .075 },
       recreation: { wRatio: .18, hRatio: .11 },
       gallery: { wRatio: .22, hRatio: .045 },
+      walkway: { wRatio: .18, hRatio: .024 },
       open_space: { wRatio: .17, hRatio: .095 },
-      pillar: { wRatio: .034, hRatio: .05 },
+      pillar: { wRatio: .028, hRatio: .04 },
     }[type] || { wRatio: .12, hRatio: .075 };
   }
 
@@ -7434,7 +7516,9 @@ const MecFormModule = (() => {
 
   function _siteElementTooltipInfo(element) {
     if (!element) return null;
-    const shape = element.type === 'recreation' ? _recreationShapeLabel(element.shape || element.ficha?.forma) : '';
+    const shape = element.type === 'recreation'
+      ? _recreationShapeLabel(element.shape || element.ficha?.forma)
+      : (element.type === 'pillar' ? (element.ficha?.forma_pilar || element.ficha?.seccion || '') : '');
     const rotation = _siteElementRotationDeg(element);
     return {
       title: element.ficha?.codigo || _siteElementLabel(element.type),
@@ -7443,6 +7527,7 @@ const MecFormModule = (() => {
         { label: 'Tipo', value: _siteElementLabel(element.type) },
         { label: 'Figura', value: shape },
         { label: 'Medidas', value: element.ficha?.largo_m && element.ficha?.ancho_m ? `${element.ficha.largo_m} x ${element.ficha.ancho_m} m` : '' },
+        { label: 'Diam./lado', value: element.type === 'pillar' && (element.ficha?.forma_pilar === 'Cuadrado' ? element.ficha?.lado_m : element.ficha?.diametro_m) ? `${element.ficha.forma_pilar === 'Cuadrado' ? element.ficha.lado_m : element.ficha.diametro_m} m` : '' },
         { label: 'Area', value: _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
         { label: 'Rotacion', value: rotation ? `${rotation} grados` : '0 grados' },
       ]),
@@ -9807,7 +9892,7 @@ const MecFormModule = (() => {
       <details class="school-plan-tree__branch school-plan-tree__branch--site" ${context.type === 'site' ? 'open' : ''}>
         <summary class="school-plan-tree__summary school-plan-tree__summary--site">
           <span>Otros espacios</span>
-          <small>${_escape(`${siteElements.length} espacio(s): canchas, galerias, tanques y areas libres`)}</small>
+          <small>${_escape(`${siteElements.length} espacio(s): canchas, galerias, camineros, tanques y areas libres`)}</small>
         </summary>
         <div class="school-plan-tree__children">
           ${grouped.map(group => `
@@ -9829,6 +9914,7 @@ const MecFormModule = (() => {
     if (type === 'water_tank') return 'Tanques de agua';
     if (type === 'recreation') return 'Recreacion y canchas';
     if (type === 'gallery') return 'Galerias';
+    if (type === 'walkway') return 'Camineros';
     if (type === 'open_space') return 'Espacios libres y especiales';
     if (type === 'pillar') return 'Pilares / estructuras';
     return fallback || 'Otros espacios';
@@ -10476,8 +10562,9 @@ const MecFormModule = (() => {
     const size = _siteElementDefaultSize(item.type, item.shape);
     const wRatio = Number(item.wRatio || size.wRatio);
     const hRatio = Number(item.hRatio || size.hRatio);
-    const w = Math.max(item.type === 'pillar' ? 18 : 30, wRatio * logicalWidth);
-    const h = Math.max(item.type === 'pillar' ? 18 : 26, hRatio * logicalHeight);
+    const slender = item.type === 'gallery' || item.type === 'walkway';
+    const w = Math.max(item.type === 'pillar' ? 18 : (slender ? 34 : 30), wRatio * logicalWidth);
+    const h = Math.max(item.type === 'pillar' ? 18 : (slender ? 14 : 26), hRatio * logicalHeight);
     return _clampPlanRect({
       x: Number(item.xRatio || 0) * logicalWidth,
       y: Number(item.yRatio || 0) * logicalHeight,
@@ -10687,10 +10774,27 @@ const MecFormModule = (() => {
       ctx.lineTo(local.x + local.w * .78, local.y + local.h * .62);
       ctx.stroke();
     } else if (item.type === 'pillar') {
-      ctx.beginPath();
-      ctx.arc(0, 0, Math.min(local.w, local.h) / 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      const square = String(item.ficha?.forma_pilar || item.ficha?.seccion || '').toLowerCase().includes('cuad');
+      const side = Math.min(local.w, local.h);
+      if (square) {
+        ctx.fillRect(-side / 2, -side / 2, side, side);
+        ctx.strokeRect(-side / 2, -side / 2, side, side);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(71,85,105,.42)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(-side / 2, -side / 2);
+        ctx.lineTo(side / 2, side / 2);
+        ctx.moveTo(side / 2, -side / 2);
+        ctx.lineTo(-side / 2, side / 2);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, side / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     } else if (item.type === 'recreation') {
       const shape = _normalizeRecreationShape(item.shape || item.ficha?.forma);
       const court = _recreationShapeConfig(shape).court;
@@ -10735,15 +10839,38 @@ const MecFormModule = (() => {
       }
       if (court) _drawRecreationCourtMarkings(ctx, item, local, shape);
     } else {
+      if (item.type === 'gallery') ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(124,58,237,.10)';
+      if (item.type === 'walkway') ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(100,116,139,.14)';
       ctx.fillRect(local.x, local.y, local.w, local.h);
       ctx.strokeRect(local.x, local.y, local.w, local.h);
-      if (item.type === 'gallery') {
+      if (item.type === 'gallery' || item.type === 'walkway') {
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
         ctx.moveTo(local.x + 6, 0);
         ctx.lineTo(local.x + local.w - 6, 0);
         ctx.stroke();
         ctx.setLineDash([]);
+        if (item.type === 'gallery') {
+          const postCount = Math.max(2, Math.floor(local.w / 42));
+          ctx.save();
+          ctx.fillStyle = cfg.tone;
+          for (let index = 0; index <= postCount; index += 1) {
+            const px = local.x + 8 + ((local.w - 16) * index) / postCount;
+            ctx.fillRect(px - 1.2, local.y + 3, 2.4, Math.max(4, local.h - 6));
+          }
+          ctx.restore();
+        } else {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(100,116,139,.45)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(local.x + 6, local.y + local.h * .25);
+          ctx.lineTo(local.x + local.w - 6, local.y + local.h * .25);
+          ctx.moveTo(local.x + 6, local.y + local.h * .75);
+          ctx.lineTo(local.x + local.w - 6, local.y + local.h * .75);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
     if (selected) {
@@ -11808,6 +11935,63 @@ const MecFormModule = (() => {
     return [...blockRects, ...siteRects];
   }
 
+  function _isSiteElementSnappable(type) {
+    return ['gallery', 'walkway', 'open_space', 'recreation', 'pillar'].includes(type);
+  }
+
+  function _rangesNearlyOverlap(a1, a2, b1, b2, pad = 0) {
+    return Math.min(a2, b2) + pad >= Math.max(a1, b1);
+  }
+
+  function _planStructureSnapRects(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
+    const rooms = _data.__classrooms || [];
+    const sanitaries = _data.__sanitaries || [];
+    const targets = [];
+    _planBlockLayout(blocks, logicalWidth, logicalHeight).forEach(({ block, x, y, w, h }) => {
+      targets.push({ id: `block::${block.id}`, type: 'block', x, y, w, h });
+      const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+      const blockSanitaries = _sanitariesForBlock(block);
+      _planFloorsForBlock(block, rooms, sanitaries).forEach((floor, floorIndex, floors) => {
+        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
+        const floorContentRect = _planFloorContentRect(floorRect);
+        targets.push({ id: `floor::${block.id}::${floor}`, type: 'floor', ...floorContentRect });
+        _planRoomItemsFromSketch(blockRooms.filter(room => _normalizeFloor(room.floor) === floor), floorContentRect)
+          .forEach(item => targets.push({ id: `room::${item.room.id}`, type: 'room', x: item.x, y: item.y, w: item.w, h: item.h }));
+        _planSanitaryItemsFromSketch(blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor), floorContentRect)
+          .forEach(item => targets.push({ id: `sanitary::${item.sanitary.id}`, type: 'sanitary', x: item.x, y: item.y, w: item.w, h: item.h }));
+      });
+    });
+    return targets.filter(item => item.w > 4 && item.h > 4);
+  }
+
+  function _snapSiteElementRectToTargets(rect, logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const bounds = { x: 12, y: 12, w: logicalWidth - 24, h: logicalHeight - 24 };
+    const clamped = _clampRectToBounds(rect, bounds);
+    const threshold = 16;
+    const xTargets = [bounds.x, bounds.x + bounds.w - clamped.w];
+    const yTargets = [bounds.y, bounds.y + bounds.h - clamped.h];
+    _planStructureSnapRects(logicalWidth, logicalHeight).forEach(target => {
+      const yNear = _rangesNearlyOverlap(clamped.y, clamped.y + clamped.h, target.y, target.y + target.h, threshold * 2);
+      const xNear = _rangesNearlyOverlap(clamped.x, clamped.x + clamped.w, target.x, target.x + target.w, threshold * 2);
+      if (yNear) {
+        xTargets.push(target.x, target.x + target.w - clamped.w, target.x - clamped.w, target.x + target.w);
+      }
+      if (xNear) {
+        yTargets.push(target.y, target.y + target.h - clamped.h, target.y - clamped.h, target.y + target.h);
+      }
+      if (xNear && yNear) {
+        xTargets.push(target.x + target.w / 2 - clamped.w / 2);
+        yTargets.push(target.y + target.h / 2 - clamped.h / 2);
+      }
+    });
+    return _clampRectToBounds({
+      ...clamped,
+      x: _snapValueToTargets(clamped.x, xTargets, threshold),
+      y: _snapValueToTargets(clamped.y, yTargets, threshold),
+    }, bounds);
+  }
+
   function _siteElementBlankPosition(type, origin = 'plan', shape = '', excludeId = '') {
     const logicalWidth = 900;
     const logicalHeight = _planCanvasHeight();
@@ -12007,12 +12191,8 @@ const MecFormModule = (() => {
     element.ficha.rotacion_grados = String(element.rotationDeg);
     if (type === 'recreation') {
       element.ficha.forma = _recreationShapeLabel(shape);
-      const measuredSize = _siteElementSizeFromFicha(type, shape, element.ficha);
-      if (measuredSize) {
-        element.wRatio = measuredSize.wRatio;
-        element.hRatio = measuredSize.hRatio;
-      }
     }
+    _updateSiteElementDerivedFields(element);
     elements.push(element);
     closeNewSiteElementFicha();
     _saveDraft(false);
@@ -12040,6 +12220,7 @@ const MecFormModule = (() => {
       rotationDeg: 0,
       ficha: _defaultSiteElementFicha(type, next, normalizedShape),
     };
+    _updateSiteElementDerivedFields(element);
     elements.push(element);
     _saveDraft(false);
     _showSchoolPlanAfterSiteInsert(element);
@@ -12245,19 +12426,7 @@ const MecFormModule = (() => {
       element.wRatio = size.wRatio;
       element.hRatio = size.hRatio;
     }
-    if (element.type === 'recreation') {
-      element.shape = _normalizeRecreationShape(element.ficha.forma);
-      element.ficha.forma = _recreationShapeLabel(element.shape);
-      const largo = Number(element.ficha.largo_m || 0);
-      const ancho = Number(element.ficha.ancho_m || 0);
-      if (largo > 0 && ancho > 0) {
-        if (!Number(element.ficha.superficie_m2 || 0)) element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
-        if (!Number(element.ficha.perimetro_m || 0)) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
-      }
-      const size = _siteElementSizeFromFicha(element.type, element.shape, element.ficha) || _siteElementDefaultSize(element.type, element.shape);
-      element.wRatio = size.wRatio;
-      element.hRatio = size.hRatio;
-    }
+    _updateSiteElementDerivedFields(element);
     _saveDraft(false);
     renderSchoolPlan();
     _redrawSketchCanvas();
@@ -12460,7 +12629,10 @@ const MecFormModule = (() => {
     if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
     const logicalWidth = 900;
     const logicalHeight = _planCanvasHeight();
-    const clamped = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
+    const initial = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
+    const clamped = _isSiteElementSnappable(element.type)
+      ? _snapSiteElementRectToTargets(initial, logicalWidth, logicalHeight)
+      : initial;
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _activePlanDrag = {

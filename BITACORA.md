@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de pilares, camineros y encastre exterior - 2026-05-12 - v2.5.64
+
+### Objetivo
+- Permitir que los pilares se registren como redondos o cuadrados.
+- Agregar camineros como elemento exterior propio, editable y medible.
+- Hacer que galerias, camineros y espacios exteriores puedan ajustarse por largo, ancho y rotacion, y se acomoden contra bloques, pisos, aulas o sanitarios del plano general.
+
+### Cambios implementados
+- Se agrego el tipo `Caminero` al selector de exteriores y al arbol del plano general.
+- La ficha de `Pilar` ahora permite elegir `Redondo` o `Cuadrado`, cargar diametro/lado y reflejar esa forma en el dibujo.
+- Las fichas de galerias, camineros y espacios libres incorporan largo, ancho, superficie calculada y ubicacion relativa respecto a bloques/aulas.
+- Al guardar la ficha se recalcula automaticamente el tamaño grafico segun medidas y rotacion cargadas.
+- Al arrastrar exteriores estructurales, el plano ahora hace snap contra bordes interiores/exteriores de bloques, pisos, aulas y sanitarios para facilitar el tope.
+- Version y cache actualizados a `v2.5.64`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- `osacompile -l JavaScript` sobre `mec-form.js`, `app.js`, `config.js` y `sw.js` sin errores.
+- `node --check` no se ejecuto porque `node` no esta instalado en esta maquina.
+- Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; version visible `v2.5.64`, cache `cialpa-app-v2.5.64` y funciones `walkway`, `forma_pilar` y `_snapSiteElementRectToTargets` presentes.
+
+---
+
 ## Sesion de rotacion en editores internos y etiquetas de ambientes - 2026-05-12 - v2.5.63
 
 ### Objetivo
