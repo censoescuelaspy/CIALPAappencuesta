@@ -1700,6 +1700,14 @@ td {
 }
 
 @media (max-width: 600px) {
+  .architecture-flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .architecture-node {
+    min-height: 0;
+  }
+
   .page-content { padding: 1rem; }
   .kpi-grid, .inicio-grid { grid-template-columns: 1fr 1fr; }
   .modal__panel--drawer { max-width: 100%; border-radius: 0; }
@@ -1837,6 +1845,191 @@ td {
   justify-content: flex-end;
 }
 
+.architecture-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.architecture-flow {
+  display: grid;
+  grid-template-columns:
+    minmax(118px, 1fr) 24px minmax(118px, 1fr) 24px minmax(118px, 1fr) 24px
+    minmax(118px, 1fr) 24px minmax(118px, 1fr) 24px minmax(118px, 1fr) 24px
+    minmax(118px, 1fr);
+  align-items: stretch;
+  gap: .45rem;
+}
+
+.architecture-flow > i {
+  position: relative;
+  align-self: center;
+  height: 2px;
+  display: block;
+  background: #cbd5e1;
+}
+
+.architecture-flow > i::after {
+  content: '>';
+  position: absolute;
+  top: 50%;
+  right: -2px;
+  transform: translateY(-52%);
+  color: #64748b;
+  font-size: .8rem;
+  font-weight: 900;
+}
+
+.architecture-node {
+  min-height: 178px;
+  display: grid;
+  align-content: start;
+  gap: .38rem;
+  padding: .85rem;
+  border: 1px solid #cbd8e6;
+  border-top: 4px solid #1f3864;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.architecture-node span {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #edf5fb;
+  color: #163a5f;
+  font-weight: 900;
+  font-size: .78rem;
+}
+
+.architecture-node h3 {
+  margin: 0;
+  color: #16243a;
+  font-size: .94rem;
+  line-height: 1.15;
+}
+
+.architecture-node p {
+  margin: 0;
+  color: #415068;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.architecture-node small {
+  margin-top: auto;
+  color: #667085;
+  font-size: .68rem;
+  font-weight: 800;
+}
+
+.architecture-node--field { border-top-color: #2f855a; }
+.architecture-node--app { border-top-color: #1f3864; }
+.architecture-node--capture { border-top-color: #2b6cb0; }
+.architecture-node--local { border-top-color: #805ad5; }
+.architecture-node--sync { border-top-color: #c05621; }
+.architecture-node--repo { border-top-color: #0e7490; }
+.architecture-node--decision { border-top-color: #b7791f; }
+
+.architecture-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
+  gap: 1rem;
+}
+
+.architecture-panel {
+  padding: 1rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.architecture-panel--wide {
+  grid-column: 1 / -1;
+}
+
+.architecture-panel h3 {
+  margin: 0 0 .75rem 0;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.architecture-table-wrap {
+  overflow-x: auto;
+}
+
+.architecture-table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: .82rem;
+}
+
+.architecture-table th,
+.architecture-table td {
+  padding: .7rem .65rem;
+  border-bottom: 1px solid #e7edf5;
+  text-align: left;
+  vertical-align: top;
+}
+
+.architecture-table th {
+  background: #f3f7fb;
+  color: #1f3864;
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.architecture-table code {
+  white-space: nowrap;
+}
+
+.architecture-list {
+  display: grid;
+  gap: .55rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  color: #334155;
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
+.architecture-list--checks li::marker {
+  color: #2f855a;
+}
+
+.architecture-roadmap {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.architecture-roadmap div {
+  min-height: 112px;
+  display: grid;
+  align-content: start;
+  gap: .35rem;
+  padding: .75rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.architecture-roadmap strong {
+  color: #173b63;
+  font-size: .9rem;
+}
+
+.architecture-roadmap span {
+  color: #415068;
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
 .btn-sm {
   padding: .45rem .7rem;
   font-size: .8rem;
@@ -1847,6 +2040,19 @@ td {
   :root {
     --sidebar-width: 232px;
     --header-height: 52px;
+  }
+
+  .architecture-flow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .architecture-flow > i {
+    display: none;
+  }
+
+  .architecture-grid,
+  .architecture-roadmap {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   html {
@@ -2939,5 +3145,15 @@ textarea.form-control {
 
   .card {
     padding: .9rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .architecture-flow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .architecture-node {
+    min-height: 0;
   }
 }

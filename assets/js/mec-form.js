@@ -1121,14 +1121,16 @@ const MecFormModule = (() => {
               <span>Etapa</span>
               <div class="mec-stage-buttons">
                 ${implemented.map(module => `
+                  ${module.id === 'plano' ? `
+                    <button class="mec-stage-button mec-stage-button--quick" type="button" onclick="MecFormModule.openOtherSpacePicker('plan')">Otros espacios</button>
+                    <button class="mec-stage-button mec-stage-button--quick" type="button" onclick="MecFormModule.openSiteElementTypePicker('plan')">Exteriores</button>
+                  ` : ''}
                   <button class="mec-stage-button ${module.id === _activeModuleId ? 'mec-stage-button--active' : ''}" type="button"
                     data-stage-module="${_escape(module.id)}"
                     aria-pressed="${module.id === _activeModuleId ? 'true' : 'false'}"
                     onclick="MecFormModule.selectModule('${_escape(module.id)}')">
                     ${_escape(module.title)}
                   </button>`).join('')}
-                <button class="mec-stage-button mec-stage-button--quick" type="button" onclick="MecFormModule.openOtherSpacePicker('plan')">Otros espacios</button>
-                <button class="mec-stage-button mec-stage-button--quick" type="button" onclick="MecFormModule.openSiteElementTypePicker('plan')">Exteriores</button>
               </div>
             </div>
             <span class="mec-stage-current">${_escape(activeModule?.description || `${implemented.length} etapas activas`)}</span>

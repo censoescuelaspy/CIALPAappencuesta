@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.5.66</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.5.67</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.5.66</strong>
+      Edición vigente<br><strong class="app-version">v2.5.67</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -209,7 +209,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.5.66</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.5.67</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -337,6 +337,145 @@
         </div>
         <div class="page-content">
           <div id="school-plan-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: ARQUITECTURA PROYECTO
+           ====================================================== -->
+      <div id="module-arquitectura" class="module-panel">
+        <div class="page-header">
+          <div>
+            <h2>Arquitectura del proyecto</h2>
+            <p class="text-muted">Mapa funcional de CIALPA: herramientas, datos, almacenamiento, sincronizacion, evidencias y seguridad operativa.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mec')">Abrir cuestionario</button>
+            <button class="btn btn-outline btn-sm" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Ver planificacion</button>
+            <button class="btn btn-primary btn-sm" onclick="AppController.showModule('plano')">Ver plano</button>
+          </div>
+        </div>
+        <div class="page-content architecture-page">
+          <section class="architecture-flow" aria-label="Diagrama funcional del sistema">
+            <article class="architecture-node architecture-node--field">
+              <span>1</span>
+              <h3>Campo</h3>
+              <p>Encuestador en tablet, celular o notebook. Levanta escuela, bloques, pisos, aulas, sanitarios, exteriores, fotos y tiempos.</p>
+              <small>Android, iPadOS, escritorio</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--app">
+              <span>2</span>
+              <h3>PWA CIALPA</h3>
+              <p>Aplicacion web estatica publicada en GitHub Pages, con Service Worker para cache offline y actualizacion de version.</p>
+              <small>HTML, CSS, JS, Cache API</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--capture">
+              <span>3</span>
+              <h3>Registro arquitectonico</h3>
+              <p>Motor MEC, plano por bloque, editor de ambientes, sanitarios, exteriores, base de calles, PDF, DXF, SVG, PNG y JSON.</p>
+              <small>Canvas, Leaflet, OSM HOT</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--local">
+              <span>4</span>
+              <h3>Persistencia local</h3>
+              <p>Autoguardado del borrador y cola offline. Permite seguir cargando aunque la conexion sea intermitente.</p>
+              <small>localStorage, IndexedDB</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--sync">
+              <span>5</span>
+              <h3>Sincronizacion</h3>
+              <p>La capa API envia sesiones, escuelas, incidencias, evidencias y estados al backend Google Apps Script.</p>
+              <small>HTTPS, GAS Web App</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--repo">
+              <span>6</span>
+              <h3>Repositorios</h3>
+              <p>Datos tabulares en Google Sheets, evidencias en Google Drive y exportaciones tecnicas para gabinete.</p>
+              <small>Sheets, Drive, anexos</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--decision">
+              <span>7</span>
+              <h3>Gestion y decision</h3>
+              <p>Mapa, planificacion, estadisticas, auditoria, jornadas, tiempos por escuela y futura capa BigQuery para escala nacional.</p>
+              <small>6000 escuelas, supervision</small>
+            </article>
+          </section>
+
+          <section class="architecture-grid">
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Que se guarda y donde</h3>
+              <div class="architecture-table-wrap">
+                <table class="architecture-table">
+                  <thead>
+                    <tr><th>Dato</th><th>Ubicacion actual</th><th>Destino sincronizado</th><th>Uso operativo</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Sesion de usuario</td><td><code>sessionStorage: cialpa_session</code></td><td>Validacion contra Apps Script</td><td>Login, rol, token y expiracion de 8 horas.</td></tr>
+                    <tr><td>Borrador MEC y plano</td><td><code>localStorage: cialpa_mec_form_draft_v1</code></td><td>Paquete CIALPA / futura migracion</td><td>General, servicios, bloques, aulas, sanitarios, exteriores y plano.</td></tr>
+                    <tr><td>Tiempos de carga</td><td><code>__registroTiempos</code> dentro del borrador</td><td>Panel de planificacion</td><td>Duracion por bloque, ambiente, sanitario y exterior.</td></tr>
+                    <tr><td>Cache y cola offline</td><td><code>IndexedDB: cialpa_offline_store</code></td><td>Reintento cuando vuelve conexion</td><td>Cache API, cola <code>queue</code> y cache <code>cache</code>.</td></tr>
+                    <tr><td>Fotos y evidencias</td><td>Vista previa local en ficha y referencias de evidencia</td><td>Google Drive, carpeta configurada</td><td>Fotos por puerta, ventana, dano, sanitario, exterior y observaciones.</td></tr>
+                    <tr><td>Escuelas, sesiones, incidencias</td><td>API cacheada localmente</td><td>Google Sheets via Apps Script</td><td>Seguimiento de estado, asignaciones, jornada y auditoria.</td></tr>
+                    <tr><td>Planos y anexos</td><td>Generados en navegador</td><td>Descarga local / expediente</td><td>PDF, DXF, SVG, PNG y JSON para revision tecnica.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Herramientas vinculadas</h3>
+              <ul class="architecture-list">
+                <li><strong>GitHub Pages:</strong> publicacion de la app web.</li>
+                <li><strong>Service Worker:</strong> app shell offline y cache de version.</li>
+                <li><strong>Google Apps Script:</strong> API de login, escuelas, sesiones, incidencias y evidencias.</li>
+                <li><strong>Google Sheets:</strong> repositorio tabular operativo.</li>
+                <li><strong>Google Drive:</strong> repositorio de fotos y anexos.</li>
+                <li><strong>Leaflet + OSM:</strong> mapa general y base de calles del plano.</li>
+                <li><strong>Canvas/SVG/DXF/PDF:</strong> produccion tecnica del plano escolar.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Seguridad y controles</h3>
+              <ul class="architecture-list architecture-list--checks">
+                <li>Acceso por usuario, contrasena y token de sesion.</li>
+                <li>Expiracion local de sesion despues de 8 horas.</li>
+                <li>Roles: encuestador, supervisor y admin.</li>
+                <li>Lista blanca adicional para administradores reales.</li>
+                <li>HTTPS en GitHub Pages y Google Apps Script.</li>
+                <li>La UI oculta funciones, pero el backend debe validar permisos.</li>
+                <li>Los datos locales del navegador dependen de la seguridad del dispositivo.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Escalamiento recomendado para 6000 escuelas</h3>
+              <div class="architecture-roadmap">
+                <div>
+                  <strong>Ahora</strong>
+                  <span>GitHub Pages + Apps Script + Sheets/Drive + cache offline.</span>
+                </div>
+                <div>
+                  <strong>Siguiente</strong>
+                  <span>Sincronizacion robusta de paquetes CIALPA, bitacora por entidad y tablero de tiempos.</span>
+                </div>
+                <div>
+                  <strong>Escala nacional</strong>
+                  <span>BigQuery como repositorio analitico, Drive/Cloud Storage para fotos, politicas de retencion y backups.</span>
+                </div>
+                <div>
+                  <strong>Gobernanza</strong>
+                  <span>Catalogo de datos, trazabilidad por usuario, version de formulario, auditoria y control de calidad.</span>
+                </div>
+              </div>
+            </article>
+          </section>
         </div>
       </div>
 

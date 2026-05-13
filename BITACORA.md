@@ -4,6 +4,37 @@
 
 ---
 
+## Sesion de pestana arquitectura del proyecto - 2026-05-13 - v2.5.67
+
+### Objetivo
+- Reordenar el boton `Otros espacios` para que aparezca antes de `Plano escuela`.
+- Agregar una vista principal que explique con un diagrama claro como funciona CIALPA, que herramientas vincula, donde guarda los datos y que controles de seguridad aplica.
+
+### Cambios implementados
+- En la barra de etapas del cuestionario MEC, `Otros espacios` y `Exteriores` ahora se insertan justo antes de `Plano escuela`.
+- Se agrego el modulo principal `Arquitectura proyecto` al navegador lateral.
+- La nueva vista incluye un flujo detallado de 7 capas: campo, PWA CIALPA, registro arquitectonico, persistencia local, sincronizacion, repositorios y gestion/decision.
+- Se agrego una tabla de almacenamiento real: `sessionStorage: cialpa_session`, `localStorage: cialpa_mec_form_draft_v1`, `IndexedDB: cialpa_offline_store`, cache offline, Google Apps Script, Google Sheets y Google Drive.
+- Se documentaron herramientas vinculadas: GitHub Pages, Service Worker, Apps Script, Sheets, Drive, Leaflet/OSM, Canvas/SVG/DXF/PDF.
+- Se incorporo bloque de seguridad con roles, expiracion de sesion, HTTPS, lista blanca admin y advertencia de que el backend debe validar permisos.
+- Se agrego hoja de ruta de escalamiento para 6000 escuelas, incluyendo BigQuery como repositorio analitico recomendado para la etapa nacional.
+- Version y cache actualizados a `v2.5.67`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: version `2.5.67`, pestaña `Arquitectura proyecto` activa, 7 nodos de diagrama, 7 filas de tabla de almacenamiento, 4 hitos de hoja de ruta, textos de seguridad y datos presentes.
+- Selenium/Chrome headless local: orden MEC verificado como `General`, `Servicios`, `Bloques y Plantas`, `Aula`, `Sanitarios`, `Otros espacios`, `Exteriores`, `Plano escuela`.
+
+### Proximos pasos
+- Revisar con el equipo si la vista debe imprimirse como anexo tecnico del proyecto.
+- Definir el diseno final de sincronizacion hacia BigQuery y repositorio masivo de fotos para la escala de 6000 escuelas.
+
+---
+
 ## Sesion de implantacion guiada, tiempos y base de calles - 2026-05-13 - v2.5.66
 
 ### Objetivo

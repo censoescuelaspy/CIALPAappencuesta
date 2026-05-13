@@ -321,6 +321,7 @@ const AppController = (() => {
     encuesta: { label: 'Migrar RUE-MEC', icon: '⇄', minRole: 'encuestador' },
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
     plano: { label: 'Plano escuela', icon: '▦', minRole: 'encuestador' },
+    arquitectura: { label: 'Arquitectura proyecto', icon: 'A', minRole: 'encuestador' },
     encuestadores: { label: 'Encuestadores', icon: '👥', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
     incidencias: { label: 'Incidencias', icon: '⚠️', minRole: 'encuestador' },
