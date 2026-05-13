@@ -8,6 +8,8 @@ const MecFormModule = (() => {
 
   const STORAGE_KEY = 'cialpa_mec_form_draft_v1';
   const PLAN_CANVAS_ID = 'school-plan-canvas';
+  const PLAN_BASEMAP_TILE_SIZE = 256;
+  const PLAN_BASEMAP_DEFAULT_ZOOM = 18;
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
@@ -25,6 +27,7 @@ const MecFormModule = (() => {
   let _planTransformStack = [];
   let _activePlanDrag = null;
   let _planMoveMode = false;
+  let _planBaseMapPanelOpen = false;
   let _activeCanvasZoom = 1;
   let _evidenceSyncRunning = false;
   let _evidenceOnlineBound = false;
@@ -539,6 +542,380 @@ const MecFormModule = (() => {
       nombre: school.nombre || school.nombre_escuela || '',
       syncedAt: new Date().toISOString(),
     };
+  }
+
+  function _numberInRange(value, fallback = 0, min = -Infinity, max = Infinity) {
+    const number = Number(String(value ?? '').replace(',', '.'));
+    if (!Number.isFinite(number)) return fallback;
+    return Math.max(min, Math.min(max, number));
+  }
+
+  function _schoolCoordinateDefaults() {
+    const school = _selectedSchoolFromContext() || _data.__selectedSchool || {};
+    const general = _data.general || {};
+    const latRaw = _firstPresent(school, ['latitud', 'lat', 'latitude']) || general.latitud || '';
+    const lngRaw = _firstPresent(school, ['longitud', 'lng', 'lon', 'longitude']) || general.longitud || '';
+    const lat = _numberInRange(latRaw, NaN, -85, 85);
+    const lng = _numberInRange(lngRaw, NaN, -180, 180);
+    return {
+      lat: Number.isFinite(lat) ? lat : '',
+      lng: Number.isFinite(lng) ? lng : '',
+    };
+  }
+
+  function _planBaseMapDefaults() {
+    const coords = _schoolCoordinateDefaults();
+    return {
+      enabled: false,
+      lat: coords.lat,
+      lng: coords.lng,
+      zoom: PLAN_BASEMAP_DEFAULT_ZOOM,
+      opacity: .56,
+      scale: 1,
+      offsetX: 0,
+      offsetY: 0,
+      savedAt: '',
+      confirmed: false,
+    };
+  }
+
+  function _ensurePlanBaseMap() {
+    const defaults = _planBaseMapDefaults();
+    const current = _data.__planBaseMap || {};
+    const merged = { ...defaults, ...current };
+    if ((merged.lat === '' || merged.lat === undefined || merged.lat === null) && defaults.lat !== '') merged.lat = defaults.lat;
+    if ((merged.lng === '' || merged.lng === undefined || merged.lng === null) && defaults.lng !== '') merged.lng = defaults.lng;
+    merged.lat = merged.lat === '' ? '' : _numberInRange(merged.lat, defaults.lat === '' ? '' : defaults.lat, -85, 85);
+    merged.lng = merged.lng === '' ? '' : _numberInRange(merged.lng, defaults.lng === '' ? '' : defaults.lng, -180, 180);
+    merged.zoom = Math.round(_numberInRange(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, 14, (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_MAX_ZOOM) || 19));
+    merged.opacity = _numberInRange(merged.opacity, .56, .15, .95);
+    merged.scale = _numberInRange(merged.scale, 1, .35, 4);
+    merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
+    merged.offsetY = _numberInRange(merged.offsetY, 0, -2000, 2000);
+    merged.enabled = Boolean(merged.enabled);
+    merged.confirmed = Boolean(merged.confirmed);
+    _data.__planBaseMap = merged;
+    return merged;
+  }
+
+  function _planBaseMapHasCoords(baseMap = _data.__planBaseMap) {
+    const lat = Number(baseMap?.lat);
+    const lng = Number(baseMap?.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  }
+
+  function _planBaseMapVisible(baseMap = _data.__planBaseMap) {
+    return Boolean(baseMap?.enabled && _planBaseMapHasCoords(baseMap));
+  }
+
+  function _planBaseMapTileTemplate() {
+    return (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_TILE_URL)
+      || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+  }
+
+  function _planBaseMapAttribution() {
+    return (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_ATTRIBUTION) || 'Tiles &copy; Esri';
+  }
+
+  function _worldPixelFromLatLng(lat, lng, zoom) {
+    const safeLat = Math.max(-85.05112878, Math.min(85.05112878, Number(lat) || 0));
+    const safeLng = Math.max(-180, Math.min(180, Number(lng) || 0));
+    const sinLat = Math.sin((safeLat * Math.PI) / 180);
+    const scale = PLAN_BASEMAP_TILE_SIZE * Math.pow(2, zoom);
+    return {
+      x: ((safeLng + 180) / 360) * scale,
+      y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale,
+    };
+  }
+
+  function _tileUrlFromTemplate(template, z, x, y) {
+    const subdomains = ['a', 'b', 'c'];
+    const subdomain = subdomains[Math.abs(x + y) % subdomains.length];
+    return String(template || '')
+      .replace(/\{s\}/g, subdomain)
+      .replace(/\{z\}/g, z)
+      .replace(/\{x\}/g, x)
+      .replace(/\{y\}/g, y);
+  }
+
+  function _cssNumber(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '0';
+    return Number(number.toFixed(2)).toString();
+  }
+
+  function _planBaseMapTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapVisible(baseMap)) return [];
+    const zoom = Math.round(baseMap.zoom);
+    const tileCount = Math.pow(2, zoom);
+    const centerWorld = _worldPixelFromLatLng(baseMap.lat, baseMap.lng, zoom);
+    const centerCanvas = {
+      x: logicalWidth / 2 + Number(baseMap.offsetX || 0),
+      y: logicalHeight / 2 + Number(baseMap.offsetY || 0),
+    };
+    const mapScale = Number(baseMap.scale || 1);
+    const minWorldX = centerWorld.x + (0 - centerCanvas.x) / mapScale;
+    const maxWorldX = centerWorld.x + (logicalWidth - centerCanvas.x) / mapScale;
+    const minWorldY = centerWorld.y + (0 - centerCanvas.y) / mapScale;
+    const maxWorldY = centerWorld.y + (logicalHeight - centerCanvas.y) / mapScale;
+    const minTileX = Math.floor(minWorldX / PLAN_BASEMAP_TILE_SIZE) - 1;
+    const maxTileX = Math.ceil(maxWorldX / PLAN_BASEMAP_TILE_SIZE) + 1;
+    const minTileY = Math.floor(minWorldY / PLAN_BASEMAP_TILE_SIZE) - 1;
+    const maxTileY = Math.ceil(maxWorldY / PLAN_BASEMAP_TILE_SIZE) + 1;
+    const template = _planBaseMapTileTemplate();
+    const items = [];
+    for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+      if (tileY < 0 || tileY >= tileCount) continue;
+      for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+        const wrappedX = ((tileX % tileCount) + tileCount) % tileCount;
+        const planX = centerCanvas.x + ((tileX * PLAN_BASEMAP_TILE_SIZE) - centerWorld.x) * mapScale;
+        const planY = centerCanvas.y + ((tileY * PLAN_BASEMAP_TILE_SIZE) - centerWorld.y) * mapScale;
+        const tileSize = PLAN_BASEMAP_TILE_SIZE * mapScale;
+        items.push({
+          x: planX * renderScale,
+          y: planY * renderScale,
+          w: tileSize * renderScale,
+          h: tileSize * renderScale,
+          url: _tileUrlFromTemplate(template, zoom, wrappedX, tileY),
+        });
+        if (items.length >= 96) return items;
+      }
+    }
+    return items;
+  }
+
+  function _planBaseMapMetersPerPlanPixel(baseMap = _data.__planBaseMap) {
+    if (!_planBaseMapHasCoords(baseMap)) return 0;
+    const lat = Number(baseMap.lat);
+    const zoom = Math.round(Number(baseMap.zoom) || PLAN_BASEMAP_DEFAULT_ZOOM);
+    const mapScale = Number(baseMap.scale || 1);
+    const groundMetersPerTilePixel = Math.cos((lat * Math.PI) / 180) * 156543.03392 / Math.pow(2, zoom);
+    return groundMetersPerTilePixel / Math.max(.01, mapScale);
+  }
+
+  function _planBaseMapMetricText(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapHasCoords(baseMap)) return 'Cargue coordenadas para activar la imagen satelital.';
+    const metersPerPx = _planBaseMapMetersPerPlanPixel(baseMap);
+    if (!metersPerPx) return 'Escala satelital pendiente.';
+    const widthM = metersPerPx * logicalWidth;
+    const heightM = metersPerPx * logicalHeight;
+    return `Cobertura aprox. ${widthM.toFixed(0)} x ${heightM.toFixed(0)} m - ${metersPerPx.toFixed(2)} m/px`;
+  }
+
+  function _planBaseMapSignature(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    return [
+      baseMap.enabled ? 1 : 0,
+      baseMap.lat,
+      baseMap.lng,
+      baseMap.zoom,
+      baseMap.opacity,
+      baseMap.scale,
+      baseMap.offsetX,
+      baseMap.offsetY,
+      logicalWidth,
+      logicalHeight,
+      _schoolPlanZoom,
+    ].join('|');
+  }
+
+  function _renderPlanBaseMapLayer(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    const displayScale = Math.max(.55, Math.min(2.8, Number(_schoolPlanZoom) || 1));
+    if (!_planBaseMapVisible(baseMap)) {
+      return '<div class="school-plan-basemap school-plan-basemap--empty" data-plan-basemap aria-hidden="true"></div>';
+    }
+    const items = _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale);
+    const images = items.map(item => `
+      <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+        style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`).join('');
+    return `
+      <div class="school-plan-basemap" data-plan-basemap aria-hidden="true">
+        <div class="school-plan-basemap__tiles" style="opacity:${_cssNumber(baseMap.opacity)}">${images}</div>
+        <span class="school-plan-basemap__attribution">${_planBaseMapAttribution()}</span>
+      </div>`;
+  }
+
+  function _planBaseMapSvgImages(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapVisible(baseMap)) return '';
+    const items = _planBaseMapTileItems(logicalWidth, logicalHeight, 1);
+    if (!items.length) return '';
+    const id = `plan-basemap-clip-${Date.now().toString(36)}`;
+    return `
+      <defs><clipPath id="${id}"><rect x="0" y="0" width="${_cssNumber(logicalWidth)}" height="${_cssNumber(logicalHeight)}"/></clipPath></defs>
+      <g clip-path="url(#${id})" opacity="${_cssNumber(baseMap.opacity)}">
+        ${items.map(item => `<image href="${_escape(item.url)}" x="${_cssNumber(item.x)}" y="${_cssNumber(item.y)}" width="${_cssNumber(item.w)}" height="${_cssNumber(item.h)}" preserveAspectRatio="none"/>`).join('')}
+      </g>`;
+  }
+
+  function _schoolPlanStageStyle(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    return `width:${Math.round(logicalWidth * _schoolPlanZoom)}px;height:${Math.round(logicalHeight * _schoolPlanZoom)}px;`;
+  }
+
+  function _refreshPlanBaseMapLayer(canvas = _activeSchoolPlanCanvas(), force = false) {
+    const stage = canvas?.closest('.school-plan__canvas-stage');
+    if (!stage) return;
+    const logical = _canvasLogicalSize(canvas, 900, _planCanvasHeight());
+    stage.style.width = canvas.style.width;
+    stage.style.height = canvas.style.height;
+    const signature = _planBaseMapSignature(logical.width, logical.height);
+    if (!force && stage.dataset.basemapSignature === signature) return;
+    stage.dataset.basemapSignature = signature;
+    const layer = stage.querySelector('[data-plan-basemap]');
+    if (layer) layer.outerHTML = _renderPlanBaseMapLayer(logical.width, logical.height);
+  }
+
+  function _renderPlanBaseMapToolbar() {
+    const baseMap = _ensurePlanBaseMap();
+    const active = _planBaseMapVisible(baseMap);
+    const coords = _planBaseMapHasCoords(baseMap)
+      ? `${Number(baseMap.lat).toFixed(5)}, ${Number(baseMap.lng).toFixed(5)}`
+      : 'Sin coordenadas';
+    return `
+      <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
+        <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Satelite activo' : 'Satelite'}</button>
+        <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
+        <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base mapa</button>
+        <small>${_escape(coords)}</small>
+      </div>`;
+  }
+
+  function _renderPlanBaseMapPanel() {
+    if (!_planBaseMapPanelOpen) return '';
+    const baseMap = _ensurePlanBaseMap();
+    const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
+    return `
+      <section class="school-plan-basemap-panel" aria-label="Configuracion de base mapa">
+        <div class="school-plan-basemap-panel__header">
+          <div>
+            <span>Base satelital calibrable</span>
+            <strong>${_escape(_planBaseMapMetricText(900, _planCanvasHeight()))}</strong>
+            <small>${_escape(savedText)}</small>
+          </div>
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.useSchoolCoordinatesForBaseMap()">Usar coordenadas escuela</button>
+        </div>
+        <div class="school-plan-basemap-panel__grid">
+          <label>Latitud
+            <input type="number" step="0.000001" value="${_escape(baseMap.lat)}" onchange="MecFormModule.setPlanBaseMapValue('lat', this.value)">
+          </label>
+          <label>Longitud
+            <input type="number" step="0.000001" value="${_escape(baseMap.lng)}" onchange="MecFormModule.setPlanBaseMapValue('lng', this.value)">
+          </label>
+          <label>Zoom satelital
+            <input type="range" min="14" max="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_MAX_ZOOM) || 19)}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
+            <b>${_escape(baseMap.zoom)}</b>
+          </label>
+          <label>Escala base
+            <input type="range" min="0.35" max="4" step="0.05" value="${_escape(baseMap.scale)}" onchange="MecFormModule.setPlanBaseMapValue('scale', this.value)">
+            <b>${Number(baseMap.scale).toFixed(2)}x</b>
+          </label>
+          <label>Opacidad
+            <input type="range" min="0.15" max="0.95" step="0.05" value="${_escape(baseMap.opacity)}" onchange="MecFormModule.setPlanBaseMapValue('opacity', this.value)">
+            <b>${Math.round(Number(baseMap.opacity) * 100)}%</b>
+          </label>
+        </div>
+        <div class="school-plan-basemap-panel__adjust">
+          <div class="school-plan-basemap-panel__nudge">
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(0, -20)" aria-label="Mover base arriba">&#8593;</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(-20, 0)" aria-label="Mover base izquierda">&#8592;</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(20, 0)" aria-label="Mover base derecha">&#8594;</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(0, 20)" aria-label="Mover base abajo">&#8595;</button>
+          </div>
+          <div class="school-plan-basemap-panel__offset">
+            <label>Desplazamiento X
+              <input type="number" step="1" value="${_escape(Math.round(baseMap.offsetX))}" onchange="MecFormModule.setPlanBaseMapValue('offsetX', this.value)">
+            </label>
+            <label>Desplazamiento Y
+              <input type="number" step="1" value="${_escape(Math.round(baseMap.offsetY))}" onchange="MecFormModule.setPlanBaseMapValue('offsetY', this.value)">
+            </label>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.resetPlanBaseMapOffset()">Centrar base</button>
+          </div>
+        </div>
+      </section>`;
+  }
+
+  function togglePlanBaseMap() {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.enabled = !baseMap.enabled;
+    if (baseMap.enabled && !_planBaseMapHasCoords(baseMap)) {
+      _planBaseMapPanelOpen = true;
+      baseMap.enabled = false;
+      UI.showToast('Cargue latitud y longitud para activar la base satelital.', 'warning', 5200);
+    }
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function togglePlanBaseMapPanel() {
+    _planBaseMapPanelOpen = !_planBaseMapPanelOpen;
+    renderSchoolPlan();
+  }
+
+  function setPlanBaseMapValue(key, value) {
+    const baseMap = _ensurePlanBaseMap();
+    if (key === 'lat') baseMap.lat = value === '' ? '' : _numberInRange(value, baseMap.lat || 0, -85, 85);
+    if (key === 'lng') baseMap.lng = value === '' ? '' : _numberInRange(value, baseMap.lng || 0, -180, 180);
+    if (key === 'zoom') baseMap.zoom = Math.round(_numberInRange(value, baseMap.zoom, 14, (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_MAX_ZOOM) || 19));
+    if (key === 'scale') baseMap.scale = _numberInRange(value, baseMap.scale, .35, 4);
+    if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, .95);
+    if (key === 'offsetX') baseMap.offsetX = _numberInRange(value, baseMap.offsetX, -2000, 2000);
+    if (key === 'offsetY') baseMap.offsetY = _numberInRange(value, baseMap.offsetY, -2000, 2000);
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function nudgePlanBaseMap(dx = 0, dy = 0) {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.offsetX = _numberInRange(Number(baseMap.offsetX || 0) + Number(dx || 0), 0, -2000, 2000);
+    baseMap.offsetY = _numberInRange(Number(baseMap.offsetY || 0) + Number(dy || 0), 0, -2000, 2000);
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function resetPlanBaseMapOffset() {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.offsetX = 0;
+    baseMap.offsetY = 0;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function useSchoolCoordinatesForBaseMap() {
+    const coords = _schoolCoordinateDefaults();
+    if (coords.lat === '' || coords.lng === '') {
+      UI.showToast('La escuela seleccionada no tiene coordenadas disponibles.', 'warning', 5200);
+      return;
+    }
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.lat = coords.lat;
+    baseMap.lng = coords.lng;
+    baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function savePlanBaseMap() {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapHasCoords(baseMap)) {
+      _planBaseMapPanelOpen = true;
+      renderSchoolPlan();
+      UI.showToast('Cargue latitud y longitud antes de guardar la base mapa.', 'warning', 5200);
+      return;
+    }
+    baseMap.enabled = true;
+    baseMap.confirmed = true;
+    baseMap.savedAt = new Date().toISOString();
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Base mapa guardada para construir el plano sobre la imagen satelital.', 'success', 5600);
   }
 
   function _fieldVisible(field) {
@@ -8414,6 +8791,7 @@ const MecFormModule = (() => {
 
   function _applySchoolPlanZoom(canvas = _activeSchoolPlanCanvas()) {
     _applyCanvasZoom(canvas, _schoolPlanZoom, 900, _planCanvasHeight());
+    _refreshPlanBaseMapLayer(canvas);
     const zoom = canvas?.closest('.school-plan__board')?.querySelector('.school-plan__zoom span');
     if (zoom) zoom.textContent = `${Math.round(_schoolPlanZoom * 100)}%`;
   }
@@ -9430,6 +9808,7 @@ const MecFormModule = (() => {
                   <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(0.15)">+</button>
                   <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.toggleSchoolPlanFullscreen()" title="Pantalla completa" aria-label="Pantalla completa">&#x26F6;</button>
                 </div>
+                ${_renderPlanBaseMapToolbar()}
                 <button class="btn ${_planMoveMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">${_planMoveMode ? 'Mover bloques activo' : 'Mover bloques'}</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanDxf()">DXF</button>
@@ -9442,8 +9821,12 @@ const MecFormModule = (() => {
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
+            ${_renderPlanBaseMapPanel()}
             <div class="school-plan__canvas-wrap">
-              <canvas id="${canvasId}" data-school-plan-canvas width="900" height="${canvasHeight}" style="width:${Math.round(900 * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
+              <div class="school-plan__canvas-stage" style="${_schoolPlanStageStyle(900, canvasHeight)}">
+                ${_renderPlanBaseMapLayer(900, canvasHeight)}
+                <canvas id="${canvasId}" data-school-plan-canvas width="900" height="${canvasHeight}" style="width:${Math.round(900 * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
+              </div>
             </div>
           </div>
           <aside class="school-plan__side">
@@ -10383,7 +10766,7 @@ const MecFormModule = (() => {
     _planHitAreas = [];
     _planTransformStack = [];
     ctx.clearRect(0, 0, logical.width, logical.height);
-    ctx.fillStyle = '#f8fafc';
+    ctx.fillStyle = _planBaseMapVisible(_data.__planBaseMap) ? 'rgba(248,250,252,.28)' : '#f8fafc';
     ctx.fillRect(0, 0, logical.width, logical.height);
 
     const rooms = _data.__classrooms || [];
@@ -13070,6 +13453,7 @@ const MecFormModule = (() => {
       exportedAt: new Date().toISOString(),
       schemaVersion: MEC_SCHEMA.version,
       source: 'CIALPA plano escolar',
+      baseMap: _data.__planBaseMap || null,
       blocks,
       classroomsWithoutBlock: (_data.__classrooms || []).filter(room => !room.blockId),
       sanitaries: _data.__sanitaries || [],
@@ -13428,8 +13812,11 @@ const MecFormModule = (() => {
     const locality = _firstPresent(school, ['localidad', 'barrio']) || general.localidad || '';
     const address = _firstPresent(school, ['direccion', 'direccion_referencia', 'referencia']) || general.direccion || '';
     const zone = _firstPresent(school, ['zona']) || general.zona || '';
-    const lat = _firstPresent(school, ['latitud', 'lat', 'latitude']) || general.latitud || '';
-    const lon = _firstPresent(school, ['longitud', 'lng', 'lon', 'longitude']) || general.longitud || '';
+    const baseMap = _data.__planBaseMap || {};
+    const baseLat = baseMap.confirmed && _planBaseMapHasCoords(baseMap) ? baseMap.lat : '';
+    const baseLon = baseMap.confirmed && _planBaseMapHasCoords(baseMap) ? baseMap.lng : '';
+    const lat = baseLat || _firstPresent(school, ['latitud', 'lat', 'latitude']) || general.latitud || '';
+    const lon = baseLon || _firstPresent(school, ['longitud', 'lng', 'lon', 'longitude']) || general.longitud || '';
     return {
       code,
       name,
@@ -14418,6 +14805,7 @@ const MecFormModule = (() => {
     const parts = [
       `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="${height}" viewBox="0 0 900 ${height}">`,
       `<rect width="900" height="${height}" fill="#f8fafc"/>`,
+      _planBaseMapSvgImages(900, height),
     ];
     layout.forEach(({ block, x, y, w, h }) => {
       const blockTransform = _planSvgRotateTransform(_blockRotationDeg(block), x + w / 2, y + h / 2);
@@ -14767,6 +15155,13 @@ const MecFormModule = (() => {
     deletePlanSelection,
     togglePlanLayer,
     togglePlanMoveMode,
+    togglePlanBaseMap,
+    togglePlanBaseMapPanel,
+    setPlanBaseMapValue,
+    nudgePlanBaseMap,
+    resetPlanBaseMapOffset,
+    useSchoolCoordinatesForBaseMap,
+    savePlanBaseMap,
     exportPlanJson,
     exportPlanDxf,
     exportPlanSvg,

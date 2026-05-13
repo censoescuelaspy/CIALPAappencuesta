@@ -4,6 +4,35 @@
 
 ---
 
+## Sesion de base mapa satelital calibrable - 2026-05-13 - v2.5.65
+
+### Objetivo
+- Permitir que la zona de trazado del `Plano escuela` use una imagen satelital como fondo cuando la escuela tenga coordenadas, ajustando centro, escala, opacidad y desplazamiento antes de confirmar con `Guardar base mapa`.
+
+### Cambios implementados
+- Se agrego la configuracion `__planBaseMap` al borrador local: latitud, longitud, zoom satelital, escala, opacidad, desplazamiento X/Y, fecha de guardado y confirmacion.
+- El canvas del plano ahora puede mostrar teselas satelitales Esri detras del dibujo, sin contaminar el canvas ni bloquear la exportacion vectorial.
+- Nuevo grupo de botones en el plano: `Satelite`, `Base mapa` y `Guardar base mapa`.
+- Nuevo panel emergente de calibracion con inputs de latitud/longitud, zoom, escala, opacidad, flechas de desplazamiento, centrado y boton para usar las coordenadas de la escuela.
+- Se muestra una metrica operativa de cobertura aproximada en metros y metros por pixel para ayudar a construir el plano sobre dimensiones reales aproximadas.
+- El exportador JSON del plano ahora incluye `baseMap`; el SVG general puede incluir la base satelital como referencias externas a teselas.
+- El mapa Leaflet reutiliza la URL satelital centralizada en `APP_CONFIG`.
+- Version y cache actualizados a `v2.5.65`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: con coordenadas `-25.287900, -57.635200`, el plano renderizo 48 teselas satelitales, mostro cobertura aprox. `486 x 335 m - 0.54 m/px` y `Guardar base mapa` persistio `confirmed: true` con desplazamiento ajustado.
+
+### Proximos pasos
+- Probar en tablet con una escuela real: abrir `Plano escuela`, activar `Satelite`, ajustar la imagen hasta que coincida con el predio y confirmar con `Guardar base mapa`.
+- Definir si la version impresa PDF debe incluir una hoja adicional de ortofoto/base satelital o mantener solo el plano tecnico vectorial.
+
+---
+
 ## Sesion de pilares, camineros y encastre exterior - 2026-05-12 - v2.5.64
 
 ### Objetivo
@@ -142,9 +171,6 @@
 - Parseo con `osascript -l JavaScript` de `mec-form.js` y `config.js` sin errores.
 - Compilacion con `osacompile -l JavaScript` de `app.js` y `sw.js` sin errores.
 - Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js`, `mec-form.css` y `sw.js`; version visible `v2.5.59` y cache `cialpa-app-v2.5.59`.
-
----
-
 ## Sesion de ficha completa para exteriores y recreacion - 2026-05-12 - v2.5.58
 
 ### Objetivo

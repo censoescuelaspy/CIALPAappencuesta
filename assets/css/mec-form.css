@@ -1852,15 +1852,177 @@
   background: #f8fafc;
 }
 
+.school-plan__canvas-stage {
+  position: relative;
+  min-width: max-content;
+  min-height: 420px;
+}
+
+.school-plan-basemap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #e2e8f0;
+}
+
+.school-plan-basemap--empty {
+  background: transparent;
+}
+
+.school-plan-basemap__tiles {
+  position: absolute;
+  inset: 0;
+}
+
+.school-plan-basemap__tiles img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.school-plan-basemap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(255,255,255,.32) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.32) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: .68;
+}
+
+.school-plan-basemap__attribution {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  z-index: 1;
+  padding: .12rem .28rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,.82);
+  color: #334155;
+  font-size: .58rem;
+  font-weight: 800;
+}
+
 .school-plan__board canvas {
   width: 100%;
   height: auto;
   display: block;
+  position: relative;
+  z-index: 2;
   background: #f8fafc;
   cursor: pointer;
   touch-action: none;
   max-width: none;
   -webkit-tap-highlight-color: transparent;
+}
+
+.school-plan-basemap-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+  padding: .2rem .3rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.school-plan-basemap-actions small {
+  color: #526071;
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+.school-plan-basemap-panel {
+  display: grid;
+  gap: .65rem;
+  margin: -.15rem 0 .7rem;
+  padding: .75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.school-plan-basemap-panel__header,
+.school-plan-basemap-panel__adjust,
+.school-plan-basemap-panel__offset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+  flex-wrap: wrap;
+}
+
+.school-plan-basemap-panel__header span {
+  display: block;
+  color: #15546b;
+  font-size: .72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.school-plan-basemap-panel__header strong {
+  display: block;
+  margin-top: .12rem;
+  color: #172033;
+  font-size: .92rem;
+}
+
+.school-plan-basemap-panel__header small {
+  display: block;
+  margin-top: .08rem;
+  color: #667085;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.school-plan-basemap-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: .55rem;
+}
+
+.school-plan-basemap-panel label {
+  display: grid;
+  gap: .22rem;
+  color: #475467;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.school-plan-basemap-panel input {
+  min-height: 34px;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: .34rem .48rem;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+}
+
+.school-plan-basemap-panel input[type="range"] {
+  padding: 0;
+}
+
+.school-plan-basemap-panel b {
+  color: #172033;
+  font-size: .72rem;
+}
+
+.school-plan-basemap-panel__nudge {
+  display: grid;
+  grid-template-columns: repeat(4, 38px);
+  gap: .35rem;
+}
+
+.school-plan-basemap-panel__offset label {
+  width: 128px;
 }
 
 .school-plan__side {
@@ -2874,6 +3036,21 @@
 
   .school-plan__layers label {
     justify-content: center;
+  }
+
+  .school-plan-basemap-actions {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .school-plan-basemap-panel__adjust,
+  .school-plan-basemap-panel__offset {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .school-plan-basemap-panel__offset label {
+    width: 100%;
   }
 
   .school-plan__board canvas {

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * config.js — Central application configuration
- * Version: 2.5.64
+ * Version: 2.5.65
  */
 
 const APP_CONFIG = {
@@ -17,8 +17,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA — Relevamiento Escolar',
-  VERSION: '2.5.64',
-  EDITION_LABEL: 'Edición vigente v2.5.64',
+  VERSION: '2.5.65',
+  EDITION_LABEL: 'Edición vigente v2.5.65',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -36,6 +36,9 @@ const APP_CONFIG = {
   // Tile layer
   TILE_URL: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  SATELLITE_TILE_URL: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  SATELLITE_ATTRIBUTION: 'Tiles &copy; Esri',
+  SATELLITE_MAX_ZOOM: 18,
   MAP_TILE_CACHE_NAME: 'cialpa-map-tiles-v2.5.0',
   MAP_TILE_CACHE_LIMIT: 260,
 
