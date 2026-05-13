@@ -4,6 +4,28 @@
 
 ---
 
+## Sesion de rotacion en editores internos y etiquetas de ambientes - 2026-05-12 - v2.5.63
+
+### Objetivo
+- Permitir girar elementos dentro del editor de aulas/ambientes y del editor de sanitarios.
+- Evitar que bibliotecas, tinglados, cantinas u otros espacios aparezcan rotulados como `Aula`.
+
+### Cambios implementados
+- Se agrego manija circular de rotacion en el elemento seleccionado dentro del croquis de ambientes y sanitarios.
+- Se agregaron botones rapidos `Girar -15`, `Girar +15` y `0 grados` en los paneles emergentes de seleccion.
+- La rotacion queda guardada en `rotationDeg` y `rotacion_grados` para objetos del croquis, ambiente activo y sanitario activo.
+- Las etiquetas del croquis, fichas, bloqueos, eliminacion y estados ahora usan el tipo real del ambiente: biblioteca, tinglado, cantina, cancha, laboratorio, etc.
+- Al regenerar la base de un ambiente se conserva la rotacion ya cargada.
+- Version y cache actualizados a `v2.5.63`.
+
+### Validaciones ejecutadas
+- `git diff --check` sin observaciones.
+- `osacompile -l JavaScript` sobre `mec-form.js`, `app.js`, `config.js` y `sw.js` sin errores.
+- `node --check` no se ejecuto porque `node` no esta instalado en esta maquina.
+- Servidor local `python3 -m http.server 8027` verificado con `curl` sobre `index.html`, `mec-form.js` y `sw.js`; version visible `v2.5.63`, cache `cialpa-app-v2.5.63` y funciones de rotacion interna presentes.
+
+---
+
 ## Sesion de rotacion integral y botones consolidados - 2026-05-12 - v2.5.62
 
 ### Objetivo
