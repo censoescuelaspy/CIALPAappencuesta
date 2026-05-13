@@ -469,8 +469,7 @@ const AppController = (() => {
         <button id="install-app-btn-header" class="btn btn-sm btn-primary" onclick="AppController.installApp()">Instalar</button>
         <button class="btn btn-sm btn-outline" onclick="AppController.updateApp()">Actualizar</button>
         <span class="user-bar__name">${_escapeHtml(`${user.nombres || ''} ${user.apellidos || ''}`.trim())}</span>
-        <span class="user-bar__role badge badge--role">${_escapeHtml(_rolLabel(user.rol))}</span>
-        <button class="btn btn-sm btn-outline" onclick="AppController.logout()">Salir</button>`;
+        <span class="user-bar__role badge badge--role">${_escapeHtml(_rolLabel(user.rol))}</span>`;
     }
     _refreshInstallButtons();
   }

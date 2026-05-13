@@ -282,8 +282,30 @@ body.sidebar-auto-hidden #sidebar.sidebar--open {
   padding: 1rem;
   border-top: 1px solid rgba(255,255,255,.1);
   font-size: .75rem;
-  opacity: .5;
+  color: rgba(255,255,255,.62);
+  opacity: 1;
   text-align: center;
+}
+
+.sidebar__logout {
+  width: 100%;
+  min-height: 36px;
+  margin-top: .75rem;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,.08);
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  opacity: 1;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+.sidebar__logout:hover {
+  border-color: rgba(255,255,255,.42);
+  background: rgba(255,255,255,.16);
+  transform: translateY(-1px);
 }
 
 /* ── Main area ────────────────────────────────────────────── */
@@ -334,6 +356,10 @@ body.sidebar-auto-hidden #sidebar.sidebar--open {
   gap: .75rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.app-header__logout {
+  flex: 0 0 auto;
 }
 
 .user-bar__name { font-size: .875rem; font-weight: 500; }

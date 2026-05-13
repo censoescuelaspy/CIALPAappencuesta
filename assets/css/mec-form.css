@@ -303,6 +303,17 @@
   color: #fff;
 }
 
+.mec-stage-button--quick {
+  border-color: #b6d4c7;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.mec-stage-button--quick:hover {
+  border-color: #5fb888;
+  background: #dcfce7;
+}
+
 .mec-module {
   display: none;
   border: 1px solid #d8e0ea;
@@ -379,7 +390,7 @@
 
 .mec-field-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: .85rem;
 }
 
@@ -857,7 +868,7 @@
 
 .mec-object-form .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: .75rem;
 }
 
@@ -1306,7 +1317,7 @@
 
 .mec-sanitary-groups {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: .75rem;
   margin: .75rem 0;
 }
@@ -1856,6 +1867,36 @@
   position: relative;
   min-width: max-content;
   min-height: 420px;
+}
+
+.mec-section--block-plan {
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.mec-section--block-plan .school-plan {
+  gap: .65rem;
+}
+
+.mec-section--block-plan .school-plan__layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mec-section--block-plan .school-plan__side,
+.mec-section--block-plan .school-plan__kpis {
+  display: none;
+}
+
+.mec-section--block-plan .school-plan-builder {
+  padding: .6rem;
+}
+
+.mec-section--block-plan .school-plan-builder__state small {
+  display: none;
+}
+
+.mec-section--block-plan .school-plan__canvas-wrap {
+  max-height: min(58vh, 520px);
 }
 
 .school-plan-basemap {
@@ -2578,7 +2619,7 @@
   }
 
   .mec-sanitary-groups {
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: .5rem;
   }
 
@@ -2658,7 +2699,7 @@
   }
 
   .mec-object-form .form-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: .5rem;
   }
 
@@ -2995,7 +3036,7 @@
   }
 
   .mec-sanitary-groups {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: .4rem;
   }
 

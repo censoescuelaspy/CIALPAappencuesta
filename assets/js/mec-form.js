@@ -579,6 +579,67 @@ const MecFormModule = (() => {
     };
   }
 
+  function _ensureTimeLog() {
+    _data.__registroTiempos = _data.__registroTiempos || {};
+    _data.__registroTiempos.items = Array.isArray(_data.__registroTiempos.items) ? _data.__registroTiempos.items : [];
+    _data.__registroTiempos.active = _data.__registroTiempos.active || {};
+    return _data.__registroTiempos;
+  }
+
+  function _timeLogKey(kind, id) {
+    return `${kind}:${id || 'sin_id'}`;
+  }
+
+  function _startTimeLog(kind, id, label = '') {
+    if (!id) return null;
+    const log = _ensureTimeLog();
+    const key = _timeLogKey(kind, id);
+    if (!log.active[key]) {
+      log.active[key] = {
+        kind,
+        id,
+        label,
+        startedAt: new Date().toISOString(),
+      };
+    } else if (label) {
+      log.active[key].label = label;
+    }
+    return log.active[key];
+  }
+
+  function _finishTimeLog(kind, id, label = '') {
+    if (!id) return null;
+    const log = _ensureTimeLog();
+    const key = _timeLogKey(kind, id);
+    const active = log.active[key] || _startTimeLog(kind, id, label);
+    const finishedAt = new Date().toISOString();
+    const startedAt = active?.startedAt || finishedAt;
+    const durationSeconds = Math.max(0, Math.round((new Date(finishedAt) - new Date(startedAt)) / 1000));
+    const record = {
+      kind,
+      id,
+      label: label || active?.label || '',
+      startedAt,
+      finishedAt,
+      durationSeconds,
+    };
+    log.items.push(record);
+    delete log.active[key];
+    return record;
+  }
+
+  function _activeTimeLog(kind, id) {
+    return _ensureTimeLog().active[_timeLogKey(kind, id)] || null;
+  }
+
+  function _formatDuration(seconds = 0) {
+    const total = Math.max(0, Number(seconds) || 0);
+    const min = Math.floor(total / 60);
+    const sec = Math.round(total % 60);
+    if (min <= 0) return `${sec}s`;
+    return `${min}m ${String(sec).padStart(2, '0')}s`;
+  }
+
   function _ensurePlanBaseMap() {
     const defaults = _planBaseMapDefaults();
     const current = _data.__planBaseMap || {};
@@ -587,7 +648,7 @@ const MecFormModule = (() => {
     if ((merged.lng === '' || merged.lng === undefined || merged.lng === null) && defaults.lng !== '') merged.lng = defaults.lng;
     merged.lat = merged.lat === '' ? '' : _numberInRange(merged.lat, defaults.lat === '' ? '' : defaults.lat, -85, 85);
     merged.lng = merged.lng === '' ? '' : _numberInRange(merged.lng, defaults.lng === '' ? '' : defaults.lng, -180, 180);
-    merged.zoom = Math.round(_numberInRange(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, 14, (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_MAX_ZOOM) || 19));
+    merged.zoom = Math.round(_numberInRange(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, 14, (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)) || 19));
     merged.opacity = _numberInRange(merged.opacity, .56, .15, .95);
     merged.scale = _numberInRange(merged.scale, 1, .35, 4);
     merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
@@ -609,12 +670,12 @@ const MecFormModule = (() => {
   }
 
   function _planBaseMapTileTemplate() {
-    return (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_TILE_URL)
-      || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+    return (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_TILE_URL || APP_CONFIG.SATELLITE_TILE_URL))
+      || 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png';
   }
 
   function _planBaseMapAttribution() {
-    return (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_ATTRIBUTION) || 'Tiles &copy; Esri';
+    return (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_ATTRIBUTION || APP_CONFIG.SATELLITE_ATTRIBUTION)) || '&copy; OpenStreetMap contributors, HOT';
   }
 
   function _worldPixelFromLatLng(lat, lng, zoom) {
@@ -696,9 +757,9 @@ const MecFormModule = (() => {
 
   function _planBaseMapMetricText(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
     const baseMap = _ensurePlanBaseMap();
-    if (!_planBaseMapHasCoords(baseMap)) return 'Cargue coordenadas para activar la imagen satelital.';
+    if (!_planBaseMapHasCoords(baseMap)) return 'Cargue coordenadas para activar la base de calles y lineas.';
     const metersPerPx = _planBaseMapMetersPerPlanPixel(baseMap);
-    if (!metersPerPx) return 'Escala satelital pendiente.';
+    if (!metersPerPx) return 'Escala cartografica pendiente.';
     const widthM = metersPerPx * logicalWidth;
     const heightM = metersPerPx * logicalHeight;
     return `Cobertura aprox. ${widthM.toFixed(0)} x ${heightM.toFixed(0)} m - ${metersPerPx.toFixed(2)} m/px`;
@@ -776,7 +837,7 @@ const MecFormModule = (() => {
       : 'Sin coordenadas';
     return `
       <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
-        <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Satelite activo' : 'Satelite'}</button>
+        <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Calles activo' : 'Calles/lineas'}</button>
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base mapa</button>
         <small>${_escape(coords)}</small>
@@ -791,7 +852,7 @@ const MecFormModule = (() => {
       <section class="school-plan-basemap-panel" aria-label="Configuracion de base mapa">
         <div class="school-plan-basemap-panel__header">
           <div>
-            <span>Base satelital calibrable</span>
+            <span>Base de calles y lineas calibrable</span>
             <strong>${_escape(_planBaseMapMetricText(900, _planCanvasHeight()))}</strong>
             <small>${_escape(savedText)}</small>
           </div>
@@ -804,8 +865,8 @@ const MecFormModule = (() => {
           <label>Longitud
             <input type="number" step="0.000001" value="${_escape(baseMap.lng)}" onchange="MecFormModule.setPlanBaseMapValue('lng', this.value)">
           </label>
-          <label>Zoom satelital
-            <input type="range" min="14" max="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_MAX_ZOOM) || 19)}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
+          <label>Zoom cartografico
+            <input type="range" min="14" max="${_escape((typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)) || 19)}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
             <b>${_escape(baseMap.zoom)}</b>
           </label>
           <label>Escala base
@@ -843,7 +904,7 @@ const MecFormModule = (() => {
     if (baseMap.enabled && !_planBaseMapHasCoords(baseMap)) {
       _planBaseMapPanelOpen = true;
       baseMap.enabled = false;
-      UI.showToast('Cargue latitud y longitud para activar la base satelital.', 'warning', 5200);
+      UI.showToast('Cargue latitud y longitud para activar la base de calles y lineas.', 'warning', 5200);
     }
     _saveDraft(false);
     renderSchoolPlan();
@@ -858,7 +919,7 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     if (key === 'lat') baseMap.lat = value === '' ? '' : _numberInRange(value, baseMap.lat || 0, -85, 85);
     if (key === 'lng') baseMap.lng = value === '' ? '' : _numberInRange(value, baseMap.lng || 0, -180, 180);
-    if (key === 'zoom') baseMap.zoom = Math.round(_numberInRange(value, baseMap.zoom, 14, (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.SATELLITE_MAX_ZOOM) || 19));
+    if (key === 'zoom') baseMap.zoom = Math.round(_numberInRange(value, baseMap.zoom, 14, (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)) || 19));
     if (key === 'scale') baseMap.scale = _numberInRange(value, baseMap.scale, .35, 4);
     if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, .95);
     if (key === 'offsetX') baseMap.offsetX = _numberInRange(value, baseMap.offsetX, -2000, 2000);
@@ -915,7 +976,7 @@ const MecFormModule = (() => {
     baseMap.savedAt = new Date().toISOString();
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast('Base mapa guardada para construir el plano sobre la imagen satelital.', 'success', 5600);
+    UI.showToast('Base mapa guardada para construir el plano sobre calles y lineas de referencia.', 'success', 5600);
   }
 
   function _fieldVisible(field) {
@@ -1066,6 +1127,8 @@ const MecFormModule = (() => {
                     onclick="MecFormModule.selectModule('${_escape(module.id)}')">
                     ${_escape(module.title)}
                   </button>`).join('')}
+                <button class="mec-stage-button mec-stage-button--quick" type="button" onclick="MecFormModule.openOtherSpacePicker('plan')">Otros espacios</button>
+                <button class="mec-stage-button mec-stage-button--quick" type="button" onclick="MecFormModule.openSiteElementTypePicker('plan')">Exteriores</button>
               </div>
             </div>
             <span class="mec-stage-current">${_escape(activeModule?.description || `${implemented.length} etapas activas`)}</span>
@@ -1156,20 +1219,24 @@ const MecFormModule = (() => {
 
   function _renderBlockModule(module) {
     _ensureBlocks();
+    const activeBlock = _blockById(_data.__activeBlockId);
+    if (activeBlock) _startTimeLog('bloque', activeBlock.id, activeBlock.bloque_codigo || 'Bloque');
     return `
       <section class="mec-section">
         <div class="mec-section__header">
           <h4>Bloques registrados</h4>
-          <p class="mec-hint">Cada cambio se guarda automaticamente. Puede cambiar de bloque, volver y seguir editando sin usar botones de guardado.</p>
+          <p class="mec-hint">Cada bloque inicia un contador al crearse o seleccionarse. Use Guardar bloque para cerrar el registro y medir el tiempo real de carga.</p>
         </div>
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newBlock()">+ Nuevo bloque</button>
+          <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.saveCurrentBlock()">Guardar bloque</button>
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">Implantar/mover en plano</button>
           <button class="btn ${_isBlockLocked(_blockById(_data.__activeBlockId)) ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setActiveBlockLocked(${_isBlockLocked(_blockById(_data.__activeBlockId)) ? 'false' : 'true'})">
             ${_isBlockLocked(_blockById(_data.__activeBlockId)) ? 'Desbloquear bloque' : 'Bloquear bloque'}
           </button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveBlock()">Eliminar bloque activo</button>
-          <span class="mec-autosave-pill">Autoguardado</span>
-          ${_isBlockLocked(_blockById(_data.__activeBlockId)) ? '<span class="mec-lock-pill">Bloque bloqueado</span>' : ''}
+          <span class="mec-autosave-pill">${_escape(_blockTimerText(activeBlock))}</span>
+          ${_isBlockLocked(activeBlock) ? '<span class="mec-lock-pill">Bloque bloqueado</span>' : ''}
         </div>
         <div class="mec-repeat-list">
           ${(_data.__blocks || []).map(block => `
@@ -1180,7 +1247,36 @@ const MecFormModule = (() => {
             </button>`).join('')}
         </div>
       </section>
+      ${_renderBlockPlanPanel()}
       ${module.sections.map(section => _renderSection(module, section)).join('')}`;
+  }
+
+  function _blockTimerText(block) {
+    if (!block?.id) return 'Tiempo sin iniciar';
+    const active = _activeTimeLog('bloque', block.id);
+    if (!active?.startedAt) return 'Tiempo listo para iniciar';
+    const seconds = Math.max(0, Math.round((Date.now() - new Date(active.startedAt).getTime()) / 1000));
+    return `Bloque en curso: ${_formatDuration(seconds)}`;
+  }
+
+  function _timerText(kind, id, label = 'registro') {
+    if (!id) return 'Tiempo sin iniciar';
+    const active = _activeTimeLog(kind, id);
+    if (!active?.startedAt) return 'Tiempo listo para iniciar';
+    const seconds = Math.max(0, Math.round((Date.now() - new Date(active.startedAt).getTime()) / 1000));
+    return `${label} en curso: ${_formatDuration(seconds)}`;
+  }
+
+  function _renderBlockPlanPanel() {
+    const block = _blockById(_data.__activeBlockId);
+    return `
+      <section class="mec-section mec-section--block-plan">
+        <div class="mec-section__header">
+          <h4>Implantacion del bloque activo</h4>
+          <p class="mec-hint">${_escape(block ? `${block.bloque_codigo || 'Bloque'}: ubique la forma en el predio antes o mientras carga dimensiones, escalera y electricidad.` : 'Cree o seleccione un bloque para implantarlo en el plano.')}</p>
+        </div>
+        <div id="mec-block-plan-root" data-school-plan-root></div>
+      </section>`;
   }
 
   function _renderPlannedModule(module) {
@@ -1360,6 +1456,7 @@ const MecFormModule = (() => {
   function _renderClassroomSketchModule() {
     _ensureClassrooms();
     const sketch = _data.__classroomSketch || {};
+    if (sketch.id) _startTimeLog('ambiente', sketch.id, _classroomHierarchyLabel(sketch) || sketch.name || _roomSpaceLabel(sketch));
     const classrooms = _data.__classrooms || [];
     const locked = _isClassroomLocked(sketch);
     const disabled = locked ? 'disabled' : '';
@@ -1374,11 +1471,12 @@ const MecFormModule = (() => {
         <div class="mec-repeat-toolbar">
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
           <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openOtherSpacePicker()">+ Otro espacio</button>
+          <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.saveCurrentClassroom()">Guardar ambiente</button>
           ${_renderClassroomLockButton(sketch)}
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveClassroom()">Eliminar ambiente activo</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveFloor()">Eliminar piso activo</button>
           <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteActiveBlock()">Eliminar bloque activo</button>
-          <span class="mec-autosave-pill">Autoguardado</span>
+          <span class="mec-autosave-pill">${_escape(_timerText('ambiente', sketch.id, _roomSpaceLabel(sketch)))}</span>
           ${locked ? `<span class="mec-lock-pill">${_escape(_roomSpaceLabel(sketch))} bloqueado</span>` : ''}
         </div>
         ${_renderClassroomBlockNavigator()}
@@ -2205,6 +2303,7 @@ const MecFormModule = (() => {
     }
     _selectedSketchObjectId = null;
     _requestSketchCenter();
+    if (_data.__classroomSketch?.id) _startTimeLog('ambiente', _data.__classroomSketch.id, _classroomHierarchyLabel(_data.__classroomSketch) || _data.__classroomSketch.name || 'Ambiente');
     _saveDraft(false);
     _render();
   }
@@ -2243,6 +2342,7 @@ const MecFormModule = (() => {
     };
     _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
     _syncActiveClassroomFromSketch();
+    _startTimeLog('ambiente', _activeClassroomId, _data.__classroomSketch.name || cfg.label);
     _selectedSketchObjectId = null;
     _requestSketchCenter();
     _saveDraft(false);
@@ -2297,10 +2397,17 @@ const MecFormModule = (() => {
     setTimeout(() => _createRoomLikeSpace(kind), origin === 'plan' ? 120 : 0);
   }
 
+  function addPlanOtherSpace(kind) {
+    chooseOtherSpaceType(kind, 'plan');
+  }
+
   function saveCurrentClassroom() {
     if (_activeClassroomId || _data.__classroomSketch?.id) _syncActiveClassroomFromSketch();
+    const room = _activeClassroomRecord();
+    const record = room ? _finishTimeLog('ambiente', room.id, _classroomHierarchyLabel(room) || room.name || _roomSpaceLabel(room)) : null;
     _saveDraft(true);
     renderSchoolPlan();
+    if (record) UI.showToast(`${_roomSpaceLabel(room)} guardado. Tiempo de registro: ${_formatDuration(record.durationSeconds)}.`, 'success', 5600);
   }
 
   async function setActiveClassroomLocked(locked) {
@@ -2633,6 +2740,16 @@ const MecFormModule = (() => {
   }
 
   function _siteElementSizeFromFicha(type, shape, ficha = {}) {
+    if (type === 'water_tank') {
+      const diametro = Number(ficha.diametro_m || ficha.ancho_m || 0);
+      const largo = Number(ficha.largo_m || diametro || 0);
+      const ancho = Number(ficha.ancho_m || diametro || 0);
+      if (!largo || !ancho) return null;
+      return {
+        wRatio: Math.max(.04, Math.min(.22, largo / 120)),
+        hRatio: Math.max(.04, Math.min(.22, ancho / 120)),
+      };
+    }
     if (type === 'pillar') {
       const square = String(ficha.forma_pilar || ficha.seccion || '').toLowerCase().includes('cuad');
       const measure = Number(square ? (ficha.lado_m || ficha.diametro_m) : (ficha.diametro_m || ficha.lado_m));
@@ -2669,6 +2786,10 @@ const MecFormModule = (() => {
     }
     const largo = Number(element.ficha.largo_m || 0);
     const ancho = Number(element.ficha.ancho_m || 0);
+    if (element.type === 'water_tank') {
+      const diametro = Number(element.ficha.diametro_m || element.ficha.ancho_m || 0);
+      if (diametro > 0) element.ficha.superficie_m2 = (Math.PI * Math.pow(diametro / 2, 2)).toFixed(2);
+    }
     if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space'].includes(element.type)) {
       element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
       if (element.ficha.perimetro_m !== undefined) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
@@ -2701,6 +2822,9 @@ const MecFormModule = (() => {
     return {
       water_tank: {
         capacidad_litros: '',
+        diametro_m: '2.00',
+        altura_m: '',
+        superficie_m2: '',
         material: 'PVC',
         soporte: 'Base elevada',
         tapa: 'Si',
@@ -2772,6 +2896,9 @@ const MecFormModule = (() => {
     return {
       water_tank: [
         { key: 'capacidad_litros', label: 'Capacidad aprox. (litros)', type: 'number', placeholder: 'Ej. 5000' },
+        { key: 'diametro_m', label: 'Diametro / ancho aprox. (m)', type: 'number', placeholder: 'Ej. 2.00' },
+        { key: 'altura_m', label: 'Altura aprox. (m)', type: 'number', placeholder: 'Ej. 4.00' },
+        { key: 'superficie_m2', label: 'Huella aprox. (m2)', type: 'number', placeholder: 'Auto' },
         { key: 'material', label: 'Material', options: ['PVC', 'Fibra', 'Hormigon', 'Metal', 'Otro'] },
         { key: 'soporte', label: 'Soporte', options: ['Base elevada', 'Torre metalica', 'Losa', 'A nivel de piso', 'Otro'] },
         { key: 'tapa', label: 'Tapa', options: ['Si', 'No', 'No verificable'] },
@@ -2981,6 +3108,7 @@ const MecFormModule = (() => {
     _data.__activeBlockId = id;
     const { id: _id, ...values } = block;
     _data.bloques = values;
+    _startTimeLog('bloque', id, block.bloque_codigo || 'Bloque');
     _saveDraft(false);
     _render();
   }
@@ -3016,6 +3144,7 @@ const MecFormModule = (() => {
     _data.__activeBlockId = `bloque_${Date.now()}`;
     _data.bloques = { bloque_codigo: _numberedLabel('Bloque', next - 1), estado_bloque: 'Operativo', cantidad_plantas: '1' };
     _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+    _startTimeLog('bloque', _data.__activeBlockId, _data.bloques.bloque_codigo);
     _saveDraft(false);
     _render();
     UI.showToast('Nuevo bloque listo para cargar.', 'success');
@@ -3023,8 +3152,15 @@ const MecFormModule = (() => {
 
   function saveCurrentBlock() {
     _syncActiveBlock();
-    _saveDraft(true);
+    const block = _blockById(_data.__activeBlockId);
+    const record = block ? _finishTimeLog('bloque', block.id, block.bloque_codigo || 'Bloque') : null;
+    _saveDraft(false);
     _render();
+    UI.showToast(record
+      ? `Bloque guardado. Tiempo de registro: ${_formatDuration(record.durationSeconds)}.`
+      : 'Bloque guardado.',
+      'success',
+      5600);
   }
 
   async function deleteActiveClassroom() {
@@ -3043,6 +3179,7 @@ const MecFormModule = (() => {
     _data.__classrooms = (_data.__classrooms || []).filter(item => item.id !== room.id);
     if (_selectedPlanId === `room::${room.id}`) _selectedPlanId = null;
     _selectBestClassroomAfterDeletion(blockId, floor);
+    document.getElementById('modal-classroom-ficha')?.remove();
     _saveDraft(false);
     _render();
     renderSchoolPlan();
@@ -3532,6 +3669,7 @@ const MecFormModule = (() => {
     const dims = item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : 'Sin medidas';
     const locked = _isSanitaryLocked(item);
     const disabled = locked ? 'disabled' : '';
+    if (item?.id) _startTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
     return `
       <div class="mec-sketch__layout mec-sanitary-editor">
         <div class="mec-sketch__tools">
@@ -3543,6 +3681,7 @@ const MecFormModule = (() => {
           </div>
           <div class="mec-sketch__actions">
             <button class="btn ${locked ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear sanitario' : 'Bloquear sanitario'}</button>
+            <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.saveCurrentSanitary('${_escape(item.id)}')">Guardar sanitario</button>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openSelectedSanitaryFicha()">Ficha sanitario</button>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'door')" ${disabled}>+ Puerta</button>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addSanitaryOpening('${_escape(item.id)}', 'window')" ${disabled}>+ Ventana</button>
@@ -3551,6 +3690,7 @@ const MecFormModule = (() => {
             <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
             <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
             <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')">Eliminar sanitario</button>
+            <span class="mec-autosave-pill">${_escape(_timerText('sanitario', item.id, 'Sanitario'))}</span>
           </div>
         </div>
         <div class="mec-sketch__board">
@@ -3958,6 +4098,7 @@ const MecFormModule = (() => {
           </div>
         </div>
         <div class="modal__footer">
+          <button class="btn btn-danger" onclick="MecFormModule.deleteSelectedSanitaryObject()">Eliminar cabina</button>
           <button class="btn btn-primary" onclick="MecFormModule.closeSanitaryStallFicha()">Guardar y cerrar</button>
         </div>
       </div>`;
@@ -4174,6 +4315,7 @@ const MecFormModule = (() => {
     _ensureSanitaryRoomObject(item);
     _data.__sanitaries.push(item);
     _activeSanitaryId = item.id;
+    _startTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
     _saveDraft(false);
     _render();
     UI.showToast('Sanitario agregado.', 'success');
@@ -4222,8 +4364,22 @@ const MecFormModule = (() => {
       _data.bloques = values;
     }
     _setActiveFloor(item.planta || 'Piso 1');
+    _startTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
     _saveDraft(false);
     _render();
+  }
+
+  function saveCurrentSanitary(id = _activeSanitaryId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) {
+      UI.showToast('Seleccione un sanitario para guardar.', 'warning');
+      return;
+    }
+    const record = _finishTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast(`Sanitario guardado. Tiempo de registro: ${_formatDuration(record.durationSeconds)}.`, 'success', 5600);
   }
 
   function addSanitaryOpening(id, type) {
@@ -4656,6 +4812,7 @@ const MecFormModule = (() => {
         </div>
         <div class="modal__footer">
           <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
+          <button class="btn btn-danger" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')" ${locked ? 'disabled' : ''}>Eliminar sanitario</button>
           <button class="btn btn-primary" onclick="MecFormModule.closeSanitaryFicha()">Cerrar ficha</button>
         </div>
       </div>`;
@@ -4841,6 +4998,8 @@ const MecFormModule = (() => {
     }
     if (_selectedSanitaryObjectId === objectId) _selectedSanitaryObjectId = null;
     if (_selectedPlanId === `sanitary::${sanitaryId}::${objectId}`) _selectedPlanId = `sanitary::${sanitaryId}`;
+    document.getElementById('modal-sanitary-object-ficha')?.remove();
+    document.getElementById('modal-sanitary-stall-ficha')?.remove();
     _saveDraft(false);
     _render();
     renderSchoolPlan();
@@ -4855,6 +5014,9 @@ const MecFormModule = (() => {
     _data.__sanitaries = (_data.__sanitaries || []).filter(sanitary => sanitary.id !== id);
     if (_activeSanitaryId === id) _activeSanitaryId = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])[0]?.id || null;
     _selectedSanitaryObjectId = null;
+    document.getElementById('modal-sanitary-ficha')?.remove();
+    document.getElementById('modal-sanitary-object-ficha')?.remove();
+    document.getElementById('modal-sanitary-stall-ficha')?.remove();
     _saveDraft(false);
     _render();
   }
@@ -8327,6 +8489,9 @@ const MecFormModule = (() => {
       return;
     }
     const previousScale = object.type === 'room' ? _sketchScale() : null;
+    const previousRect = object.type === 'room'
+      ? { x: object.x, y: object.y, w: object.w, h: object.h }
+      : null;
     const minW = 18;
     const minH = 12;
     const right = object.x + object.w;
@@ -8352,7 +8517,11 @@ const MecFormModule = (() => {
     if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 8;
     if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 8;
     if (object.type === 'room') {
-      _clampRoomWithinBlock(object);
+      const resolved = _resolveRoomOverlap(previousRect || object, _clampRectToBlock(object));
+      object.x = resolved.x;
+      object.y = resolved.y;
+      object.w = resolved.w;
+      object.h = resolved.h;
       _updateSketchDimensionsFromRoom(object, previousScale);
       _reflowAttachedOpenings(object);
     }
@@ -9205,6 +9374,7 @@ const MecFormModule = (() => {
           </form>
         </div>
         <div class="modal__footer">
+          <button class="btn btn-danger" onclick="MecFormModule.deleteSelectedSketchObject()" ${locked ? 'disabled' : ''}>Eliminar elemento</button>
           <button class="btn btn-outline" onclick="MecFormModule.closeSketchObjectFicha()">Cancelar</button>
           <button class="btn btn-primary" onclick="MecFormModule.saveSketchObjectFicha()" ${locked ? 'disabled' : ''}>Guardar ficha</button>
         </div>
@@ -9595,6 +9765,7 @@ const MecFormModule = (() => {
             onchange="MecFormModule.setSketchField('openings', this.value)" ${locked ? 'disabled' : ''}>${_escape(room.openings || '')}</textarea>
         </div>
         <div class="modal__footer">
+          <button class="btn btn-danger" onclick="MecFormModule.deleteActiveClassroom()" ${locked ? 'disabled' : ''}>Eliminar ${_escape(typeText)}</button>
           <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setActiveClassroomLocked(${locked ? 'false' : 'true'})">${locked ? `Desbloquear ${_escape(typeText)}` : `Bloquear ${_escape(typeText)}`}</button>
           <button class="btn btn-primary" onclick="MecFormModule.closeClassroomFicha()">Cerrar ficha</button>
         </div>
@@ -9732,6 +9903,7 @@ const MecFormModule = (() => {
     _pushSketchHistory();
     _data.__classroomSketch.objects = _data.__classroomSketch.objects.filter(object => object.id !== _selectedSketchObjectId);
     _selectedSketchObjectId = null;
+    closeSketchObjectFicha();
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
@@ -9984,6 +10156,15 @@ const MecFormModule = (() => {
     return `<button class="btn ${_escape(action.tone)} ${_escape(sizeClass)}" type="button" onclick="${_escape(action.onClick)}">${_escape(action.label)}</button>`;
   }
 
+  function _quickOtherSpaceActions() {
+    return [
+      { label: '+ Cantina', onClick: "MecFormModule.addPlanOtherSpace('canteen')" },
+      { label: '+ Biblioteca', onClick: "MecFormModule.addPlanOtherSpace('library')" },
+      { label: '+ Tinglado', onClick: "MecFormModule.addPlanOtherSpace('covered_court')" },
+      { label: '+ Cancha', onClick: "MecFormModule.addPlanOtherSpace('court')" },
+    ];
+  }
+
   function _planSelectionContext(id = _selectedPlanId) {
     const fallback = {
       title: 'Seleccione un bloque, aula, sanitario u objeto',
@@ -9991,6 +10172,7 @@ const MecFormModule = (() => {
       actions: [
         { label: '+ Nueva aula', tone: 'btn-primary', onClick: 'MecFormModule.newPlanClassroom()' },
         { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
+        ..._quickOtherSpaceActions(),
         { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
         { label: '+ Exterior', onClick: "MecFormModule.openSiteElementTypePicker('plan')" },
         { label: 'Aulas', onClick: "MecFormModule.selectModule('aulas')" },
@@ -10011,6 +10193,7 @@ const MecFormModule = (() => {
           { label: 'Abrir bloque', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
           { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
+          ..._quickOtherSpaceActions(),
           { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
           { label: '+ Exterior', onClick: "MecFormModule.openSiteElementTypePicker('plan')" },
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', -15)` },
@@ -10753,6 +10936,35 @@ const MecFormModule = (() => {
     return Math.max(620, 320 * rows + Math.max(0, maxFloors - 1) * 170);
   }
 
+  function _drawBlockInfrastructureHints(ctx, block, x, y, w, h) {
+    const circulation = String(block?.tipo_circulacion || '').toLowerCase();
+    const hasStair = circulation.includes('escalera') || circulation.includes('ambas');
+    const hasRamp = circulation.includes('rampa') || circulation.includes('ambas');
+    const tablero = String(block?.tablero_estado || '').toLowerCase();
+    const hasBoard = tablero && !tablero.includes('no existe') && !tablero.includes('no visible');
+    const markers = [];
+    if (hasStair) markers.push({ label: 'Esc', tone: '#4b5563', fill: '#f8fafc' });
+    if (hasRamp) markers.push({ label: 'Rmp', tone: '#7c3aed', fill: '#f5f3ff' });
+    if (hasBoard) markers.push({ label: 'TBL', tone: '#854d0e', fill: '#fef3c7' });
+    if (!markers.length) return;
+    markers.forEach((marker, index) => {
+      const mx = x + w - 38 - index * 42;
+      const my = y + 38;
+      ctx.save();
+      ctx.fillStyle = marker.fill;
+      ctx.strokeStyle = marker.tone;
+      ctx.lineWidth = 1.6;
+      ctx.fillRect(mx, my, 32, 22);
+      ctx.strokeRect(mx, my, 32, 22);
+      ctx.fillStyle = marker.tone;
+      ctx.font = _canvasFont(900, 9);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(marker.label, mx + 16, my + 11);
+      ctx.restore();
+    });
+  }
+
   function _drawSchoolPlan() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
@@ -10821,6 +11033,7 @@ const MecFormModule = (() => {
         ctx.fillStyle = '#475467';
         ctx.fillText(`${block.largo_m} x ${block.ancho_m} m`, x + 10, y + 26);
       }
+      _drawBlockInfrastructureHints(ctx, block, x, y, w, h);
       if (blockSelected) {
         _drawPlanRotateHandle(ctx, blockRect, 0);
         const handle = _planRotateHandle(blockRect, 0);
@@ -12318,6 +12531,25 @@ const MecFormModule = (() => {
     return [...blockRects, ...siteRects];
   }
 
+  function _planMoveBlockers(kind, id, logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
+    const blockRects = blocks.length ? _planBlockLayout(blocks, logicalWidth, logicalHeight)
+      .filter(item => !(kind === 'block' && item.block?.id === id))
+      .filter(Boolean)
+      .map(rect => _inflatePlanRect(rect, 2, logicalWidth, logicalHeight)) : [];
+    const siteRects = _ensureSiteElements()
+      .filter(item => !(kind === 'site' && item.id === id))
+      .map(item => _inflatePlanRect(_rotatedSiteElementBounds(_siteElementRect(item, logicalWidth, logicalHeight), item), 2, logicalWidth, logicalHeight));
+    return [...blockRects, ...siteRects];
+  }
+
+  function _resolvePlanRectNoOverlap(rect, blockers = [], logicalWidth = 900, logicalHeight = _planCanvasHeight(), gap = 2) {
+    const bounds = { x: 8, y: 8, w: logicalWidth - 16, h: logicalHeight - 16 };
+    const desired = _clampRectToBounds(rect, bounds);
+    if (!_rectOverlapsAny(desired, blockers, gap)) return desired;
+    return _nearestFreeRectInBounds(desired, blockers, bounds, gap) || desired;
+  }
+
   function _isSiteElementSnappable(type) {
     return ['gallery', 'walkway', 'open_space', 'recreation', 'pillar'].includes(type);
   }
@@ -12577,6 +12809,7 @@ const MecFormModule = (() => {
     }
     _updateSiteElementDerivedFields(element);
     elements.push(element);
+    _startTimeLog('exterior', element.id, element.ficha.codigo || cfg.label);
     closeNewSiteElementFicha();
     _saveDraft(false);
     _showSchoolPlanAfterSiteInsert(element);
@@ -12605,6 +12838,7 @@ const MecFormModule = (() => {
     };
     _updateSiteElementDerivedFields(element);
     elements.push(element);
+    _startTimeLog('exterior', element.id, element.ficha.codigo || cfg.label);
     _saveDraft(false);
     _showSchoolPlanAfterSiteInsert(element);
     setTimeout(() => openSiteElementFicha(element.id), 180);
@@ -12685,6 +12919,7 @@ const MecFormModule = (() => {
     _selectedPlanId = `site::${element.id}`;
     element.ficha = { ..._defaultSiteElementFicha(element.type), ...(element.ficha || {}) };
     const cfg = _siteElementConfig(element.type);
+    _startTimeLog('exterior', element.id, element.ficha.codigo || cfg.label);
     const locked = _isSiteElementLocked(element);
     const disabled = locked ? 'disabled' : '';
     const modalId = 'modal-site-element-ficha';
@@ -12752,6 +12987,7 @@ const MecFormModule = (() => {
           </form>
         </div>
         <div class="modal__footer">
+          <button class="btn btn-danger" onclick="MecFormModule.deleteSiteElement('${_escape(element.id)}')" ${locked ? 'disabled' : ''}>Eliminar elemento</button>
           <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setSiteElementLocked('${_escape(element.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
           <button class="btn btn-outline" onclick="MecFormModule.closeSiteElementFicha()">Cancelar</button>
           <button class="btn btn-primary" onclick="MecFormModule.saveSiteElementFicha()" ${disabled}>Guardar ficha</button>
@@ -12781,8 +13017,31 @@ const MecFormModule = (() => {
   }
 
   function saveSiteElementFicha() {
-    _persistSiteElementFicha(true);
+    const form = document.getElementById('form-site-element-ficha');
+    const id = form ? String(new FormData(form).get('element_id') || '') : '';
+    const element = id ? _ensureSiteElements().find(item => item.id === id) : null;
+    const persisted = _persistSiteElementFicha(false);
+    const record = persisted && element ? _finishTimeLog('exterior', element.id, element.ficha?.codigo || _siteElementLabel(element.type)) : null;
+    if (record) _saveDraft(false);
+    if (record) UI.showToast(`Elemento guardado. Tiempo de registro: ${_formatDuration(record.durationSeconds)}.`, 'success', 5600);
+    else if (persisted) UI.showToast('Ficha exterior guardada.', 'success');
     closeSiteElementFicha();
+  }
+
+  async function deleteSiteElement(id) {
+    const element = _ensureSiteElements().find(item => item.id === id);
+    if (!element) return;
+    if (!_assertSiteElementUnlocked(element, 'eliminarlo')) return;
+    const confirmed = await UI.showConfirm('Eliminar elemento', `¿Confirma eliminar ${_escape(element.ficha?.codigo || _siteElementLabel(element.type))}?`);
+    if (!confirmed) return;
+    _data.__siteElements = (_data.__siteElements || []).filter(item => item.id !== id);
+    if (_selectedPlanId === `site::${id}`) _selectedPlanId = null;
+    closeSiteElementFicha();
+    _saveDraft(false);
+    renderSchoolPlan();
+    _redrawSketchCanvas();
+    _redrawSanitaryCanvas();
+    UI.showToast('Elemento eliminado.', 'success');
   }
 
   function _persistSiteElementFicha(showToast = false) {
@@ -12987,7 +13246,8 @@ const MecFormModule = (() => {
     if (!_assertBlockUnlocked(block, 'moverlo')) return null;
     const logicalWidth = 900;
     const logicalHeight = _planCanvasHeight();
-    const clamped = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
+    const desired = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
+    const clamped = _resolvePlanRectNoOverlap(desired, _planMoveBlockers('block', block.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
     const position = {
       xRatio: clamped.x / logicalWidth,
       yRatio: clamped.y / logicalHeight,
@@ -13013,9 +13273,10 @@ const MecFormModule = (() => {
     const logicalWidth = 900;
     const logicalHeight = _planCanvasHeight();
     const initial = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
-    const clamped = _isSiteElementSnappable(element.type)
+    const snapped = _isSiteElementSnappable(element.type)
       ? _snapSiteElementRectToTargets(initial, logicalWidth, logicalHeight)
       : initial;
+    const clamped = _resolvePlanRectNoOverlap(snapped, _planMoveBlockers('site', element.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _activePlanDrag = {
@@ -15081,6 +15342,7 @@ const MecFormModule = (() => {
     selectClassroom,
     newClassroom,
     openOtherSpacePicker,
+    addPlanOtherSpace,
     closeOtherSpacePicker,
     chooseOtherSpaceType,
     openSiteElementTypePicker,
@@ -15095,6 +15357,7 @@ const MecFormModule = (() => {
     deleteActiveFloor,
     addSanitary,
     selectSanitary,
+    saveCurrentSanitary,
     addSanitaryFixture,
     addSanitaryOpening,
     addSanitaryElement,
@@ -15144,6 +15407,7 @@ const MecFormModule = (() => {
     openSiteElementFicha,
     closeSiteElementFicha,
     saveSiteElementFicha,
+    deleteSiteElement,
     setSiteElementLocked,
     setSiteElementEvidence,
     rotatePlanSiteElement,

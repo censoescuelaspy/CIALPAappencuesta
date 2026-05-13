@@ -44,8 +44,8 @@ const MEC_SCHEMA = {
           title: '3 - Cercado perimetral',
           fields: [
             { id: 'cercado_presencia', label: 'Presencia del cercado', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del cercado', options: ['Si, completo', 'Si, incompleto', 'No'] },
-            { id: 'cercado_tipo', label: 'Tipo de cercado', type: 'checkbox', options: ['Muralla', 'Verjas de hierro', 'Tejido', 'Alambrado'], visibleWhen: { field: 'general.cercado_presencia', not: 'No' } },
-            { id: 'cercado_observacion', label: 'Observaciones del cercado', type: 'textarea', visibleWhen: { field: 'general.cercado_presencia', not: 'No' } },
+            { id: 'cercado_tipo', label: 'Tipo de cercado', type: 'checkbox', options: ['Muralla', 'Verjas de hierro', 'Tejido', 'Alambrado'], visibleWhen: { field: 'general.cercado_presencia', in: ['Si, completo', 'Si, incompleto'] } },
+            { id: 'cercado_observacion', label: 'Observaciones del cercado', type: 'textarea', hint: 'Si no existe cercado, registre aqui la observacion o condicion encontrada.' },
           ],
         },
         {

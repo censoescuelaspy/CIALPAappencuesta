@@ -4,6 +4,43 @@
 
 ---
 
+## Sesion de implantacion guiada, tiempos y base de calles - 2026-05-13 - v2.5.66
+
+### Objetivo
+- Reemplazar la base satelital del plano por una referencia opcional de calles y lineas, sin imagen de arboles ni ortofoto.
+- Llevar la implantacion del bloque al momento de cargar `Bloques y Plantas`, para que dimensiones, escalera y electricidad se registren con referencia visual.
+- Agregar controles rapidos para otros espacios/exteriores, salida de sesion visible y medicion de tiempos de registro.
+- Corregir logica de cercado y reducir formularios a una sola columna.
+
+### Cambios implementados
+- `Plano escuela` ahora usa `PLAN_BASEMAP_TILE_URL` con OpenStreetMap HOT como base de calles/lineas; el boton quedo como `Calles/lineas` y sigue siendo opcional.
+- En la etapa `Bloques y Plantas` se embebe el plano del predio para implantar/mover el bloque activo mientras se cargan identificacion, dimensiones, escalera y electricidad.
+- Se agregaron botones rapidos `Otros espacios` y `Exteriores` junto a las etapas del cuestionario, ademas de acciones directas para cantina, biblioteca, tinglado y cancha en el constructor del plano.
+- Se agrego boton fijo `Salir` en la cabecera y boton `Cerrar sesion` en el pie del sidebar.
+- Se incorporo registro de tiempos en `__registroTiempos` para bloques, ambientes/aulas, sanitarios y elementos exteriores; `Guardar bloque`, `Guardar ambiente`, `Guardar sanitario` y `Guardar ficha` cierran el tiempo y muestran la duracion.
+- `Tipo de cercado` solo aparece cuando hay cercado; `Observaciones del cercado` queda visible tambien cuando no hay cercado.
+- El cuestionario principal, grupos sanitarios y fichas redujeron sus grids de campos a una sola columna para mejorar uso en tablet.
+- Tanques de agua incorporan diametro/ancho, altura y huella aproximada, recalculando el tamano del dibujo desde la ficha igual que otros exteriores.
+- Las fichas emergentes de sanitarios, cabinas, objetos sanitarios, ambientes, objetos de croquis y exteriores incluyen eliminacion interna.
+- El movimiento de bloques y elementos exteriores en plano general evita solaparse con otros bloques/exteriores; el redimensionado de ambientes evita invadir aulas o sanitarios del mismo piso.
+- Version y cache actualizados a `v2.5.66`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: version `2.5.66`, base mapa con `tile.openstreetmap.fr/hot`, sin `World_Imagery`, botones `Otros espacios` y `Exteriores` visibles, boton fijo `Salir` visible, plano embebido `900 x 620`, cuestionario en una columna, `cercado_tipo` oculto con `No`, `cercado_observacion` visible y `Guardar bloque` registrando `__registroTiempos.items[{ kind: "bloque" }]`.
+
+### Proximos pasos
+- Probar en tablet Android/iPad el flujo completo: crear bloque, implantarlo, completar electricidad, agregar aula/sanitario/exterior y cerrar tiempos con los botones de guardar.
+- Conectar `__registroTiempos` al futuro tablero de planificacion para estimar tiempo restante por escuela, censista y lote de escuelas.
+- Definir si los exteriores tambien necesitan manijas de redimensionado directo en canvas, ademas de las dimensiones por ficha.
+
+---
+
 ## Sesion de base mapa satelital calibrable - 2026-05-13 - v2.5.65
 
 ### Objetivo
