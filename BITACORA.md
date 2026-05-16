@@ -4,6 +4,27 @@
 
 ---
 
+## Sesion de plano protagonista en registro guiado - 2026-05-16 - v2.6.2
+
+### Objetivo
+- Reubicar la tarjeta de etapa del `Registro guiado` arriba del plano para que el plano gane ancho y protagonismo en vista horizontal.
+
+### Cambios implementados
+- El bloque de etapa tipo slide ya no queda como columna izquierda; ahora funciona como franja superior compacta.
+- La franja superior organiza descripcion, checks y botones en una sola banda horizontal en escritorio.
+- El plano vivo queda debajo a ancho completo, con mas espacio horizontal para dibujo, revision y seleccion.
+- En pantallas angostas la etapa vuelve a apilarse en una columna para evitar solapamientos tactiles.
+- Se amplio la altura util del canvas dentro del registro guiado hasta `min(64vh, 720px)`.
+- Version y cache actualizados a `v2.6.2`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: version `2.6.2`, etapa arriba del plano, plano debajo a ancho completo, `nearFullWidth: true`, sidebar solo con `Registro guiado`.
+
 ## Sesion de concentracion en registro guiado - 2026-05-16 - v2.6.1
 
 ### Objetivo

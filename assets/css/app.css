@@ -3331,8 +3331,8 @@ textarea.form-control {
 
 .guided-workbench {
   display: grid;
-  grid-template-columns: minmax(360px, .78fr) minmax(560px, 1.22fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .85rem;
   align-items: start;
   min-height: 0;
 }
@@ -3342,7 +3342,7 @@ textarea.form-control {
   background: #ffffff;
   border: 1px solid #d8e2ee;
   border-radius: 8px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, .08);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .07);
   touch-action: pan-y;
 }
 
@@ -3358,43 +3358,56 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 520px;
+  min-height: 236px;
 }
 
 .guided-slide__body {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  padding: 1.15rem;
+  display: grid;
+  grid-template-columns: minmax(230px, .72fr) minmax(220px, .62fr) minmax(380px, 1.36fr);
+  grid-template-areas:
+    "kicker checks actions"
+    "title checks actions"
+    "summary checks actions";
+  gap: .65rem 1rem;
+  align-items: start;
+  padding: .85rem 1rem;
+}
+
+.guided-slide__kicker {
+  grid-area: kicker;
 }
 
 .guided-slide h3 {
+  grid-area: title;
   margin: 0;
   color: #13294b;
-  font-size: 1.45rem;
+  font-size: 1.22rem;
 }
 
 .guided-slide p {
+  grid-area: summary;
   margin: 0;
   color: #526173;
+  font-size: .88rem;
 }
 
 .guided-slide__checks {
+  grid-area: checks;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: .5rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .38rem;
 }
 
 .guided-slide__checks span {
   display: flex;
   align-items: center;
-  min-height: 38px;
-  padding: .48rem .65rem;
+  min-height: 32px;
+  padding: .38rem .55rem;
   background: #f7fafc;
   border: 1px solid #dbe7f3;
   border-radius: 8px;
   color: #334155;
-  font-size: .82rem;
+  font-size: .78rem;
   font-weight: 750;
 }
 
@@ -3409,18 +3422,19 @@ textarea.form-control {
 }
 
 .guided-slide__actions {
+  grid-area: actions;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
-  gap: .6rem;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: .45rem;
 }
 
 .guided-action {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: .55rem;
+  gap: .45rem;
   align-items: center;
-  min-height: 54px;
-  padding: .62rem .7rem;
+  min-height: 44px;
+  padding: .48rem .55rem;
   background: #ffffff;
   color: #172033;
   border: 1px solid #cfdbea;
@@ -3441,8 +3455,8 @@ textarea.form-control {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.35rem;
-  height: 2.15rem;
+  width: 2.1rem;
+  height: 1.9rem;
   background: #eef6ff;
   border: 1px solid #c9d9ef;
   border-radius: 7px;
@@ -3454,7 +3468,7 @@ textarea.form-control {
 .guided-action strong {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: .86rem;
+  font-size: .82rem;
 }
 
 .guided-action--primary {
@@ -3474,7 +3488,7 @@ textarea.form-control {
   align-items: center;
   justify-content: space-between;
   gap: .75rem;
-  padding: .9rem 1.15rem;
+  padding: .58rem .85rem;
   border-top: 1px solid #e4ecf5;
   background: #f8fbff;
 }
@@ -3486,8 +3500,8 @@ textarea.form-control {
 }
 
 .guided-plan-panel {
-  position: sticky;
-  top: .75rem;
+  position: relative;
+  top: auto;
   min-width: 0;
   background: #ffffff;
   border: 1px solid #d8e2ee;
@@ -3522,7 +3536,7 @@ textarea.form-control {
 }
 
 .guided-plan-surface {
-  max-height: calc(100vh - 255px);
+  max-height: none;
   overflow: auto;
   padding: .75rem;
   background: #f6f9fd;
@@ -3554,7 +3568,7 @@ textarea.form-control {
 }
 
 #module-registro .school-plan__canvas-wrap {
-  max-height: 470px;
+  max-height: min(64vh, 720px);
 }
 
 #module-registro .school-plan__side {
@@ -3579,18 +3593,25 @@ textarea.form-control {
   .guided-summary {
     grid-template-columns: repeat(3, minmax(120px, 1fr));
   }
+}
 
-  .guided-workbench {
-    grid-template-columns: 1fr;
+@media (max-width: 980px) {
+  .guided-slide {
+    min-height: 0;
   }
 
-  .guided-plan-panel {
-    position: relative;
-    top: auto;
+  .guided-slide__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "kicker"
+      "title"
+      "summary"
+      "checks"
+      "actions";
   }
 
-  .guided-plan-surface {
-    max-height: none;
+  .guided-slide__checks {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
 
