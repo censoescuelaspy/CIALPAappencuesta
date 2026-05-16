@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.5.60
+ * Version: 2.6.0
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -318,6 +318,7 @@ const AppController = (() => {
   const MODULES = {
     inicio: { label: 'Inicio', icon: '🏠', minRole: 'encuestador' },
     mapa: { label: 'Mapa', icon: '🗺️', minRole: 'encuestador' },
+    registro: { label: 'Registro guiado', icon: '>>', minRole: 'encuestador' },
     encuesta: { label: 'Migrar RUE-MEC', icon: '⇄', minRole: 'encuestador' },
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
     plano: { label: 'Plano escuela', icon: '▦', minRole: 'encuestador' },
@@ -736,6 +737,9 @@ const AppController = (() => {
         break;
       case 'mapa':
         await _initMapa();
+        break;
+      case 'registro':
+        if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
         break;
       case 'encuesta':
         // survey panel re-renders itself on selectEscuela

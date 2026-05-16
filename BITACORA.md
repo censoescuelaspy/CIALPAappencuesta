@@ -4,6 +4,36 @@
 
 ---
 
+## Sesion de registro guiado secuencial - 2026-05-16 - v2.6.0
+
+### Objetivo
+- Reconstruir la experiencia de carga para que el usuario avance en una secuencia ordenada tipo slides.
+- Mantener un unico plano vivo como punto de partida, de modo que bloques, aulas, sanitarios, exteriores y evidencias se vayan incorporando durante el recorrido.
+- Reducir saltos mentales entre vistas y priorizar botones de accion rapida por encima de listas o navegacion dispersa.
+
+### Cambios implementados
+- Se agrego el modulo principal `Registro guiado` al navegador lateral, ubicado como flujo operativo central despues de `Mapa`.
+- Se creo `assets/js/guided-register.js`, una nueva capa de experiencia con 7 slides horizontales: Escuela y jornada, Predio base, Bloques y pisos, Aulas y espacios, Sanitarios, Exteriores, Revision y salida.
+- Cada slide incorpora botones directos para acciones reales del motor existente: crear bloque, guardar bloque, crear aula, agregar otro espacio, aberturas, tomas, tableros, luces, ventiladores, aires, daño/observacion, sanitario, cabina, artefactos sanitarios, tanque, recreacion, galeria, caminero, espacio libre, pilar, validar, PDF, DXF y JSON.
+- La vista mantiene visible el plano unico con `data-school-plan-root`, reutilizando `MecFormModule.renderSchoolPlan()` para no duplicar el motor de geometria, fichas, bloqueo, zoom, base mapa ni exportaciones.
+- Se agregaron KPIs compactos del flujo guiado: bloques, aulas, otros espacios, sanitarios, exteriores y fotos detectadas desde el borrador local.
+- Se agrego navegacion horizontal con botones `Anterior`/`Siguiente`, barra de progreso, selector de etapas y gesto de arrastre lateral sobre el deck.
+- En Inicio se agrego acceso destacado a `Registro guiado`.
+- Version, cache y App Shell actualizados a `v2.6.0`; el Service Worker ya incluye `assets/js/guided-register.js`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: version `2.6.0`, modulo activo `module-registro`, sidebar con `Registro guiado`, 7 slides, 6 tarjetas de resumen, barra de progreso y canvas vivo `school-plan-canvas` renderizado en `guided-school-plan-root`.
+
+### Proximos pasos
+- Probar en tablet Android y iPad el desplazamiento horizontal, botones tactiles y plano sticky.
+- Ajustar el orden fino de campos internos de cada ficha para que cada slide cubra exactamente el protocolo de campo definitivo.
+- Convertir progresivamente mas preguntas del MEC tradicional en tarjetas/botones dentro del flujo guiado.
+
 ## Sesion de pestana arquitectura del proyecto - 2026-05-13 - v2.5.67
 
 ### Objetivo

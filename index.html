@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.5.67</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.0</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.5.67</strong>
+      Edición vigente<br><strong class="app-version">v2.6.0</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -199,6 +199,7 @@
             <div style="display:flex;gap:1rem;flex-wrap:wrap;">
               <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ver Mapa</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Migrar datos al RUE-MEC</button>
+              <button class="btn btn-primary" onclick="AppController.showModule('registro')">Registro guiado</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
               <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Planificación</button>
@@ -209,13 +210,14 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.5.67</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.0</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
               <button class="btn btn-outline" onclick="AppController.updateApp()">Actualizar app</button>
               <button class="btn btn-outline" onclick="AppController.openWorkbook()">Libro en línea</button>
               <button class="btn btn-outline" onclick="AppController.openEvidenceFolder()">Fotos y evidencias</button>
+              <button class="btn btn-primary" onclick="AppController.showModule('registro')">Abrir registro guiado</button>
               <button class="btn btn-outline" onclick="AppController.showModule('plano')">Ver plano escuela</button>
             </div>
           </div>
@@ -317,6 +319,15 @@
       <div id="module-mec" class="module-panel">
         <div class="page-content">
           <div id="mec-form-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: REGISTRO GUIADO
+           ====================================================== -->
+      <div id="module-registro" class="module-panel">
+        <div class="page-content page-content--flush">
+          <div id="guided-register-root"></div>
         </div>
       </div>
 
@@ -1062,6 +1073,7 @@
 <script src="assets/js/admin.js"></script>
 <script src="assets/js/jornada.js"></script>
 <script src="assets/js/manual.js"></script>
+<script src="assets/js/guided-register.js"></script>
 <script src="assets/js/app.js"></script>
 
 <script>
