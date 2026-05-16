@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de navegacion de gestion y franja sin solapes - 2026-05-16 - v2.6.3
+
+### Objetivo
+- Mantener `Registro guiado` como experiencia principal sin perder accesos operativos a mapa, usuarios y resultados globales.
+- Corregir solapamientos en la franja superior del registro guiado.
+
+### Cambios implementados
+- El sidebar vuelve a mostrar accesos principales: `Registro guiado`, `Mapa`, `Usuarios` y `Resultados globales`, respetando roles.
+- `Registro guiado` sigue siendo la vista inicial al cargar la app.
+- La franja superior del flujo guiado pasa de tres columnas rigidas a dos zonas flexibles: contexto/checks y botones.
+- Se redujeron minimos rigidos, se permitio envoltura automatica y se agrego `min-width: 0`/`overflow-wrap` para evitar textos o botones montados.
+- El encabezado del registro guiado ahora se apila antes en tabletas para que la botonera no invada el titulo ni el resumen.
+- Version y cache actualizados a `v2.6.3`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: version `2.6.3`, sidebar con `Registro guiado`, `Mapa`, `Usuarios` y `Resultados globales`, plano debajo a ancho completo y franja superior sin botones fuera del slide.
+- Selenium/Chrome headless local en anchos tipo tablet/movil (`900px` y `740px`): 7 etapas revisadas, incluidos `Aulas y espacios` y `Sanitarios`, sin solapes ni errores graves de consola.
+
 ## Sesion de plano protagonista en registro guiado - 2026-05-16 - v2.6.2
 
 ### Objetivo

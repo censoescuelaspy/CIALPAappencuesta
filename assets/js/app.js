@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.2
+ * Version: 2.6.3
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -206,6 +206,10 @@ const UI = (() => {
   };
 })();
 
+function _escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+}
+
 // ── Incidencias inline module ─────────────────────────────────────────────────
 
 const IncidenciasModule = (() => {
@@ -323,11 +327,11 @@ const AppController = (() => {
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
     plano: { label: 'Plano escuela', icon: '▦', minRole: 'encuestador' },
     arquitectura: { label: 'Arquitectura proyecto', icon: 'A', minRole: 'encuestador' },
-    encuestadores: { label: 'Encuestadores', icon: '👥', minRole: 'admin' },
+    encuestadores: { label: 'Usuarios', icon: '👥', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
     incidencias: { label: 'Incidencias', icon: '⚠️', minRole: 'encuestador' },
     jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
-    estadisticas: { label: 'Panel Estadístico', icon: '📊', minRole: 'supervisor' },
+    estadisticas: { label: 'Resultados globales', icon: '📊', minRole: 'supervisor' },
     planificacion: { label: 'Planificación', icon: '⏱', minRole: 'supervisor' },
     configuracion: { label: 'Configuración', icon: '⚙️', minRole: 'admin' },
     auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
@@ -450,8 +454,10 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    nav.innerHTML = Object.entries(MODULES)
-      .filter(([id, mod]) => id === 'registro' && Auth.canAccess(mod.minRole))
+    const primaryModules = ['registro', 'mapa', 'encuestadores', 'estadisticas'];
+    nav.innerHTML = primaryModules
+      .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
+      .map(id => [id, MODULES[id]])
       .map(([id, mod]) => `
         <li class="nav-item" data-module="${id}">
           <a href="#" onclick="AppController.showModule('${id}'); return false;">

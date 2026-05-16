@@ -3358,16 +3358,17 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 236px;
+  min-height: 0;
 }
 
 .guided-slide__body {
   display: grid;
-  grid-template-columns: minmax(230px, .72fr) minmax(220px, .62fr) minmax(380px, 1.36fr);
+  grid-template-columns: minmax(240px, .48fr) minmax(0, 1fr);
   grid-template-areas:
-    "kicker checks actions"
-    "title checks actions"
-    "summary checks actions";
+    "kicker actions"
+    "title actions"
+    "summary actions"
+    "checks actions";
   gap: .65rem 1rem;
   align-items: start;
   padding: .85rem 1rem;
@@ -3379,23 +3380,28 @@ textarea.form-control {
 
 .guided-slide h3 {
   grid-area: title;
+  min-width: 0;
   margin: 0;
   color: #13294b;
   font-size: 1.22rem;
+  overflow-wrap: anywhere;
 }
 
 .guided-slide p {
   grid-area: summary;
+  min-width: 0;
   margin: 0;
   color: #526173;
   font-size: .88rem;
+  overflow-wrap: anywhere;
 }
 
 .guided-slide__checks {
   grid-area: checks;
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: .38rem;
+  min-width: 0;
 }
 
 .guided-slide__checks span {
@@ -3424,8 +3430,9 @@ textarea.form-control {
 .guided-slide__actions {
   grid-area: actions;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
   gap: .45rem;
+  min-width: 0;
 }
 
 .guided-action {
@@ -3442,6 +3449,7 @@ textarea.form-control {
   text-align: left;
   cursor: pointer;
   box-shadow: 0 6px 14px rgba(15, 23, 42, .04);
+  min-width: 0;
 }
 
 .guided-action:hover,
@@ -3595,11 +3603,17 @@ textarea.form-control {
   }
 }
 
-@media (max-width: 980px) {
-  .guided-slide {
-    min-height: 0;
+@media (max-width: 1100px) {
+  .guided-register__header {
+    grid-template-columns: minmax(0, 1fr);
   }
 
+  .guided-register__toolbar {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 980px) {
   .guided-slide__body {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
