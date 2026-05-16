@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.0
+ * Version: 2.6.1
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -333,7 +333,7 @@ const AppController = (() => {
     auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
   };
 
-  const START_MODULE = 'inicio';
+  const START_MODULE = 'registro';
   let _currentModule = null;
   let _mapInitialized = false;
   let _sidebarHideTimer = null;
@@ -415,7 +415,7 @@ const AppController = (() => {
       _bindGlobalEvents();
     } catch (err) {
       console.error('Error inicializando la vista principal:', err);
-      UI.showToast?.('Se restauro la vista Inicio despues de actualizar la app.', 'warning', 6000);
+      UI.showToast?.('Se restauro la vista Registro guiado despues de actualizar la app.', 'warning', 6000);
     } finally {
       resetToHome();
     }
@@ -436,7 +436,7 @@ const AppController = (() => {
     try {
       showModule(START_MODULE);
     } catch (err) {
-      console.error('No se pudo abrir Inicio por el ruteador:', err);
+      console.error('No se pudo abrir Registro guiado por el ruteador:', err);
       _ensureVisibleModule(START_MODULE, true);
     }
     requestAnimationFrame(() => {
@@ -451,7 +451,7 @@ const AppController = (() => {
     if (!nav) return;
 
     nav.innerHTML = Object.entries(MODULES)
-      .filter(([, mod]) => Auth.canAccess(mod.minRole))
+      .filter(([id, mod]) => id === 'registro' && Auth.canAccess(mod.minRole))
       .map(([id, mod]) => `
         <li class="nav-item" data-module="${id}">
           <a href="#" onclick="AppController.showModule('${id}'); return false;">

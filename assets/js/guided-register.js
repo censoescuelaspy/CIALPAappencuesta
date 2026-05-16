@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.0
+ * Version: 2.6.1
  */
 
 const GuidedRegisterModule = (() => {
@@ -147,7 +147,7 @@ const GuidedRegisterModule = (() => {
       <section class="guided-register" aria-label="Registro guiado CIALPA">
         <header class="guided-register__header">
           <div>
-            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.0')}</p>
+            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.1')}</p>
             <h2>Registro guiado sobre plano unico</h2>
             <p>Una secuencia horizontal de carga: cada accion alimenta el mismo plano vivo de la escuela.</p>
           </div>
@@ -273,6 +273,11 @@ const GuidedRegisterModule = (() => {
     if (action === 'module') return _openModule(value);
     if (action === 'stage') return _openMecStage(value);
     if (action === 'demo') return _openDemo();
+    if (_actionNeedsBlock(action) && !_snapshot().blocks) {
+      UI.showToast('Primero cree un bloque desde la etapa Bloques y pisos.', 'warning', 5200);
+      goTo(2);
+      return;
+    }
 
     const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
     if (!mec) {
@@ -356,6 +361,20 @@ const GuidedRegisterModule = (() => {
       console.error(err);
       UI.showToast('No se pudo ejecutar la accion solicitada.', 'error');
     }
+  }
+
+  function _actionNeedsBlock(action) {
+    return [
+      'saveBlock',
+      'lockBlock',
+      'classroom',
+      'otherSpace',
+      'roomElement',
+      'sanitary',
+      'stall',
+      'fixture',
+      'sanitaryOpening',
+    ].includes(action);
   }
 
   function _openModule(moduleId) {

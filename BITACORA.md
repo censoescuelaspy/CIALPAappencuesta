@@ -4,6 +4,31 @@
 
 ---
 
+## Sesion de concentracion en registro guiado - 2026-05-16 - v2.6.1
+
+### Objetivo
+- Hacer que `Registro guiado` sea la experiencia principal de la app y reducir las demas vistas a soporte interno.
+- Evitar que la app cree o muestre un bloque por defecto antes de que el usuario pulse `Nuevo bloque`.
+
+### Cambios implementados
+- `Registro guiado` ahora es la vista inicial despues del login y tambien al volver a la app instalada/PWA.
+- El navegador lateral queda concentrado en `Registro guiado`; los demas modulos siguen disponibles solo como soporte invocado desde el flujo cuando haga falta.
+- `_ensureBlocks()` ya no crea automaticamente `Bloque 1`; si no hay bloques mantiene el modelo vacio.
+- Al eliminar el ultimo bloque, el proyecto queda sin bloque activo en lugar de generar uno nuevo automaticamente.
+- El plano vacio ya no dibuja un contenedor `Sin bloque`; muestra el mensaje para iniciar con `Nuevo bloque`.
+- El flujo guiado impide crear aulas, sanitarios o elementos internos si todavia no existe un bloque, y lleva al usuario a la etapa `Bloques y pisos`.
+- `Guardar bloque` avisa correctamente cuando no hay ningun bloque creado.
+- Version y cache actualizados a `v2.6.1`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local: arranque directo en `module-registro`, sidebar solo con `Registro guiado`, version `2.6.1`, borrador vacio con 0 bloques, `__activeBlockId` vacio y plano sin contenedor por defecto.
+
 ## Sesion de registro guiado secuencial - 2026-05-16 - v2.6.0
 
 ### Objetivo

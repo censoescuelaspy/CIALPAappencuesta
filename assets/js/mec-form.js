@@ -2614,17 +2614,14 @@ const MecFormModule = (() => {
   }
 
   function _ensureBlocks() {
-    _data.__blocks = _data.__blocks || [];
+    _data.__blocks = Array.isArray(_data.__blocks) ? _data.__blocks : [];
     _data.bloques = _data.bloques || {};
-    if (!_data.__activeBlockId) _data.__activeBlockId = _data.__blocks[0]?.id || `bloque_${Date.now()}`;
+    if (_data.__activeBlockId && !_data.__blocks.some(block => block.id === _data.__activeBlockId)) _data.__activeBlockId = '';
+    if (!_data.__activeBlockId && _data.__blocks.length) _data.__activeBlockId = _data.__blocks[0]?.id || '';
     if (!_data.__blocks.length) {
-      _data.bloques = {
-        bloque_codigo: 'Bloque 1',
-        estado_bloque: 'Operativo',
-        cantidad_plantas: '1',
-        ..._data.bloques,
-      };
-      _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+      _data.__activeBlockId = '';
+      _data.bloques = {};
+      return;
     }
     _data.__blocks.forEach(_normalizeBlockFloorCount);
     _normalizeBlockFloorCount(_data.bloques);
@@ -3048,6 +3045,7 @@ const MecFormModule = (() => {
 
   function _syncActiveBlock() {
     _ensureBlocks();
+    if (!_data.__activeBlockId) return;
     const foundIndex = (_data.__blocks || []).findIndex(item => item.id === _data.__activeBlockId);
     const currentIndex = foundIndex >= 0 ? foundIndex : (_data.__blocks || []).length;
     const previousBlock = foundIndex >= 0 ? (_data.__blocks[foundIndex] || {}) : {};
@@ -3155,6 +3153,10 @@ const MecFormModule = (() => {
   function saveCurrentBlock() {
     _syncActiveBlock();
     const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('No hay bloque para guardar. Pulse Nuevo bloque para iniciar el registro.', 'warning', 5200);
+      return;
+    }
     const record = block ? _finishTimeLog('bloque', block.id, block.bloque_codigo || 'Bloque') : null;
     _saveDraft(false);
     _render();
@@ -3278,9 +3280,8 @@ const MecFormModule = (() => {
     _data.__sanitaries = (_data.__sanitaries || []).filter(item => !_matchesBlockReference(item.bloque, block));
     _data.__blocks = (_data.__blocks || []).filter(item => item.id !== block.id);
     if (!_data.__blocks.length) {
-      _data.__activeBlockId = `bloque_${Date.now()}`;
-      _data.bloques = { bloque_codigo: 'Bloque 1', estado_bloque: 'Operativo', cantidad_plantas: '1' };
-      _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+      _data.__activeBlockId = '';
+      _data.bloques = {};
     } else {
       const next = _data.__blocks[Math.min(blockIndex, _data.__blocks.length - 1)];
       _data.__activeBlockId = next.id;
@@ -10357,10 +10358,10 @@ const MecFormModule = (() => {
   }
 
   function _renderPlanHierarchyTree() {
-    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const siteElements = _ensureSiteElements();
     const hasModel = blocks.length || (_data.__classrooms || []).length || (_data.__sanitaries || []).length || siteElements.length;
-    if (!hasModel) return '<p class="text-muted">Todavia no hay elementos cargados. Genere el aula base desde el Cuestionario MEC.</p>';
+    if (!hasModel) return '<p class="text-muted">Todavia no hay elementos cargados. Pulse Nuevo bloque en Registro guiado para iniciar el plano.</p>';
     return `
       <div class="school-plan-tree" aria-label="Jerarquia del plano escolar">
         ${blocks.map(block => _renderPlanBlockBranch(block)).join('')}
@@ -10654,7 +10655,7 @@ const MecFormModule = (() => {
 
   function _schoolPlanAudit() {
     const issues = [];
-    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const classrooms = _data.__classrooms || [];
     const sanitaries = _data.__sanitaries || [];
     const roomMatchesBlock = (room, block) => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque');
@@ -10932,7 +10933,7 @@ const MecFormModule = (() => {
   }
 
   function _planCanvasHeight() {
-    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const rows = Math.max(1, Math.ceil(blocks.length / 2));
     const maxFloors = Math.max(1, ...blocks.map(block => _planFloorsForBlock(block).length));
     return Math.max(620, 320 * rows + Math.max(0, maxFloors - 1) * 170);
@@ -10986,12 +10987,12 @@ const MecFormModule = (() => {
     const rooms = _data.__classrooms || [];
     const sanitaries = _data.__sanitaries || [];
     const siteElements = _ensureSiteElements();
-    const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque', largo_m: 0, ancho_m: 0 }];
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
     if (!rooms.length && !sanitaries.length && !siteElements.length && !blocks.length) {
       ctx.fillStyle = '#667085';
       ctx.font = _canvasFont(700, 18);
       ctx.textAlign = 'center';
-      ctx.fillText('Plano general en espera de datos cargados', logical.width / 2, logical.height / 2);
+      ctx.fillText('Plano general en espera: pulse Nuevo bloque para iniciar', logical.width / 2, logical.height / 2);
       return;
     }
 
