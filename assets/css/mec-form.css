@@ -1535,6 +1535,12 @@
   gap: .4rem;
 }
 
+.school-plan__kpis--side {
+  grid-template-columns: 1fr 1fr;
+  gap: .32rem;
+  margin-bottom: .75rem;
+}
+
 .school-plan-kpi {
   min-height: 54px;
   display: grid;
@@ -1792,7 +1798,7 @@
 
 .school-plan__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 250px);
   gap: 1rem;
   align-items: start;
 }
@@ -1818,12 +1824,77 @@
   flex-wrap: wrap;
 }
 
+.school-plan__kpis--side .school-plan-kpi {
+  min-height: 42px;
+  padding: .34rem .42rem;
+}
+
+.school-plan__tools-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .45rem;
+  align-items: center;
+  margin: -.25rem 0 .6rem;
+  padding: .38rem .45rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.school-plan__tools-label {
+  color: #526071;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .school-plan__layers,
 .school-plan__exports {
   display: flex;
   align-items: center;
   gap: .45rem;
   flex-wrap: wrap;
+}
+
+.school-plan__exports .btn-sm,
+.school-plan-basemap-actions .btn-sm {
+  min-height: 30px;
+  padding: .26rem .48rem;
+  font-size: .7rem;
+}
+
+.school-plan__tools-row .mec-sketch-toolset {
+  margin-top: 0;
+  min-width: 0;
+}
+
+.mec-sketch-toolset--compact {
+  display: flex;
+  gap: .34rem;
+  padding: .28rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.mec-sketch-toolset--compact .mec-sketch-tool {
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
+  place-items: center start;
+  min-width: 88px;
+  min-height: 38px;
+  padding: .26rem .34rem;
+  gap: .28rem;
+  font-size: .62rem;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.mec-sketch-toolset--compact .mec-sketch-tool__icon {
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: .64rem;
 }
 
 .school-plan__zoom {
@@ -3245,6 +3316,10 @@
   letter-spacing: .04em;
 }
 
+.school-plan__kpis--side .school-plan-kpi span {
+  font-size: .55rem;
+}
+
 .mec-command h3,
 .mec-section__header h3,
 .school-plan__side h3,
@@ -3339,6 +3414,10 @@
 .school-plan-kpi strong {
   margin: 0;
   font-size: 1.02rem;
+}
+
+.school-plan__kpis--side .school-plan-kpi strong {
+  font-size: .82rem;
 }
 
 .school-plan__legend {

@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de plano con herramientas compactas - 2026-05-17 - v2.6.7
+
+### Objetivo
+- Ganar espacio util para el plano reduciendo el impacto visual de KPIs y botoneras.
+- Mantener siempre visibles los elementos ubicables en el plano dentro del flujo guiado.
+
+### Cambios implementados
+- Los KPIs del plano se redujeron a indicadores basicos y se movieron al panel lateral compacto: area, bloques, aulas, otros, sanitarios, exteriores y alertas.
+- Se elimino la tira grande de KPIs debajo del plano para liberar alto de vista.
+- Se agrego una fila permanente `Elementos` debajo de la barra de acciones del plano, con accesos rapidos a tanque, recreacion, galeria, caminero, espacio libre, pilar, escalera, rampa, acometida, medidor, tablero y puesta a tierra.
+- La fila de elementos usa botones compactos con desplazamiento horizontal controlado cuando la pantalla no alcanza.
+- La barra de acciones del plano y los botones de base mapa/exportacion se densificaron con menor texto, menor padding y menor altura.
+- En `Registro guiado`, el panel lateral del plano queda mas estrecho y el canvas recupera mas alto util.
+- Version y cache actualizados a `v2.6.7`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Revision estatica de estructura: `sideKpis`, `school-plan__tools-row`, `mec-sketch-toolset--compact` y version `v2.6.7` presentes en los archivos esperados.
+
 ## Sesion de elementos automaticos desde respuestas - 2026-05-17 - v2.6.6
 
 ### Objetivo

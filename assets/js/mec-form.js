@@ -1611,9 +1611,10 @@ const MecFormModule = (() => {
       </button>`;
   }
 
-  function _renderSiteElementToolset(origin = 'plan') {
+  function _renderSiteElementToolset(origin = 'plan', variant = '') {
+    const compact = variant === 'compact';
     return `
-      <div class="mec-sketch-toolset mec-sketch-toolset--site" aria-label="Elementos exteriores del predio">
+      <div class="mec-sketch-toolset mec-sketch-toolset--site ${compact ? 'mec-sketch-toolset--compact' : ''}" aria-label="Elementos del plano">
         ${SITE_ELEMENT_TYPES.map(tool => `
           <button class="mec-sketch-tool mec-sketch-tool--site" type="button"
             title="${_escape(tool.label)}"
@@ -10091,21 +10092,14 @@ const MecFormModule = (() => {
     const canvasWidth = _planCanvasWidth(root);
     const canvasHeight = _planCanvasHeight();
     root.dataset.planCanvasId = canvasId;
-    const kpis = `
-      <section class="school-plan__kpis" aria-label="Resumen del plano">
-        ${_planKpi('Area construida relevada', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
-        ${_planKpi('Aulas cargadas', metrics.rooms, 'Aulas dibujadas')}
-        ${_planKpi('Otros espacios', metrics.otherSpaces, 'Cantinas, bibliotecas, tinglados y especiales')}
+    const sideKpis = `
+      <section class="school-plan__kpis school-plan__kpis--side" aria-label="Indicadores basicos del plano">
+        ${_planKpi('Area', `${metrics.areaTotal.toFixed(2)} m2`, 'Aulas/ambientes con dimensiones')}
         ${_planKpi('Bloques', metrics.blocks, 'Bloques registrados')}
+        ${_planKpi('Aulas', metrics.rooms, 'Aulas dibujadas')}
+        ${_planKpi('Otros', metrics.otherSpaces, 'Cantinas, bibliotecas, tinglados y especiales')}
         ${_planKpi('Sanitarios', metrics.sanitaries, 'Baterias o banos cargados')}
         ${_planKpi('Exteriores', metrics.siteElements, 'Tanques, galerias y recreacion')}
-        ${_planKpi('Puertas', metrics.doors, _stateSummaryText(metrics.states.door))}
-        ${_planKpi('Ventanas', metrics.windows, _stateSummaryText(metrics.states.window))}
-        ${_planKpi('Tomas', metrics.outlets, _stateSummaryText(metrics.states.outlet))}
-        ${_planKpi('Tableros aula', metrics.switchboards, _stateSummaryText(metrics.states.switchboard))}
-        ${_planKpi('Luces', metrics.lights, _stateSummaryText(metrics.states.light))}
-        ${_planKpi('Ventiladores', metrics.fans, _stateSummaryText(metrics.states.fan))}
-        ${_planKpi('Aires', metrics.acs, _stateSummaryText(metrics.states.ac))}
         ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
       </section>`;
 
@@ -10143,6 +10137,10 @@ const MecFormModule = (() => {
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
+            <div class="school-plan__tools-row" aria-label="Elementos rapidos para ubicar en el plano">
+              <span class="school-plan__tools-label">Elementos</span>
+              ${_renderSiteElementToolset('plan', 'compact')}
+            </div>
             ${_renderPlanBaseMapPanel()}
             <div class="school-plan__canvas-wrap">
               <div class="school-plan__canvas-stage" style="${_schoolPlanStageStyle(canvasWidth, canvasHeight)}">
@@ -10152,7 +10150,9 @@ const MecFormModule = (() => {
             </div>
           </div>
           <aside class="school-plan__side">
-            <h3>Aulas y elementos</h3>
+            <h3>Resumen</h3>
+            ${sideKpis}
+            <h3>Capas</h3>
             <div class="school-plan__legend">
               <span><i class="legend-room"></i>Aula</span>
               <span><i class="legend-door"></i>Puerta</span>
@@ -10169,7 +10169,6 @@ const MecFormModule = (() => {
             ${_renderPlanHierarchyTree()}
           </aside>
         </section>
-        ${kpis}
       </div>`;
 
     _drawSchoolPlan();
