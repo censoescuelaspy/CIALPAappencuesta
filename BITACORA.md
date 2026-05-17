@@ -4,6 +4,25 @@
 
 ---
 
+## Sesion de correccion de solape en etapa guiada - 2026-05-16 - v2.6.4
+
+### Objetivo
+- Resolver el solapamiento visual entre la etiqueta de etapa, el titulo y el resumen dentro de las tarjetas del `Registro guiado`.
+
+### Cambios implementados
+- El resumen de cada slide ahora usa la clase especifica `guided-slide__summary`.
+- Se reemplazo la regla generica `.guided-slide p`, que tambien afectaba a `guided-slide__kicker` y enviaba ambos textos al mismo lugar de la grilla.
+- La etiqueta de etapa, el titulo, el resumen, los checks y las acciones vuelven a ocupar areas independientes.
+- Version y cache actualizados a `v2.6.4`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local en `1280px`: etapa `Revision y salida` activa, areas `kicker`, `title`, `summary`, `checks` y `actions` separadas, sin colisiones visuales ni errores graves de consola.
+
 ## Sesion de navegacion de gestion y franja sin solapes - 2026-05-16 - v2.6.3
 
 ### Objetivo
