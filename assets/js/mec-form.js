@@ -29,6 +29,8 @@ const MecFormModule = (() => {
   let _planMoveMode = false;
   let _planBaseMapPanelOpen = false;
   let _activeCanvasZoom = 1;
+  let _schoolPlanResizeBound = false;
+  let _schoolPlanResizeTimer = null;
   let _evidenceSyncRunning = false;
   let _evidenceOnlineBound = false;
   const _sketchHistory = [];
@@ -816,10 +818,28 @@ const MecFormModule = (() => {
     return `width:${Math.round(logicalWidth * _schoolPlanZoom)}px;height:${Math.round(logicalHeight * _schoolPlanZoom)}px;`;
   }
 
+  function _planCanvasWidth(root = _activeSchoolPlanRoot()) {
+    const minWidth = 900;
+    const zoom = Math.max(.55, Math.min(2.8, Number(_schoolPlanZoom) || 1));
+    const available = Math.floor(((root?.getBoundingClientRect?.().width || 0) - 30) / zoom);
+    return Math.max(minWidth, Math.min(1800, Number.isFinite(available) ? available : minWidth));
+  }
+
+  function _bindSchoolPlanResize() {
+    if (_schoolPlanResizeBound) return;
+    _schoolPlanResizeBound = true;
+    window.addEventListener('resize', () => {
+      clearTimeout(_schoolPlanResizeTimer);
+      _schoolPlanResizeTimer = setTimeout(() => {
+        if (_activeSchoolPlanRoot()) renderSchoolPlan();
+      }, 160);
+    });
+  }
+
   function _refreshPlanBaseMapLayer(canvas = _activeSchoolPlanCanvas(), force = false) {
     const stage = canvas?.closest('.school-plan__canvas-stage');
     if (!stage) return;
-    const logical = _canvasLogicalSize(canvas, 900, _planCanvasHeight());
+    const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
     stage.style.width = canvas.style.width;
     stage.style.height = canvas.style.height;
     const signature = _planBaseMapSignature(logical.width, logical.height);
@@ -8962,7 +8982,8 @@ const MecFormModule = (() => {
   }
 
   function _applySchoolPlanZoom(canvas = _activeSchoolPlanCanvas()) {
-    _applyCanvasZoom(canvas, _schoolPlanZoom, 900, _planCanvasHeight());
+    const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
+    _applyCanvasZoom(canvas, _schoolPlanZoom, logical.width, logical.height);
     _refreshPlanBaseMapLayer(canvas);
     const zoom = canvas?.closest('.school-plan__board')?.querySelector('.school-plan__zoom span');
     if (zoom) zoom.textContent = `${Math.round(_schoolPlanZoom * 100)}%`;
@@ -9935,6 +9956,7 @@ const MecFormModule = (() => {
     if (!_initialized && !Object.keys(_data || {}).length) _loadDraft();
     const root = _activeSchoolPlanRoot();
     if (!root) return;
+    _bindSchoolPlanResize();
     const sketch = _data.__classroomSketch || {};
     _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
     _data.__sanitaries = Array.isArray(_data.__sanitaries) ? _data.__sanitaries : [];
@@ -9942,6 +9964,7 @@ const MecFormModule = (() => {
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
+    const canvasWidth = _planCanvasWidth(root);
     const canvasHeight = _planCanvasHeight();
     root.dataset.planCanvasId = canvasId;
     const kpis = `
@@ -9998,9 +10021,9 @@ const MecFormModule = (() => {
             </div>
             ${_renderPlanBaseMapPanel()}
             <div class="school-plan__canvas-wrap">
-              <div class="school-plan__canvas-stage" style="${_schoolPlanStageStyle(900, canvasHeight)}">
-                ${_renderPlanBaseMapLayer(900, canvasHeight)}
-                <canvas id="${canvasId}" data-school-plan-canvas width="900" height="${canvasHeight}" style="width:${Math.round(900 * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
+              <div class="school-plan__canvas-stage" style="${_schoolPlanStageStyle(canvasWidth, canvasHeight)}">
+                ${_renderPlanBaseMapLayer(canvasWidth, canvasHeight)}
+                <canvas id="${canvasId}" data-school-plan-canvas width="${canvasWidth}" height="${canvasHeight}" style="width:${Math.round(canvasWidth * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
               </div>
             </div>
           </div>
@@ -10939,6 +10962,26 @@ const MecFormModule = (() => {
     return Math.max(620, 320 * rows + Math.max(0, maxFloors - 1) * 170);
   }
 
+  function _drawSchoolPlanGrid(ctx, logical) {
+    const step = 20;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(23, 59, 99, .085)';
+    ctx.lineWidth = 1;
+    for (let x = step; x < logical.width; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, logical.height);
+      ctx.stroke();
+    }
+    for (let y = step; y < logical.height; y += step) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(logical.width, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   function _drawBlockInfrastructureHints(ctx, block, x, y, w, h) {
     const circulation = String(block?.tipo_circulacion || '').toLowerCase();
     const hasStair = circulation.includes('escalera') || circulation.includes('ambas');
@@ -10977,12 +11020,13 @@ const MecFormModule = (() => {
     _applySchoolPlanZoom(canvas);
     const ctx = canvas.getContext('2d');
     _prepareLogicalCanvasContext(ctx, canvas);
-    const logical = _canvasLogicalSize(canvas, 900, _planCanvasHeight());
+    const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
     _planHitAreas = [];
     _planTransformStack = [];
     ctx.clearRect(0, 0, logical.width, logical.height);
     ctx.fillStyle = _planBaseMapVisible(_data.__planBaseMap) ? 'rgba(248,250,252,.28)' : '#f8fafc';
     ctx.fillRect(0, 0, logical.width, logical.height);
+    _drawSchoolPlanGrid(ctx, logical);
 
     const rooms = _data.__classrooms || [];
     const sanitaries = _data.__sanitaries || [];
@@ -13421,7 +13465,7 @@ const MecFormModule = (() => {
     const activePointers = new Map();
     const pointFromEvent = event => {
       const rect = canvas.getBoundingClientRect();
-      const logical = _canvasLogicalSize(canvas, 900, _planCanvasHeight());
+      const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
       return {
         x: (event.clientX - rect.left) * (logical.width / rect.width),
         y: (event.clientY - rect.top) * (logical.height / rect.height),

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.4
+ * Version: 2.6.5
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -649,7 +649,7 @@ const AppController = (() => {
       toggleBtn?.setAttribute('aria-expanded', 'true');
       toggleBtn?.setAttribute('aria-label', 'Ocultar menu');
     };
-    const scheduleHide = () => {
+    const scheduleHide = (delay = 110) => {
       if (!isAutoHidden()) return;
       clearTimeout(_sidebarHideTimer);
       _sidebarHideTimer = setTimeout(() => {
@@ -657,26 +657,26 @@ const AppController = (() => {
         sidebar.classList.remove('sidebar--open');
         toggleBtn?.setAttribute('aria-expanded', 'false');
         toggleBtn?.setAttribute('aria-label', 'Mostrar menu');
-      }, 360);
+      }, delay);
     };
 
     hotzone.addEventListener('mouseenter', show);
     hotzone.addEventListener('mousemove', show);
     hotzone.addEventListener('touchstart', show, { passive: true });
     sidebar.addEventListener('mouseenter', show);
-    sidebar.addEventListener('mouseleave', scheduleHide);
-    sidebar.addEventListener('touchend', scheduleHide, { passive: true });
+    sidebar.addEventListener('mouseleave', () => scheduleHide(90));
+    sidebar.addEventListener('touchend', () => scheduleHide(180), { passive: true });
     document.addEventListener('mousemove', event => {
       if (!isAutoHidden()) return;
       if (event.clientX <= 32) {
         show();
         return;
       }
-      if (document.body.classList.contains('sidebar-peek') && event.clientX > sidebar.offsetWidth + 36) {
-        scheduleHide();
+      if (document.body.classList.contains('sidebar-peek') && event.clientX > sidebar.offsetWidth + 24) {
+        scheduleHide(70);
       }
     });
-    window.addEventListener('resize', scheduleHide);
+    window.addEventListener('resize', () => scheduleHide(0));
   }
 
   // ── Module router ──────────────────────────────────────────────────────────

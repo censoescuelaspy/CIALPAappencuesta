@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.4
+ * Version: 2.6.5
  */
 
 const GuidedRegisterModule = (() => {
@@ -147,7 +147,7 @@ const GuidedRegisterModule = (() => {
       <section class="guided-register" aria-label="Registro guiado CIALPA">
         <header class="guided-register__header">
           <div>
-            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.4')}</p>
+            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.5')}</p>
             <h2>Registro guiado sobre plano unico</h2>
             <p>Una secuencia horizontal de carga: cada accion alimenta el mismo plano vivo de la escuela.</p>
           </div>

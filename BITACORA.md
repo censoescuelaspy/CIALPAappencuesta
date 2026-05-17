@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de sidebar agil y plano a ancho completo - 2026-05-16 - v2.6.5
+
+### Objetivo
+- Hacer que el panel lateral izquierdo se oculte mas rapido al retirar el cursor.
+- Lograr que la zona cuadriculada del plano cubra todo el ancho util del area de dibujo.
+
+### Cambios implementados
+- Se redujo el retardo de ocultado automatico del sidebar de `360ms` a valores cortos entre `70ms` y `110ms`, con salida inmediata en resize.
+- El plano general ahora calcula el ancho logico del canvas segun el ancho disponible del contenedor activo, manteniendo un minimo de `900px`.
+- La cuadrilla del plano se dibuja dentro del canvas con `_drawSchoolPlanGrid()`, no solo como fondo CSS del contenedor.
+- El canvas y la capa de base mapa usan el mismo ancho logico dinamico para evitar franjas sin cuadricula dentro del area destinada al plano.
+- Se agrego recalculo del plano al redimensionar la ventana.
+- Version y cache actualizados a `v2.6.5`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local en `1414px`: version `2.6.5`, canvas logico expandido a `1319px`, cobertura de cuadricula sobre el ancho del plano `> 1.0`, sin franja derecha vacia y sin errores graves de consola.
+- Selenium/Chrome headless local: sidebar emerge desde la zona caliente y queda oculto nuevamente antes de `160ms` al retirar el cursor del area lateral.
+
 ## Sesion de correccion de solape en etapa guiada - 2026-05-16 - v2.6.4
 
 ### Objetivo
