@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de registro guiado con plano inmediato - 2026-05-17 - v2.6.8
+
+### Objetivo
+- Eliminar la franja superior redundante marcada como zona 1 en la revision visual.
+- Mover la solicitud activa del registro guiado desde debajo del plano hacia la zona 3, inmediatamente antes de `Plano vivo`.
+
+### Cambios implementados
+- Se elimino del DOM la cabecera amplia `Registro guiado sobre plano unico` junto con sus botones superiores redundantes.
+- Se elimino del DOM la fila superior de KPIs `Bloques`, `Aulas`, `Otros`, `Sanitarios`, `Exteriores` y `Fotos`; esos indicadores ya quedan resumidos dentro del panel lateral compacto del plano.
+- La bandeja de preguntas/acciones de la etapa activa ahora se renderiza antes del panel `Plano vivo`, ocupando la zona de trabajo superior solicitada.
+- La barra de etapas, la banda de progreso y la tarjeta activa se compactaron para ocupar menos alto y dejar mas vista disponible al plano.
+- Se redujeron tamaños de texto, padding, altura de checks y botones del registro guiado.
+- Version y cache actualizados a `v2.6.8`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Revision estatica: `guided-register__header` y `guided-summary` ya no se renderizan en `assets/js/guided-register.js`; `guided-deck` queda antes de `guided-plan-panel`.
+
 ## Sesion de plano con herramientas compactas - 2026-05-17 - v2.6.7
 
 ### Objetivo

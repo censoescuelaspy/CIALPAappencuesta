@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.7
+ * Version: 2.6.8
  */
 
 const GuidedRegisterModule = (() => {
@@ -145,29 +145,6 @@ const GuidedRegisterModule = (() => {
   function _render(root) {
     root.innerHTML = `
       <section class="guided-register" aria-label="Registro guiado CIALPA">
-        <header class="guided-register__header">
-          <div>
-            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.7')}</p>
-            <h2>Registro guiado sobre plano unico</h2>
-            <p>Una secuencia horizontal de carga: cada accion alimenta el mismo plano vivo de la escuela.</p>
-          </div>
-          <div class="guided-register__toolbar" aria-label="Controles de plano">
-            <button class="btn btn-outline btn-sm" type="button" data-guided-action="zoomOut">-</button>
-            <button class="btn btn-outline btn-sm" type="button" data-guided-action="zoomIn">+</button>
-            <button class="btn btn-outline btn-sm" type="button" data-guided-action="fullscreen">Pantalla completa</button>
-            <button class="btn btn-primary btn-sm" type="button" data-guided-action="next">Siguiente</button>
-          </div>
-        </header>
-
-        <section class="guided-summary" aria-label="Resumen del registro">
-          <article><span>Bloques</span><strong data-guided-count="blocks">0</strong></article>
-          <article><span>Aulas</span><strong data-guided-count="classrooms">0</strong></article>
-          <article><span>Otros</span><strong data-guided-count="otherSpaces">0</strong></article>
-          <article><span>Sanitarios</span><strong data-guided-count="sanitaries">0</strong></article>
-          <article><span>Exteriores</span><strong data-guided-count="siteElements">0</strong></article>
-          <article><span>Fotos</span><strong data-guided-count="evidence">0</strong></article>
-        </section>
-
         <nav class="guided-steps" aria-label="Etapas del registro guiado">
           ${STEPS.map((step, index) => `
             <button class="guided-step" type="button" data-guided-step="${index}" aria-current="${index === _activeIndex ? 'step' : 'false'}">
@@ -180,6 +157,12 @@ const GuidedRegisterModule = (() => {
         <div class="guided-progress" aria-hidden="true"><span data-guided-progress></span></div>
 
         <section class="guided-workbench">
+          <div class="guided-deck" data-guided-deck>
+            <div class="guided-track" data-guided-track>
+              ${STEPS.map(step => _renderSlide(step)).join('')}
+            </div>
+          </div>
+
           <aside class="guided-plan-panel" aria-label="Plano vivo del registro">
             <div class="guided-plan-panel__header">
               <div>
@@ -190,12 +173,6 @@ const GuidedRegisterModule = (() => {
             </div>
             <div id="guided-school-plan-root" class="guided-plan-surface" data-school-plan-root></div>
           </aside>
-
-          <div class="guided-deck" data-guided-deck>
-            <div class="guided-track" data-guided-track>
-              ${STEPS.map(step => _renderSlide(step)).join('')}
-            </div>
-          </div>
         </section>
       </section>`;
   }
