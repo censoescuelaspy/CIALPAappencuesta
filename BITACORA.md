@@ -4,6 +4,33 @@
 
 ---
 
+## Sesion de elementos automaticos desde respuestas - 2026-05-17 - v2.6.6
+
+### Objetivo
+- Hacer que respuestas tecnicas del bloque creen automaticamente elementos ubicables en el plano.
+- Mantener el plano como protagonista del registro guiado y mover las solicitudes de carga debajo del tablero.
+
+### Cambios implementados
+- Al responder `Circulacion vertical principal` con `Escalera`, `Rampa` o `Ambas`, la app crea automaticamente el elemento correspondiente en torno al bloque activo.
+- Al registrar acometida, medidor/punto de medicion, tablero electrico del bloque o puesta a tierra, la app crea automaticamente su elemento tecnico en el plano.
+- Los nuevos elementos automaticos quedan vinculados al bloque y al campo que los genero mediante `autoSource`.
+- Si la respuesta cambia a una opcion que ya no requiere el elemento, se eliminan solo los elementos creados automaticamente desde esa respuesta para evitar duplicados o elementos fantasma.
+- Cada elemento automatico abre ficha emergente propia para completar caracteristicas, medidas, estado, nota (i), observacion y fotos.
+- Se agregaron nuevos tipos movibles en el plano: `Escalera de bloque`, `Rampa de bloque`, `Acometida / punto de ingreso`, `Medidor / punto de medicion`, `Tablero electrico del bloque` y `Puesta a tierra`.
+- Se agregaron iconos canvas diferenciados para escalera, rampa, medidor, acometida, tablero y puesta a tierra.
+- `Registro guiado` ahora coloca el plano vivo antes de la bandeja de solicitudes, con panel sticky, para mantener el plano fijo y las preguntas/acciones debajo.
+- Version y cache actualizados a `v2.6.6`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Revision estatica contra `assets/js/mec-schema.js`: campos `tipo_circulacion`, `acometida_tipo`, `medidor_estado`, `tablero_estado` y `puesta_tierra` confirmados con las opciones usadas por la creacion automatica.
+- Intento de validacion headless/CDP bloqueado por el runner local al comunicarse con el proceso del navegador; queda pendiente una pasada visual manual en la app publicada.
+
 ## Sesion de sidebar agil y plano a ancho completo - 2026-05-16 - v2.6.5
 
 ### Objetivo

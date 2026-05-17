@@ -3508,8 +3508,9 @@ textarea.form-control {
 }
 
 .guided-plan-panel {
-  position: relative;
-  top: auto;
+  position: sticky;
+  top: .55rem;
+  z-index: 2;
   min-width: 0;
   background: #ffffff;
   border: 1px solid #d8e2ee;
@@ -3576,7 +3577,7 @@ textarea.form-control {
 }
 
 #module-registro .school-plan__canvas-wrap {
-  max-height: min(64vh, 720px);
+  max-height: min(58vh, 690px);
 }
 
 #module-registro .school-plan__side {

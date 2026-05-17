@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.5
+ * Version: 2.6.6
  */
 
 const GuidedRegisterModule = (() => {
@@ -147,7 +147,7 @@ const GuidedRegisterModule = (() => {
       <section class="guided-register" aria-label="Registro guiado CIALPA">
         <header class="guided-register__header">
           <div>
-            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.5')}</p>
+            <p class="guided-register__eyebrow">Nuevo flujo secuencial v${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '2.6.6')}</p>
             <h2>Registro guiado sobre plano unico</h2>
             <p>Una secuencia horizontal de carga: cada accion alimenta el mismo plano vivo de la escuela.</p>
           </div>
@@ -180,12 +180,6 @@ const GuidedRegisterModule = (() => {
         <div class="guided-progress" aria-hidden="true"><span data-guided-progress></span></div>
 
         <section class="guided-workbench">
-          <div class="guided-deck" data-guided-deck>
-            <div class="guided-track" data-guided-track>
-              ${STEPS.map(step => _renderSlide(step)).join('')}
-            </div>
-          </div>
-
           <aside class="guided-plan-panel" aria-label="Plano vivo del registro">
             <div class="guided-plan-panel__header">
               <div>
@@ -196,6 +190,12 @@ const GuidedRegisterModule = (() => {
             </div>
             <div id="guided-school-plan-root" class="guided-plan-surface" data-school-plan-root></div>
           </aside>
+
+          <div class="guided-deck" data-guided-deck>
+            <div class="guided-track" data-guided-track>
+              ${STEPS.map(step => _renderSlide(step)).join('')}
+            </div>
+          </div>
         </section>
       </section>`;
   }

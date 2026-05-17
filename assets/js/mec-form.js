@@ -87,6 +87,12 @@ const MecFormModule = (() => {
     { id: 'walkway', label: 'Caminero', short: 'CAM', tone: '#64748b' },
     { id: 'open_space', label: 'Espacio libre', short: 'ESP', tone: '#b45309' },
     { id: 'pillar', label: 'Pilar', short: 'PIL', tone: '#475569' },
+    { id: 'stair', label: 'Escalera de bloque', short: 'ESC', tone: '#4b5563' },
+    { id: 'ramp', label: 'Rampa de bloque', short: 'RMP', tone: '#7c3aed' },
+    { id: 'service_connection', label: 'Acometida / punto de ingreso', short: 'ACM', tone: '#0369a1' },
+    { id: 'meter', label: 'Medidor / punto de medicion', short: 'MED', tone: '#ca8a04' },
+    { id: 'main_switchboard', label: 'Tablero electrico del bloque', short: 'TBL', tone: '#dc2626' },
+    { id: 'grounding', label: 'Puesta a tierra', short: 'PAT', tone: '#15803d' },
   ];
 
   const ROOM_SPACE_TYPES = [
@@ -185,7 +191,10 @@ const MecFormModule = (() => {
       return;
     }
     _data[moduleId][fieldId] = value;
-    if (moduleId === 'bloques') _syncActiveBlock();
+    if (moduleId === 'bloques') {
+      _syncActiveBlock();
+      _syncBlockDrivenPlanElements(fieldId, value);
+    }
     _saveDraft(false);
     _refreshDynamicState();
   }
@@ -2678,6 +2687,7 @@ const MecFormModule = (() => {
         hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : (measuredSize?.hRatio || size.hRatio),
         rotationDeg,
         ficha,
+        autoSource: item.autoSource || null,
         locked: Boolean(item.locked),
         lockedAt: item.lockedAt || '',
       };
@@ -2780,12 +2790,22 @@ const MecFormModule = (() => {
         hRatio: px / logicalHeight,
       };
     }
-    const acceptsMeasures = ['recreation', 'gallery', 'walkway', 'open_space'].includes(type);
+    if (type === 'stair' || type === 'ramp') {
+      const largo = Number(ficha.largo_m || 0);
+      const ancho = Number(ficha.ancho_m || 0);
+      if (!largo || !ancho) return null;
+      const base = _siteElementDefaultSize(type);
+      return {
+        wRatio: Math.max(base.wRatio, Math.min(.24, largo / 70)),
+        hRatio: Math.max(base.hRatio, Math.min(.16, ancho / 38)),
+      };
+    }
+    const acceptsMeasures = ['recreation', 'gallery', 'walkway', 'open_space', 'stair', 'ramp'].includes(type);
     if (!acceptsMeasures) return null;
     const largo = Number(ficha.largo_m || ficha.longitud_m || 0);
     const ancho = Number(ficha.ancho_m || 0);
     if (!largo || !ancho) return null;
-    const slender = type === 'gallery' || type === 'walkway';
+    const slender = type === 'gallery' || type === 'walkway' || type === 'ramp';
     return {
       wRatio: Math.max(slender ? .055 : .045, Math.min(.62, largo / 120)),
       hRatio: Math.max(slender ? .012 : .035, Math.min(slender ? .16 : .36, ancho / 120)),
@@ -2809,7 +2829,7 @@ const MecFormModule = (() => {
       const diametro = Number(element.ficha.diametro_m || element.ficha.ancho_m || 0);
       if (diametro > 0) element.ficha.superficie_m2 = (Math.PI * Math.pow(diametro / 2, 2)).toFixed(2);
     }
-    if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space'].includes(element.type)) {
+    if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space', 'stair', 'ramp'].includes(element.type)) {
       element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
       if (element.ficha.perimetro_m !== undefined) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
     }
@@ -2908,6 +2928,55 @@ const MecFormModule = (() => {
         estabilidad: 'Estable',
         fisuras: 'No',
       },
+      stair: {
+        largo_m: '3.00',
+        ancho_m: '1.20',
+        alto_total_m: '',
+        cantidad_peldanos: '',
+        material: 'Hormigon',
+        pasamanos: 'Un lado',
+        seguridad: 'Regular',
+        ubicacion_relativa: 'Adosada al bloque',
+      },
+      ramp: {
+        largo_m: '4.00',
+        ancho_m: '1.20',
+        pendiente_pct: '',
+        descansos: 'No verificable',
+        material: 'Hormigon',
+        pasamanos: 'No verificable',
+        seguridad: 'Regular',
+        ubicacion_relativa: 'Adosada al bloque',
+      },
+      service_connection: {
+        tipo_acometida: 'Aerea',
+        punto_ingreso: 'Fachada del bloque',
+        altura_m: '',
+        proteccion_mecanica: 'No verificable',
+        seguridad: 'No verificable',
+      },
+      meter: {
+        tipo_medidor: 'Monofasico',
+        propiedad: 'Propio del bloque',
+        ubicacion_relativa: 'Fachada del bloque',
+        altura_m: '',
+        sello: 'No verificable',
+        seguridad: 'No verificable',
+      },
+      main_switchboard: {
+        ubicacion_relativa: 'Fachada/interior del bloque',
+        proteccion: 'No verificable',
+        rotulado: 'No verificable',
+        capacidad_a: '',
+        seguridad: 'No verificable',
+      },
+      grounding: {
+        ubicacion_relativa: 'Junto a tablero o acometida',
+        conductor_visible: 'No verificable',
+        jabalina_visible: 'No verificable',
+        continuidad: 'No verificable',
+        resistencia_ohm: '',
+      },
     }[type] || {};
   }
 
@@ -2982,6 +3051,55 @@ const MecFormModule = (() => {
         { key: 'estabilidad', label: 'Estabilidad', options: ['Estable', 'Fisuras leves', 'Fisuras severas', 'Desplazado', 'No verificable'] },
         { key: 'fisuras', label: 'Fisuras visibles', options: ['No', 'Leves', 'Severas', 'No verificable'] },
       ],
+      stair: [
+        { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 3.00' },
+        { key: 'ancho_m', label: 'Ancho libre aprox. (m)', type: 'number', placeholder: 'Ej. 1.20' },
+        { key: 'alto_total_m', label: 'Altura total salvada (m)', type: 'number', placeholder: 'Ej. 3.00' },
+        { key: 'cantidad_peldanos', label: 'Cantidad de peldanos', type: 'number', placeholder: 'Ej. 18' },
+        { key: 'material', label: 'Material', options: ['Hormigon', 'Metal', 'Madera', 'Mixta', 'Otro'] },
+        { key: 'pasamanos', label: 'Pasamanos', options: ['Ambos lados', 'Un lado', 'No tiene', 'No verificable'] },
+        { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Riesgo', 'No verificable'] },
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Interior del bloque', 'Adosada al bloque', 'Exterior independiente', 'Entre bloques', 'Otro'] },
+      ],
+      ramp: [
+        { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 4.00' },
+        { key: 'ancho_m', label: 'Ancho libre aprox. (m)', type: 'number', placeholder: 'Ej. 1.20' },
+        { key: 'pendiente_pct', label: 'Pendiente aprox. (%)', type: 'number', placeholder: 'Ej. 8' },
+        { key: 'descansos', label: 'Descansos', options: ['Tiene', 'No tiene', 'No aplica', 'No verificable'] },
+        { key: 'material', label: 'Material', options: ['Hormigon', 'Metal', 'Madera', 'Tierra compactada', 'Otro'] },
+        { key: 'pasamanos', label: 'Pasamanos', options: ['Ambos lados', 'Un lado', 'No tiene', 'No verificable'] },
+        { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Riesgo', 'No verificable'] },
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Acceso principal', 'Acceso secundario', 'Adosada al bloque', 'Exterior independiente', 'Otro'] },
+      ],
+      service_connection: [
+        { key: 'tipo_acometida', label: 'Tipo de acometida', options: ['Aerea', 'Subterranea', 'Compartida con otro bloque', 'No visible'] },
+        { key: 'punto_ingreso', label: 'Punto de ingreso', options: ['Fachada del bloque', 'Poste', 'Gabinete exterior', 'Subterraneo', 'Otro'] },
+        { key: 'altura_m', label: 'Altura aprox. visible (m)', type: 'number', placeholder: 'Ej. 3.20' },
+        { key: 'proteccion_mecanica', label: 'Proteccion mecanica', options: ['Adecuada', 'Parcial', 'No tiene', 'No verificable'] },
+        { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Expuesto', 'Riesgo', 'No verificable'] },
+      ],
+      meter: [
+        { key: 'tipo_medidor', label: 'Tipo de medidor', options: ['Monofasico', 'Trifasico', 'Digital', 'Analogico', 'No verificable'] },
+        { key: 'propiedad', label: 'Relacion con el bloque', options: ['Propio del bloque', 'Compartido', 'No visible', 'No verificable'] },
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Fachada del bloque', 'Gabinete exterior', 'Poste', 'Otro bloque', 'Otro'] },
+        { key: 'altura_m', label: 'Altura aprox. (m)', type: 'number', placeholder: 'Ej. 1.60' },
+        { key: 'sello', label: 'Sello / tapa', options: ['Bueno', 'Regular', 'Roto', 'No visible', 'No verificable'] },
+        { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Expuesto', 'Riesgo', 'No verificable'] },
+      ],
+      main_switchboard: [
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Interior del bloque', 'Fachada/interior del bloque', 'Gabinete exterior', 'Otro'] },
+        { key: 'proteccion', label: 'Proteccion', options: ['Termomagnetica', 'Diferencial', 'Ambas', 'No tiene', 'No verificable'] },
+        { key: 'rotulado', label: 'Rotulado', options: ['Si', 'Parcial', 'No', 'No verificable'] },
+        { key: 'capacidad_a', label: 'Capacidad aprox. (A)', type: 'number', placeholder: 'Ej. 63' },
+        { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Sin tapa', 'Expuesto', 'Riesgo', 'No verificable'] },
+      ],
+      grounding: [
+        { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Junto a tablero o acometida', 'Patio tecnico', 'No visible', 'Otro'] },
+        { key: 'conductor_visible', label: 'Conductor visible', options: ['Si', 'No', 'No verificable'] },
+        { key: 'jabalina_visible', label: 'Jabalina visible', options: ['Si', 'No', 'No verificable'] },
+        { key: 'continuidad', label: 'Continuidad verificada', options: ['Si', 'No', 'No medida', 'No verificable'] },
+        { key: 'resistencia_ohm', label: 'Resistencia medida (ohm)', type: 'number', placeholder: 'Si se midio' },
+      ],
     }[type] || [];
   }
 
@@ -3036,6 +3154,12 @@ const MecFormModule = (() => {
       walkway: { wRatio: .18, hRatio: .024 },
       open_space: { wRatio: .17, hRatio: .095 },
       pillar: { wRatio: .028, hRatio: .04 },
+      stair: { wRatio: .072, hRatio: .065 },
+      ramp: { wRatio: .11, hRatio: .038 },
+      service_connection: { wRatio: .05, hRatio: .055 },
+      meter: { wRatio: .045, hRatio: .05 },
+      main_switchboard: { wRatio: .055, hRatio: .055 },
+      grounding: { wRatio: .05, hRatio: .045 },
     }[type] || { wRatio: .12, hRatio: .075 };
   }
 
@@ -11481,6 +11605,104 @@ const MecFormModule = (() => {
         ctx.strokeRect(local.x, local.y, local.w, local.h);
       }
       if (court) _drawRecreationCourtMarkings(ctx, item, local, shape);
+    } else if (item.type === 'stair') {
+      ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(248,250,252,.96)';
+      ctx.fillRect(local.x, local.y, local.w, local.h);
+      ctx.strokeRect(local.x, local.y, local.w, local.h);
+      const steps = Math.max(4, Math.min(9, Math.round(local.w / 12)));
+      ctx.save();
+      ctx.strokeStyle = cfg.tone;
+      ctx.lineWidth = 1.4;
+      for (let index = 1; index < steps; index += 1) {
+        const sx = local.x + (local.w * index) / steps;
+        ctx.beginPath();
+        ctx.moveTo(sx, local.y + 4);
+        ctx.lineTo(sx, local.y + local.h - 4);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(local.x + 5, local.y + local.h - 6);
+      ctx.lineTo(local.x + local.w - 5, local.y + 6);
+      ctx.stroke();
+      ctx.restore();
+    } else if (item.type === 'ramp') {
+      ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(124,58,237,.10)';
+      ctx.beginPath();
+      ctx.moveTo(local.x, local.y + local.h);
+      ctx.lineTo(local.x + local.w, local.y + local.h);
+      ctx.lineTo(local.x + local.w, local.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.save();
+      ctx.strokeStyle = cfg.tone;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(local.x + 8, local.y + local.h - 8);
+      ctx.lineTo(local.x + local.w - 10, local.y + 10);
+      ctx.moveTo(local.x + local.w - 22, local.y + 10);
+      ctx.lineTo(local.x + local.w - 10, local.y + 10);
+      ctx.lineTo(local.x + local.w - 10, local.y + 22);
+      ctx.stroke();
+      ctx.restore();
+    } else if (item.type === 'meter') {
+      const side = Math.min(local.w, local.h);
+      ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(254,243,199,.94)';
+      ctx.fillRect(-side / 2, -side / 2, side, side);
+      ctx.strokeRect(-side / 2, -side / 2, side, side);
+      ctx.beginPath();
+      ctx.arc(0, -side * .05, side * .22, Math.PI, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -side * .05);
+      ctx.lineTo(side * .16, -side * .17);
+      ctx.stroke();
+    } else if (item.type === 'service_connection') {
+      ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(224,242,254,.92)';
+      ctx.fillRect(local.x, local.y, local.w, local.h);
+      ctx.strokeRect(local.x, local.y, local.w, local.h);
+      ctx.save();
+      ctx.strokeStyle = cfg.tone;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(local.x + local.w * .2, local.y + local.h * .25);
+      ctx.lineTo(local.x + local.w * .8, local.y + local.h * .25);
+      ctx.moveTo(local.x + local.w * .25, local.y + local.h * .25);
+      ctx.lineTo(local.x + local.w * .25, local.y + local.h * .86);
+      ctx.moveTo(local.x + local.w * .75, local.y + local.h * .25);
+      ctx.lineTo(local.x + local.w * .75, local.y + local.h * .86);
+      ctx.stroke();
+      ctx.restore();
+    } else if (item.type === 'main_switchboard') {
+      ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(254,226,226,.92)';
+      ctx.fillRect(local.x, local.y, local.w, local.h);
+      ctx.strokeRect(local.x, local.y, local.w, local.h);
+      ctx.save();
+      ctx.strokeStyle = cfg.tone;
+      ctx.lineWidth = 1.2;
+      for (let index = 0; index < 3; index += 1) {
+        const bx = local.x + local.w * (.24 + index * .26);
+        ctx.strokeRect(bx - 4, local.y + local.h * .24, 8, local.h * .52);
+      }
+      ctx.restore();
+    } else if (item.type === 'grounding') {
+      ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(220,252,231,.88)';
+      ctx.fillRect(local.x, local.y, local.w, local.h);
+      ctx.strokeRect(local.x, local.y, local.w, local.h);
+      ctx.save();
+      ctx.strokeStyle = cfg.tone;
+      ctx.lineWidth = 1.7;
+      ctx.beginPath();
+      ctx.moveTo(0, local.y + 5);
+      ctx.lineTo(0, local.y + local.h * .52);
+      ctx.moveTo(local.x + local.w * .25, local.y + local.h * .56);
+      ctx.lineTo(local.x + local.w * .75, local.y + local.h * .56);
+      ctx.moveTo(local.x + local.w * .33, local.y + local.h * .68);
+      ctx.lineTo(local.x + local.w * .67, local.y + local.h * .68);
+      ctx.moveTo(local.x + local.w * .42, local.y + local.h * .8);
+      ctx.lineTo(local.x + local.w * .58, local.y + local.h * .8);
+      ctx.stroke();
+      ctx.restore();
     } else {
       if (item.type === 'gallery') ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(124,58,237,.10)';
       if (item.type === 'walkway') ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(100,116,139,.14)';
@@ -12696,10 +12918,216 @@ const MecFormModule = (() => {
     };
   }
 
+  function _blockDrivenPlanSpecs(fieldId, value, block) {
+    const text = _auditText(value);
+    const blockLabel = block?.bloque_codigo || 'Bloque';
+    if (!block?.id || !text) return [];
+    if (fieldId === 'tipo_circulacion') {
+      const specs = [];
+      if (text.includes('escalera') || text.includes('ambas')) {
+        specs.push({
+          type: 'stair',
+          reason: 'circulacion vertical declarada',
+          ficha: {
+            codigo: `Esc ${blockLabel}`,
+            subtipo: 'Escalera de bloque',
+            ubicacion_relativa: 'Adosada al bloque',
+            nota_i: `Creada automaticamente al marcar ${value} en circulacion vertical del ${blockLabel}.`,
+          },
+        });
+      }
+      if (text.includes('rampa') || text.includes('ambas')) {
+        specs.push({
+          type: 'ramp',
+          reason: 'circulacion accesible declarada',
+          ficha: {
+            codigo: `Rmp ${blockLabel}`,
+            subtipo: 'Rampa de bloque',
+            ubicacion_relativa: 'Acceso principal',
+            nota_i: `Creada automaticamente al marcar ${value} en circulacion vertical del ${blockLabel}.`,
+          },
+        });
+      }
+      return specs;
+    }
+    if (fieldId === 'acometida_tipo' && !['no', 'no visible'].includes(text)) {
+      return [{
+        type: 'service_connection',
+        reason: 'acometida electrica declarada',
+        ficha: {
+          codigo: `Acm ${blockLabel}`,
+          tipo_acometida: value,
+          subtipo: 'Acometida / punto de ingreso',
+          nota_i: `Creada automaticamente al registrar acometida "${value}" en ${blockLabel}.`,
+        },
+      }];
+    }
+    if (fieldId === 'medidor_estado' && !['no existe', 'no visible'].includes(text)) {
+      return [{
+        type: 'meter',
+        reason: 'medidor o punto de medicion declarado',
+        ficha: {
+          codigo: `Med ${blockLabel}`,
+          propiedad: value,
+          subtipo: 'Medidor / punto de medicion',
+          nota_i: `Creado automaticamente al registrar medidor "${value}" en ${blockLabel}.`,
+        },
+      }];
+    }
+    if (fieldId === 'tablero_estado' && !text.includes('no existe') && !text.includes('no visible')) {
+      return [{
+        type: 'main_switchboard',
+        reason: 'tablero electrico declarado',
+        ficha: {
+          codigo: `Tbl ${blockLabel}`,
+          estado: value,
+          subtipo: 'Tablero electrico del bloque',
+          nota_i: `Creado automaticamente al registrar tablero "${value}" en ${blockLabel}.`,
+        },
+      }];
+    }
+    if (fieldId === 'puesta_tierra' && text === 'si') {
+      return [{
+        type: 'grounding',
+        reason: 'puesta a tierra declarada',
+        ficha: {
+          codigo: `PAT ${blockLabel}`,
+          subtipo: 'Puesta a tierra',
+          conductor_visible: 'Si',
+          nota_i: `Creada automaticamente al marcar puesta a tierra visible/verificable en ${blockLabel}.`,
+        },
+      }];
+    }
+    return [];
+  }
+
+  function _findBlockDrivenPlanElement(blockId, fieldId, type) {
+    return _ensureSiteElements().find(item =>
+      item.autoSource?.module === 'bloques'
+      && item.autoSource?.blockId === blockId
+      && item.autoSource?.fieldId === fieldId
+      && item.type === type) || null;
+  }
+
+  function _removeBlockDrivenPlanElements(blockId, fieldIds = [], keepTypes = []) {
+    const fields = Array.isArray(fieldIds) ? fieldIds : [fieldIds];
+    const keep = new Set(keepTypes);
+    const before = _ensureSiteElements().length;
+    _data.siteElements = _ensureSiteElements().filter(item => {
+      const source = item.autoSource;
+      if (!source || source.module !== 'bloques' || source.blockId !== blockId) return true;
+      if (!fields.includes(source.fieldId)) return true;
+      return keep.has(item.type);
+    });
+    return before - _ensureSiteElements().length;
+  }
+
+  function _blockDrivenElementPosition(type, blockId, fieldId, shape = '') {
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+    const size = _siteElementDefaultSize(type, shape);
+    const w = Math.max(type === 'pillar' ? 18 : 30, size.wRatio * logicalWidth);
+    const h = Math.max(type === 'pillar' ? 18 : 26, size.hRatio * logicalHeight);
+    const blockLayout = _planBlockLayout(_data.__blocks || [], logicalWidth, logicalHeight)
+      .find(item => item.block?.id === blockId);
+    if (!blockLayout) return _siteElementBlankPosition(type, 'plan', shape);
+    const gap = 16;
+    const anchors = {
+      tipo_circulacion: type === 'ramp'
+        ? { x: blockLayout.x - w - gap, y: blockLayout.y + blockLayout.h * .58 - h / 2 }
+        : { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y + blockLayout.h * .42 - h / 2 },
+      acometida_tipo: { x: blockLayout.x - w - gap, y: blockLayout.y - h - gap },
+      medidor_estado: { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y - h - gap },
+      tablero_estado: { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y + 34 },
+      puesta_tierra: { x: blockLayout.x - w - gap, y: blockLayout.y + blockLayout.h - h - 10 },
+    };
+    const anchor = anchors[fieldId] || { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y + blockLayout.h / 2 - h / 2 };
+    const resolved = _resolvePlanRectNoOverlap(
+      { x: anchor.x, y: anchor.y, w, h },
+      _planMoveBlockers('site', '', logicalWidth, logicalHeight),
+      logicalWidth,
+      logicalHeight,
+      2
+    );
+    return {
+      xRatio: resolved.x / logicalWidth,
+      yRatio: resolved.y / logicalHeight,
+      ...size,
+    };
+  }
+
+  function _createBlockDrivenPlanElement(block, fieldId, spec) {
+    const cfg = _siteElementConfig(spec.type);
+    if (!cfg) return null;
+    const next = _ensureSiteElements().filter(item => item.type === spec.type).length + 1;
+    const position = _blockDrivenElementPosition(spec.type, block.id, fieldId);
+    const element = {
+      id: `site_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      type: spec.type,
+      shape: '',
+      xRatio: position.xRatio,
+      yRatio: position.yRatio,
+      wRatio: position.wRatio,
+      hRatio: position.hRatio,
+      rotationDeg: 0,
+      autoSource: {
+        module: 'bloques',
+        blockId: block.id,
+        blockLabel: block.bloque_codigo || 'Bloque',
+        fieldId,
+        reason: spec.reason || '',
+        createdAt: new Date().toISOString(),
+      },
+      ficha: {
+        ..._defaultSiteElementFicha(spec.type, next, ''),
+        ...(spec.ficha || {}),
+        origen_registro: `${block.bloque_codigo || 'Bloque'} / ${fieldId}`,
+      },
+    };
+    _updateSiteElementDerivedFields(element);
+    _ensureSiteElements().push(element);
+    _planLayers.exteriores = true;
+    _startTimeLog('exterior', element.id, element.ficha.codigo || cfg.label);
+    _saveDraft(false);
+    _showSchoolPlanAfterSiteInsert(element);
+    setTimeout(() => openSiteElementFicha(element.id), 220);
+    UI.showToast(`${cfg.label} agregado automaticamente al plano. Complete su ficha y arrastrelo a su ubicacion exacta.`, 'success', 6500);
+    return element;
+  }
+
+  function _syncBlockDrivenPlanElements(fieldId, value) {
+    const block = _blockById(_data.__activeBlockId);
+    const specs = _blockDrivenPlanSpecs(fieldId, value, block);
+    if (!block) return [];
+    const text = _auditText(value);
+    const cascadeFields = fieldId === 'acometida_tipo' && ['no', 'no visible'].includes(text)
+      ? ['acometida_tipo', 'medidor_estado', 'tablero_estado', 'puesta_tierra']
+      : [fieldId];
+    if (!specs.length) {
+      const removed = _removeBlockDrivenPlanElements(block.id, cascadeFields);
+      if (removed) {
+        _saveDraft(false);
+        if (_isStandaloneSchoolPlanActive() || _activeSchoolPlanRoot() || _activeModuleId === 'plano') renderSchoolPlan();
+      }
+      return [];
+    }
+    _removeBlockDrivenPlanElements(block.id, fieldId, specs.map(spec => spec.type));
+    return specs.map(spec => {
+      const existing = _findBlockDrivenPlanElement(block.id, fieldId, spec.type);
+      if (existing) {
+        existing.ficha = { ..._defaultSiteElementFicha(existing.type), ...(existing.ficha || {}), ...(spec.ficha || {}) };
+        existing.autoSource = { ...(existing.autoSource || {}), reason: spec.reason || existing.autoSource?.reason || '', updatedAt: new Date().toISOString() };
+        _updateSiteElementDerivedFields(existing);
+        return existing;
+      }
+      return _createBlockDrivenPlanElement(block, fieldId, spec);
+    }).filter(Boolean);
+  }
+
   function _showSchoolPlanAfterSiteInsert(element) {
     _selectedPlanId = `site::${element.id}`;
     _planMoveMode = true;
-    if (_isStandaloneSchoolPlanActive()) {
+    if (_isStandaloneSchoolPlanActive() || _activeSchoolPlanRoot()) {
       _saveDraft(false);
       renderSchoolPlan();
     } else if (_activeModuleId !== 'plano') {
@@ -12711,7 +13139,8 @@ const MecFormModule = (() => {
     setTimeout(() => {
       renderSchoolPlan();
       const canvas = _activeSchoolPlanCanvas();
-      const rect = canvas ? _siteElementRect(element, 900, _planCanvasHeight()) : null;
+      const logical = canvas ? _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight()) : null;
+      const rect = canvas && logical ? _siteElementRect(element, logical.width, logical.height) : null;
       if (canvas && rect) {
         _scrollCanvasWrapToPoint(
           canvas.closest('.school-plan__canvas-wrap'),
