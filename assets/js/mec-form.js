@@ -12046,14 +12046,48 @@ const MecFormModule = (() => {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(logical.width, y); ctx.stroke();
     }
 
-    // Scale label (bottom-left corner)
+    // Axis labels along top and left edges
     const fmtM = v => v >= 1 ? `${v} m` : v >= 0.01 ? `${+(v * 100).toPrecision(2)} cm` : `${+(v * 1000).toPrecision(2)} mm`;
+    ctx.font = '8px sans-serif';
+    ctx.fillStyle = 'rgba(23, 59, 99, .45)';
+    // Top axis (horizontal)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    let labelCount = 0;
+    for (let lx = phX; lx < logical.width && labelCount < 30; lx += majorPx, labelCount++) {
+      if (lx < 18) continue;
+      const mVal = (lx - gridOriginX) / effectivePPM;
+      const mRounded = Math.round(mVal / majorM) * majorM;
+      const lbl = fmtM(Math.abs(mRounded));
+      ctx.fillStyle = 'rgba(248,250,252,.75)';
+      const lw = ctx.measureText(lbl).width;
+      ctx.fillRect(lx - lw / 2 - 1, 1, lw + 2, 10);
+      ctx.fillStyle = 'rgba(23, 59, 99, .45)';
+      ctx.fillText(lbl, lx, 2);
+    }
+    // Left axis (vertical)
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    labelCount = 0;
+    for (let ly = phY; ly < logical.height && labelCount < 30; ly += majorPx, labelCount++) {
+      if (ly < 12) continue;
+      const mVal = (ly - gridOriginY) / effectivePPM;
+      const mRounded = Math.round(mVal / majorM) * majorM;
+      const lbl = fmtM(Math.abs(mRounded));
+      ctx.fillStyle = 'rgba(248,250,252,.75)';
+      const lw = ctx.measureText(lbl).width;
+      ctx.fillRect(logical.width - lw - 3, ly - 5, lw + 2, 10);
+      ctx.fillStyle = 'rgba(23, 59, 99, .45)';
+      ctx.fillText(lbl, logical.width - 2, ly);
+    }
+
+    // Scale chip (bottom-left corner)
     const scaleLabel = `Cuad.: ${fmtM(majorM)}`;
     ctx.font = '9px sans-serif';
     const tw = ctx.measureText(scaleLabel).width;
-    ctx.fillStyle = 'rgba(248,250,252,.82)';
+    ctx.fillStyle = 'rgba(248,250,252,.88)';
     ctx.fillRect(4, logical.height - 16, tw + 6, 13);
-    ctx.fillStyle = 'rgba(23, 59, 99, .55)';
+    ctx.fillStyle = 'rgba(23, 59, 99, .60)';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillText(scaleLabel, 7, logical.height - 10);
@@ -12419,16 +12453,11 @@ const MecFormModule = (() => {
         h,
         metersPerPx: scale ? 1 / scale : 1,
       });
-      ctx.strokeStyle = blockSelected ? '#111827' : '#172033';
-      ctx.lineWidth = blockSelected ? 4 : 3;
-      ctx.fillStyle = 'rgba(226,232,240,.32)';
+      ctx.fillStyle = 'rgba(226,232,240,.20)';
       ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = blockSelected ? '#111827' : '#374151';
+      ctx.lineWidth = blockSelected ? 2 : 1;
       ctx.strokeRect(x, y, w, h);
-      ctx.strokeStyle = 'rgba(23,32,51,.45)';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(x + 6, y + 6, w - 12, h - 12);
-      ctx.fillStyle = 'rgba(23,32,51,.06)';
-      ctx.fillRect(x + 1, y + 1, w - 2, 30);
       ctx.fillStyle = '#172033';
       ctx.font = _canvasFont(800, 12);
       ctx.textAlign = 'left';
@@ -13446,9 +13475,8 @@ const MecFormModule = (() => {
     if (!selectedId) return;
     const source = items.find(item => item.id === selectedId);
     if (!source) return;
-    const candidates = source.type === 'block'
-      ? items.filter(item => item.type === 'block')
-      : items.filter(item => item.type !== 'block');
+    if (source.type !== 'block') return;
+    const candidates = items.filter(item => item.type === 'block');
     const nearest = _nearestPlanDistance(source, candidates);
     if (!nearest || !Number.isFinite(nearest.distancePx)) return;
     const meters = nearest.distancePx * nearest.metersPerPx;
