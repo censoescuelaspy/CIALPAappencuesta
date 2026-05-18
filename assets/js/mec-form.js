@@ -16750,6 +16750,47 @@ const MecFormModule = (() => {
     return null;
   }
 
+  function nudgeSelectedPlanItem(dx, dy) {
+    const raw = String(_selectedPlanId || '');
+    if (!raw || (!dx && !dy)) return;
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+    if (raw.startsWith('site::')) {
+      const elementId = raw.replace('site::', '');
+      const element = _ensureSiteElements().find(el => el.id === elementId);
+      if (!element) return;
+      const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+      _movePlanSiteElement(elementId, rect.x + dx, rect.y + dy, rect);
+      _saveDraft(false);
+      return;
+    }
+    if (raw.startsWith('block::')) {
+      const blockId = raw.replace('block::', '');
+      const layout = _planBlockLayout(_data.__blocks || [], logicalWidth, logicalHeight)
+        .find(l => l.block?.id === blockId);
+      if (!layout) return;
+      const rect = { x: layout.x, y: layout.y, w: layout.w, h: layout.h };
+      _movePlanBlock(blockId, rect.x + dx, rect.y + dy, rect);
+      _saveDraft(false);
+      return;
+    }
+    if (raw.startsWith('sanitary::')) {
+      const sanitaryId = raw.split('::')[1];
+      const sanitary = (_data.__sanitaries || []).find(s => s.id === sanitaryId);
+      if (!sanitary) return;
+      const logH = logicalHeight;
+      const rect = {
+        x: Number(sanitary.xRatio || 0) * logicalWidth,
+        y: Number(sanitary.yRatio || 0) * logH,
+        w: Number(sanitary.wRatio || 0.2) * logicalWidth,
+        h: Number(sanitary.hRatio || 0.15) * logH,
+      };
+      _movePlanSanitary(sanitaryId, rect.x + dx, rect.y + dy, rect, { x: 0, y: 0, w: logicalWidth, h: logH });
+      _saveDraft(false);
+      return;
+    }
+  }
+
   function _bindSchoolPlanCanvas() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
@@ -16791,7 +16832,23 @@ const MecFormModule = (() => {
       if (!_planLayers.exteriores) return null;
       const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
       const handleHit = _findSiteResizeHandleAt(point, logical);
-      if (handleHit) return handleHit;
+      if (handleHit) {
+        // For small elements the handle hit-zone covers the whole body; prefer move over resize
+        // when the click lands strictly inside the element rectangle.
+        const siteEl = _ensureSiteElements().find(el => el.id === handleHit.siteId);
+        if (siteEl) {
+          const r = _siteElementRect(siteEl, logical.width, logical.height);
+          if (Math.min(r.w, r.h) < 20 &&
+              point.x >= r.x && point.x <= r.x + r.w &&
+              point.y >= r.y && point.y <= r.y + r.h) {
+            // fall through to body hit below
+          } else {
+            return handleHit;
+          }
+        } else {
+          return handleHit;
+        }
+      }
       const siteHit = _findSiteElementAt(point, logical);
       if (!siteHit?.item || !siteHit.rect) return null;
       return {
@@ -17239,6 +17296,16 @@ const MecFormModule = (() => {
         { x: event.clientX, y: event.clientY }
       ));
     }, { passive: false });
+    canvas.tabIndex = 0;
+    canvas.addEventListener('keydown', event => {
+      if (!_selectedPlanId) return;
+      const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+      const dir = ARROWS[event.key];
+      if (!dir) return;
+      event.preventDefault();
+      const step = event.shiftKey ? 1 : (event.altKey ? 20 : 5);
+      nudgeSelectedPlanItem(dir[0] * step, dir[1] * step);
+    });
   }
 
   function _buildSchoolPlanModel() {
@@ -18995,6 +19062,7 @@ const MecFormModule = (() => {
     orientSelectedPlanItem,
     rotateSelectedPlanItem,
     flipSelectedPlanItem,
+    nudgeSelectedPlanItem,
     deletePlanFloor,
     newPlanClassroom,
     addPlanSanitary,
