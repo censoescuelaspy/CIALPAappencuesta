@@ -95,19 +95,19 @@ const MecFormModule = (() => {
   const WALL_RECT_TYPES = ['switchboard', 'board'];
 
   const SITE_ELEMENT_TYPES = [
-    { id: 'water_tank', label: 'Tanque de agua', short: 'TQ', tone: '#0e7490' },
-    { id: 'well', label: 'Pozo / captacion', short: 'POZ', tone: '#0f766e' },
-    { id: 'recreation', label: 'Espacio recreacion', short: 'REC', tone: '#15803d' },
-    { id: 'gallery', label: 'Galeria', short: 'GAL', tone: '#7c3aed' },
-    { id: 'walkway', label: 'Caminero', short: 'CAM', tone: '#64748b' },
-    { id: 'open_space', label: 'Espacio libre', short: 'ESP', tone: '#b45309' },
-    { id: 'pillar', label: 'Pilar', short: 'PIL', tone: '#475569' },
-    { id: 'stair', label: 'Escalera de bloque', short: 'ESC', tone: '#4b5563' },
-    { id: 'ramp', label: 'Rampa de bloque', short: 'RMP', tone: '#7c3aed' },
-    { id: 'service_connection', label: 'Acometida / punto de ingreso', short: 'ACM', tone: '#0369a1' },
-    { id: 'meter', label: 'Medidor / punto de medicion', short: 'MED', tone: '#ca8a04' },
-    { id: 'main_switchboard', label: 'Tablero electrico del bloque', short: 'TBL', tone: '#dc2626' },
-    { id: 'grounding', label: 'Puesta a tierra', short: 'PAT', tone: '#15803d' },
+    { id: 'water_tank',        label: 'Tanque de agua',               short: 'TQ',  icon: '&#x25CB;', ribbonLabel: 'Tanque',     tone: '#0e7490' },
+    { id: 'well',              label: 'Pozo / captacion',             short: 'POZ', icon: '&#x2299;', ribbonLabel: 'Pozo',       tone: '#0f766e' },
+    { id: 'recreation',       label: 'Espacio recreacion',           short: 'REC', icon: '&#x25C6;', ribbonLabel: 'Recreacion', tone: '#15803d' },
+    { id: 'gallery',           label: 'Galeria',                      short: 'GAL', icon: '&#x2261;', ribbonLabel: 'Galeria',    tone: '#7c3aed' },
+    { id: 'walkway',           label: 'Caminero',                     short: 'CAM', icon: '&#x21E8;', ribbonLabel: 'Caminero',   tone: '#64748b' },
+    { id: 'open_space',        label: 'Espacio libre',                short: 'ESP', icon: '&#x25A1;', ribbonLabel: 'Esp. libre', tone: '#b45309' },
+    { id: 'pillar',            label: 'Pilar',                        short: 'PIL', icon: '&#x25A0;', ribbonLabel: 'Pilar',      tone: '#475569' },
+    { id: 'stair',             label: 'Escalera de bloque',           short: 'ESC', icon: '&#x25EB;', ribbonLabel: 'Escalera',   tone: '#4b5563' },
+    { id: 'ramp',              label: 'Rampa de bloque',              short: 'RMP', icon: '&#x2571;', ribbonLabel: 'Rampa',      tone: '#7c3aed' },
+    { id: 'service_connection',label: 'Acometida / punto de ingreso', short: 'ACM', icon: '&#x21AA;', ribbonLabel: 'Acometida',  tone: '#0369a1' },
+    { id: 'meter',             label: 'Medidor / punto de medicion',  short: 'MED', icon: '&#x29BF;', ribbonLabel: 'Medidor',    tone: '#ca8a04' },
+    { id: 'main_switchboard',  label: 'Tablero electrico del bloque', short: 'TBL', icon: '&#x26A1;', ribbonLabel: 'Tablero',    tone: '#dc2626' },
+    { id: 'grounding',         label: 'Puesta a tierra',              short: 'PAT', icon: '&#x23DA;', ribbonLabel: 'P. tierra',  tone: '#15803d' },
   ];
 
   const ROOM_SPACE_TYPES = [
@@ -10822,11 +10822,13 @@ const MecFormModule = (() => {
       const hasSanitary = sel.startsWith('sanitary::');
       const groups = [
         _renderPlanRibbonGroup('Ambientes', [
-          _renderPlanRibbonButton({ icon: '+A', label: 'Aula', onClick: 'MecFormModule.newPlanClassroom()', tone: 'btn-primary', title: 'Crear aula' }),
-          _renderPlanRibbonButton({ icon: '+E', label: 'Espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')", title: 'Crear otro espacio' }),
-          _renderPlanRibbonButton({ icon: '+WC', label: 'Sanitario', onClick: 'MecFormModule.addPlanSanitary()', title: 'Crear sanitario' }),
+          _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Aula', onClick: 'MecFormModule.newPlanClassroom()', tone: 'btn-primary', title: 'Crear nueva aula' }),
+          _renderPlanRibbonButton({ icon: '&#x25A7;', label: 'Espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')", title: 'Crear otro tipo de espacio' }),
+          _renderPlanRibbonButton({ icon: '&#x2300;', label: 'Sanitario', onClick: 'MecFormModule.addPlanSanitary()', title: 'Crear sanitario' }),
         ].join('')),
-        _renderPlanRibbonGroup('Exteriores', _renderSiteElementToolset('plan', 'compact'), 'school-plan-ribbon__group--wide'),
+        _renderPlanRibbonGroup('Exteriores', SITE_ELEMENT_TYPES.map(tool =>
+          _renderPlanRibbonButton({ icon: tool.icon || tool.short, label: tool.ribbonLabel || tool.label, onClick: `MecFormModule.addPlanSiteElement('${tool.id}', 'plan')`, title: tool.label })
+        ).join('')),
       ];
       if (hasRoom) {
         groups.push(_renderPlanRibbonGroup('Aberturas del aula', [
@@ -10862,11 +10864,11 @@ const MecFormModule = (() => {
     }
     if (activeTab === 'exportar') {
       return _renderPlanRibbonGroup('Salida', [
-        _renderPlanRibbonButton({ icon: 'JS', label: 'JSON', onClick: 'MecFormModule.exportPlanJson()', title: 'Exportar JSON' }),
-        _renderPlanRibbonButton({ icon: 'DX', label: 'DXF', onClick: 'MecFormModule.exportPlanDxf()', title: 'Exportar DXF' }),
-        _renderPlanRibbonButton({ icon: 'VG', label: 'SVG', onClick: 'MecFormModule.exportPlanSvg()', title: 'Exportar SVG' }),
-        _renderPlanRibbonButton({ icon: 'PN', label: 'PNG', onClick: 'MecFormModule.exportPlanPng()', title: 'Exportar PNG' }),
-        _renderPlanRibbonButton({ icon: 'PF', label: 'PDF', onClick: 'MecFormModule.printPlanPdf()', tone: 'btn-primary', title: 'Generar PDF' }),
+        _renderPlanRibbonButton({ icon: '&#x7B;&#x7D;', label: 'JSON', onClick: 'MecFormModule.exportPlanJson()', title: 'Exportar JSON' }),
+        _renderPlanRibbonButton({ icon: '&#x2315;', label: 'DXF', onClick: 'MecFormModule.exportPlanDxf()', title: 'Exportar DXF' }),
+        _renderPlanRibbonButton({ icon: '&#x2666;', label: 'SVG', onClick: 'MecFormModule.exportPlanSvg()', title: 'Exportar SVG (vectores)' }),
+        _renderPlanRibbonButton({ icon: '&#x25A3;', label: 'PNG', onClick: 'MecFormModule.exportPlanPng()', title: 'Exportar PNG (imagen)' }),
+        _renderPlanRibbonButton({ icon: '&#x2399;', label: 'PDF', onClick: 'MecFormModule.printPlanPdf()', tone: 'btn-primary', title: 'Generar PDF' }),
       ].join(''));
     }
     const canDelete = Boolean(_selectedPlanId);
