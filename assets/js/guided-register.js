@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.8
+ * Version: 2.6.9
  */
 
 const GuidedRegisterModule = (() => {
@@ -52,9 +52,10 @@ const GuidedRegisterModule = (() => {
       checks: ['Bloque creado', 'Cantidad de pisos', 'Dimensiones y estado'],
       actions: [
         { label: 'Nuevo bloque', icon: '+BL', action: 'newBlock', primary: true },
+        { label: 'Agregar piso', icon: '+P', action: 'floor' },
         { label: 'Guardar bloque', icon: 'SAVE', action: 'saveBlock' },
         { label: 'Bloquear', icon: 'LOCK', action: 'lockBlock' },
-        { label: 'Ficha bloque', icon: 'FORM', action: 'stage', value: 'bloques' },
+        { label: 'Ficha bloque', icon: 'FORM', action: 'blockFicha' },
       ],
     },
     {
@@ -281,6 +282,12 @@ const GuidedRegisterModule = (() => {
           break;
         case 'saveBlock':
           mec.saveCurrentBlock();
+          break;
+        case 'floor':
+          mec.addFloorToActiveBlock();
+          break;
+        case 'blockFicha':
+          mec.openPlanBlockFicha();
           break;
         case 'lockBlock':
           mec.setActiveBlockLocked(true);

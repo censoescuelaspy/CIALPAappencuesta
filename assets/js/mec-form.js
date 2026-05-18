@@ -1100,7 +1100,7 @@ const MecFormModule = (() => {
         ...(_data.bloques || {}),
         ...values,
         bloque_codigo: activeBlock.bloque_codigo,
-        cantidad_plantas: values.cantidad_plantas ?? _data.bloques?.cantidad_plantas ?? '1',
+        cantidad_plantas: values.cantidad_plantas ?? _data.bloques?.cantidad_plantas ?? '0',
       };
     }
   }
@@ -1500,6 +1500,7 @@ const MecFormModule = (() => {
           <p class="mec-hint">Cada aula, cantina, biblioteca, tinglado o espacio especial queda guardado como ambiente independiente. En el plano del bloque puede tocarlo para activarlo, moverlo y editarlo.</p>
         </div>
         <div class="mec-repeat-toolbar">
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addFloorToActiveBlock()">+ Piso</button>
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.newClassroom()">+ Nueva aula</button>
           <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.openOtherSpacePicker()">+ Otro espacio</button>
           <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.saveCurrentClassroom()">Guardar ambiente</button>
@@ -1849,6 +1850,84 @@ const MecFormModule = (() => {
     block.rotationDeg = next;
     block.rotacion_grados = String(next);
     block.plano_general = { ...(block.planPosition || {}), ...(block.plano_general || {}), rotacion_grados: String(next) };
+    return next;
+  }
+
+  function _floorRecordLabel(floor) {
+    if (typeof floor === 'string') return _normalizeFloor(floor);
+    return _normalizeFloor(floor?.label || floor?.floor || floor?.nombre || 'Piso 1');
+  }
+
+  function _floorRecordId(floor, fallbackLabel = '') {
+    if (typeof floor === 'string') return _floorRecordLabel(floor);
+    return floor?.id || _floorRecordLabel(floor || fallbackLabel);
+  }
+
+  function _floorRecordPlanId(block, floor) {
+    return `floor::${block?.id || ''}::${_floorRecordId(floor)}`;
+  }
+
+  function _ensureBlockFloors(block) {
+    if (!block) return [];
+    const source = Array.isArray(block.floors)
+      ? block.floors
+      : (Array.isArray(block.pisos) ? block.pisos : []);
+    block.floors = source.map((floor, index) => {
+      const label = _floorRecordLabel(floor?.label || floor?.floor || floor?.nombre || index + 1);
+      const id = floor?.id || `piso_${Date.now().toString(36)}_${index}`;
+      const rotationDeg = _planRotationDeg(floor?.rotationDeg ?? floor?.rotacion_grados ?? 0);
+      return {
+        ...floor,
+        id,
+        label,
+        floor: label,
+        largo_m: floor?.largo_m ?? floor?.length ?? '',
+        ancho_m: floor?.ancho_m ?? floor?.width ?? '',
+        xRatio: Number.isFinite(Number(floor?.xRatio)) ? Number(floor.xRatio) : floor?.xRatio,
+        yRatio: Number.isFinite(Number(floor?.yRatio)) ? Number(floor.yRatio) : floor?.yRatio,
+        wRatio: Number.isFinite(Number(floor?.wRatio)) ? Number(floor.wRatio) : floor?.wRatio,
+        hRatio: Number.isFinite(Number(floor?.hRatio)) ? Number(floor.hRatio) : floor?.hRatio,
+        rotationDeg,
+        rotacion_grados: String(rotationDeg),
+      };
+    });
+    return block.floors;
+  }
+
+  function _blockFloorRecord(block, floorIdOrLabel) {
+    const target = String(floorIdOrLabel || '');
+    return _ensureBlockFloors(block).find(floor =>
+      floor.id === target || _floorRecordLabel(floor) === _normalizeFloor(target)) || null;
+  }
+
+  function _syncBlockFloorCountFromRecords(block) {
+    if (!block) return 0;
+    const count = _ensureBlockFloors(block).length;
+    block.cantidad_plantas = String(count);
+    if (block.id === _data.__activeBlockId) {
+      _data.bloques = { ...(_data.bloques || {}), cantidad_plantas: String(count), floors: block.floors };
+    }
+    return count;
+  }
+
+  function _nextFloorLabelForBlock(block) {
+    const usedNumbers = [
+      ..._ensureBlockFloors(block).map(floor => _floorNumberValue(_floorRecordLabel(floor))),
+      ...(_data.__classrooms || []).filter(room => room.blockId === block?.id).map(room => _floorNumberValue(room.floor)),
+      ...(_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block)).map(item => _floorNumberValue(item.planta)),
+    ].filter(Number.isFinite);
+    return _normalizeFloor((Math.max(0, ...usedNumbers) || 0) + 1);
+  }
+
+  function _floorRotationDeg(floor = {}) {
+    return _planRotationDeg(floor.rotationDeg ?? floor.rotacion_grados ?? 0);
+  }
+
+  function _setFloorRotation(floor, rotation) {
+    if (!floor) return 0;
+    const next = _planRotationDeg(rotation);
+    floor.rotationDeg = next;
+    floor.rotacion_grados = String(next);
     return next;
   }
 
@@ -2354,6 +2433,7 @@ const MecFormModule = (() => {
     const block = _blockById(_data.__activeBlockId);
     const cfg = _roomSpaceConfig(kind);
     if (!_assertBlockUnlocked(block, `agregar ${cfg.label.toLowerCase()}`)) return;
+    if (!_requireActiveFloorForContent(`agregar ${cfg.label.toLowerCase()}`)) return;
     const floor = _activeFloor();
     const nextNumber = _nextRoomLikeNumber(cfg.id, _data.__activeBlockId || '', floor);
     _activeClassroomId = `${cfg.id}_${Date.now()}`;
@@ -2659,8 +2739,10 @@ const MecFormModule = (() => {
 
   function _normalizeBlockFloorCount(block) {
     if (!block) return block;
-    const value = Math.max(1, Math.round(Number(block.cantidad_plantas || 1)));
+    const value = Math.max(0, Math.round(Number(block.cantidad_plantas || 0)));
     block.cantidad_plantas = String(value);
+    _ensureBlockFloors(block);
+    if (block.floors?.length) block.cantidad_plantas = String(block.floors.length);
     return block;
   }
 
@@ -3197,7 +3279,7 @@ const MecFormModule = (() => {
     _data.bloques = {
       bloque_codigo: _numberedLabel('Bloque', currentIndex),
       estado_bloque: 'Operativo',
-      cantidad_plantas: '1',
+      cantidad_plantas: '0',
       ...(_data.bloques || {}),
     };
     _data.bloques.bloque_codigo = _numberedLabel('Bloque', currentIndex);
@@ -3287,12 +3369,82 @@ const MecFormModule = (() => {
     _syncActiveBlock();
     const next = (_data.__blocks || []).length + 1;
     _data.__activeBlockId = `bloque_${Date.now()}`;
-    _data.bloques = { bloque_codigo: _numberedLabel('Bloque', next - 1), estado_bloque: 'Operativo', cantidad_plantas: '1' };
+    _data.bloques = { bloque_codigo: _numberedLabel('Bloque', next - 1), estado_bloque: 'Operativo', cantidad_plantas: '0', floors: [] };
     _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
     _startTimeLog('bloque', _data.__activeBlockId, _data.bloques.bloque_codigo);
     _saveDraft(false);
     _render();
     UI.showToast('Nuevo bloque listo para cargar.', 'success');
+  }
+
+  function addFloorToActiveBlock() {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('Primero cree o seleccione un bloque.', 'warning');
+      return null;
+    }
+    return addPlanFloor(block.id);
+  }
+
+  function addPlanFloor(blockId = _data.__activeBlockId) {
+    const block = _blockById(blockId);
+    if (!block) {
+      UI.showToast('Seleccione un bloque para agregar un piso.', 'warning');
+      return null;
+    }
+    if (!_assertBlockUnlocked(block, 'agregar pisos')) return null;
+    const label = _nextFloorLabelForBlock(block);
+    const floors = _ensureBlockFloors(block);
+    const index = floors.length;
+    const floor = {
+      id: `piso_${Date.now().toString(36)}_${index}`,
+      label,
+      floor: label,
+      largo_m: block.largo_m || '',
+      ancho_m: block.ancho_m || '',
+      xRatio: .06,
+      yRatio: .16 + Math.min(index, 4) * .08,
+      wRatio: .88,
+      hRatio: .36,
+      rotationDeg: 0,
+      rotacion_grados: '0',
+    };
+    floors.push(floor);
+    _data.__activeBlockId = block.id;
+    const { id: _id, ...values } = block;
+    _data.bloques = values;
+    _syncBlockFloorCountFromRecords(block);
+    _setActiveFloor(label);
+    _selectedPlanId = _floorRecordPlanId(block, floor);
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    closePlanBlockFicha();
+    setTimeout(() => openPlanFloorFicha(block.id, floor.id), 80);
+    UI.showToast(`${label} agregado. Ajuste medidas y ubicacion en su ficha.`, 'success');
+    return floor;
+  }
+
+  function _activeBlockHasFloor(floor = _activeFloor()) {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) return false;
+    const label = _normalizeFloor(floor || 'Piso 1');
+    return _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []).includes(label);
+  }
+
+  function _requireActiveFloorForContent(action = 'agregar elementos') {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('Primero cree o seleccione un bloque.', 'warning');
+      return false;
+    }
+    if (!_activeBlockHasFloor()) {
+      UI.showToast(`Agregue y ubique un piso antes de ${action}.`, 'warning', 5600);
+      _selectedPlanId = `block::${block.id}`;
+      renderSchoolPlan();
+      return false;
+    }
+    return true;
   }
 
   function saveCurrentBlock() {
@@ -3345,9 +3497,10 @@ const MecFormModule = (() => {
     if (!_assertBlockUnlocked(block, 'eliminar pisos')) return;
     const floor = _activeFloor();
     const floorNumber = _floorNumberValue(floor);
+    const floorRecords = _ensureBlockFloors(block);
+    const floorRecord = _blockFloorRecord(block, floor);
     const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === floor);
     const sanitaries = (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block) && _normalizeFloor(item.planta || 'Piso 1') === floor);
-    const configuredFloors = _configuredFloorCount(block);
     const lockedRooms = rooms.filter(_isClassroomLocked);
     if (lockedRooms.length) {
       UI.showToast(`No se puede eliminar el piso: ${lockedRooms.length} aula(s) bloqueada(s). Desbloqueelas primero.`, 'warning', 6200);
@@ -3358,8 +3511,8 @@ const MecFormModule = (() => {
       UI.showToast(`No se puede eliminar el piso: ${lockedSanitaries.length} sanitario(s) bloqueado(s). Desbloqueelos primero.`, 'warning', 6200);
       return;
     }
-    if (!rooms.length && !sanitaries.length && configuredFloors <= 1) {
-      UI.showToast('El bloque solo tiene un piso vacio. Use eliminar bloque si corresponde.', 'info');
+    if (!rooms.length && !sanitaries.length && !floorRecord) {
+      UI.showToast('No hay un piso cargado para eliminar.', 'info');
       return;
     }
     const confirmed = await UI.showConfirm(
@@ -3369,22 +3522,28 @@ const MecFormModule = (() => {
     if (!confirmed) return;
     _data.__classrooms = (_data.__classrooms || []).filter(room => !(room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === floor));
     _data.__sanitaries = (_data.__sanitaries || []).filter(item => !(_matchesBlockReference(item.bloque, block) && _normalizeFloor(item.planta || 'Piso 1') === floor));
+    block.floors = floorRecords.filter(item => item !== floorRecord && _floorRecordLabel(item) !== floor);
+    block.floors.forEach(item => {
+      const current = _floorNumberValue(_floorRecordLabel(item));
+      if (current > floorNumber) {
+        const nextLabel = _normalizeFloor(current - 1);
+        item.label = nextLabel;
+        item.floor = nextLabel;
+      }
+    });
     (_data.__classrooms || [])
       .filter(room => room.blockId === block.id && _floorNumberValue(room.floor) > floorNumber)
       .forEach(room => { room.floor = _normalizeFloor(_floorNumberValue(room.floor) - 1); });
     (_data.__sanitaries || [])
       .filter(item => _matchesBlockReference(item.bloque, block) && _floorNumberValue(item.planta) > floorNumber)
       .forEach(item => { item.planta = _normalizeFloor(_floorNumberValue(item.planta) - 1); });
-    const remainingMax = Math.max(1,
-      ...(_data.__classrooms || []).filter(room => room.blockId === block.id).map(room => _floorNumberValue(room.floor)),
-      ...(_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block)).map(item => _floorNumberValue(item.planta)),
-      configuredFloors - 1);
-    block.cantidad_plantas = String(remainingMax);
+    const remainingFloors = _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
+    block.cantidad_plantas = String(_ensureBlockFloors(block).length);
     if (block.id === _data.__activeBlockId) {
       const { id: _id, ...values } = block;
       _data.bloques = { ...(_data.bloques || {}), ...values };
     }
-    const nextFloor = _normalizeFloor(Math.min(floorNumber, remainingMax));
+    const nextFloor = remainingFloors[Math.min(Math.max(0, floorNumber - 1), Math.max(0, remainingFloors.length - 1))] || 'Piso 1';
     _setActiveFloor(nextFloor);
     _selectBestClassroomAfterDeletion(block.id, nextFloor);
     _activeSanitaryId = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])[0]?.id || null;
@@ -3653,6 +3812,7 @@ const MecFormModule = (() => {
           <p class="mec-hint">Cada sanitario se ubica como ambiente independiente dentro del plano del bloque y piso activo, junto a las aulas y otros banos ya cargados.</p>
         </div>
         <div class="mec-repeat-toolbar">
+          <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addFloorToActiveBlock()">+ Piso</button>
           <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.addSanitary()">+ Agregar sanitario</button>
           <span class="mec-autosave-pill">Autoguardado</span>
         </div>
@@ -3685,25 +3845,26 @@ const MecFormModule = (() => {
 
   function _floorCountForActiveBlock() {
     const block = _blockById(_data.__activeBlockId);
-    const configured = Number(block?.cantidad_plantas || _data.bloques?.cantidad_plantas || 1);
-    const floors = [
-      configured || 1,
-      ...(_data.__classrooms || [])
-        .filter(room => room.blockId === _data.__activeBlockId)
-        .map(room => _floorNumberValue(room.floor)),
-      ..._visibleSanitariesForActiveBlock(_data.__sanitaries || [])
-        .map(item => _floorNumberValue(item.planta)),
-    ];
-    return Math.max(1, ...floors.filter(Number.isFinite));
+    if (!block) return 0;
+    return _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []).length;
   }
 
   function _renderFloorNavigator(context = 'classrooms') {
-    const count = _floorCountForActiveBlock();
+    const block = _blockById(_data.__activeBlockId);
+    const floors = block ? _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []) : [];
     const activeFloor = _activeFloor();
+    if (!floors.length) {
+      return `
+        <div class="mec-block-tabs mec-floor-tabs" aria-label="Navegacion de pisos">
+          <button class="mec-block-tab mec-block-tab--active" type="button" onclick="MecFormModule.addFloorToActiveBlock()">
+            <strong>+ Agregar piso</strong>
+            <span>El bloque aun no tiene pisos ubicados</span>
+          </button>
+        </div>`;
+    }
     return `
       <div class="mec-block-tabs mec-floor-tabs" aria-label="Navegacion de pisos">
-        ${Array.from({ length: count }, (_, index) => {
-          const floor = _normalizeFloor(index + 1);
+        ${floors.map(floor => {
           const rooms = (_data.__classrooms || []).filter(room => room.blockId === _data.__activeBlockId && _normalizeFloor(room.floor) === floor).length;
           const sanitaries = _visibleSanitariesForActiveBlock(_data.__sanitaries || []).filter(item => _normalizeFloor(item.planta) === floor).length;
           return `
@@ -4457,6 +4618,7 @@ const MecFormModule = (() => {
     _ensureSanitaries();
     const block = _blockById(_data.__activeBlockId);
     if (!_assertBlockUnlocked(block, 'agregar sanitarios')) return;
+    if (!_requireActiveFloorForContent('agregar sanitarios')) return;
     const next = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || []).length + 1;
     const item = _sanitaryTemplate(next);
     _ensureSanitaryPlan(item, true);
@@ -5225,7 +5387,7 @@ const MecFormModule = (() => {
 
       if (moduleId === 'bloques' && fieldId === 'cantidad_plantas') {
         const persistFloorCount = () => {
-          const next = Math.max(1, Math.round(Number(input.value || 1)));
+          const next = Math.max(0, Math.round(Number(input.value || 0)));
           input.value = String(next);
           _setValue(moduleId, fieldId, String(next));
         };
@@ -8283,6 +8445,24 @@ const MecFormModule = (() => {
         ].filter(row => row.value),
       };
     }
+    if (area.type === 'floor' || area.type === 'floor-rotate') {
+      const block = _blockById(area.blockId);
+      const floor = _blockFloorRecord(block, area.floorId) || { label: area.floor };
+      const label = _floorRecordLabel(floor);
+      const rooms = (_data.__classrooms || []).filter(room => room.blockId === block?.id && _normalizeFloor(room.floor || 'Piso 1') === label);
+      const sanitaries = _sanitariesForBlock(block).filter(item => _normalizeFloor(item.planta || 'Piso 1') === label);
+      return {
+        title: `${block?.bloque_codigo || 'Bloque'} - ${label}`,
+        subtitle: 'Piso',
+        rows: [
+          { label: 'Medidas', value: floor.largo_m && floor.ancho_m ? `${floor.largo_m} x ${floor.ancho_m} m` : '' },
+          { label: 'Area', value: _tooltipPlanArea(floor.largo_m, floor.ancho_m) },
+          { label: 'Rotacion', value: `${_floorRotationDeg(floor)} grados` },
+          { label: 'Ambientes', value: rooms.length ? `${rooms.length} aula/espacio(s)` : '' },
+          { label: 'Sanitarios', value: sanitaries.length ? `${sanitaries.length} sanitario(s)` : '' },
+        ].filter(row => row.value),
+      };
+    }
     if (area.type === 'room' || area.type === 'room-rotate') {
       const room = (_data.__classrooms || []).find(item => item.id === area.roomId);
       return _classroomTooltipInfo(room, _roomObjectForClassroom(room));
@@ -10254,6 +10434,53 @@ const MecFormModule = (() => {
         onClick: `MecFormModule.setPlanBlockLocked('${_escape(block.id)}', ${locked ? 'false' : 'true'})`,
       };
     }
+    if (raw.startsWith('floor::')) return null;
+    if (false && raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      const block = _blockById(blockId);
+      const floor = _blockFloorRecord(block, floorId) || { id: floorId, label: _normalizeFloor(floorId), virtual: true };
+      if (!block) return fallback;
+      const label = _floorRecordLabel(floor);
+      const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === label);
+      const sanitaries = _sanitariesForBlock(block).filter(item => _normalizeFloor(item.planta || 'Piso 1') === label);
+      return {
+        title: `${block.bloque_codigo || 'Bloque'} - ${label}`,
+        detail: `${floor.largo_m && floor.ancho_m ? `${floor.largo_m} x ${floor.ancho_m} m` : 'Sin medidas'} Â· ${rooms.length} aula(s) Â· ${sanitaries.length} sanitario(s) Â· ${_floorRotationDeg(floor)} grados`,
+        actions: [
+          { label: 'Ficha piso', tone: 'btn-primary', onClick: `MecFormModule.openPlanFloorFicha('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
+          { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
+          { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
+          { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+          { label: 'Girar -15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', -15)` },
+          { label: 'Girar +15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', 15)` },
+          { label: '0 grados', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', ${-_floorRotationDeg(floor)})` },
+          { label: 'Eliminar piso', tone: 'btn-danger', onClick: `MecFormModule.deletePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
+        ],
+      };
+    }
+    if (raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      const block = _blockById(blockId);
+      const floor = _blockFloorRecord(block, floorId) || { id: floorId, label: _normalizeFloor(floorId), virtual: true };
+      if (!block) return fallback;
+      const label = _floorRecordLabel(floor);
+      const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === label);
+      const sanitaries = _sanitariesForBlock(block).filter(item => _normalizeFloor(item.planta || 'Piso 1') === label);
+      return {
+        title: `${block.bloque_codigo || 'Bloque'} - ${label}`,
+        detail: `${floor.largo_m && floor.ancho_m ? `${floor.largo_m} x ${floor.ancho_m} m` : 'Sin medidas'} - ${rooms.length} aula(s) - ${sanitaries.length} sanitario(s) - ${_floorRotationDeg(floor)} grados`,
+        actions: [
+          { label: 'Ficha piso', tone: 'btn-primary', onClick: `MecFormModule.openPlanFloorFicha('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
+          { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
+          { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
+          { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+          { label: 'Girar -15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', -15)` },
+          { label: 'Girar +15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', 15)` },
+          { label: '0 grados', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', ${-_floorRotationDeg(floor)})` },
+          { label: 'Eliminar piso', tone: 'btn-danger', onClick: `MecFormModule.deletePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
+        ],
+      };
+    }
     if (raw.startsWith('room::')) {
       const room = _classroomById(raw.replace('room::', ''));
       if (!room) return null;
@@ -10339,7 +10566,8 @@ const MecFormModule = (() => {
         title: block.bloque_codigo || 'Bloque seleccionado',
         detail: `${block.estado_bloque || 'Sin estado'} · ${floors.length} piso(s) · ${block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : 'Sin dimensiones'}`,
         actions: [
-          { label: 'Abrir bloque', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          { label: 'Ficha bloque', tone: 'btn-primary', onClick: `MecFormModule.openPlanBlockFicha('${_escape(block.id)}')` },
+          { label: '+ Piso', onClick: `MecFormModule.addPlanFloor('${_escape(block.id)}')` },
           { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
           { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
           ..._quickOtherSpaceActions(),
@@ -10348,6 +10576,29 @@ const MecFormModule = (() => {
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', ${-_blockRotationDeg(block)})` },
+        ],
+      };
+    }
+    if (raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      const block = _blockById(blockId);
+      const floor = _blockFloorRecord(block, floorId) || { id: floorId, label: _normalizeFloor(floorId), virtual: true };
+      if (!block) return fallback;
+      const label = _floorRecordLabel(floor);
+      const rooms = (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === label);
+      const sanitaries = _sanitariesForBlock(block).filter(item => _normalizeFloor(item.planta || 'Piso 1') === label);
+      return {
+        title: `${block.bloque_codigo || 'Bloque'} - ${label}`,
+        detail: `${floor.largo_m && floor.ancho_m ? `${floor.largo_m} x ${floor.ancho_m} m` : 'Sin medidas'} - ${rooms.length} aula(s) - ${sanitaries.length} sanitario(s) - ${_floorRotationDeg(floor)} grados`,
+        actions: [
+          { label: 'Ficha piso', tone: 'btn-primary', onClick: `MecFormModule.openPlanFloorFicha('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
+          { label: '+ Nueva aula', onClick: 'MecFormModule.newPlanClassroom()' },
+          { label: '+ Otro espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')" },
+          { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
+          { label: 'Girar -15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', -15)` },
+          { label: 'Girar +15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', 15)` },
+          { label: '0 grados', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', ${-_floorRotationDeg(floor)})` },
+          { label: 'Eliminar piso', tone: 'btn-danger', onClick: `MecFormModule.deletePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
         ],
       };
     }
@@ -10475,7 +10726,7 @@ const MecFormModule = (() => {
     _activePlanDrag = null;
     renderSchoolPlan();
     UI.showToast(_planMoveMode
-      ? 'Modo mover activo. Arrastre bloques y otros espacios del plano general.'
+      ? 'Modo mover activo. Arrastre bloques, pisos y otros espacios del plano general.'
       : 'Plano bloqueado: navegar y seleccionar no mueve elementos.',
       _planMoveMode ? 'info' : 'success');
   }
@@ -10484,6 +10735,12 @@ const MecFormModule = (() => {
     const raw = String(id || '');
     if (!raw) return { blockId: _data.__activeBlockId || '', floor: _activeFloor(), type: '' };
     if (raw.startsWith('block::')) return { blockId: raw.replace('block::', ''), floor: _activeFloor(), type: 'block' };
+    if (raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      const block = _blockById(blockId);
+      const floor = _blockFloorRecord(block, floorId);
+      return { blockId, floor: _floorRecordLabel(floor || floorId), type: 'floor' };
+    }
     if (raw.startsWith('room::')) {
       const room = _classroomById(raw.replace('room::', ''));
       return { blockId: room?.blockId || '', floor: _normalizeFloor(room?.floor || _activeFloor()), type: 'room' };
@@ -10521,7 +10778,7 @@ const MecFormModule = (() => {
     const rooms = ambiences.filter(room => !_isOtherRoomSpace(room));
     const otherSpaces = ambiences.filter(room => _isOtherRoomSpace(room));
     const sanitaries = _sanitariesForBlock(block);
-    const floors = _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
+    const floors = _planFloorRecordsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
     const open = context.blockId ? context.blockId === block.id : block.id === _data.__activeBlockId;
     const locked = _isBlockLocked(block);
     return `
@@ -10531,6 +10788,11 @@ const MecFormModule = (() => {
           <small>${_escape([locked ? 'Bloqueado' : '', `${floors.length} piso(s)`, `${rooms.length} aula(s)`, `${sanitaries.length} sanitario(s)`, `${otherSpaces.length} otro(s)`].filter(Boolean).join(' Â· '))}</small>
         </summary>
         <div class="school-plan-tree__children">
+          <button class="school-plan-object school-plan-object--child" type="button" onclick="MecFormModule.addPlanFloor('${_escape(block.id)}')">
+            <span class="school-plan-object__type">Piso</span>
+            <strong>+ Agregar piso</strong>
+            <small>Implantar nivel dentro del bloque</small>
+          </button>
           ${floors.map(floor => _renderPlanFloorBranch(block, floor)).join('')}
         </div>
       </details>`;
@@ -10538,19 +10800,21 @@ const MecFormModule = (() => {
 
   function _renderPlanFloorBranch(block, floor) {
     const context = _selectedPlanTreeContext();
+    const floorLabel = _floorRecordLabel(floor);
+    const floorPlanId = _floorRecordPlanId(block, floor);
     const floorAmbiences = (_data.__classrooms || [])
-      .filter(room => ((room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque')) && _normalizeFloor(room.floor || 'Piso 1') === floor);
+      .filter(room => ((room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque')) && _normalizeFloor(room.floor || 'Piso 1') === floorLabel);
     const floorRooms = floorAmbiences.filter(room => !_isOtherRoomSpace(room));
     const floorOtherSpaces = floorAmbiences.filter(room => _isOtherRoomSpace(room));
     const floorSanitaries = _sanitariesForBlock(block)
-      .filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
-    const open = context.blockId === block.id && context.floor === floor;
+      .filter(item => _normalizeFloor(item.planta || 'Piso 1') === floorLabel);
+    const open = context.blockId === block.id && context.floor === floorLabel;
     const roomsGroup = floorRooms.length
       ? `
         <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
           <summary class="school-plan-tree__summary school-plan-tree__summary--rooms">
             <span>Aulas</span>
-            <small>${_escape(`${floorRooms.length} aula(s) en ${floor}`)}</small>
+            <small>${_escape(`${floorRooms.length} aula(s) en ${floorLabel}`)}</small>
           </summary>
           <div class="school-plan-tree__children school-plan-tree__children--floor-group">
             ${floorRooms.map(_renderPlanClassroomRow).join('')}
@@ -10562,7 +10826,7 @@ const MecFormModule = (() => {
         <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
           <summary class="school-plan-tree__summary school-plan-tree__summary--sanitaries">
             <span>Sanitarios</span>
-            <small>${_escape(`${floorSanitaries.length} sanitario(s) en ${floor}`)}</small>
+            <small>${_escape(`${floorSanitaries.length} sanitario(s) en ${floorLabel}`)}</small>
           </summary>
           <div class="school-plan-tree__children school-plan-tree__children--floor-group">
             ${floorSanitaries.map(_renderPlanSanitaryRow).join('')}
@@ -10574,7 +10838,7 @@ const MecFormModule = (() => {
         <details class="school-plan-tree__floor school-plan-tree__floor--group" open>
           <summary class="school-plan-tree__summary school-plan-tree__summary--other-space">
             <span>Otros espacios</span>
-            <small>${_escape(`${floorOtherSpaces.length} ambiente(s) en ${floor}`)}</small>
+            <small>${_escape(`${floorOtherSpaces.length} ambiente(s) en ${floorLabel}`)}</small>
           </summary>
           <div class="school-plan-tree__children school-plan-tree__children--floor-group">
             ${floorOtherSpaces.map(_renderPlanClassroomRow).join('')}
@@ -10583,8 +10847,8 @@ const MecFormModule = (() => {
       : '';
     return `
       <details class="school-plan-tree__floor" ${open || floorAmbiences.length || floorSanitaries.length ? 'open' : ''}>
-        <summary class="school-plan-tree__summary school-plan-tree__summary--floor">
-          <span>${_escape(floor)}</span>
+        <summary class="school-plan-tree__summary school-plan-tree__summary--floor" onclick="MecFormModule.selectPlanItem('${_escape(floorPlanId)}')">
+          <span>${_escape(floorLabel)}</span>
           <small>${_escape([`${floorRooms.length} aula(s)`, `${floorSanitaries.length} sanitario(s)`, `${floorOtherSpaces.length} otro(s)`].join(' Â· '))}</small>
         </summary>
         <div class="school-plan-tree__children school-plan-tree__children--floor">
@@ -11064,18 +11328,31 @@ const MecFormModule = (() => {
   }
 
   function _configuredFloorCount(block) {
-    const value = Number(block?.cantidad_plantas || _data.bloques?.cantidad_plantas || 1);
-    return Number.isFinite(value) && value > 0 ? Math.round(value) : 1;
+    const value = Number(block?.cantidad_plantas || _data.bloques?.cantidad_plantas || 0);
+    return Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
+  }
+
+  function _planFloorRecordsForBlock(block, rooms = _data.__classrooms || [], sanitaries = _data.__sanitaries || []) {
+    if (!block) return [];
+    const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
+    const blockSanitaries = (sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
+    const byLabel = new Map();
+    _ensureBlockFloors(block).forEach(floor => {
+      byLabel.set(_floorRecordLabel(floor), floor);
+    });
+    blockRooms.forEach(room => {
+      const label = _normalizeFloor(room.floor || 'Piso 1');
+      if (!byLabel.has(label)) byLabel.set(label, { id: label, label, floor: label, virtual: true });
+    });
+    blockSanitaries.forEach(item => {
+      const label = _normalizeFloor(item.planta || 'Piso 1');
+      if (!byLabel.has(label)) byLabel.set(label, { id: label, label, floor: label, virtual: true });
+    });
+    return [...byLabel.values()].sort((a, b) => _floorNumberValue(_floorRecordLabel(a)) - _floorNumberValue(_floorRecordLabel(b)));
   }
 
   function _planFloorsForBlock(block, rooms = _data.__classrooms || [], sanitaries = _data.__sanitaries || []) {
-    const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
-    const blockSanitaries = (sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
-    const configured = _configuredFloorCount(block);
-    const floors = new Set(Array.from({ length: configured }, (_, index) => _normalizeFloor(index + 1)));
-    blockRooms.forEach(room => floors.add(_normalizeFloor(room.floor || 'Piso 1')));
-    blockSanitaries.forEach(item => floors.add(_normalizeFloor(item.planta || 'Piso 1')));
-    return [...floors].sort((a, b) => _floorNumberValue(a) - _floorNumberValue(b));
+    return _planFloorRecordsForBlock(block, rooms, sanitaries).map(_floorRecordLabel);
   }
 
   function _planCanvasHeight() {
@@ -11132,6 +11409,29 @@ const MecFormModule = (() => {
       ctx.fillText(marker.label, mx + 16, my + 11);
       ctx.restore();
     });
+  }
+
+  function _drawPlanDimensionLabels(ctx, rect, length, width, tone = '#334155') {
+    const lengthLabel = length ? `${length} m` : 'Largo s/d';
+    const widthLabel = width ? `${width} m` : 'Ancho s/d';
+    ctx.save();
+    ctx.fillStyle = tone;
+    ctx.strokeStyle = 'rgba(15,23,42,.35)';
+    ctx.lineWidth = 1;
+    ctx.font = _canvasFont(800, 9);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.beginPath();
+    ctx.moveTo(rect.x + 10, rect.y - 6);
+    ctx.lineTo(rect.x + rect.w - 10, rect.y - 6);
+    ctx.stroke();
+    ctx.fillText(lengthLabel, rect.x + rect.w / 2, rect.y - 10);
+    ctx.save();
+    ctx.translate(rect.x - 8, rect.y + rect.h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(widthLabel, 0, 0);
+    ctx.restore();
+    ctx.restore();
   }
 
   function _drawSchoolPlan() {
@@ -11202,6 +11502,11 @@ const MecFormModule = (() => {
         ctx.font = _canvasFont(700, 9);
         ctx.fillStyle = '#475467';
         ctx.fillText(`${block.largo_m} x ${block.ancho_m} m`, x + 10, y + 26);
+        if (blockSelected) _drawPlanDimensionLabels(ctx, blockRect, block.largo_m, block.ancho_m, '#111827');
+      } else {
+        ctx.font = _canvasFont(700, 9);
+        ctx.fillStyle = '#667085';
+        ctx.fillText('Sin dimensiones: abrir ficha', x + 10, y + 26);
       }
       _drawBlockInfrastructureHints(ctx, block, x, y, w, h);
       if (blockSelected) {
@@ -11226,21 +11531,30 @@ const MecFormModule = (() => {
 
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
-      const floors = _planFloorsForBlock(block, rooms, sanitaries);
-      if (!blockRooms.length && !blockSanitaries.length) {
+      const floors = _planFloorRecordsForBlock(block, rooms, sanitaries);
+      if (!floors.length) {
         ctx.fillStyle = '#667085';
         ctx.font = _canvasFont(700, 12);
-        ctx.fillText('Bloque sin aulas o sanitarios asociados', x + 12, y + 56);
+        ctx.fillText('Bloque sin pisos: use + Piso para implantar el primer nivel', x + 12, y + 56);
       }
       floors.forEach((floor, floorIndex) => {
-        const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floor);
-        const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor);
-        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
+        const floorLabel = _floorRecordLabel(floor);
+        const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floorLabel);
+        const floorSanitaries = blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floorLabel);
+        const fallbackFloorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
+        const floorRect = _planFloorRectForRecord(block, floor, fallbackFloorRect, blockRect);
         const floorContentRect = _planFloorContentRect(floorRect);
-        _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex);
+        const floorRotation = _floorRotationDeg(floor);
+        ctx.save();
+        const floorTransform = _applyPlanCanvasRotation(ctx, floorRect, floorRotation);
+        if (floorTransform) _planTransformStack.push(floorTransform);
+        _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex, blockRect);
+        if (_selectedPlanId === _floorRecordPlanId(block, floor) && (floor.largo_m || floor.ancho_m)) {
+          _drawPlanDimensionLabels(ctx, floorRect, floor.largo_m, floor.ancho_m, '#9a3412');
+        }
         const roomItems = _planRoomItemsFromSketch(floorRooms, floorContentRect);
         const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorContentRect);
-        const floorMetersPerPx = _planFloorMetersPerPx(block, floorContentRect);
+        const floorMetersPerPx = _planFloorMetersPerPx({ ...block, largo_m: floor.largo_m || block.largo_m, ancho_m: floor.ancho_m || block.ancho_m }, floorContentRect);
         roomItems.forEach(item => _pushPlanDistanceItem(distanceItems, {
           id: `room::${item.room.id}`,
           type: 'room',
@@ -11270,6 +11584,8 @@ const MecFormModule = (() => {
           sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h, floorContentRect));
         }
         if (!roomItems.some(item => _roomRotationDeg(item.room))) _drawSharedWallTicks(ctx, roomItems);
+        if (floorTransform) _planTransformStack.pop();
+        ctx.restore();
       });
       if (blockTransform) _planTransformStack.pop();
       ctx.restore();
@@ -11294,10 +11610,76 @@ const MecFormModule = (() => {
     };
   }
 
-  function _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex = 0) {
+  function _planFloorRectForRecord(block, floorRecord, fallbackRect, blockRect) {
+    const record = typeof floorRecord === 'string' ? _blockFloorRecord(block, floorRecord) : floorRecord;
+    if (!record || record.virtual) return fallbackRect;
+    const xRatio = Number(record.xRatio);
+    const yRatio = Number(record.yRatio);
+    const wRatio = Number(record.wRatio);
+    const hRatio = Number(record.hRatio);
+    const hasGeometry = [xRatio, yRatio, wRatio, hRatio].every(Number.isFinite);
+    if (!hasGeometry) return fallbackRect;
+    const bounds = {
+      x: blockRect.x + 10,
+      y: blockRect.y + 40,
+      w: Math.max(50, blockRect.w - 20),
+      h: Math.max(42, blockRect.h - 52),
+    };
+    const rect = {
+      x: blockRect.x + xRatio * blockRect.w,
+      y: blockRect.y + yRatio * blockRect.h,
+      w: Math.max(44, wRatio * blockRect.w),
+      h: Math.max(32, hRatio * blockRect.h),
+    };
+    return _clampRectToBounds(rect, bounds);
+  }
+
+  function _saveFloorRectToRecord(block, floorRecord, rect, blockRect) {
+    if (!block || !floorRecord || floorRecord.virtual || !rect || !blockRect) return;
+    floorRecord.xRatio = Math.max(0, Math.min(1, (rect.x - blockRect.x) / blockRect.w));
+    floorRecord.yRatio = Math.max(0, Math.min(1, (rect.y - blockRect.y) / blockRect.h));
+    floorRecord.wRatio = Math.max(.04, Math.min(1, rect.w / blockRect.w));
+    floorRecord.hRatio = Math.max(.04, Math.min(1, rect.h / blockRect.h));
+  }
+
+  function _applyFloorMeasureRatios(block, floorRecord) {
+    if (!block || !floorRecord || floorRecord.virtual) return;
+    const blockLength = Number(block.largo_m || 0);
+    const blockWidth = Number(block.ancho_m || 0);
+    const floorLength = Number(floorRecord.largo_m || 0);
+    const floorWidth = Number(floorRecord.ancho_m || 0);
+    if (blockLength && floorLength) floorRecord.wRatio = Math.max(.08, Math.min(.96, floorLength / blockLength));
+    if (blockWidth && floorWidth) floorRecord.hRatio = Math.max(.08, Math.min(.82, floorWidth / blockWidth));
+    if (!Number.isFinite(Number(floorRecord.xRatio))) floorRecord.xRatio = .06;
+    if (!Number.isFinite(Number(floorRecord.yRatio))) floorRecord.yRatio = .16;
+  }
+
+  function _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex = 0, blockRect = null) {
+    const floorLabel = _floorRecordLabel(floor);
+    const floorId = _floorRecordId(floor, floorLabel);
+    const floorPlanId = _floorRecordPlanId(block, floor);
     const selectedContext = _selectedPlanTreeContext();
-    const active = selectedContext.blockId === block.id && selectedContext.floor === floor;
-    const label = `${block.bloque_codigo || 'Bloque'} - ${floor}`;
+    const active = selectedContext.blockId === block.id && selectedContext.floor === floorLabel;
+    const label = `${block.bloque_codigo || 'Bloque'} - ${floorLabel}`;
+    _pushPlanHitArea({
+      id: floorPlanId,
+      type: 'floor',
+      blockId: block.id,
+      floorId,
+      floor: floorLabel,
+      x: floorRect.x,
+      y: floorRect.y,
+      w: floorRect.w,
+      h: floorRect.h,
+      baseX: floorRect.x,
+      baseY: floorRect.y,
+      baseW: floorRect.w,
+      baseH: floorRect.h,
+      blockX: blockRect?.x,
+      blockY: blockRect?.y,
+      blockW: blockRect?.w,
+      blockH: blockRect?.h,
+    });
     ctx.save();
     ctx.shadowColor = 'rgba(15,23,42,.12)';
     ctx.shadowBlur = 4;
@@ -11321,6 +11703,36 @@ const MecFormModule = (() => {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
     ctx.fillText(_truncateLabel(ctx, label, Math.max(32, floorRect.w - 16)), floorRect.x + 8, floorRect.y + 14);
+    if (floor?.largo_m || floor?.ancho_m) {
+      ctx.font = _canvasFont(800, 8);
+      ctx.fillStyle = active ? '#9a3412' : '#475467';
+      ctx.fillText(_truncateLabel(ctx, `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`, Math.max(28, floorRect.w - 16)), floorRect.x + 8, floorRect.y + 32);
+    }
+    if (active) {
+      _drawPlanRotateHandle(ctx, floorRect, _floorRotationDeg(floor));
+      const handle = _planRotateHandle(floorRect, _floorRotationDeg(floor));
+      _pushPlanHitArea({
+        id: floorPlanId,
+        type: 'floor-rotate',
+        blockId: block.id,
+        floorId,
+        floor: floorLabel,
+        x: handle.x - handle.size / 2,
+        y: handle.y - handle.size / 2,
+        w: handle.size,
+        h: handle.size,
+        centerX: handle.center.x,
+        centerY: handle.center.y,
+        baseX: floorRect.x,
+        baseY: floorRect.y,
+        baseW: floorRect.w,
+        baseH: floorRect.h,
+        blockX: blockRect?.x,
+        blockY: blockRect?.y,
+        blockW: blockRect?.w,
+        blockH: blockRect?.h,
+      });
+    }
     ctx.restore();
   }
 
@@ -12588,6 +13000,18 @@ const MecFormModule = (() => {
       }
       return;
     }
+    if (raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      const block = _blockById(blockId);
+      const floor = _blockFloorRecord(block, floorId) || { label: _normalizeFloor(floorId) };
+      if (block) {
+        _data.__activeBlockId = block.id;
+        const { id: _id, ...values } = block;
+        _data.bloques = values;
+        _setActiveFloor(_floorRecordLabel(floor));
+      }
+      return;
+    }
     if (raw.startsWith('room::')) {
       const roomId = raw.replace('room::', '');
       _activatePlanClassroom(roomId);
@@ -12656,8 +13080,12 @@ const MecFormModule = (() => {
     }
     if (raw.startsWith('block::')) {
       const blockId = raw.replace('block::', '');
-      selectModule('bloques');
-      selectBlock(blockId);
+      openPlanBlockFicha(blockId);
+      return;
+    }
+    if (raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      openPlanFloorFicha(blockId, floorId);
       return;
     }
     if (raw.startsWith('room::')) {
@@ -12677,6 +13105,225 @@ const MecFormModule = (() => {
     if (raw.includes('::')) {
       editPlanObject(raw);
     }
+  }
+
+  function openPlanBlockFicha(blockId = _data.__activeBlockId) {
+    const block = _blockById(blockId);
+    if (!block) {
+      UI.showToast('Seleccione un bloque para editar su ficha.', 'warning');
+      return;
+    }
+    _selectedPlanId = `block::${block.id}`;
+    _activatePlanSelection(_selectedPlanId);
+    document.getElementById('modal-plan-block-ficha')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'modal-plan-block-ficha';
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    const locked = _isBlockLocked(block);
+    const disabled = locked ? 'disabled' : '';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closePlanBlockFicha()"></div>
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h3>Ficha del bloque</h3>
+          <button class="modal__close" onclick="MecFormModule.closePlanBlockFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          <input type="hidden" id="plan-block-id" value="${_escape(block.id)}">
+          <p class="mec-hint">El bloque puede permanecer sin pisos. Agregue pisos solo cuando corresponda al relevamiento.</p>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Codigo</label>
+              <input id="plan-block-code" class="form-control" value="${_escape(block.bloque_codigo || '')}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Estado</label>
+              <input id="plan-block-state" class="form-control" value="${_escape(block.estado_bloque || '')}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Largo del bloque (m)</label>
+              <input id="plan-block-length" class="form-control" type="number" min="0" step="0.01" value="${_escape(block.largo_m || '')}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Ancho del bloque (m)</label>
+              <input id="plan-block-width" class="form-control" type="number" min="0" step="0.01" value="${_escape(block.ancho_m || '')}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Rotacion (grados)</label>
+              <input id="plan-block-rotation" class="form-control" type="number" step="1" value="${_escape(_blockRotationDeg(block))}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Pisos integrados</label>
+              <input class="form-control" value="${_escape(String(_ensureBlockFloors(block).length))}" readonly aria-readonly="true">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Observacion</label>
+            <textarea id="plan-block-observation" class="form-control" rows="3" ${disabled}>${_escape(block.observacion || block.observaciones || '')}</textarea>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-outline" onclick="MecFormModule.addPlanFloor('${_escape(block.id)}')" ${disabled}>+ Piso</button>
+          <button class="btn btn-outline" onclick="MecFormModule.closePlanBlockFicha()">Cerrar</button>
+          <button class="btn btn-primary" onclick="MecFormModule.savePlanBlockFicha()" ${disabled}>Guardar ficha</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal('modal-plan-block-ficha');
+  }
+
+  function closePlanBlockFicha() {
+    const modal = document.getElementById('modal-plan-block-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 200);
+  }
+
+  function savePlanBlockFicha() {
+    const blockId = document.getElementById('plan-block-id')?.value || '';
+    const block = _blockById(blockId);
+    if (!block) return;
+    if (!_assertBlockUnlocked(block, 'editar la ficha')) return;
+    block.bloque_codigo = document.getElementById('plan-block-code')?.value || block.bloque_codigo || '';
+    block.estado_bloque = document.getElementById('plan-block-state')?.value || '';
+    block.largo_m = document.getElementById('plan-block-length')?.value || '';
+    block.ancho_m = document.getElementById('plan-block-width')?.value || '';
+    block.observacion = document.getElementById('plan-block-observation')?.value || '';
+    _setBlockRotation(block, document.getElementById('plan-block-rotation')?.value || 0);
+    _syncBlockFloorCountFromRecords(block);
+    if (block.id === _data.__activeBlockId) {
+      const { id: _id, ...values } = block;
+      _data.bloques = values;
+    }
+    _selectedPlanId = `block::${block.id}`;
+    _saveDraft(false);
+    closePlanBlockFicha();
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Ficha del bloque actualizada.', 'success');
+  }
+
+  function openPlanFloorFicha(blockId, floorId) {
+    const block = _blockById(blockId);
+    let floor = _blockFloorRecord(block, floorId);
+    if (block && !floor) {
+      const label = _normalizeFloor(floorId || 'Piso 1');
+      floor = {
+        id: `piso_${Date.now().toString(36)}_${_ensureBlockFloors(block).length}`,
+        label,
+        floor: label,
+        largo_m: block.largo_m || '',
+        ancho_m: block.ancho_m || '',
+        xRatio: .06,
+        yRatio: .16,
+        wRatio: .88,
+        hRatio: .36,
+        rotationDeg: 0,
+        rotacion_grados: '0',
+      };
+      _ensureBlockFloors(block).push(floor);
+      _syncBlockFloorCountFromRecords(block);
+    }
+    if (!block || !floor) {
+      UI.showToast('Seleccione un piso editable del bloque.', 'warning');
+      return;
+    }
+    _selectedPlanId = _floorRecordPlanId(block, floor);
+    _activatePlanSelection(_selectedPlanId);
+    document.getElementById('modal-plan-floor-ficha')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'modal-plan-floor-ficha';
+    modal.className = 'modal modal--dialog mec-object-modal';
+    modal.style.display = 'none';
+    const locked = _isBlockLocked(block);
+    const disabled = locked ? 'disabled' : '';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="MecFormModule.closePlanFloorFicha()"></div>
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h3>Ficha del piso</h3>
+          <button class="modal__close" onclick="MecFormModule.closePlanFloorFicha()">&times;</button>
+        </div>
+        <div class="modal__body">
+          <input type="hidden" id="plan-floor-block-id" value="${_escape(block.id)}">
+          <input type="hidden" id="plan-floor-id" value="${_escape(floor.id)}">
+          <p class="mec-hint">Puede mover el piso en el plano con Mover bloques activo, o ajustar aqui medidas, posicion relativa y angulo.</p>
+          <div class="grid-2">
+            <div class="form-group">
+              <label>Nombre del piso</label>
+              <input id="plan-floor-label" class="form-control" value="${_escape(_floorRecordLabel(floor))}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Rotacion (grados)</label>
+              <input id="plan-floor-rotation" class="form-control" type="number" step="1" value="${_escape(_floorRotationDeg(floor))}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Largo del piso (m)</label>
+              <input id="plan-floor-length" class="form-control" type="number" min="0" step="0.01" value="${_escape(floor.largo_m || '')}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Ancho del piso (m)</label>
+              <input id="plan-floor-width" class="form-control" type="number" min="0" step="0.01" value="${_escape(floor.ancho_m || '')}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Posicion X (%)</label>
+              <input id="plan-floor-x" class="form-control" type="number" min="0" max="100" step="1" value="${_escape(Math.round(Number(floor.xRatio || 0) * 100))}" ${disabled}>
+            </div>
+            <div class="form-group">
+              <label>Posicion Y (%)</label>
+              <input id="plan-floor-y" class="form-control" type="number" min="0" max="100" step="1" value="${_escape(Math.round(Number(floor.yRatio || 0) * 100))}" ${disabled}>
+            </div>
+          </div>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-danger" onclick="MecFormModule.deletePlanFloor('${_escape(block.id)}', '${_escape(floor.id)}')" ${disabled}>Eliminar piso</button>
+          <button class="btn btn-outline" onclick="MecFormModule.closePlanFloorFicha()">Cerrar</button>
+          <button class="btn btn-primary" onclick="MecFormModule.savePlanFloorFicha()" ${disabled}>Guardar ficha</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    UI.openModal('modal-plan-floor-ficha');
+  }
+
+  function closePlanFloorFicha() {
+    const modal = document.getElementById('modal-plan-floor-ficha');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 200);
+  }
+
+  function savePlanFloorFicha() {
+    const blockId = document.getElementById('plan-floor-block-id')?.value || '';
+    const floorId = document.getElementById('plan-floor-id')?.value || '';
+    const block = _blockById(blockId);
+    const floor = _blockFloorRecord(block, floorId);
+    if (!block || !floor) return;
+    if (!_assertBlockUnlocked(block, 'editar el piso')) return;
+    const previousLabel = _floorRecordLabel(floor);
+    const nextLabel = _normalizeFloor(document.getElementById('plan-floor-label')?.value || previousLabel);
+    floor.label = nextLabel;
+    floor.floor = nextLabel;
+    floor.largo_m = document.getElementById('plan-floor-length')?.value || '';
+    floor.ancho_m = document.getElementById('plan-floor-width')?.value || '';
+    floor.xRatio = Math.max(0, Math.min(1, Number(document.getElementById('plan-floor-x')?.value || 0) / 100));
+    floor.yRatio = Math.max(0, Math.min(1, Number(document.getElementById('plan-floor-y')?.value || 0) / 100));
+    _setFloorRotation(floor, document.getElementById('plan-floor-rotation')?.value || 0);
+    _applyFloorMeasureRatios(block, floor);
+    if (previousLabel !== nextLabel) {
+      (_data.__classrooms || []).filter(room => room.blockId === block.id && _normalizeFloor(room.floor || 'Piso 1') === previousLabel)
+        .forEach(room => { room.floor = nextLabel; });
+      (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block) && _normalizeFloor(item.planta || 'Piso 1') === previousLabel)
+        .forEach(item => { item.planta = nextLabel; });
+    }
+    _syncBlockFloorCountFromRecords(block);
+    _setActiveFloor(nextLabel);
+    _selectedPlanId = _floorRecordPlanId(block, floor);
+    _saveDraft(false);
+    closePlanFloorFicha();
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Ficha del piso actualizada.', 'success');
   }
 
   function _selectedPlanRoomId() {
@@ -12835,13 +13482,14 @@ const MecFormModule = (() => {
       targets.push({ id: `block::${block.id}`, type: 'block', x, y, w, h });
       const blockRooms = rooms.filter(room => (room.blockId || 'sin_bloque') === block.id || (!room.blockId && block.id === 'sin_bloque'));
       const blockSanitaries = _sanitariesForBlock(block);
-      _planFloorsForBlock(block, rooms, sanitaries).forEach((floor, floorIndex, floors) => {
-        const floorRect = _planFloorRect(x, y, w, h, floorIndex, floors.length, false);
+      _planFloorRecordsForBlock(block, rooms, sanitaries).forEach((floor, floorIndex, floors) => {
+        const floorLabel = _floorRecordLabel(floor);
+        const floorRect = _planFloorRectForRecord(block, floor, _planFloorRect(x, y, w, h, floorIndex, floors.length, false), { x, y, w, h });
         const floorContentRect = _planFloorContentRect(floorRect);
-        targets.push({ id: `floor::${block.id}::${floor}`, type: 'floor', ...floorContentRect });
-        _planRoomItemsFromSketch(blockRooms.filter(room => _normalizeFloor(room.floor) === floor), floorContentRect)
+        targets.push({ id: _floorRecordPlanId(block, floor), type: 'floor', ...floorContentRect });
+        _planRoomItemsFromSketch(blockRooms.filter(room => _normalizeFloor(room.floor) === floorLabel), floorContentRect)
           .forEach(item => targets.push({ id: `room::${item.room.id}`, type: 'room', x: item.x, y: item.y, w: item.w, h: item.h }));
-        _planSanitaryItemsFromSketch(blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floor), floorContentRect)
+        _planSanitaryItemsFromSketch(blockSanitaries.filter(item => _normalizeFloor(item.planta || 'Piso 1') === floorLabel), floorContentRect)
           .forEach(item => targets.push({ id: `sanitary::${item.sanitary.id}`, type: 'sanitary', x: item.x, y: item.y, w: item.w, h: item.h }));
       });
     });
@@ -13579,6 +14227,11 @@ const MecFormModule = (() => {
       await deleteActiveBlock();
       return;
     }
+    if (String(_selectedPlanId).startsWith('floor::')) {
+      const [, blockId, floorId] = String(_selectedPlanId).split('::');
+      await deletePlanFloor(blockId, floorId);
+      return;
+    }
     if (String(_selectedPlanId).startsWith('room::')) {
       const classroomId = String(_selectedPlanId).replace('room::', '');
       const room = (_data.__classrooms || []).find(item => item.id === classroomId);
@@ -13741,6 +14394,32 @@ const MecFormModule = (() => {
     return clamped;
   }
 
+  function _movePlanFloor(blockId, floorId, targetX, targetY, rect, blockRect) {
+    const block = _blockById(blockId);
+    const floor = _blockFloorRecord(block, floorId);
+    if (!block || !floor || !rect || !blockRect || floor.virtual) return null;
+    if (!_assertBlockUnlocked(block, 'mover el piso')) return null;
+    const bounds = {
+      x: blockRect.x + 10,
+      y: blockRect.y + 40,
+      w: Math.max(50, blockRect.w - 20),
+      h: Math.max(42, blockRect.h - 52),
+    };
+    const clamped = _clampRectToBounds({ x: targetX, y: targetY, w: rect.w, h: rect.h }, bounds);
+    _saveFloorRectToRecord(block, floor, clamped, blockRect);
+    _activePlanDrag = {
+      id: _floorRecordPlanId(block, floor),
+      blockId: block.id,
+      floorId: floor.id,
+      x: clamped.x,
+      y: clamped.y,
+      w: rect.w,
+      h: rect.h,
+    };
+    _drawSchoolPlan();
+    return clamped;
+  }
+
   function _movePlanSiteElement(elementId, targetX, targetY, rect) {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
@@ -13795,6 +14474,37 @@ const MecFormModule = (() => {
     UI.showToast(`Rotacion del bloque: ${next} grados.`, 'success');
   }
 
+  function rotatePlanFloor(blockId, floorId, delta = 15) {
+    const block = _blockById(blockId);
+    const floor = _blockFloorRecord(block, floorId);
+    if (!block || !floor) {
+      UI.showToast('Seleccione un piso para rotarlo.', 'warning');
+      return;
+    }
+    if (!_assertBlockUnlocked(block, 'rotar el piso')) return;
+    const next = _setFloorRotation(floor, _floorRotationDeg(floor) + Number(delta || 0));
+    _selectedPlanId = _floorRecordPlanId(block, floor);
+    _setActiveFloor(_floorRecordLabel(floor));
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast(`Rotacion del piso: ${next} grados.`, 'success');
+  }
+
+  async function deletePlanFloor(blockId, floorId) {
+    const block = _blockById(blockId);
+    const floor = _blockFloorRecord(block, floorId);
+    if (!block || !floor) {
+      UI.showToast('Seleccione un piso para eliminar.', 'warning');
+      return;
+    }
+    _data.__activeBlockId = block.id;
+    const { id: _id, ...values } = block;
+    _data.bloques = values;
+    _setActiveFloor(_floorRecordLabel(floor));
+    closePlanFloorFicha();
+    await deleteActiveFloor();
+  }
+
   function rotatePlanRoom(roomId, delta = 15) {
     const room = (_data.__classrooms || []).find(item => item.id === roomId);
     if (!room) {
@@ -13831,6 +14541,14 @@ const MecFormModule = (() => {
       _setBlockRotation(block, next);
       return { id: `block::${id}`, value: next };
     }
+    if (kind === 'floor') {
+      const [blockId, floorId] = String(id || '').split('::');
+      const block = _blockById(blockId);
+      const floor = _blockFloorRecord(block, floorId);
+      if (!floor) return null;
+      _setFloorRotation(floor, next);
+      return { id: _floorRecordPlanId(block, floor), value: next };
+    }
     if (kind === 'room') {
       const room = (_data.__classrooms || []).find(item => item.id === id);
       if (!room) return null;
@@ -13859,6 +14577,13 @@ const MecFormModule = (() => {
       const block = _blockById(area.blockId);
       if (!_assertBlockUnlocked(block, 'rotarlo')) return null;
       return { kind: 'block', id: area.blockId, selectedId: `block::${area.blockId}`, rotation: _blockRotationDeg(block) };
+    }
+    if (area.type === 'floor-rotate') {
+      const block = _blockById(area.blockId);
+      if (!_assertBlockUnlocked(block, 'rotar el piso')) return null;
+      const floor = _blockFloorRecord(block, area.floorId);
+      if (!floor) return null;
+      return { kind: 'floor', id: `${area.blockId}::${area.floorId}`, selectedId: _floorRecordPlanId(block, floor), rotation: _floorRotationDeg(floor) };
     }
     if (area.type === 'room-rotate') {
       const room = (_data.__classrooms || []).find(item => item.id === area.roomId);
@@ -13971,7 +14696,7 @@ const MecFormModule = (() => {
         return;
       }
       pointerCandidate = area;
-      if (_planMoveMode && ['block', 'site-element'].includes(area.type)) event.preventDefault();
+      if (_planMoveMode && ['block', 'site-element', 'floor'].includes(area.type)) event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
       if (activePointers.has(event.pointerId)) rememberPointer(event);
@@ -14011,6 +14736,7 @@ const MecFormModule = (() => {
       }
       if (blockDrag) {
         if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
+        else if (blockDrag.type === 'floor') _movePlanFloor(blockDrag.blockId, blockDrag.floorId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.blockRect);
         else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -14022,8 +14748,13 @@ const MecFormModule = (() => {
       }
       _hideCanvasHoverTooltip();
       if (movedTooFar(pointerStart, currentPoint)) {
-        if (_planMoveMode && ['block', 'site-element'].includes(pointerCandidate.type)) {
+        if (_planMoveMode && ['block', 'site-element', 'floor'].includes(pointerCandidate.type)) {
           if (pointerCandidate.type === 'block' && !_assertBlockUnlocked(_blockById(pointerCandidate.blockId), 'moverlo')) {
+            pointerCandidate = null;
+            event.preventDefault();
+            return;
+          }
+          if (pointerCandidate.type === 'floor' && !_assertBlockUnlocked(_blockById(pointerCandidate.blockId), 'mover el piso')) {
             pointerCandidate = null;
             event.preventDefault();
             return;
@@ -14039,12 +14770,15 @@ const MecFormModule = (() => {
           blockDrag = {
             type: pointerCandidate.type,
             blockId: pointerCandidate.blockId,
+            floorId: pointerCandidate.floorId,
             siteId: pointerCandidate.siteId,
             rect: { w: pointerCandidate.baseW || pointerCandidate.w, h: pointerCandidate.baseH || pointerCandidate.h },
+            blockRect: { x: pointerCandidate.blockX || 0, y: pointerCandidate.blockY || 0, w: pointerCandidate.blockW || 0, h: pointerCandidate.blockH || 0 },
             offsetX: pointerStart.x - (pointerCandidate.baseX ?? pointerCandidate.x),
             offsetY: pointerStart.y - (pointerCandidate.baseY ?? pointerCandidate.y),
           };
           if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
+          else if (blockDrag.type === 'floor') _movePlanFloor(blockDrag.blockId, blockDrag.floorId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.blockRect);
           else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
           pointerCandidate = null;
           suppressClickUntil = Date.now() + 350;
@@ -14083,12 +14817,15 @@ const MecFormModule = (() => {
       if (blockDrag) {
         const blockId = blockDrag.blockId;
         const siteId = blockDrag.siteId;
+        const floorId = blockDrag.floorId;
         const dragType = blockDrag.type;
         blockDrag = null;
         pointerCandidate = null;
         pointerStart = null;
         _activePlanDrag = null;
-        _selectedPlanId = dragType === 'site-element' ? `site::${siteId}` : `block::${blockId}`;
+        _selectedPlanId = dragType === 'site-element'
+          ? `site::${siteId}`
+          : (dragType === 'floor' ? `floor::${blockId}::${floorId}` : `block::${blockId}`);
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
@@ -14128,6 +14865,10 @@ const MecFormModule = (() => {
       if (area.type === 'room' || area.type === 'room-rotate') editPlanClassroom(area.roomId);
       else if (area.type === 'block' || area.type === 'block-rotate') {
         selectPlanItem(`block::${area.blockId}`);
+        openPlanSelection();
+      }
+      else if (area.type === 'floor' || area.type === 'floor-rotate') {
+        selectPlanItem(`floor::${area.blockId}::${area.floorId}`);
         openPlanSelection();
       }
       else if (area.type === 'sanitary' || area.type === 'sanitary-rotate') editPlanSanitary(area.sanitaryId);
@@ -15810,6 +16551,8 @@ const MecFormModule = (() => {
     selectBlockForSanitaries,
     selectFloor,
     newBlock,
+    addFloorToActiveBlock,
+    addPlanFloor,
     saveCurrentBlock,
     deleteActiveBlock,
     setActiveBlockLocked,
@@ -15867,6 +16610,12 @@ const MecFormModule = (() => {
     editPlanSanitary,
     selectPlanItem,
     openPlanSelection,
+    openPlanBlockFicha,
+    closePlanBlockFicha,
+    savePlanBlockFicha,
+    openPlanFloorFicha,
+    closePlanFloorFicha,
+    savePlanFloorFicha,
     addPlanClassroomElement,
     addPlanSanitaryFixture,
     addPlanSanitaryOpening,
@@ -15887,8 +16636,10 @@ const MecFormModule = (() => {
     setSiteElementEvidence,
     rotatePlanSiteElement,
     rotatePlanBlock,
+    rotatePlanFloor,
     rotatePlanRoom,
     rotatePlanSanitary,
+    deletePlanFloor,
     newPlanClassroom,
     addPlanSanitary,
     deletePlanSelection,

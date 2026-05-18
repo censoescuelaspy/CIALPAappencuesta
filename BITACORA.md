@@ -4,6 +4,34 @@
 
 ---
 
+## Sesion de bloques sin piso automatico y pisos editables - 2026-05-17 - v2.6.9
+
+### Objetivo
+- Evitar que un bloque nuevo nazca con un piso por defecto.
+- Permitir que cada piso se incorpore explicitamente dentro del bloque y sea ubicable/editable en el plano.
+- Hacer visibles y editables las medidas del bloque y del piso desde fichas emergentes.
+
+### Cambios implementados
+- `Nuevo bloque` ahora crea bloques con `0` pisos integrados y `floors: []`.
+- La cantidad de pisos/plantas permite valor `0`; se actualizo el texto del esquema para indicar que los pisos se agregan desde el plano.
+- Se agrego la accion `+ Piso` en `Registro guiado`, en Aulas/Espacios, Sanitarios y en el arbol del plano.
+- Los pisos ahora son registros propios del bloque, con id, nombre, largo, ancho, posicion relativa, rotacion y ficha emergente.
+- El plano permite seleccionar pisos, abrir su ficha, girarlos, eliminarlos y moverlos dentro del bloque con `Mover bloques` activo.
+- La ficha emergente del bloque permite editar estado, largo, ancho, rotacion y observacion sin abandonar el plano.
+- La ficha emergente del piso permite editar nombre, largo, ancho, posicion X/Y y rotacion.
+- Se bloquea la creacion de aulas, otros espacios y sanitarios si el bloque activo todavia no tiene un piso incorporado.
+- El canvas muestra `Bloque sin pisos` cuando corresponde y marca dimensiones del bloque/piso al seleccionarlos.
+- Version y cache actualizados a `v2.6.9`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
 ## Sesion de registro guiado con plano inmediato - 2026-05-17 - v2.6.8
 
 ### Objetivo
