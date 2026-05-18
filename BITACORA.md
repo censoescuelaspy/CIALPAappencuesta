@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de giro tipo Word en plano - 2026-05-18 - v2.6.19
+
+### Objetivo
+- Agregar acciones rapidas de rotacion y volteo estilo Word para elementos seleccionados del plano.
+
+### Cambios implementados
+- La barra visible del plano incorpora `Rotar der. 90`, `Rotar izq. 90`, `Voltear H` y `Voltear V` junto a `Horizontal` y `Vertical`.
+- Las acciones funcionan sobre bloque, piso, aula/espacio, sanitario, elementos exteriores/tecnicos y objetos internos rotables.
+- `Rotar der. 90` y `Rotar izq. 90` aplican giros incrementales de 90 grados.
+- `Voltear H` y `Voltear V` reflejan la orientacion del elemento seleccionado sobre el eje horizontal o vertical mediante su angulo de giro.
+- Las acciones respetan bloqueos existentes.
+- Version y cache actualizados a `v2.6.19`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor local `py -3 -m http.server 8034 --bind 127.0.0.1`: `index.html`, `assets/js/config.js`, `assets/js/mec-form.js` y `sw.js` servidos correctamente con version/cache `v2.6.19`, botones `Rotar der. 90`, `Rotar izq. 90`, `Voltear H` y `Voltear V`.
+
 ## Sesion de botones visibles de orientacion - 2026-05-18 - v2.6.18
 
 ### Objetivo

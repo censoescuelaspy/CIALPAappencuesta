@@ -10730,7 +10730,11 @@ const MecFormModule = (() => {
     const disabled = enabled ? '' : ' disabled title="Seleccione un elemento del plano"';
     return `
       <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('horizontal')"${disabled}>Horizontal</button>
-      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('vertical')"${disabled}>Vertical</button>`;
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('vertical')"${disabled}>Vertical</button>
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.rotateSelectedPlanItem(90)"${disabled}>Rotar der. 90</button>
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.rotateSelectedPlanItem(-90)"${disabled}>Rotar izq. 90</button>
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.flipSelectedPlanItem('horizontal')"${disabled}>Voltear H</button>
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.flipSelectedPlanItem('vertical')"${disabled}>Voltear V</button>`;
   }
 
   function _quickOtherSpaceActions() {
@@ -15722,91 +15726,93 @@ const MecFormModule = (() => {
     return _orientationAngle(orientation) === 90 ? 'vertical' : 'horizontal';
   }
 
-  function orientSelectedPlanItem(orientation = 'horizontal') {
+  function _transformSelectedPlanRotation(transform, messageForType = null) {
     const raw = String(_selectedPlanId || '');
-    const angle = _orientationAngle(orientation);
-    const label = _orientationLabel(orientation);
     if (!raw) {
-      UI.showToast('Seleccione un elemento del plano para orientarlo.', 'warning');
-      return;
+      UI.showToast('Seleccione un elemento del plano para girarlo.', 'warning');
+      return false;
     }
+    const nextRotation = current => _planRotationDeg(typeof transform === 'function' ? transform(_planRotationDeg(current)) : transform);
+    const message = (label, rotation) => typeof messageForType === 'function'
+      ? messageForType(label, rotation)
+      : `${label}: ${rotation} grados.`;
     if (raw.startsWith('block::')) {
       const block = _blockById(raw.replace('block::', ''));
-      if (!block) return;
-      if (!_assertBlockUnlocked(block, 'orientarlo')) return;
-      _setBlockRotation(block, angle);
+      if (!block) return false;
+      if (!_assertBlockUnlocked(block, 'girarlo')) return false;
+      const next = _setBlockRotation(block, nextRotation(_blockRotationDeg(block)));
       _selectedPlanId = `block::${block.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(`Bloque orientado en ${label}.`, 'success');
-      return;
+      UI.showToast(message('Bloque', next), 'success');
+      return true;
     }
     if (raw.startsWith('floor::')) {
       const [, blockId, floorId] = raw.split('::');
       const block = _blockById(blockId);
       const floor = _blockFloorRecord(block, floorId);
       if (!block || !floor) {
-        UI.showToast('Seleccione un piso valido para orientarlo.', 'warning');
-        return;
+        UI.showToast('Seleccione un piso valido para girarlo.', 'warning');
+        return false;
       }
-      if (!_assertBlockUnlocked(block, 'orientar el piso')) return;
-      _setFloorRotation(floor, angle);
+      if (!_assertBlockUnlocked(block, 'girar el piso')) return false;
+      const next = _setFloorRotation(floor, nextRotation(_floorRotationDeg(floor)));
       _selectedPlanId = _floorRecordPlanId(block, floor);
       _setActiveFloor(_floorRecordLabel(floor));
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(`Piso orientado en ${label}.`, 'success');
-      return;
+      UI.showToast(message('Piso', next), 'success');
+      return true;
     }
     if (raw.startsWith('room::')) {
       const room = _classroomById(raw.replace('room::', ''));
-      if (!room) return;
-      if (!_assertClassroomUnlocked(room, 'orientarlo')) return;
-      _setRoomRotation(room, angle);
+      if (!room) return false;
+      if (!_assertClassroomUnlocked(room, 'girarlo')) return false;
+      const next = _setRoomRotation(room, nextRotation(_roomRotationDeg(room)));
       _selectedPlanId = `room::${room.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(`${_roomSpaceLabel(room)} orientado en ${label}.`, 'success');
-      return;
+      UI.showToast(message(_roomSpaceLabel(room), next), 'success');
+      return true;
     }
     if (raw.startsWith('sanitary::')) {
       const [, sanitaryId, objectId] = raw.split('::');
       const item = _activatePlanSanitary(sanitaryId, objectId || '');
-      if (!item) return;
+      if (!item) return false;
       if (objectId) {
         const object = (item.objects || []).find(child => child.id === objectId);
         if (!_isRotatableSketchObject(object)) {
           UI.showToast('Seleccione un objeto girable del sanitario.', 'warning');
-          return;
+          return false;
         }
-        if (!_assertSanitaryUnlocked(item, 'orientar el objeto')) return;
-        _setSanitaryObjectRotation(item, object, angle);
+        if (!_assertSanitaryUnlocked(item, 'girar el objeto')) return false;
+        const next = _setSanitaryObjectRotation(item, object, nextRotation(_sketchObjectRotationDeg(object)));
         _selectedPlanId = `sanitary::${item.id}::${object.id}`;
         _saveDraft(false);
         _redrawSanitaryCanvas();
         renderSchoolPlan();
-        UI.showToast(`${_sanitaryObjectLabel(object.type)} orientado en ${label}.`, 'success');
-        return;
+        UI.showToast(message(_sanitaryObjectLabel(object.type), next), 'success');
+        return true;
       }
-      if (!_assertSanitaryUnlocked(item, 'orientarlo')) return;
-      _setSanitaryRotation(item, angle);
+      if (!_assertSanitaryUnlocked(item, 'girarlo')) return false;
+      const next = _setSanitaryRotation(item, nextRotation(_sanitaryRotationDeg(item)));
       _selectedPlanId = `sanitary::${item.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(`Sanitario orientado en ${label}.`, 'success');
-      return;
+      UI.showToast(message('Sanitario', next), 'success');
+      return true;
     }
     if (raw.startsWith('site::')) {
       const element = _ensureSiteElements().find(item => item.id === raw.replace('site::', ''));
-      if (!element) return;
-      if (!_assertSiteElementUnlocked(element, 'orientarlo')) return;
-      element.rotationDeg = _normalizeSiteRotation(angle);
+      if (!element) return false;
+      if (!_assertSiteElementUnlocked(element, 'girarlo')) return false;
+      element.rotationDeg = nextRotation(_siteElementRotationDeg(element));
       element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
       _selectedPlanId = `site::${element.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(`${_siteElementLabel(element.type)} orientado en ${label}.`, 'success');
-      return;
+      UI.showToast(message(_siteElementLabel(element.type), element.rotationDeg), 'success');
+      return true;
     }
     if (raw.includes('::')) {
       const [roomId, objectId] = raw.split('::');
@@ -15814,20 +15820,42 @@ const MecFormModule = (() => {
       const object = (_data.__classroomSketch?.objects || []).find(item => item.id === objectId);
       if (!room || !_isRotatableSketchObject(object)) {
         UI.showToast('Seleccione un objeto girable del aula.', 'warning');
-        return;
+        return false;
       }
-      if (!_assertClassroomUnlocked(room, 'orientar el objeto')) return;
+      if (!_assertClassroomUnlocked(room, 'girar el objeto')) return false;
       _pushSketchHistory();
-      _setSketchObjectRotation(object, angle);
+      const next = _setSketchObjectRotation(object, nextRotation(_sketchObjectRotationDeg(object)));
       _syncActiveClassroomFromSketch();
       _selectedPlanId = `${room.id}::${object.id}`;
       _saveDraft(false);
       _redrawSketchCanvas();
       renderSchoolPlan();
-      UI.showToast(`${_sketchLabel(object.type)} orientado en ${label}.`, 'success');
-      return;
+      UI.showToast(message(_sketchLabel(object.type), next), 'success');
+      return true;
     }
-    UI.showToast('El elemento seleccionado no admite orientacion rapida.', 'warning');
+    UI.showToast('El elemento seleccionado no admite giro rapido.', 'warning');
+    return false;
+  }
+
+  function orientSelectedPlanItem(orientation = 'horizontal') {
+    const angle = _orientationAngle(orientation);
+    const orientationLabel = _orientationLabel(orientation);
+    _transformSelectedPlanRotation(angle, label => `${label} orientado en ${orientationLabel}.`);
+  }
+
+  function rotateSelectedPlanItem(delta = 90) {
+    const amount = Number(delta || 0);
+    const direction = amount >= 0 ? 'a la derecha' : 'a la izquierda';
+    const degrees = Math.abs(amount) || 0;
+    _transformSelectedPlanRotation(current => current + amount, label => `${label} rotado ${degrees} grados ${direction}.`);
+  }
+
+  function flipSelectedPlanItem(axis = 'horizontal') {
+    const horizontal = String(axis || '').toLowerCase().startsWith('h');
+    _transformSelectedPlanRotation(
+      current => (horizontal ? 180 - current : -current),
+      label => `${label} volteado ${horizontal ? 'horizontalmente' : 'verticalmente'}.`
+    );
   }
 
   function _setPlanRotationFromDrag(kind, id, rotation) {
@@ -18105,6 +18133,8 @@ const MecFormModule = (() => {
     rotatePlanRoom,
     rotatePlanSanitary,
     orientSelectedPlanItem,
+    rotateSelectedPlanItem,
+    flipSelectedPlanItem,
     deletePlanFloor,
     newPlanClassroom,
     addPlanSanitary,
