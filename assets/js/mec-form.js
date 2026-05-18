@@ -3040,8 +3040,8 @@ const MecFormModule = (() => {
     const technical = ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(type);
     const slender = type === 'gallery' || type === 'walkway' || type === 'ramp';
     return {
-      wRatio: Math.max(technical ? .025 : (slender ? .055 : .045), Math.min(technical ? .16 : .62, largo / 120)),
-      hRatio: Math.max(technical ? .025 : (slender ? .012 : .035), Math.min(technical ? .14 : (slender ? .16 : .36), ancho / 120)),
+      wRatio: Math.max(technical ? .018 : (slender ? .055 : .045), Math.min(technical ? .12 : .62, technical ? largo / 10 : largo / 120)),
+      hRatio: Math.max(technical ? .018 : (slender ? .012 : .035), Math.min(technical ? .10 : (slender ? .16 : .36), technical ? ancho / 10 : ancho / 120)),
     };
   }
 
@@ -12047,7 +12047,7 @@ const MecFormModule = (() => {
     }
 
     // Axis labels along top and left edges
-    const fmtM = v => v >= 1 ? `${v} m` : v >= 0.01 ? `${+(v * 100).toPrecision(2)} cm` : `${+(v * 1000).toPrecision(2)} mm`;
+    const fmtM = v => v === 0 ? '0 m' : v >= 1 ? `${v} m` : v >= 0.01 ? `${+(v * 100).toPrecision(2)} cm` : `${+(v * 1000).toPrecision(2)} mm`;
     ctx.font = '8px sans-serif';
     ctx.fillStyle = 'rgba(23, 59, 99, .45)';
     // Top axis (horizontal)
@@ -12058,7 +12058,8 @@ const MecFormModule = (() => {
       if (lx < 18) continue;
       const mVal = (lx - gridOriginX) / effectivePPM;
       const mRounded = Math.round(mVal / majorM) * majorM;
-      const lbl = fmtM(Math.abs(mRounded));
+      if (mRounded < 0) continue;
+      const lbl = fmtM(mRounded);
       ctx.fillStyle = 'rgba(248,250,252,.75)';
       const lw = ctx.measureText(lbl).width;
       ctx.fillRect(lx - lw / 2 - 1, 1, lw + 2, 10);
@@ -12073,7 +12074,8 @@ const MecFormModule = (() => {
       if (ly < 12) continue;
       const mVal = (ly - gridOriginY) / effectivePPM;
       const mRounded = Math.round(mVal / majorM) * majorM;
-      const lbl = fmtM(Math.abs(mRounded));
+      if (mRounded < 0) continue;
+      const lbl = fmtM(mRounded);
       ctx.fillStyle = 'rgba(248,250,252,.75)';
       const lw = ctx.measureText(lbl).width;
       ctx.fillRect(logical.width - lw - 3, ly - 5, lw + 2, 10);
