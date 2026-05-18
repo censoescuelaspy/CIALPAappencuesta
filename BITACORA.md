@@ -4,6 +4,33 @@
 
 ---
 
+## Sesion de cabinas y artefactos sanitarios en ribbon - 2026-05-18 - v2.6.25
+
+### Objetivo
+- Exponer en la pestaña Insertar del ribbon los botones para agregar cabinas y artefactos cuando un sanitario esta seleccionado en el plano.
+- Usar iconos Unicode acordes a cada elemento (◜ puerta, ▭ ventana, ▣ cabina, WC inodoro, ◎ lavamanos, ⊔ urinario, ≋ ducha).
+
+### Problema
+Al seleccionar un sanitario en el plano y abrir la pestana Insertar, solo aparecian Puerta y Ventana. Las opciones de Cabina, Inodoro, Lavamanos, Urinario y Ducha no eran visibles desde el ribbon, aunque existian como funciones `addPlanSanitaryStall` y `addPlanSanitaryFixture`.
+
+### Solucion
+**`assets/js/mec-form.js` — `_renderPlanRibbonPanel`:**
+- Cuando `hasSanitary`, se agregan dos nuevos grupos antes de Aberturas:
+  - `Cabinas del sanitario`: boton Cabina (▣) → `addPlanSanitaryStall()`
+  - `Artefactos del sanitario`: Inodoro (WC), Lavamanos (◎), Urinario (⊔), Ducha (≋)
+- Iconos de Puerta (◜ &#x25DC;) y Ventana (▭ &#x25AD;) actualizados en ambos grupos (aula y sanitario) usando los mismos simbolos que `_sketchToolIcon`.
+
+**`_isPlanRibbonDuplicateAction`:**
+- Filtro ampliado: cuando hasSanitary, oculta `+ cabina`, `+ inodoro`, `+ lavamanos` del builder panel para evitar duplicados con el ribbon.
+
+### Archivos modificados
+- `assets/js/mec-form.js` — ribbon insertar, filtro duplicados
+- `assets/js/config.js` — VERSION 2.6.25
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.25
+- `index.html` — spans app-version
+
+---
+
 ## Sesion de actualizacion confiable del Service Worker - 2026-05-16 - v2.6.24
 
 ### Objetivo

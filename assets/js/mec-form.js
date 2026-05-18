@@ -10781,14 +10781,23 @@ const MecFormModule = (() => {
       ];
       if (hasRoom) {
         groups.push(_renderPlanRibbonGroup('Aberturas del aula', [
-          _renderPlanRibbonButton({ icon: 'P', label: 'Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')", tone: 'btn-primary', title: 'Agregar puerta al aula seleccionada' }),
-          _renderPlanRibbonButton({ icon: 'V', label: 'Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')", tone: 'btn-secondary', title: 'Agregar ventana al aula seleccionada' }),
+          _renderPlanRibbonButton({ icon: '&#x25DC;', label: 'Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')", tone: 'btn-primary', title: 'Agregar puerta al aula seleccionada' }),
+          _renderPlanRibbonButton({ icon: '&#x25AD;', label: 'Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')", tone: 'btn-secondary', title: 'Agregar ventana al aula seleccionada' }),
         ].join('')));
       }
       if (hasSanitary) {
+        groups.push(_renderPlanRibbonGroup('Cabinas del sanitario', [
+          _renderPlanRibbonButton({ icon: '&#x25A3;', label: 'Cabina', onClick: 'MecFormModule.addPlanSanitaryStall()', tone: 'btn-primary', title: 'Agregar cabina (inodoro con particion) al sanitario seleccionado' }),
+        ].join('')));
+        groups.push(_renderPlanRibbonGroup('Artefactos del sanitario', [
+          _renderPlanRibbonButton({ icon: 'WC', label: 'Inodoro', onClick: "MecFormModule.addPlanSanitaryFixture('toilet')", title: 'Agregar inodoro suelto al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x25CE;', label: 'Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')", title: 'Agregar lavamanos al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x2294;', label: 'Urinario', onClick: "MecFormModule.addPlanSanitaryFixture('urinal')", title: 'Agregar urinario al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x224B;', label: 'Ducha', onClick: "MecFormModule.addPlanSanitaryFixture('shower')", title: 'Agregar ducha al sanitario seleccionado' }),
+        ].join('')));
         groups.push(_renderPlanRibbonGroup('Aberturas del sanitario', [
-          _renderPlanRibbonButton({ icon: 'P', label: 'Puerta', onClick: "MecFormModule.addPlanSanitaryOpening('door')", tone: 'btn-primary', title: 'Agregar puerta al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: 'V', label: 'Ventana', onClick: "MecFormModule.addPlanSanitaryOpening('window')", tone: 'btn-secondary', title: 'Agregar ventana al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x25DC;', label: 'Puerta', onClick: "MecFormModule.addPlanSanitaryOpening('door')", tone: 'btn-primary', title: 'Agregar puerta al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x25AD;', label: 'Ventana', onClick: "MecFormModule.addPlanSanitaryOpening('window')", tone: 'btn-secondary', title: 'Agregar ventana al sanitario seleccionado' }),
         ].join('')));
       }
       return groups.join('');
@@ -10887,6 +10896,7 @@ const MecFormModule = (() => {
     const hasRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
     const hasSanitary = sel.startsWith('sanitary::');
     if ((hasRoom || hasSanitary) && (label === '+ puerta' || label === '+ ventana')) return true;
+    if (hasSanitary && (label === '+ cabina' || label === '+ inodoro' || label === '+ lavamanos')) return true;
     return false;
   }
 
