@@ -4,6 +4,29 @@
 
 ---
 
+## Sesion de arrastre directo de exteriores - 2026-05-18 - v2.6.16
+
+### Objetivo
+- Corregir que elementos exteriores y tecnicos insertados, como tanques de agua, rampas, acometidas y medidores, no respondieran de forma confiable al arrastre o al redimensionamiento en el plano.
+
+### Cambios implementados
+- Los elementos exteriores ahora pueden arrastrarse directamente desde el plano, aun sin depender del modo `Mover elementos`.
+- Las esquinas de elementos exteriores se detectan para redimensionar incluso cuando el elemento no habia quedado seleccionado previamente.
+- La deteccion de clic sobre exteriores usa el contorno rotado del elemento para coincidir con lo que se ve en pantalla.
+- El movimiento y redimensionamiento interactivo de exteriores ya no se revierte por reglas de no solape contra bloques, pisos u otros objetos; solo se limita al area del canvas.
+- Tanque, rampa, escalera, acometida, medidor, tablero, puesta a tierra, galeria, caminero, espacio libre, pilar, pozo y recreacion mantienen sincronizacion de medidas al estirarse.
+- Version y cache actualizados a `v2.6.16`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor local `py -3 -m http.server 8031 --bind 127.0.0.1`: `index.html`, `assets/js/config.js` y `sw.js` servidos correctamente con version/cache `v2.6.16`.
+
 ## Sesion de cuestionario guiado obligatorio - 2026-05-18 - v2.6.15
 
 ### Objetivo

@@ -7848,13 +7848,42 @@ const MecFormModule = (() => {
   function _findSiteElementAt(point, logical = SKETCH_CANVAS) {
     return [..._ensureSiteElements()]
       .reverse()
-      .map(item => ({ item, rect: _siteElementRect(item, logical.width || SKETCH_CANVAS.width, logical.height || SKETCH_CANVAS.height) }))
+      .map(item => {
+        const rect = _siteElementRect(item, logical.width || SKETCH_CANVAS.width, logical.height || SKETCH_CANVAS.height);
+        return { item, rect, bounds: _rotatedSiteElementBounds(rect, item) };
+      })
       .find(entry =>
-        point.x >= entry.rect.x - 6 &&
-        point.x <= entry.rect.x + entry.rect.w + 6 &&
-        point.y >= entry.rect.y - 6 &&
-        point.y <= entry.rect.y + entry.rect.h + 6
+        point.x >= entry.bounds.x - 8 &&
+        point.x <= entry.bounds.x + entry.bounds.w + 8 &&
+        point.y >= entry.bounds.y - 8 &&
+        point.y <= entry.bounds.y + entry.bounds.h + 8
       ) || null;
+  }
+
+  function _findSiteResizeHandleAt(point, logical = SKETCH_CANVAS) {
+    const width = logical.width || SKETCH_CANVAS.width;
+    const height = logical.height || SKETCH_CANVAS.height;
+    for (const item of [..._ensureSiteElements()].reverse()) {
+      const rect = _siteElementRect(item, width, height);
+      const handle = _planResizeHandles(rect, _siteElementRotationDeg(item))
+        .find(entry => Math.hypot(point.x - entry.x, point.y - entry.y) <= entry.size);
+      if (!handle) continue;
+      return {
+        id: `site::${item.id}`,
+        type: 'site-resize',
+        siteId: item.id,
+        handle: handle.name,
+        x: handle.x - handle.size / 2,
+        y: handle.y - handle.size / 2,
+        w: handle.size,
+        h: handle.size,
+        baseX: rect.x,
+        baseY: rect.y,
+        baseW: rect.w,
+        baseH: rect.h,
+      };
+    }
+    return null;
   }
 
   function _moveSiteElementOnCanvas(hit, point, offset, logical = SKETCH_CANVAS) {
@@ -14957,11 +14986,7 @@ const MecFormModule = (() => {
     if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
-    const initial = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
-    const snapped = _isSiteElementSnappable(element.type)
-      ? _snapSiteElementRectToTargets(initial, logicalWidth, logicalHeight)
-      : initial;
-    const clamped = _resolvePlanRectNoOverlap(snapped, _planMoveBlockers('site', element.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
+    const clamped = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _activePlanDrag = {
@@ -14969,8 +14994,8 @@ const MecFormModule = (() => {
       siteId: element.id,
       x: clamped.x,
       y: clamped.y,
-      w: rect.w,
-      h: rect.h,
+      w: clamped.w,
+      h: clamped.h,
     };
     _drawSchoolPlan();
     return clamped;
@@ -15419,8 +15444,7 @@ const MecFormModule = (() => {
     if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
-    const initial = _clampPlanRect(rect, logicalWidth, logicalHeight);
-    const clamped = _resolvePlanRectNoOverlap(initial, _planMoveBlockers('site', element.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
+    const clamped = _clampPlanRect(rect, logicalWidth, logicalHeight);
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _syncSiteElementMeasuresFromRect(element, clamped, logicalWidth, logicalHeight);
@@ -15776,6 +15800,8 @@ const MecFormModule = (() => {
     const siteAreaFromPoint = point => {
       if (!_planLayers.exteriores) return null;
       const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
+      const handleHit = _findSiteResizeHandleAt(point, logical);
+      if (handleHit) return handleHit;
       const siteHit = _findSiteElementAt(point, logical);
       if (!siteHit?.item || !siteHit.rect) return null;
       return {
@@ -15818,6 +15844,10 @@ const MecFormModule = (() => {
       isClassObjectArea(area) ||
       isSanitaryObjectArea(area)
     ));
+    const canDragPlanArea = area => Boolean(
+      isPlanMovableArea(area) &&
+      (_planMoveMode || area.type === 'site-element' || area.id === _selectedPlanId)
+    );
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     const angleFromCenter = (center, point) => (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
     const applyPlanMoveDrag = currentPoint => {
@@ -15921,7 +15951,7 @@ const MecFormModule = (() => {
         return;
       }
       pointerCandidate = area;
-      if (_planMoveMode && isPlanMovableArea(area)) event.preventDefault();
+      if (canDragPlanArea(area)) event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
       if (activePointers.has(event.pointerId)) rememberPointer(event);
@@ -15991,7 +16021,7 @@ const MecFormModule = (() => {
       }
       _hideCanvasHoverTooltip();
       if (movedTooFar(pointerStart, currentPoint)) {
-        if (_planMoveMode && isPlanMovableArea(pointerCandidate)) {
+        if (canDragPlanArea(pointerCandidate)) {
           if (pointerCandidate.type === 'block' && !_assertBlockUnlocked(_blockById(pointerCandidate.blockId), 'moverlo')) {
             pointerCandidate = null;
             event.preventDefault();
