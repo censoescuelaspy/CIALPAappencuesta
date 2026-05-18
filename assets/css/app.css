@@ -3368,6 +3368,7 @@ textarea.form-control {
     "kicker actions"
     "title actions"
     "summary actions"
+    "next actions"
     "checks actions";
   gap: .34rem .7rem;
   align-items: start;
@@ -3394,6 +3395,61 @@ textarea.form-control {
   color: #526173;
   font-size: .74rem;
   overflow-wrap: anywhere;
+}
+
+.guided-slide__next {
+  grid-area: next;
+  min-width: 0;
+}
+
+.guided-slide__next:empty {
+  display: none;
+}
+
+.guided-next-card {
+  display: grid;
+  gap: .28rem;
+  padding: .48rem .55rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-left: 4px solid #e84c22;
+  border-radius: 8px;
+}
+
+.guided-next-card--done {
+  background: #ecfdf5;
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+}
+
+.guided-next-card span {
+  color: #9a3412;
+  font-size: .58rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.guided-next-card--done span {
+  color: #166534;
+}
+
+.guided-next-card strong {
+  color: #172033;
+  font-size: .76rem;
+  line-height: 1.15;
+}
+
+.guided-next-card p {
+  margin: 0;
+  color: #526173;
+  font-size: .68rem;
+  line-height: 1.25;
+}
+
+.guided-next-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
 }
 
 .guided-slide__checks {
@@ -3656,6 +3712,7 @@ textarea.form-control {
       "kicker"
       "title"
       "summary"
+      "next"
       "checks"
       "actions";
   }

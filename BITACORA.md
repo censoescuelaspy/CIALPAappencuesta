@@ -4,6 +4,32 @@
 
 ---
 
+## Sesion de guia de relevamiento por bloque y piso - 2026-05-17 - v2.6.10
+
+### Objetivo
+- Hacer que el registro guiado se comporte desde el inicio como una guia operativa de relevamiento.
+- Ordenar la carga de bloques en una secuencia obligatoria: medir bloque, ubicarlo en el plano, completar ficha y luego decidir si se grafica un piso.
+- Exigir que aulas, sanitarios y espacios se construyan sobre pisos previamente incorporados al bloque.
+
+### Cambios implementados
+- La etapa `Bloques y pisos` ahora muestra una tarjeta dinamica de `Paso sugerido` segun el estado real del borrador.
+- Si no hay bloque, la guia solicita `Iniciar bloque` y abre automaticamente la ficha para cargar largo, ancho, estado y observaciones.
+- Al guardar la ficha del bloque con medidas, si todavia no fue ubicado, se activa `Mover bloques` y queda seleccionado para arrastrarlo en el plano.
+- Se agrego la accion `Ubicar bloque` para activar posicionamiento directo desde el flujo guiado.
+- Se agrego la accion guiada `Piso`: si no hay piso lo crea, y si ya existe abre la ficha del piso pendiente.
+- La guia distingue entre bloque sin medidas, bloque sin ubicacion, pregunta de existencia de piso, piso sin medidas y bloque listo para ambientes.
+- `Registro guiado` marca la etapa `Bloques y pisos` como lista solo cuando el bloque tiene medidas, ubicacion y pisos existentes completos.
+- Version, cache y textos de edicion actualizados a `v2.6.10`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
 ## Sesion de bloques sin piso automatico y pisos editables - 2026-05-17 - v2.6.9
 
 ### Objetivo

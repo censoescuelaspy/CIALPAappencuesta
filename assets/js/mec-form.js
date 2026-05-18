@@ -3377,6 +3377,52 @@ const MecFormModule = (() => {
     UI.showToast('Nuevo bloque listo para cargar.', 'success');
   }
 
+  function startGuidedBlockRegistration() {
+    _syncActiveBlock();
+    let block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      newBlock();
+      block = _blockById(_data.__activeBlockId);
+    }
+    if (!block) return;
+    _selectedPlanId = `block::${block.id}`;
+    renderSchoolPlan();
+    setTimeout(() => openPlanBlockFicha(block.id), 80);
+    UI.showToast('Paso 1: cargue medidas del bloque. Luego ubíquelo en el plano.', 'info', 6200);
+  }
+
+  function positionActiveBlockOnPlan() {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('Primero cree o seleccione un bloque.', 'warning');
+      return;
+    }
+    _selectedPlanId = `block::${block.id}`;
+    _activatePlanSelection(_selectedPlanId);
+    _planMoveMode = true;
+    renderSchoolPlan();
+    UI.showToast('Modo mover activo: arrastre el bloque hasta su ubicacion en el plano.', 'info', 6200);
+  }
+
+  function continueGuidedFloorRegistration() {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      startGuidedBlockRegistration();
+      return;
+    }
+    const floors = _ensureBlockFloors(block);
+    if (!floors.length) {
+      addPlanFloor(block.id);
+      return;
+    }
+    const floor = floors.find(item => !item.largo_m || !item.ancho_m) || floors[0];
+    _selectedPlanId = _floorRecordPlanId(block, floor);
+    _setActiveFloor(_floorRecordLabel(floor));
+    renderSchoolPlan();
+    setTimeout(() => openPlanFloorFicha(block.id, floor.id), 80);
+    UI.showToast('Complete y ubique el piso dentro del bloque.', 'info', 5600);
+  }
+
   function addFloorToActiveBlock() {
     const block = _blockById(_data.__activeBlockId);
     if (!block) {
@@ -13192,16 +13238,24 @@ const MecFormModule = (() => {
     block.observacion = document.getElementById('plan-block-observation')?.value || '';
     _setBlockRotation(block, document.getElementById('plan-block-rotation')?.value || 0);
     _syncBlockFloorCountFromRecords(block);
+    const hasMeasures = Number(block.largo_m || 0) > 0 && Number(block.ancho_m || 0) > 0;
+    const hasPlanPosition = Number.isFinite(Number(block.planPosition?.xRatio ?? block.plano_general?.xRatio))
+      && Number.isFinite(Number(block.planPosition?.yRatio ?? block.plano_general?.yRatio));
     if (block.id === _data.__activeBlockId) {
       const { id: _id, ...values } = block;
       _data.bloques = values;
     }
     _selectedPlanId = `block::${block.id}`;
+    if (hasMeasures && !hasPlanPosition) _planMoveMode = true;
     _saveDraft(false);
     closePlanBlockFicha();
     _render();
     renderSchoolPlan();
-    UI.showToast('Ficha del bloque actualizada.', 'success');
+    UI.showToast(hasMeasures && !hasPlanPosition
+      ? 'Ficha del bloque actualizada. Ahora arrastre el bloque hasta su ubicacion en el plano.'
+      : 'Ficha del bloque actualizada.',
+      hasMeasures && !hasPlanPosition ? 'info' : 'success',
+      6200);
   }
 
   function openPlanFloorFicha(blockId, floorId) {
@@ -16551,6 +16605,9 @@ const MecFormModule = (() => {
     selectBlockForSanitaries,
     selectFloor,
     newBlock,
+    startGuidedBlockRegistration,
+    positionActiveBlockOnPlan,
+    continueGuidedFloorRegistration,
     addFloorToActiveBlock,
     addPlanFloor,
     saveCurrentBlock,

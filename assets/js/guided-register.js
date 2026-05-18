@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.9
+ * Version: 2.6.10
  */
 
 const GuidedRegisterModule = (() => {
@@ -48,11 +48,12 @@ const GuidedRegisterModule = (() => {
       number: '03',
       title: 'Bloques y pisos',
       kicker: 'Estructura principal',
-      summary: 'Crear cada bloque una sola vez, cargar sus pisos y ubicarlo en el predio.',
-      checks: ['Bloque creado', 'Cantidad de pisos', 'Dimensiones y estado'],
+      summary: 'Guia paso a paso: medir bloque, ubicarlo en el plano, completar ficha y luego decidir si corresponde agregar pisos.',
+      checks: ['Medidas del bloque', 'Bloque ubicado', 'Ficha y pisos'],
       actions: [
-        { label: 'Nuevo bloque', icon: '+BL', action: 'newBlock', primary: true },
-        { label: 'Agregar piso', icon: '+P', action: 'floor' },
+        { label: 'Iniciar bloque', icon: '+BL', action: 'guidedBlock', primary: true },
+        { label: 'Ubicar bloque', icon: 'MOVE', action: 'positionBlock' },
+        { label: 'Piso', icon: '+P', action: 'floorGuide' },
         { label: 'Guardar bloque', icon: 'SAVE', action: 'saveBlock' },
         { label: 'Bloquear', icon: 'LOCK', action: 'lockBlock' },
         { label: 'Ficha bloque', icon: 'FORM', action: 'blockFicha' },
@@ -185,6 +186,7 @@ const GuidedRegisterModule = (() => {
           <p class="guided-slide__kicker">${_escape(step.kicker)}</p>
           <h3>${_escape(step.title)}</h3>
           <p class="guided-slide__summary">${_escape(step.summary)}</p>
+          <div class="guided-slide__next" data-guided-next="${_escape(step.id)}"></div>
           <div class="guided-slide__checks">
             ${step.checks.map(check => `<span>${_escape(check)}</span>`).join('')}
           </div>
@@ -277,14 +279,23 @@ const GuidedRegisterModule = (() => {
         case 'moveMode':
           mec.togglePlanMoveMode();
           break;
+        case 'guidedBlock':
+          mec.startGuidedBlockRegistration();
+          break;
         case 'newBlock':
           mec.newBlock();
+          break;
+        case 'positionBlock':
+          mec.positionActiveBlockOnPlan();
           break;
         case 'saveBlock':
           mec.saveCurrentBlock();
           break;
         case 'floor':
           mec.addFloorToActiveBlock();
+          break;
+        case 'floorGuide':
+          mec.continueGuidedFloorRegistration();
           break;
         case 'blockFicha':
           mec.openPlanBlockFicha();
@@ -351,6 +362,10 @@ const GuidedRegisterModule = (() => {
     return [
       'saveBlock',
       'lockBlock',
+      'blockFicha',
+      'positionBlock',
+      'floor',
+      'floorGuide',
       'classroom',
       'otherSpace',
       'roomElement',
@@ -448,6 +463,9 @@ const GuidedRegisterModule = (() => {
       label.textContent = done ? 'Listo' : 'Pendiente';
       label.closest('.guided-step')?.classList.toggle('guided-step--done', done);
     });
+    root.querySelectorAll('[data-guided-next]').forEach(panel => {
+      panel.innerHTML = _guidedNextHtml(panel.dataset.guidedNext || '', snap);
+    });
   }
 
   function _setCount(root, key, value) {
@@ -469,7 +487,14 @@ const GuidedRegisterModule = (() => {
     const sanitaries = Array.isArray(values.__sanitaries) ? values.__sanitaries : [];
     const classrooms = rooms.filter(room => !room.spaceKind || room.spaceKind === 'classroom').length;
     const otherSpaces = Math.max(0, rooms.length - classrooms);
-    const activeBlock = blocks.find(block => block.id === values.__activeBlockId);
+    const activeBlock = blocks.find(block => block.id === values.__activeBlockId) || blocks[0] || null;
+    const activeFloors = Array.isArray(activeBlock?.floors) ? activeBlock.floors : [];
+    const firstFloor = activeFloors[0] || null;
+    const blockHasMeasures = _hasMeasures(activeBlock, 'largo_m', 'ancho_m');
+    const blockPositioned = _hasPosition(activeBlock?.planPosition || activeBlock?.plano_general);
+    const activeFloorsReady = activeFloors.length
+      ? activeFloors.every(floor => _hasMeasures(floor, 'largo_m', 'ancho_m') && _hasPosition(floor))
+      : true;
     return {
       blocks: blocks.length,
       classrooms,
@@ -480,18 +505,85 @@ const GuidedRegisterModule = (() => {
       baseMapSaved: Boolean(values.__planBaseMap?.confirmed || values.__planBaseMap?.savedAt),
       savedAtText: _formatDate(saved.savedAt),
       planTitle: activeBlock?.bloque_codigo || values.general?.nombre_institucion || 'Escuela en construccion',
+      activeBlock,
+      activeFloors,
+      firstFloor,
+      blockHasMeasures,
+      blockPositioned,
+      activeFloorsReady,
     };
   }
 
   function _stepDone(id, snap) {
     if (id === 'escuela') return Boolean(snap.savedAtText);
     if (id === 'predio') return snap.baseMapSaved;
-    if (id === 'bloques') return snap.blocks > 0;
+    if (id === 'bloques') return snap.blocks > 0 && snap.blockHasMeasures && snap.blockPositioned && snap.activeFloorsReady;
     if (id === 'ambientes') return snap.classrooms + snap.otherSpaces > 0;
     if (id === 'sanitarios') return snap.sanitaries > 0;
     if (id === 'exteriores') return snap.siteElements > 0;
     if (id === 'cierre') return snap.blocks + snap.classrooms + snap.sanitaries + snap.siteElements > 0;
     return false;
+  }
+
+  function _hasMeasures(item, lengthKey, widthKey) {
+    return Number(item?.[lengthKey] || 0) > 0 && Number(item?.[widthKey] || 0) > 0;
+  }
+
+  function _hasPosition(item) {
+    return Number.isFinite(Number(item?.xRatio)) && Number.isFinite(Number(item?.yRatio));
+  }
+
+  function _guidedNextHtml(stepId, snap) {
+    if (stepId !== 'bloques') return '';
+    if (!snap.blocks) {
+      return _guidedNextCard('Paso 1', 'Crear bloque y cargar medidas', 'Pulse iniciar bloque: se abrira la ficha para largo, ancho, estado y observaciones.', [
+        { label: 'Iniciar bloque', action: 'guidedBlock', primary: true },
+      ]);
+    }
+    if (!snap.blockHasMeasures) {
+      return _guidedNextCard('Paso 1', 'Medidas obligatorias del bloque', 'Complete largo y ancho antes de avanzar. Esas medidas fijan la escala para pisos y ambientes.', [
+        { label: 'Completar ficha bloque', action: 'blockFicha', primary: true },
+      ]);
+    }
+    if (!snap.blockPositioned) {
+      return _guidedNextCard('Paso 2', 'Ubicar el bloque en el plano', 'Arrastre el bloque sobre la base del predio. Luego podra cargar la ficha tecnica completa y sus pisos.', [
+        { label: 'Ubicar bloque', action: 'positionBlock', primary: true },
+        { label: 'Ficha bloque', action: 'blockFicha' },
+      ]);
+    }
+    if (!snap.activeFloors.length) {
+      return _guidedNextCard('Paso 3', '¿El bloque tiene piso registrable?', 'Si existe un piso, agreguelo y grafiquelo dentro del bloque. Si no corresponde, guarde el bloque sin pisos.', [
+        { label: 'Si, agregar piso', action: 'floorGuide', primary: true },
+        { label: 'Guardar sin pisos', action: 'saveBlock' },
+      ]);
+    }
+    if (!snap.activeFloorsReady) {
+      return _guidedNextCard('Paso 4', 'Graficar y medir el piso', 'El piso debe quedar dibujado sobre el bloque y con largo/ancho antes de incorporar aulas o sanitarios.', [
+        { label: 'Completar piso', action: 'floorGuide', primary: true },
+        { label: 'Ubicar bloque', action: 'positionBlock' },
+      ]);
+    }
+    return _guidedNextCard('Listo', 'Bloque y piso listos para ambientes', 'Ya puede avanzar a aulas, otros espacios o sanitarios con el plano como referencia principal.', [
+      { label: 'Aulas y espacios', action: 'next', primary: true },
+      { label: 'Nuevo bloque', action: 'guidedBlock' },
+    ], true);
+  }
+
+  function _guidedNextCard(kicker, title, body, actions = [], done = false) {
+    return `
+      <section class="guided-next-card ${done ? 'guided-next-card--done' : ''}">
+        <span>${_escape(kicker)}</span>
+        <strong>${_escape(title)}</strong>
+        <p>${_escape(body)}</p>
+        <div>
+          ${actions.map(action => `
+            <button class="btn ${action.primary ? 'btn-primary' : 'btn-outline'} btn-sm" type="button"
+              data-guided-action="${_escape(action.action)}"
+              data-guided-value="${_escape(action.value || '')}">
+              ${_escape(action.label)}
+            </button>`).join('')}
+        </div>
+      </section>`;
   }
 
   function _countEvidence(value, seen = new Set()) {
