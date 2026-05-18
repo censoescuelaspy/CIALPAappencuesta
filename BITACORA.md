@@ -4,6 +4,124 @@
 
 ---
 
+## Movimiento por teclado y fix drag-resize en elementos pequeños - 2026-05-18 - v2.6.35
+
+### Problema
+- Arrastrar un objeto pequeño (elemento tecnico de 6-10 px) disparaba un resize en lugar de un movimiento porque el radio del hit-area del handle (10 px) cubre el cuerpo entero del elemento.
+- No existia forma de mover objetos con las teclas de direccion del teclado.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- `siteAreaFromPoint` (dentro de `_bindSchoolPlanCanvas`): si el elemento tiene menos de 20 px en alguna dimension y el clic cae dentro del rectangulo del cuerpo, se devuelve hit de cuerpo (mover) en lugar de hit de handle (resize). Para elementos grandes el comportamiento es identico al anterior.
+- `_bindSchoolPlanCanvas`: `canvas.tabIndex = 0` + listener `keydown`. Flechas mueven el elemento seleccionado 5 px (Shift = 1 px fino, Alt = 20 px rapido).
+- Nueva funcion `nudgeSelectedPlanItem(dx, dy)`: mueve el elemento seleccionado segun su tipo — site-element via `_movePlanSiteElement`, bloque via `_movePlanBlock`, sanitario via `_movePlanSanitary`. Exportada como `MecFormModule.nudgeSelectedPlanItem`.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.35
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.35
+- `index.html` — spans app-version
+
+---
+
+### Proximos pasos
+- Probar en tablet que el canvas reciba foco al tocarlo y que las flechas del teclado fisico (si disponible) muevan el elemento.
+- Evaluar si se necesita soporte de nudge para elementos de tipo `floor` y `room` (actualmente solo site-element, block y sanitary).
+- Considerar agregar botones de direccion visibles en el panel contextual (▲ ▼ ◀ ▶) como alternativa tactil al teclado.
+- Revisar el dibujo interno de elementos tecnicos (service_connection, grounding) para que el volteo H/V sea visualmente distinguible (formas actualmente simetricas).
+
+---
+
+## Handles adaptativos y botones Voltear en panel contextual - 2026-05-18 - v2.6.34
+
+### Problema
+- Los cuadritos de resize (handles) tienen tamaño fijo (hit 22 px, visual 11 px) independientemente del tamaño del elemento, resultando desproporcionados en elementos tecnicos pequeños.
+- Los botones "Voltear H" y "Voltear V" solo eran accesibles desde el tab "Editar" del ribbon; no aparecian en el panel de acciones rapidas al seleccionar un elemento exterior.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- `_planResizeHandles`: tamaño de hit ahora escala segun `min(rect.w, rect.h)`: < 14 px → hit 10 px; 14-28 px → hit 14 px; > 28 px → hit 22 px (anterior).
+- `_drawPlanResizeHandles`: visual `half` escala: < 14 px → 3 px; 14-28 px → 4 px; > 28 px → 5.5 px. `lineWidth` tambien escala.
+- `_planSelectionContext` (rama `site::`): se agregan `Voltear H` y `Voltear V` al array de acciones del panel contextual.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.34
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.34
+- `index.html` — spans app-version
+
+---
+
+## Elementos tecnicos a escala y etiquetas de grilla corregidas - 2026-05-18 - v2.6.33
+
+### Problema
+- Los elementos del tipo "tecnico" (acometida, medidor, tablero, puesta a tierra) tenian un minimo de 30×26 px hardcodeado al renderizarse, lo que les impedia ocupar su tamaño real (tipicamente 0.1-0.5 m).
+- El limite de redimensionado por drag era fijo 18×14 px sin distincion de tipo.
+- `_syncSiteElementMeasuresFromRect` usaba `factorX = 120` para convertir wRatio → largo_m en elementos tecnicos, inconsistente con el `/ 10` introducido en v2.6.32.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- `_siteElementRect`: minimo de render `30×26 → 6×6` px para tipos tecnicos.
+- `_siteElementBlankPosition` y `_blockDrivenElementPosition`: mismo minimo 6×6 para tipos tecnicos.
+- Inicializacion de `resizeDrag` (rama `site-resize`): se agrega `elementType: element.type` al objeto.
+- Logica de drag minimum (linea `minW/minH`): si `elementType` es tecnico, minimo 6 px en lugar de 18/14.
+- `_syncSiteElementMeasuresFromRect`: `factorX/Y = 10` para tipos tecnicos (era 120); minimo de largo/ancho almacenado = 0.05 m (era 0.2 m).
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.33
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.33
+- `index.html` — spans app-version
+
+---
+
+## Correcciones de etiquetas de grilla y formula de elementos tecnicos - 2026-05-18 - v2.6.32
+
+### Problema
+1. `fmtM(0)` retornaba "0 mm" (cae en la rama `< 0.01` del formatter).
+2. Las etiquetas del eje de la grilla usaban `Math.abs(mRounded)`, causando que posiciones a la izquierda/arriba del origen del bloque mostraran los mismos valores positivos que el lado derecho/abajo (etiquetas duplicadas).
+3. Los elementos tecnicos (llaves electricas, tableros, medidor, puesta a tierra) no respondian visualmente a cambios de dimension en la ficha porque `largo / 120` hace que valores < 3 m siempre caigan en el minimo de wRatio.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- `fmtM`: agregado caso `v === 0 → '0 m'` antes de la cadena de condiciones.
+- Bucles de etiquetas horizontal y vertical en `_drawSchoolPlanGrid`: `if (mRounded < 0) continue` elimina etiquetas en posiciones negativas (izquierda/arriba del origen del bloque). Eliminado `Math.abs` del argumento de `fmtM`.
+- `_siteElementDimensionsFromFicha`: para tipos tecnicos, divisor `largo / 120 → largo / 10` y `ancho / 120 → ancho / 10`; minimos ajustados de `.025 → .018` y maximos de `.16/.14 → .12/.10`.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.32
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.32
+- `index.html` — spans app-version
+
+---
+
+## Bordes de bloque simples y etiquetas de eje en grilla - 2026-05-18 - v2.6.31
+
+### Problema
+- El borde grueso de los bloques ("muro grueso", 3 px + doble borde interior + relleno de cabecera) era visualmente pesado y confundia la escala.
+- La cuadricula no tenia indicacion numerica de posicion; el usuario no podia leer la distancia desde el origen del bloque al inspeccionar.
+- El indicador "m bordes" aparecia con valores absurdos (ej. 160 m) al seleccionar elementos pequeños de sitio porque usaba `metersPerPx` calculado para otro tipo de elemento.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- Dibujo de bloque: eliminados borde interior doble, relleno de cabecera y lineWidth = 3. Ahora: `fillRect` rgba(.20), `strokeRect` con `lineWidth = 1` (seleccionado: 2).
+- `_drawSchoolPlanGrid`: etiquetas numericas a lo largo del eje superior y del eje derecho. Formato automatico m/cm/mm. Fondo semi-opaco bajo cada etiqueta para legibilidad.
+- `_drawPlanDistanceGuides`: restringido solo a comparaciones bloque–bloque (`if (source.type !== 'block') return`).
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.31
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.31
+- `index.html` — spans app-version
+
+---
+
 ## Cuadricula a escala real y zoom extendido - 2026-05-18 - v2.6.30
 
 ### Problema
