@@ -11557,6 +11557,7 @@ const MecFormModule = (() => {
       _drawBlockInfrastructureHints(ctx, block, x, y, w, h);
       if (blockSelected) {
         _drawPlanRotateHandle(ctx, blockRect, 0);
+        _drawPlanResizeHandles(ctx, blockRect, 0);
         const handle = _planRotateHandle(blockRect, 0);
         _pushPlanHitArea({
           id: blockPlanId,
@@ -11572,6 +11573,13 @@ const MecFormModule = (() => {
           baseY: y,
           baseW: w,
           baseH: h,
+        });
+        _pushPlanResizeHitAreas({
+          id: blockPlanId,
+          type: 'block-resize',
+          rect: blockRect,
+          blockId: block.id,
+          floorCount: Math.max(1, _planFloorsForBlock(block).length),
         });
       }
 
@@ -11756,6 +11764,7 @@ const MecFormModule = (() => {
     }
     if (active) {
       _drawPlanRotateHandle(ctx, floorRect, _floorRotationDeg(floor));
+      _drawPlanResizeHandles(ctx, floorRect, 0);
       const handle = _planRotateHandle(floorRect, _floorRotationDeg(floor));
       _pushPlanHitArea({
         id: floorPlanId,
@@ -11773,6 +11782,18 @@ const MecFormModule = (() => {
         baseY: floorRect.y,
         baseW: floorRect.w,
         baseH: floorRect.h,
+        blockX: blockRect?.x,
+        blockY: blockRect?.y,
+        blockW: blockRect?.w,
+        blockH: blockRect?.h,
+      });
+      _pushPlanResizeHitAreas({
+        id: floorPlanId,
+        type: 'floor-resize',
+        rect: floorRect,
+        blockId: block.id,
+        floorId,
+        floor: floorLabel,
         blockX: blockRect?.x,
         blockY: blockRect?.y,
         blockW: blockRect?.w,
@@ -11902,6 +11923,59 @@ const MecFormModule = (() => {
     ctx.arc(handle.x, handle.y, 3.5, Math.PI * .1, Math.PI * 1.65);
     ctx.stroke();
     ctx.restore();
+  }
+
+  function _planResizeHandles(rect, rotation = 0) {
+    if (!rect) return [];
+    const center = _planRectCenter(rect);
+    const size = 22;
+    return [
+      { name: 'nw', x: rect.x, y: rect.y },
+      { name: 'ne', x: rect.x + rect.w, y: rect.y },
+      { name: 'se', x: rect.x + rect.w, y: rect.y + rect.h },
+      { name: 'sw', x: rect.x, y: rect.y + rect.h },
+    ].map(handle => ({
+      ..._rotatePointAround(center, { x: handle.x, y: handle.y }, rotation),
+      name: handle.name,
+      size,
+    }));
+  }
+
+  function _drawPlanResizeHandles(ctx, rect, rotation = 0) {
+    const handles = _planResizeHandles(rect, rotation);
+    if (!handles.length) return;
+    ctx.save();
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#111827';
+    ctx.lineWidth = 2;
+    handles.forEach(handle => {
+      const half = 5.5;
+      ctx.beginPath();
+      ctx.rect(handle.x - half, handle.y - half, half * 2, half * 2);
+      ctx.fill();
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function _pushPlanResizeHitAreas(base) {
+    if (!base?.rect || !base.type || !base.id) return;
+    _planResizeHandles(base.rect, base.rotation || 0).forEach(handle => {
+      _pushPlanHitArea({
+        ...base,
+        type: base.type,
+        id: base.id,
+        handle: handle.name,
+        x: handle.x - handle.size / 2,
+        y: handle.y - handle.size / 2,
+        w: handle.size,
+        h: handle.size,
+        baseX: base.rect.x,
+        baseY: base.rect.y,
+        baseW: base.rect.w,
+        baseH: base.rect.h,
+      });
+    });
   }
 
   function _siteElementRotateHandle(item, rect) {
@@ -12286,8 +12360,16 @@ const MecFormModule = (() => {
             baseH: rect.h,
           });
         }
+        _pushPlanResizeHitAreas({
+          id: `site::${item.id}`,
+          type: 'site-resize',
+          rect,
+          rotation: _siteElementRotationDeg(item),
+          siteId: item.id,
+        });
       }
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
+      if (selected) _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
     });
   }
 
@@ -12329,26 +12411,35 @@ const MecFormModule = (() => {
       const { block, length, width, floorCount } = model;
       const col = index % cols;
       const row = Math.floor(index / cols);
-      const bw = Math.max(70, length * scale);
+      let bw = Math.max(70, length * scale);
       const floorH = Math.max(34, width * scale);
-      const bh = Math.max(78, 68 + floorCount * floorH + Math.max(0, floorCount - 1) * floorGap);
+      let bh = Math.max(78, 68 + floorCount * floorH + Math.max(0, floorCount - 1) * floorGap);
       const cellX = 28 + col * cellW;
       const cellY = 36 + row * cellH;
       const autoX = cellX + Math.max(0, (cellW - bw) / 2);
       const autoY = cellY + Math.max(0, (cellH - bh) / 2);
       const saved = block.planPosition || block.plano_general || null;
+      const savedW = Number(saved?.wRatio);
+      const savedH = Number(saved?.hRatio);
+      if (Number.isFinite(savedW) && savedW > 0) bw = Math.max(70, Math.min(canvasW - 24, savedW * canvasW));
+      if (Number.isFinite(savedH) && savedH > 0) bh = Math.max(78, Math.min(canvasH - 24, savedH * canvasH));
       const savedX = Number(saved?.xRatio);
       const savedY = Number(saved?.yRatio);
       const x = Number.isFinite(savedX) ? savedX * canvasW : autoX;
       const y = Number.isFinite(savedY) ? savedY * canvasH : autoY;
       const clamped = _clampPlanRect({ x, y, w: bw, h: bh }, canvasW, canvasH);
+      const stackH = Math.max(1, bh - 68 - Math.max(0, floorCount - 1) * floorGap);
+      const scaleX = length ? bw / length : scale;
+      const scaleY = width ? (stackH / Math.max(1, floorCount)) / width : scaleX;
       return {
         block,
         x: clamped.x,
         y: clamped.y,
         w: bw,
         h: bh,
-        scale,
+        scale: (Number.isFinite(scaleX) && Number.isFinite(scaleY)) ? (scaleX + scaleY) / 2 : scale,
+        scaleX,
+        scaleY,
       };
     });
   }
@@ -12561,6 +12652,7 @@ const MecFormModule = (() => {
     }
     if (selected) {
       _drawPlanRotateHandle(ctx, rect, 0);
+      _drawPlanResizeHandles(ctx, rect, 0);
       const handle = _planRotateHandle(rect, 0);
       _pushPlanHitArea({
         id: `sanitary::${item.id}`,
@@ -12572,6 +12664,13 @@ const MecFormModule = (() => {
         h: handle.size,
         centerX: handle.center.x,
         centerY: handle.center.y,
+      });
+      _pushPlanResizeHitAreas({
+        id: `sanitary::${item.id}`,
+        type: 'sanitary-resize',
+        rect,
+        sanitaryId: item.id,
+        floorRect,
       });
     }
     _drawPlanSanitaryOpenings(ctx, item, x, y, w, h);
@@ -12769,6 +12868,7 @@ const MecFormModule = (() => {
     }
     if (selected) {
       _drawPlanRotateHandle(ctx, rect, 0);
+      _drawPlanResizeHandles(ctx, rect, 0);
       const handle = _planRotateHandle(rect, 0);
       _pushPlanHitArea({
         id: `room::${room.id}`,
@@ -12780,6 +12880,13 @@ const MecFormModule = (() => {
         h: handle.size,
         centerX: handle.center.x,
         centerY: handle.center.y,
+      });
+      _pushPlanResizeHitAreas({
+        id: `room::${room.id}`,
+        type: 'room-resize',
+        rect,
+        roomId: room.id,
+        floorRect,
       });
     }
     _drawPlanOpenings(ctx, room, x, y, w, h);
@@ -13578,7 +13685,7 @@ const MecFormModule = (() => {
   }
 
   function _siteElementBlankPosition(type, origin = 'plan', shape = '', excludeId = '') {
-    const logicalWidth = 900;
+    const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const size = _siteElementDefaultSize(type, shape);
     const w = Math.max(type === 'pillar' ? 18 : 30, size.wRatio * logicalWidth);
@@ -14426,7 +14533,7 @@ const MecFormModule = (() => {
     const block = _blockById(blockId);
     if (!block || !rect) return null;
     if (!_assertBlockUnlocked(block, 'moverlo')) return null;
-    const logicalWidth = 900;
+    const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const desired = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
     const clamped = _resolvePlanRectNoOverlap(desired, _planMoveBlockers('block', block.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
@@ -14434,7 +14541,7 @@ const MecFormModule = (() => {
       xRatio: clamped.x / logicalWidth,
       yRatio: clamped.y / logicalHeight,
     };
-    block.planPosition = position;
+    block.planPosition = { ...(block.planPosition || block.plano_general || {}), ...position };
     block.plano_general = { ...(block.plano_general || {}), ...position, rotacion_grados: String(_blockRotationDeg(block)) };
     _activePlanDrag = {
       id: `block::${block.id}`,
@@ -14478,7 +14585,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
     if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
-    const logicalWidth = 900;
+    const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const initial = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
     const snapped = _isSiteElementSnappable(element.type)
@@ -14497,6 +14604,335 @@ const MecFormModule = (() => {
     };
     _drawSchoolPlan();
     return clamped;
+  }
+
+  function _planResizeRectFromHandle(startRect, handleName, point, minW = 24, minH = 18, bounds = null) {
+    if (!startRect || !handleName || !point) return null;
+    const right = startRect.x + startRect.w;
+    const bottom = startRect.y + startRect.h;
+    let x = startRect.x;
+    let y = startRect.y;
+    let w = startRect.w;
+    let h = startRect.h;
+    if (handleName.includes('w')) {
+      x = Math.min(point.x, right - minW);
+      w = right - x;
+    }
+    if (handleName.includes('e')) w = Math.max(minW, point.x - x);
+    if (handleName.includes('n')) {
+      y = Math.min(point.y, bottom - minH);
+      h = bottom - y;
+    }
+    if (handleName.includes('s')) h = Math.max(minH, point.y - y);
+    const next = {
+      x: Math.round(x),
+      y: Math.round(y),
+      w: Math.round(Math.max(minW, w)),
+      h: Math.round(Math.max(minH, h)),
+    };
+    return bounds ? _clampRectToBounds(next, bounds) : next;
+  }
+
+  function _planBlockMeasureHeight(rect, floorCount = 1) {
+    return Math.max(1, Number(rect?.h || 0) - 68 - Math.max(0, floorCount - 1) * 34);
+  }
+
+  function _resizePlanBlock(blockId, rect, drag) {
+    const block = _blockById(blockId);
+    if (!block || !rect) return null;
+    if (!_assertBlockUnlocked(block, 'redimensionarlo')) return null;
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+    const desired = _clampPlanRect(rect, logicalWidth, logicalHeight);
+    const clamped = _resolvePlanRectNoOverlap(desired, _planMoveBlockers('block', block.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
+    const floorCount = Math.max(1, Number(drag?.floorCount || _planFloorsForBlock(block).length || 1));
+    const startLength = Number(drag?.startLength || block.largo_m || 0);
+    const startWidth = Number(drag?.startWidth || block.ancho_m || 0);
+    const startRect = drag?.rect || { ...clamped };
+    if (startLength && startRect.w) block.largo_m = Math.max(.5, startLength * (clamped.w / startRect.w)).toFixed(2);
+    else block.largo_m = Math.max(.5, clamped.w / 12).toFixed(2);
+    const startContentH = _planBlockMeasureHeight(startRect, floorCount);
+    const nextContentH = _planBlockMeasureHeight(clamped, floorCount);
+    if (startWidth && startContentH) block.ancho_m = Math.max(.5, startWidth * (nextContentH / startContentH)).toFixed(2);
+    else block.ancho_m = Math.max(.5, nextContentH / 12).toFixed(2);
+    const position = {
+      xRatio: clamped.x / logicalWidth,
+      yRatio: clamped.y / logicalHeight,
+      wRatio: clamped.w / logicalWidth,
+      hRatio: clamped.h / logicalHeight,
+    };
+    block.planPosition = { ...(block.planPosition || block.plano_general || {}), ...position };
+    block.plano_general = { ...(block.plano_general || {}), ...position, rotacion_grados: String(_blockRotationDeg(block)) };
+    _activePlanDrag = { id: `block::${block.id}`, blockId: block.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
+    _drawSchoolPlan();
+    return clamped;
+  }
+
+  function _planFloorResizeBlockers(block, floorId, blockRect) {
+    if (!block || !blockRect) return [];
+    const floors = _planFloorRecordsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
+    return floors
+      .map((floor, index) => _planFloorRectForRecord(
+        block,
+        floor,
+        _planFloorRect(blockRect.x, blockRect.y, blockRect.w, blockRect.h, index, floors.length, false),
+        blockRect
+      ))
+      .filter((_, index) => _floorRecordId(floors[index], _floorRecordLabel(floors[index])) !== floorId)
+      .filter(Boolean);
+  }
+
+  function _resizePlanFloor(blockId, floorId, rect, blockRect, drag) {
+    const block = _blockById(blockId);
+    const floor = _blockFloorRecord(block, floorId);
+    if (!block || !floor || !rect || !blockRect || floor.virtual) return null;
+    if (!_assertBlockUnlocked(block, 'redimensionar el piso')) return null;
+    const bounds = {
+      x: blockRect.x + 10,
+      y: blockRect.y + 40,
+      w: Math.max(50, blockRect.w - 20),
+      h: Math.max(42, blockRect.h - 52),
+    };
+    const clamped = _clampRectToBounds(rect, bounds);
+    if (_rectOverlapsAny(clamped, _planFloorResizeBlockers(block, floorId, blockRect), 2)) return null;
+    _saveFloorRectToRecord(block, floor, clamped, blockRect);
+    const startRect = drag?.rect || clamped;
+    const startLength = Number(drag?.startLength || floor.largo_m || 0);
+    const startWidth = Number(drag?.startWidth || floor.ancho_m || 0);
+    if (startLength && startRect.w) floor.largo_m = Math.max(.5, startLength * (clamped.w / startRect.w)).toFixed(2);
+    else if (block.largo_m) floor.largo_m = Math.max(.5, Number(block.largo_m) * (clamped.w / blockRect.w)).toFixed(2);
+    if (startWidth && startRect.h) floor.ancho_m = Math.max(.5, startWidth * (clamped.h / startRect.h)).toFixed(2);
+    else if (block.ancho_m) floor.ancho_m = Math.max(.5, Number(block.ancho_m) * (clamped.h / blockRect.h)).toFixed(2);
+    _activePlanDrag = { id: _floorRecordPlanId(block, floor), blockId: block.id, floorId: floor.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
+    _drawSchoolPlan();
+    return clamped;
+  }
+
+  function _planRectToSketchRect(rect, floorRect, minW = 24, minH = 18) {
+    const source = _sketchBlockRect();
+    if (!rect || !floorRect?.w || !floorRect?.h) return null;
+    return _clampRectToBounds({
+      x: Math.round(source.x + ((rect.x - floorRect.x) / floorRect.w) * source.w),
+      y: Math.round(source.y + ((rect.y - floorRect.y) / floorRect.h) * source.h),
+      w: Math.max(minW, Math.round((rect.w / floorRect.w) * source.w)),
+      h: Math.max(minH, Math.round((rect.h / floorRect.h) * source.h)),
+    }, source);
+  }
+
+  function _scaleSketchChildrenToRoom(objects, roomObject, previousRect) {
+    if (!objects || !roomObject || !previousRect?.w || !previousRect?.h) return;
+    const sx = roomObject.w / previousRect.w;
+    const sy = roomObject.h / previousRect.h;
+    objects.forEach(object => {
+      if (object.id === roomObject.id) return;
+      const scalePoint = point => ({
+        x: Math.round(roomObject.x + (point.x - previousRect.x) * sx),
+        y: Math.round(roomObject.y + (point.y - previousRect.y) * sy),
+      });
+      if (object.type === 'wall') {
+        const p1 = scalePoint({ x: object.x1, y: object.y1 });
+        const p2 = scalePoint({ x: object.x2, y: object.y2 });
+        object.x1 = p1.x;
+        object.y1 = p1.y;
+        object.x2 = p2.x;
+        object.y2 = p2.y;
+        return;
+      }
+      if (object.type === 'pencil') {
+        object.points = (object.points || []).map(scalePoint);
+        return;
+      }
+      if (object.x !== undefined && object.y !== undefined) {
+        const point = scalePoint(object);
+        object.x = point.x;
+        object.y = point.y;
+        if (object.w) object.w = Math.max(4, Math.round(object.w * sx));
+        if (object.h) object.h = Math.max(4, Math.round(object.h * sy));
+      }
+    });
+  }
+
+  function _roomPlanMeasureSource(room) {
+    const block = _blockById(room?.blockId);
+    const floor = _blockFloorRecord(block, _normalizeFloor(room?.floor || _activeFloor()));
+    return {
+      length: Number(floor?.largo_m || block?.largo_m || 0),
+      width: Number(floor?.ancho_m || block?.ancho_m || 0),
+    };
+  }
+
+  function _syncRoomMeasuresFromSketchObject(room, object) {
+    if (!room || !object) return;
+    const source = _sketchBlockRect();
+    const measures = _roomPlanMeasureSource(room);
+    if (measures.length) room.length = Math.max(.2, (object.w / source.w) * measures.length).toFixed(2);
+    if (measures.width) room.width = Math.max(.2, (object.h / source.h) * measures.width).toFixed(2);
+  }
+
+  function _resizePlanRoom(roomId, rect, floorRect) {
+    const room = _classroomById(roomId);
+    if (!room || !rect || !floorRect) return null;
+    if (!_assertClassroomUnlocked(room, 'redimensionarlo')) return null;
+    _activatePlanClassroom(room.id);
+    const activeRoom = _data.__classroomSketch || room;
+    activeRoom.objects = Array.isArray(activeRoom.objects) ? activeRoom.objects : [];
+    let object = _roomObjectForClassroom(activeRoom);
+    const target = _planRectToSketchRect(rect, floorRect, 30, 24);
+    if (!target) return null;
+    if (!object) {
+      object = { id: `room_${Date.now()}_${Math.floor(Math.random() * 1000)}`, type: 'room', ...target, ficha: { codigo: activeRoom.name || 'Ambiente' } };
+      activeRoom.objects.unshift(object);
+    }
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const resolved = _resolveRoomOverlap(previous, target);
+    object.x = resolved.x;
+    object.y = resolved.y;
+    object.w = resolved.w;
+    object.h = resolved.h;
+    _scaleSketchChildrenToRoom(activeRoom.objects, object, previous);
+    _syncRoomMeasuresFromSketchObject(activeRoom, object);
+    _reflowAttachedOpenings(object);
+    _syncActiveClassroomFromSketch();
+    _activePlanDrag = { id: `room::${room.id}`, roomId: room.id, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return rect;
+  }
+
+  function _syncSanitaryMeasuresFromSketchObject(item, object) {
+    if (!item || !object) return;
+    const source = _sketchBlockRect();
+    const block = _blockForSanitary(item);
+    const floor = _blockFloorRecord(block, _normalizeFloor(item.planta || _activeFloor()));
+    const length = Number(floor?.largo_m || block?.largo_m || 0);
+    const width = Number(floor?.ancho_m || block?.ancho_m || 0);
+    if (length) item.largo_m = Math.max(.2, (object.w / source.w) * length).toFixed(2);
+    if (width) item.ancho_m = Math.max(.2, (object.h / source.h) * width).toFixed(2);
+  }
+
+  function _resizePlanSanitary(sanitaryId, rect, floorRect) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    if (!item || !rect || !floorRect) return null;
+    if (!_assertSanitaryUnlocked(item, 'redimensionarlo')) return null;
+    _activatePlanSanitary(item.id);
+    const object = _ensureSanitaryRoomObject(item);
+    const target = _planRectToSketchRect(rect, floorRect, 28, 22);
+    if (!object || !target) return null;
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const resolved = _snapSanitaryRoomRect(item, target, previous);
+    if (_rectOverlapsAny(resolved, _sanitaryRoomBlockers(item), 2)) return null;
+    object.x = resolved.x;
+    object.y = resolved.y;
+    object.w = resolved.w;
+    object.h = resolved.h;
+    _scaleSketchChildrenToRoom(item.objects || [], object, previous);
+    _syncSanitaryMeasuresFromSketchObject(item, object);
+    _reflowSanitaryChildren(item);
+    _activePlanDrag = { id: `sanitary::${item.id}`, sanitaryId: item.id, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return rect;
+  }
+
+  function _syncSiteElementMeasuresFromRect(element, rect, logicalWidth, logicalHeight) {
+    if (!element || !rect) return;
+    element.ficha = element.ficha || {};
+    element.wRatio = Math.max(.006, rect.w / logicalWidth);
+    element.hRatio = Math.max(.006, rect.h / logicalHeight);
+    if (element.type === 'pillar') {
+      const measure = Math.max(.1, Math.max(rect.w, rect.h) / 42).toFixed(2);
+      if (String(element.ficha.forma_pilar || element.ficha.seccion || '').toLowerCase().includes('cuad')) element.ficha.lado_m = measure;
+      else element.ficha.diametro_m = measure;
+      return;
+    }
+    const factorX = ['stair', 'ramp'].includes(element.type) ? 70 : 120;
+    const factorY = ['stair', 'ramp'].includes(element.type) ? 38 : 120;
+    const largo = Math.max(.2, element.wRatio * factorX);
+    const ancho = Math.max(.2, element.hRatio * factorY);
+    element.ficha.largo_m = largo.toFixed(2);
+    element.ficha.ancho_m = ancho.toFixed(2);
+    if (element.type === 'water_tank') {
+      element.ficha.diametro_m = ((largo + ancho) / 2).toFixed(2);
+    }
+    if (['recreation', 'gallery', 'walkway', 'open_space', 'stair', 'ramp'].includes(element.type)) {
+      element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
+      element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
+    }
+  }
+
+  function _resizePlanSiteElement(elementId, rect) {
+    const element = _ensureSiteElements().find(item => item.id === elementId);
+    if (!element || !rect) return null;
+    if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+    const initial = _clampPlanRect(rect, logicalWidth, logicalHeight);
+    const clamped = _resolvePlanRectNoOverlap(initial, _planMoveBlockers('site', element.id, logicalWidth, logicalHeight), logicalWidth, logicalHeight, 2);
+    element.xRatio = clamped.x / logicalWidth;
+    element.yRatio = clamped.y / logicalHeight;
+    _syncSiteElementMeasuresFromRect(element, clamped, logicalWidth, logicalHeight);
+    _activePlanDrag = { id: `site::${element.id}`, siteId: element.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
+    _drawSchoolPlan();
+    return clamped;
+  }
+
+  function _planResizeDragConfig(area) {
+    if (!area || !String(area.type || '').endsWith('-resize')) return null;
+    const rect = { x: area.baseX ?? area.x, y: area.baseY ?? area.y, w: area.baseW ?? area.w, h: area.baseH ?? area.h };
+    if (area.type === 'block-resize') {
+      const block = _blockById(area.blockId);
+      if (!block) return null;
+      if (!_assertBlockUnlocked(block, 'redimensionarlo')) return null;
+      return {
+        type: 'block',
+        selectedId: `block::${area.blockId}`,
+        blockId: area.blockId,
+        handle: area.handle,
+        rect,
+        bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 },
+        floorCount: area.floorCount || Math.max(1, _planFloorsForBlock(block).length),
+        startLength: Number(block?.largo_m || 0),
+        startWidth: Number(block?.ancho_m || 0),
+        rotation: _blockRotationDeg(block),
+      };
+    }
+    if (area.type === 'floor-resize') {
+      const block = _blockById(area.blockId);
+      const floor = _blockFloorRecord(block, area.floorId);
+      if (!block || !floor) return null;
+      if (!_assertBlockUnlocked(block, 'redimensionar el piso')) return null;
+      const blockRect = { x: area.blockX || 0, y: area.blockY || 0, w: area.blockW || 0, h: area.blockH || 0 };
+      return {
+        type: 'floor',
+        selectedId: _floorRecordPlanId(block, floor),
+        blockId: area.blockId,
+        floorId: area.floorId,
+        handle: area.handle,
+        rect,
+        blockRect,
+        bounds: { x: blockRect.x + 10, y: blockRect.y + 40, w: Math.max(50, blockRect.w - 20), h: Math.max(42, blockRect.h - 52) },
+        startLength: Number(floor?.largo_m || 0),
+        startWidth: Number(floor?.ancho_m || 0),
+        rotation: _floorRotationDeg(floor),
+      };
+    }
+    if (area.type === 'room-resize') {
+      const room = _classroomById(area.roomId);
+      if (!room) return null;
+      if (!_assertClassroomUnlocked(room, 'redimensionarlo')) return null;
+      return { type: 'room', selectedId: `room::${area.roomId}`, roomId: area.roomId, handle: area.handle, rect, floorRect: area.floorRect, bounds: area.floorRect, rotation: _roomRotationDeg(room) };
+    }
+    if (area.type === 'sanitary-resize') {
+      const sanitary = (_data.__sanitaries || []).find(item => item.id === area.sanitaryId);
+      if (!sanitary) return null;
+      if (!_assertSanitaryUnlocked(sanitary, 'redimensionarlo')) return null;
+      return { type: 'sanitary', selectedId: `sanitary::${area.sanitaryId}`, sanitaryId: area.sanitaryId, handle: area.handle, rect, floorRect: area.floorRect, bounds: area.floorRect, rotation: _sanitaryRotationDeg(sanitary) };
+    }
+    if (area.type === 'site-resize') {
+      const element = _ensureSiteElements().find(item => item.id === area.siteId);
+      if (!element) return null;
+      if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
+      return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element) };
+    }
+    return null;
   }
 
   function rotatePlanSiteElement(elementId, delta = 15) {
@@ -14666,6 +15102,7 @@ const MecFormModule = (() => {
     let pointerStart = null;
     let blockDrag = null;
     let rotateDrag = null;
+    let resizeDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
     let planPinch = null;
@@ -14723,6 +15160,7 @@ const MecFormModule = (() => {
         pointerStart = null;
         blockDrag = null;
         rotateDrag = null;
+        resizeDrag = null;
         suppressClickUntil = Date.now() + 350;
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
@@ -14745,6 +15183,15 @@ const MecFormModule = (() => {
         };
         pointerCandidate = null;
         _selectedPlanId = rotateConfig.selectedId;
+        _activatePlanSelection(_selectedPlanId);
+        event.preventDefault();
+        return;
+      }
+      const resizeConfig = _planResizeDragConfig(area);
+      if (resizeConfig) {
+        resizeDrag = resizeConfig;
+        pointerCandidate = null;
+        _selectedPlanId = resizeConfig.selectedId;
         _activatePlanSelection(_selectedPlanId);
         event.preventDefault();
         return;
@@ -14784,6 +15231,24 @@ const MecFormModule = (() => {
           h: 0,
         };
         _drawSchoolPlan();
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
+      if (resizeDrag) {
+        const resizePoint = resizeDrag.rotation
+          ? _rotatePointAround(_planRectCenter(resizeDrag.rect), currentPoint, -resizeDrag.rotation)
+          : currentPoint;
+        const minW = resizeDrag.type === 'block' ? 70 : resizeDrag.type === 'floor' ? 44 : resizeDrag.type === 'site-element' ? 18 : 24;
+        const minH = resizeDrag.type === 'block' ? 78 : resizeDrag.type === 'floor' ? 32 : resizeDrag.type === 'site-element' ? 14 : 18;
+        const rect = _planResizeRectFromHandle(resizeDrag.rect, resizeDrag.handle, resizePoint, minW, minH, resizeDrag.bounds);
+        if (rect) {
+          if (resizeDrag.type === 'block') _resizePlanBlock(resizeDrag.blockId, rect, resizeDrag);
+          else if (resizeDrag.type === 'floor') _resizePlanFloor(resizeDrag.blockId, resizeDrag.floorId, rect, resizeDrag.blockRect, resizeDrag);
+          else if (resizeDrag.type === 'room') _resizePlanRoom(resizeDrag.roomId, rect, resizeDrag.floorRect);
+          else if (resizeDrag.type === 'sanitary') _resizePlanSanitary(resizeDrag.sanitaryId, rect, resizeDrag.floorRect);
+          else if (resizeDrag.type === 'site-element') _resizePlanSiteElement(resizeDrag.siteId, rect);
+        }
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -14851,12 +15316,27 @@ const MecFormModule = (() => {
         pointerStart = null;
         blockDrag = null;
         rotateDrag = null;
+        resizeDrag = null;
         event.preventDefault();
         return;
       }
       if (rotateDrag) {
         const selectedId = rotateDrag.selectedId;
         rotateDrag = null;
+        pointerCandidate = null;
+        pointerStart = null;
+        _activePlanDrag = null;
+        _selectedPlanId = selectedId;
+        _activatePlanSelection(_selectedPlanId);
+        _saveDraft(false);
+        renderSchoolPlan();
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
+      if (resizeDrag) {
+        const selectedId = resizeDrag.selectedId;
+        resizeDrag = null;
         pointerCandidate = null;
         pointerStart = null;
         _activePlanDrag = null;
@@ -14902,6 +15382,7 @@ const MecFormModule = (() => {
       pointerStart = null;
       blockDrag = null;
       rotateDrag = null;
+      resizeDrag = null;
       _activePlanDrag = null;
     });
     canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);

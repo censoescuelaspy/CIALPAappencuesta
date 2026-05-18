@@ -4,6 +4,32 @@
 
 ---
 
+## Sesion de redimensionamiento por vertices - 2026-05-17 - v2.6.11
+
+### Objetivo
+- Permitir que bloques, pisos, aulas, sanitarios y elementos exteriores cambien de tamano directamente desde el plano.
+- Hacer que el usuario pueda ajustar medidas tirando desde cualquier esquina visible del elemento seleccionado.
+
+### Cambios implementados
+- Se agregaron manijas de esquina al seleccionar bloques, pisos, aulas/espacios, sanitarios y elementos exteriores.
+- El arrastre de una esquina actualiza geometria visible, posicion, largo/ancho y ficha asociada segun el tipo de elemento.
+- Los bloques guardan tambien proporcion visual del plano para que el estiramiento no se pierda al redibujar.
+- Los pisos guardan proporcion dentro del bloque, largo, ancho y posicion relativa.
+- Aulas y sanitarios sincronizan su rectangulo interno de croquis, medidas y elementos hijos al redimensionarse desde el plano general.
+- Elementos exteriores como tanque, recreacion, galeria, caminero, espacio libre, pilar, escalera y rampa actualizan ratios y medidas desde el arrastre.
+- Se mantuvieron bloqueos: elementos bloqueados no pueden redimensionarse hasta ser desbloqueados.
+- Se ajusto el ancho logico dinamico tambien para movimientos y nuevas ubicaciones exteriores, evitando volver a depender de 900 px fijos.
+- Version y cache actualizados a `v2.6.11`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
 ## Sesion de guia de relevamiento por bloque y piso - 2026-05-17 - v2.6.10
 
 ### Objetivo
