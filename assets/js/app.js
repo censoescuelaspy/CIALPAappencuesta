@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.20
+ * Version: 2.6.21
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -35,11 +35,20 @@ const UI = (() => {
 
   function showToast(message, type = 'info', duration = 4000) {
     if (!_toastContainer) return;
+    const normalizedType = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+    const maxVisible = normalizedType === 'success' ? 2 : 3;
+    const existingToasts = [..._toastContainer.querySelectorAll('.toast')];
+    existingToasts
+      .slice(0, Math.max(0, existingToasts.length - (maxVisible - 1)))
+      .forEach(item => item.remove());
+    const timeout = normalizedType === 'success'
+      ? Math.min(Number(duration) || 1600, 1600)
+      : Number(duration);
     const toast = document.createElement('div');
-    toast.className = `toast toast--${type}`;
+    toast.className = `toast toast--${normalizedType}`;
     const icon = document.createElement('span');
     icon.className = 'toast__icon';
-    icon.textContent = _toastIcon(type);
+    icon.textContent = _toastIcon(normalizedType);
     const text = document.createElement('span');
     text.className = 'toast__message';
     text.textContent = String(message || '');
@@ -51,11 +60,11 @@ const UI = (() => {
     toast.append(icon, text, close);
     _toastContainer.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('toast--visible'));
-    if (duration > 0) {
+    if (timeout > 0) {
       setTimeout(() => {
         toast.classList.remove('toast--visible');
         setTimeout(() => toast.remove(), 300);
-      }, duration);
+      }, timeout);
     }
     return toast;
   }
@@ -595,26 +604,22 @@ const AppController = (() => {
   }
 
   async function updateApp() {
-    UI.showToast('Buscando la edición vigente y actualizando caché de la app...', 'info');
+    UI.showToast('Limpiando caché y reiniciando la app…', 'info');
     try {
-      if (_swRegistration) {
-        await _swRegistration.update();
-        const waiting = _swRegistration.waiting || _swRegistration.installing;
-        if (waiting) waiting.postMessage({ type: 'SKIP_WAITING' });
-      }
       if ('caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys
-          .filter(key => key.startsWith('cialpa-') && !key.startsWith('cialpa-map-tiles'))
+          .filter(key => !key.startsWith('cialpa-map-tiles'))
           .map(key => caches.delete(key)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map(reg => reg.unregister()));
       }
     } catch (err) {
       console.warn('Actualización manual incompleta:', err);
     }
-    const url = new URL(window.location.href);
-    url.searchParams.set('v', APP_CONFIG.VERSION);
-    url.searchParams.set('t', Date.now());
-    window.location.replace(url.toString());
+    window.location.replace(window.location.pathname + '?_=' + Date.now());
   }
 
   function _openConfiguredUrl(url, label) {

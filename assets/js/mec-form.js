@@ -55,6 +55,10 @@ const MecFormModule = (() => {
     { id: 'exportar', label: 'Exportar', icon: '&#8681;' },
   ];
 
+  const PLAN_WALL_THICKNESS = 7;
+  const PLAN_OPENING_STROKE = 1.5;
+  const PLAN_VERTEX_HANDLE_SIZE = 12;
+
   const SKETCH_CANVAS = { width: 760, height: 460 };
   const BLOCK_ELECTRIC_FIELDS = [
     'tablero_estado',
@@ -2095,6 +2099,7 @@ const MecFormModule = (() => {
       openings: sketch.openings || '',
       locked: Boolean(sketch.locked),
       lockedAt: sketch.lockedAt || '',
+      planShape: _clonePlanShape(sketch.planShape || _roomObjectForClassroom(sketch)?.planShape),
       objects: sketch.objects || [],
     }));
   }
@@ -2219,6 +2224,108 @@ const MecFormModule = (() => {
     return (room?.objects || []).find(object => object.type === 'room') ||
       (room?.objects || []).find(object => object.type === 'sanitary-room') ||
       null;
+  }
+
+  function _clonePlanShape(shape) {
+    const points = Array.isArray(shape?.points)
+      ? shape.points
+        .map(point => ({
+          x: Number(point?.x),
+          y: Number(point?.y),
+        }))
+        .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+      : [];
+    if (points.length < 3) return null;
+    return {
+      type: shape?.type || 'polygon',
+      points: points.map(point => ({
+        x: Math.max(0, Math.min(1, point.x)),
+        y: Math.max(0, Math.min(1, point.y)),
+      })),
+    };
+  }
+
+  function _defaultPlanShape(kind = 'l') {
+    if (kind === 'rect') return null;
+    return {
+      type: kind === 'l' ? 'l-shape' : 'polygon',
+      points: [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: .56 },
+        { x: .58, y: .56 },
+        { x: .58, y: 1 },
+        { x: 0, y: 1 },
+      ],
+    };
+  }
+
+  function _planShapePoints(record, rect) {
+    const shape = _clonePlanShape(record?.planShape);
+    if (!shape || !rect?.w || !rect?.h) return null;
+    return shape.points.map(point => ({
+      x: rect.x + point.x * rect.w,
+      y: rect.y + point.y * rect.h,
+    }));
+  }
+
+  function _syncRoomShapeObject(room) {
+    const object = _roomObjectForClassroom(room);
+    if (!object) return;
+    const shape = _clonePlanShape(room?.planShape);
+    if (shape) object.planShape = shape;
+    else delete object.planShape;
+  }
+
+  function _ensurePlanShape(record, kind = 'l') {
+    if (!record) return null;
+    const current = _clonePlanShape(record.planShape);
+    if (current) return current;
+    const shape = _defaultPlanShape(kind);
+    record.planShape = shape;
+    return shape;
+  }
+
+  function _insertPlanShapeVertex(record) {
+    const shape = _ensurePlanShape(record, 'l');
+    if (!shape?.points?.length) return null;
+    let edgeIndex = 0;
+    let maxDistance = -1;
+    shape.points.forEach((point, index) => {
+      const next = shape.points[(index + 1) % shape.points.length];
+      const distance = Math.hypot(next.x - point.x, next.y - point.y);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        edgeIndex = index;
+      }
+    });
+    const a = shape.points[edgeIndex];
+    const b = shape.points[(edgeIndex + 1) % shape.points.length];
+    shape.points.splice(edgeIndex + 1, 0, {
+      x: Math.max(0, Math.min(1, (a.x + b.x) / 2)),
+      y: Math.max(0, Math.min(1, (a.y + b.y) / 2)),
+    });
+    record.planShape = shape;
+    return shape;
+  }
+
+  function _removePlanShapeVertex(record) {
+    const shape = _clonePlanShape(record?.planShape);
+    if (!shape || shape.points.length <= 3) return null;
+    shape.points.pop();
+    record.planShape = shape;
+    return shape;
+  }
+
+  function _setPlanShapeVertex(record, index, point, rect) {
+    const shape = _clonePlanShape(record?.planShape);
+    if (!shape || !rect?.w || !rect?.h || !shape.points[index]) return null;
+    shape.points[index] = {
+      x: Math.max(0, Math.min(1, (point.x - rect.x) / rect.w)),
+      y: Math.max(0, Math.min(1, (point.y - rect.y) / rect.h)),
+    };
+    record.planShape = shape;
+    return shape;
   }
 
   function _sketchRoomsForActiveBlockFloor() {
@@ -6586,13 +6693,10 @@ const MecFormModule = (() => {
     ctx.save();
     ctx.globalAlpha = .66;
     ctx.fillStyle = 'rgba(128,90,213,.095)';
-    ctx.strokeStyle = 'rgba(128,90,213,.62)';
-    ctx.lineWidth = 2.2;
     ctx.fillRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
+    ctx.strokeStyle = 'rgba(5,5,5,.82)';
+    ctx.lineWidth = 7;
     ctx.strokeRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
-    ctx.strokeStyle = 'rgba(128,90,213,.32)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
     _labelSketchObject(ctx, roomObject, item.codigo || 'Sanitario', roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
     (item.objects || [])
       .filter(object => object.id !== roomObject.id)
@@ -6602,13 +6706,10 @@ const MecFormModule = (() => {
 
   function _drawContextRoom(ctx, room, roomObject) {
     ctx.fillStyle = 'rgba(43,108,176,.065)';
-    ctx.strokeStyle = 'rgba(43,108,176,.44)';
-    ctx.lineWidth = 2;
     ctx.fillRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
+    ctx.strokeStyle = 'rgba(5,5,5,.78)';
+    ctx.lineWidth = 7;
     ctx.strokeRect(roomObject.x, roomObject.y, roomObject.w, roomObject.h);
-    ctx.strokeStyle = 'rgba(43,108,176,.25)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(roomObject.x + 5, roomObject.y + 5, Math.max(0, roomObject.w - 10), Math.max(0, roomObject.h - 10));
     _labelSketchObject(ctx, roomObject, room.name || 'Aula', roomObject.x + roomObject.w / 2, roomObject.y - 14, true);
   }
 
@@ -7016,21 +7117,45 @@ const MecFormModule = (() => {
     const style = _sketchStyle('room');
     ctx.fillStyle = style.fill;
     ctx.fillRect(object.x, object.y, object.w, object.h);
-    ctx.strokeStyle = selected ? '#111827' : style.stroke;
-    ctx.lineWidth = selected ? 4 : style.lineWidth;
+    ctx.strokeStyle = '#050505';
+    ctx.lineWidth = selected ? 10 : 8;
+    ctx.lineJoin = 'miter';
     ctx.strokeRect(object.x, object.y, object.w, object.h);
-    ctx.strokeStyle = 'rgba(23,32,51,.72)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(object.x + 7, object.y + 7, Math.max(0, object.w - 14), Math.max(0, object.h - 14));
+    _drawSketchOpeningCuts(ctx, object, _data.__classroomSketch?.objects || []);
+    if (selected) {
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(object.x - 7, object.y - 7, object.w + 14, object.h + 14);
+      ctx.setLineDash([]);
+    }
     _labelSketchObject(ctx, object, _sketchVisualLabel(object, selected), object.x + object.w / 2, object.y - 14);
     if (_isResizableSketchObject(object)) _drawResizeHandles(ctx, object, selected);
     _drawSketchRotateHandle(ctx, object, selected);
   }
 
+  function _drawSketchOpeningCuts(ctx, roomObject, objects = []) {
+    const openings = (objects || []).filter(object => ['door', 'window'].includes(object.type));
+    if (!roomObject || !openings.length) return;
+    ctx.save();
+    ctx.strokeStyle = '#fbfcfe';
+    ctx.lineWidth = 11;
+    ctx.lineCap = 'butt';
+    openings.forEach(object => {
+      const segment = _openingCutSegment(roomObject, object, _openingSide(object));
+      if (!segment) return;
+      ctx.beginPath();
+      ctx.moveTo(segment.x1, segment.y1);
+      ctx.lineTo(segment.x2, segment.y2);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
   function _drawDoorObject(ctx, object, selected) {
     const swing = object.ficha?.abre_hacia === 'Exterior' ? -1 : 1;
     const vertical = _openingSide(object) === 'left' || _openingSide(object) === 'right';
-    const thickness = 8;
+    const thickness = 5;
     if (vertical) object.w = thickness;
     else object.h = thickness;
     const length = vertical ? object.h : object.w;
@@ -7041,7 +7166,7 @@ const MecFormModule = (() => {
     const variant = _doorVariant(object);
     ctx.fillStyle = selected ? 'rgba(47,133,90,.28)' : (variant === 'opening' ? 'rgba(255,255,255,.92)' : 'rgba(47,133,90,.16)');
     ctx.strokeStyle = selected ? '#111827' : (variant === 'opening' ? '#667085' : '#2f855a');
-    ctx.lineWidth = selected ? 3 : 2;
+    ctx.lineWidth = selected ? 2.2 : 1.4;
     ctx.fillRect(object.x, object.y, object.w, object.h);
     ctx.strokeRect(object.x, object.y, object.w, object.h);
     if (variant !== 'door') {
@@ -7314,8 +7439,8 @@ const MecFormModule = (() => {
     return {
       room: { stroke: '#172033', fill: 'rgba(226,232,240,.28)', lineWidth: 4 },
       wall: { stroke: '#172033', fill: 'transparent', lineWidth: 5 },
-      door: { stroke: '#2f855a', fill: 'rgba(47,133,90,.16)', lineWidth: 3 },
-      window: { stroke: '#2b6cb0', fill: 'rgba(43,108,176,.14)', lineWidth: 3 },
+      door: { stroke: '#2f855a', fill: 'rgba(47,133,90,.12)', lineWidth: 1.6 },
+      window: { stroke: '#2b6cb0', fill: 'rgba(43,108,176,.1)', lineWidth: 1.6 },
       stair: { stroke: '#4a5568', fill: 'rgba(74,85,104,.14)', lineWidth: 3 },
       stall: { stroke: '#4b5563', fill: 'rgba(107,114,128,.12)', lineWidth: 2 },
       board: { stroke: '#4a5568', fill: 'rgba(74,85,104,.16)', lineWidth: 3 },
@@ -7732,7 +7857,6 @@ const MecFormModule = (() => {
 
   function _announceRotation(object) {
     if (!object) return;
-    UI.showToast(`Rotacion de ${_sketchLabel(object.type)}: ${_sketchObjectRotationDeg(object)} grados.`, 'success');
   }
 
   function _resizeHandles(object) {
@@ -10644,14 +10768,30 @@ const MecFormModule = (() => {
   function _renderPlanRibbonPanel(tab = _planRibbonTab) {
     const activeTab = _normalizePlanRibbonTab(tab);
     if (activeTab === 'insertar') {
-      return [
+      const sel = String(_selectedPlanId || '');
+      const hasRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
+      const hasSanitary = sel.startsWith('sanitary::');
+      const groups = [
         _renderPlanRibbonGroup('Ambientes', [
           _renderPlanRibbonButton({ icon: '+A', label: 'Aula', onClick: 'MecFormModule.newPlanClassroom()', tone: 'btn-primary', title: 'Crear aula' }),
           _renderPlanRibbonButton({ icon: '+E', label: 'Espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')", title: 'Crear otro espacio' }),
           _renderPlanRibbonButton({ icon: '+WC', label: 'Sanitario', onClick: 'MecFormModule.addPlanSanitary()', title: 'Crear sanitario' }),
         ].join('')),
         _renderPlanRibbonGroup('Exteriores', _renderSiteElementToolset('plan', 'compact'), 'school-plan-ribbon__group--wide'),
-      ].join('');
+      ];
+      if (hasRoom) {
+        groups.push(_renderPlanRibbonGroup('Aberturas del aula', [
+          _renderPlanRibbonButton({ icon: 'P', label: 'Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')", tone: 'btn-primary', title: 'Agregar puerta al aula seleccionada' }),
+          _renderPlanRibbonButton({ icon: 'V', label: 'Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')", tone: 'btn-secondary', title: 'Agregar ventana al aula seleccionada' }),
+        ].join('')));
+      }
+      if (hasSanitary) {
+        groups.push(_renderPlanRibbonGroup('Aberturas del sanitario', [
+          _renderPlanRibbonButton({ icon: 'P', label: 'Puerta', onClick: "MecFormModule.addPlanSanitaryOpening('door')", tone: 'btn-primary', title: 'Agregar puerta al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: 'V', label: 'Ventana', onClick: "MecFormModule.addPlanSanitaryOpening('window')", tone: 'btn-secondary', title: 'Agregar ventana al sanitario seleccionado' }),
+        ].join('')));
+      }
+      return groups.join('');
     }
     if (activeTab === 'vista') {
       return [
@@ -10742,9 +10882,12 @@ const MecFormModule = (() => {
 
   function _isPlanRibbonDuplicateAction(action = {}) {
     const label = String(action.label || '').toLowerCase();
-    return label.startsWith('girar ')
-      || label === '0 grados'
-      || label.startsWith('eliminar ');
+    if (label.startsWith('girar ') || label === '0 grados' || label.startsWith('eliminar ')) return true;
+    const sel = String(_selectedPlanId || '');
+    const hasRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
+    const hasSanitary = sel.startsWith('sanitary::');
+    if ((hasRoom || hasSanitary) && (label === '+ puerta' || label === '+ ventana')) return true;
+    return false;
   }
 
   function _selectedPlanLockAction(id = _selectedPlanId) {
@@ -10983,6 +11126,10 @@ const MecFormModule = (() => {
           { label: '+ Aire', onClick: "MecFormModule.addPlanClassroomElement('ac')" },
           { label: '+ Daño', onClick: "MecFormModule.addPlanClassroomElement('damage')" },
           { label: '+ Escalera', onClick: "MecFormModule.addPlanClassroomElement('stair')" },
+          { label: 'Forma L', onClick: `MecFormModule.setPlanClassroomShape('${_escape(room.id)}', 'l')` },
+          { label: '+ Vertice', onClick: `MecFormModule.addPlanClassroomVertex('${_escape(room.id)}')` },
+          { label: '- Vertice', onClick: `MecFormModule.removePlanClassroomVertex('${_escape(room.id)}')` },
+          { label: 'Rectangular', onClick: `MecFormModule.setPlanClassroomShape('${_escape(room.id)}', 'rect')` },
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanRoom('${_escape(room.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanRoom('${_escape(room.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanRoom('${_escape(room.id)}', ${-_roomRotationDeg(room)})` },
@@ -11022,6 +11169,10 @@ const MecFormModule = (() => {
           { label: '+ Foco', onClick: "MecFormModule.addPlanSanitaryElement('light')" },
           { label: '+ Ventilador', onClick: "MecFormModule.addPlanSanitaryElement('fan')" },
           { label: '+ Aire', onClick: "MecFormModule.addPlanSanitaryElement('ac')" },
+          { label: 'Forma L', onClick: `MecFormModule.setPlanSanitaryShape('${_escape(item.id)}', 'l')` },
+          { label: '+ Vertice', onClick: `MecFormModule.addPlanSanitaryVertex('${_escape(item.id)}')` },
+          { label: '- Vertice', onClick: `MecFormModule.removePlanSanitaryVertex('${_escape(item.id)}')` },
+          { label: 'Rectangular', onClick: `MecFormModule.setPlanSanitaryShape('${_escape(item.id)}', 'rect')` },
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSanitary('${_escape(item.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSanitary('${_escape(item.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanSanitary('${_escape(item.id)}', ${-_sanitaryRotationDeg(item)})` },
@@ -11853,6 +12004,151 @@ const MecFormModule = (() => {
       w: Math.max(8, (object.w || 0) * sx),
       h: Math.max(8, (object.h || 0) * sy),
     };
+  }
+
+  function _drawPlanShapePath(ctx, points) {
+    if (!Array.isArray(points) || points.length < 3) return false;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
+    ctx.closePath();
+    return true;
+  }
+
+  function _drawPlanRoomShell(ctx, rect, options = {}) {
+    const { selected = false, fill = 'rgba(43,108,176,.08)', accent = '#2563eb', points = null } = options;
+    ctx.save();
+    ctx.fillStyle = fill;
+    ctx.strokeStyle = '#050505';
+    ctx.lineWidth = PLAN_WALL_THICKNESS;
+    ctx.lineJoin = 'miter';
+    if (points?.length >= 3 && _drawPlanShapePath(ctx, points)) {
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    if (selected) {
+      ctx.strokeStyle = accent;
+      ctx.lineWidth = 1.7;
+      ctx.setLineDash([5, 4]);
+      if (points?.length >= 3 && _drawPlanShapePath(ctx, points)) ctx.stroke();
+      else ctx.strokeRect(rect.x - 6, rect.y - 6, rect.w + 12, rect.h + 12);
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
+
+  function _openingCutSegment(parentRect, objectRect, side) {
+    if (!parentRect || !objectRect) return null;
+    const pad = 2;
+    if (side === 'left' || side === 'right') {
+      const x = side === 'left' ? parentRect.x : parentRect.x + parentRect.w;
+      const y1 = Math.max(parentRect.y, objectRect.y - pad);
+      const y2 = Math.min(parentRect.y + parentRect.h, objectRect.y + objectRect.h + pad);
+      return y2 > y1 ? { x1: x, y1, x2: x, y2 } : null;
+    }
+    const y = side === 'bottom' ? parentRect.y + parentRect.h : parentRect.y;
+    const x1 = Math.max(parentRect.x, objectRect.x - pad);
+    const x2 = Math.min(parentRect.x + parentRect.w, objectRect.x + objectRect.w + pad);
+    return x2 > x1 ? { x1, y1: y, x2, y2: y } : null;
+  }
+
+  function _openingCutSegmentOnPolygon(polyPoints, objectRect) {
+    if (!polyPoints || polyPoints.length < 3 || !objectRect) return null;
+    const cx = objectRect.x + objectRect.w / 2;
+    const cy = objectRect.y + objectRect.h / 2;
+    const pad = 2;
+    let bestEdge = null;
+    let bestDist = Infinity;
+    let bestProj = null;
+    for (let i = 0; i < polyPoints.length; i++) {
+      const p1 = polyPoints[i];
+      const p2 = polyPoints[(i + 1) % polyPoints.length];
+      const edx = p2.x - p1.x;
+      const edy = p2.y - p1.y;
+      const len2 = edx * edx + edy * edy;
+      if (len2 < 0.001) continue;
+      const t = Math.max(0, Math.min(1, ((cx - p1.x) * edx + (cy - p1.y) * edy) / len2));
+      const px = p1.x + t * edx;
+      const py = p1.y + t * edy;
+      const dist = Math.hypot(cx - px, cy - py);
+      if (dist < bestDist) {
+        bestDist = dist;
+        const len = Math.sqrt(len2);
+        bestEdge = { dx: edx / len, dy: edy / len };
+        bestProj = { x: px, y: py };
+      }
+    }
+    if (!bestEdge || !bestProj) return null;
+    const halfOpen = (Math.abs(objectRect.w * bestEdge.dx) + Math.abs(objectRect.h * bestEdge.dy)) / 2;
+    const halfLen = Math.max(4, halfOpen + pad);
+    return {
+      x1: bestProj.x - bestEdge.dx * halfLen,
+      y1: bestProj.y - bestEdge.dy * halfLen,
+      x2: bestProj.x + bestEdge.dx * halfLen,
+      y2: bestProj.y + bestEdge.dy * halfLen,
+    };
+  }
+
+  function _drawPlanOpeningCuts(ctx, objects, roomObject, parentRect, shapePoints = null) {
+    if (!_planLayers.aberturas || !roomObject || !parentRect) return;
+    const openings = (objects || []).filter(object => ['door', 'window'].includes(object.type));
+    if (!openings.length) return;
+    const usePolygon = shapePoints && shapePoints.length >= 3;
+    ctx.save();
+    ctx.strokeStyle = '#f8fafc';
+    ctx.lineWidth = PLAN_WALL_THICKNESS + 3;
+    ctx.lineCap = 'butt';
+    openings.forEach(object => {
+      const objectRect = _planChildObjectRect(roomObject, object, parentRect);
+      const segment = usePolygon
+        ? _openingCutSegmentOnPolygon(shapePoints, objectRect)
+        : _openingCutSegment(parentRect, objectRect, _openingSide(object));
+      if (!segment) return;
+      ctx.beginPath();
+      ctx.moveTo(segment.x1, segment.y1);
+      ctx.lineTo(segment.x2, segment.y2);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  function _drawPlanShapeVertices(ctx, record, rect, selectedId, type, extra = {}) {
+    const points = _planShapePoints(record, rect);
+    if (!points?.length) return;
+    ctx.save();
+    points.forEach((point, index) => {
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, PLAN_VERTEX_HANDLE_SIZE / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#111827';
+      ctx.font = _canvasFont(800, 7);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(index + 1), point.x, point.y);
+      _pushPlanHitArea({
+        ...extra,
+        id: selectedId,
+        type,
+        vertexIndex: index,
+        x: point.x - PLAN_VERTEX_HANDLE_SIZE,
+        y: point.y - PLAN_VERTEX_HANDLE_SIZE,
+        w: PLAN_VERTEX_HANDLE_SIZE * 2,
+        h: PLAN_VERTEX_HANDLE_SIZE * 2,
+        baseX: point.x - PLAN_VERTEX_HANDLE_SIZE,
+        baseY: point.y - PLAN_VERTEX_HANDLE_SIZE,
+        baseW: PLAN_VERTEX_HANDLE_SIZE * 2,
+        baseH: PLAN_VERTEX_HANDLE_SIZE * 2,
+        rect,
+      });
+    });
+    ctx.restore();
   }
 
   function _planChildRectToSketchRect(rect, parentObject, parentRect, minW = 12, minH = 10) {
@@ -13106,14 +13402,14 @@ const MecFormModule = (() => {
     const transform = _applyPlanCanvasRotation(ctx, rect, rotation);
     if (transform) _planTransformStack.push(transform);
     _pushPlanHitArea({ id: `sanitary::${item.id}`, type: 'sanitary', sanitaryId: item.id, x, y, w, h, floorRect });
-    ctx.fillStyle = selected ? 'rgba(128,90,213,.2)' : 'rgba(128,90,213,.1)';
-    ctx.strokeStyle = selected ? '#111827' : '#805ad5';
-    ctx.lineWidth = selected ? 2.5 : 1.8;
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeRect(x, y, w, h);
-    ctx.strokeStyle = 'rgba(128,90,213,.38)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 3, y + 3, Math.max(0, w - 6), Math.max(0, h - 6));
+    const shapePoints = _planShapePoints(item, rect);
+    _drawPlanRoomShell(ctx, rect, {
+      selected,
+      fill: selected ? 'rgba(128,90,213,.18)' : 'rgba(128,90,213,.09)',
+      accent: '#7c3aed',
+      points: shapePoints,
+    });
+    _drawPlanOpeningCuts(ctx, item.objects || [], _sanitaryRoomObject(item), rect, shapePoints);
     if (_planLayers.etiquetas) {
       ctx.fillStyle = '#44337a';
       ctx.font = _canvasFont(800, 9);
@@ -13154,6 +13450,13 @@ const MecFormModule = (() => {
         sanitaryId: item.id,
         floorRect,
       });
+      if (shapePoints) {
+        _drawPlanShapeVertices(ctx, item, rect, `sanitary::${item.id}`, 'sanitary-vertex', {
+          sanitaryId: item.id,
+          floorRect,
+          rotation,
+        });
+      }
     }
     if (transform) _planTransformStack.pop();
     ctx.restore();
@@ -13209,7 +13512,7 @@ const MecFormModule = (() => {
           const hinge = _doorHingePoint(scaledObject, 8);
           const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
           ctx.strokeStyle = '#2f855a';
-          ctx.lineWidth = 1.5;
+          ctx.lineWidth = PLAN_OPENING_STROKE;
           ctx.beginPath();
           ctx.moveTo(hinge.x, hinge.y);
           ctx.lineTo(hinge.x + Math.cos(angles.leaf) * length, hinge.y + Math.sin(angles.leaf) * length);
@@ -13237,7 +13540,7 @@ const MecFormModule = (() => {
           }
           _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
           ctx.strokeStyle = '#2b6cb0';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = PLAN_OPENING_STROKE;
           ctx.beginPath();
           ctx.moveTo(ox, oy);
           ctx.lineTo(vertical ? ox : ox + length, vertical ? oy + length : oy);
@@ -13370,14 +13673,14 @@ const MecFormModule = (() => {
     const transform = _applyPlanCanvasRotation(ctx, rect, rotation);
     if (transform) _planTransformStack.push(transform);
     _pushPlanHitArea({ id: `room::${room.id}`, type: 'room', roomId: room.id, x, y, w, h, floorRect });
-    ctx.strokeStyle = selected ? '#111827' : '#2b6cb0';
-    ctx.fillStyle = selected ? 'rgba(43,108,176,.18)' : 'rgba(43,108,176,.08)';
-    ctx.lineWidth = selected ? 3 : 2;
-    ctx.fillRect(x, y, w, h);
-    ctx.strokeRect(x, y, w, h);
-    ctx.strokeStyle = 'rgba(43,108,176,.5)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + 4, y + 4, Math.max(0, w - 8), Math.max(0, h - 8));
+    const shapePoints = _planShapePoints(room, rect);
+    _drawPlanRoomShell(ctx, rect, {
+      selected,
+      fill: selected ? 'rgba(43,108,176,.16)' : 'rgba(43,108,176,.075)',
+      accent: '#2563eb',
+      points: shapePoints,
+    });
+    _drawPlanOpeningCuts(ctx, room.objects || [], _roomObjectForClassroom(room), rect, shapePoints);
     if (_planLayers.etiquetas) {
       ctx.fillStyle = '#173f68';
       ctx.font = _canvasFont(800, 10);
@@ -13418,6 +13721,13 @@ const MecFormModule = (() => {
         roomId: room.id,
         floorRect,
       });
+      if (shapePoints) {
+        _drawPlanShapeVertices(ctx, room, rect, `room::${room.id}`, 'room-vertex', {
+          roomId: room.id,
+          floorRect,
+          rotation,
+        });
+      }
     }
     if (transform) _planTransformStack.pop();
     ctx.restore();
@@ -13465,7 +13775,7 @@ const MecFormModule = (() => {
           const hinge = _doorHingePoint(scaledObject, 8);
           const angles = _doorSwingAngles(object, object.ficha?.abre_hacia === 'Exterior' ? -1 : 1);
           ctx.strokeStyle = '#2f855a';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = PLAN_OPENING_STROKE;
           ctx.beginPath();
           ctx.moveTo(hinge.x, hinge.y);
           ctx.lineTo(hinge.x + Math.cos(angles.leaf) * length, hinge.y + Math.sin(angles.leaf) * length);
@@ -13488,7 +13798,7 @@ const MecFormModule = (() => {
           _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16), baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
           ctx.strokeStyle = '#2b6cb0';
-          ctx.lineWidth = 3;
+          ctx.lineWidth = PLAN_OPENING_STROKE;
           ctx.beginPath();
           ctx.moveTo(ox, oy);
           ctx.lineTo(vertical ? ox : ox + length, vertical ? oy + length : oy);
@@ -15805,7 +16115,6 @@ const MecFormModule = (() => {
     _selectedPlanId = `site::${element.id}`;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`Rotacion: ${element.rotationDeg} grados.`, 'success');
   }
 
   function rotatePlanBlock(blockId, delta = 15) {
@@ -15815,11 +16124,10 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertBlockUnlocked(block, 'rotarlo')) return;
-    const next = _setBlockRotation(block, _blockRotationDeg(block) + Number(delta || 0));
+    _setBlockRotation(block, _blockRotationDeg(block) + Number(delta || 0));
     _selectedPlanId = `block::${block.id}`;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`Rotacion del bloque: ${next} grados.`, 'success');
   }
 
   function rotatePlanFloor(blockId, floorId, delta = 15) {
@@ -15830,12 +16138,11 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertBlockUnlocked(block, 'rotar el piso')) return;
-    const next = _setFloorRotation(floor, _floorRotationDeg(floor) + Number(delta || 0));
+    _setFloorRotation(floor, _floorRotationDeg(floor) + Number(delta || 0));
     _selectedPlanId = _floorRecordPlanId(block, floor);
     _setActiveFloor(_floorRecordLabel(floor));
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`Rotacion del piso: ${next} grados.`, 'success');
   }
 
   async function deletePlanFloor(blockId, floorId) {
@@ -15860,11 +16167,10 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertClassroomUnlocked(room, 'rotarlo')) return;
-    const next = _setRoomRotation(room, _roomRotationDeg(room) + Number(delta || 0));
+    _setRoomRotation(room, _roomRotationDeg(room) + Number(delta || 0));
     _selectedPlanId = `room::${room.id}`;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`Rotacion del ambiente: ${next} grados.`, 'success');
   }
 
   function rotatePlanSanitary(sanitaryId, delta = 15) {
@@ -15874,11 +16180,10 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSanitaryUnlocked(item, 'rotarlo')) return;
-    const next = _setSanitaryRotation(item, _sanitaryRotationDeg(item) + Number(delta || 0));
+    _setSanitaryRotation(item, _sanitaryRotationDeg(item) + Number(delta || 0));
     _selectedPlanId = `sanitary::${item.id}`;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`Rotacion del sanitario: ${next} grados.`, 'success');
   }
 
   function _orientationAngle(orientation = 'horizontal') {
@@ -15889,25 +16194,21 @@ const MecFormModule = (() => {
     return _orientationAngle(orientation) === 90 ? 'vertical' : 'horizontal';
   }
 
-  function _transformSelectedPlanRotation(transform, messageForType = null) {
+  function _transformSelectedPlanRotation(transform) {
     const raw = String(_selectedPlanId || '');
     if (!raw) {
       UI.showToast('Seleccione un elemento del plano para girarlo.', 'warning');
       return false;
     }
     const nextRotation = current => _planRotationDeg(typeof transform === 'function' ? transform(_planRotationDeg(current)) : transform);
-    const message = (label, rotation) => typeof messageForType === 'function'
-      ? messageForType(label, rotation)
-      : `${label}: ${rotation} grados.`;
     if (raw.startsWith('block::')) {
       const block = _blockById(raw.replace('block::', ''));
       if (!block) return false;
       if (!_assertBlockUnlocked(block, 'girarlo')) return false;
-      const next = _setBlockRotation(block, nextRotation(_blockRotationDeg(block)));
+      _setBlockRotation(block, nextRotation(_blockRotationDeg(block)));
       _selectedPlanId = `block::${block.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(message('Bloque', next), 'success');
       return true;
     }
     if (raw.startsWith('floor::')) {
@@ -15919,23 +16220,21 @@ const MecFormModule = (() => {
         return false;
       }
       if (!_assertBlockUnlocked(block, 'girar el piso')) return false;
-      const next = _setFloorRotation(floor, nextRotation(_floorRotationDeg(floor)));
+      _setFloorRotation(floor, nextRotation(_floorRotationDeg(floor)));
       _selectedPlanId = _floorRecordPlanId(block, floor);
       _setActiveFloor(_floorRecordLabel(floor));
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(message('Piso', next), 'success');
       return true;
     }
     if (raw.startsWith('room::')) {
       const room = _classroomById(raw.replace('room::', ''));
       if (!room) return false;
       if (!_assertClassroomUnlocked(room, 'girarlo')) return false;
-      const next = _setRoomRotation(room, nextRotation(_roomRotationDeg(room)));
+      _setRoomRotation(room, nextRotation(_roomRotationDeg(room)));
       _selectedPlanId = `room::${room.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(message(_roomSpaceLabel(room), next), 'success');
       return true;
     }
     if (raw.startsWith('sanitary::')) {
@@ -15949,20 +16248,18 @@ const MecFormModule = (() => {
           return false;
         }
         if (!_assertSanitaryUnlocked(item, 'girar el objeto')) return false;
-        const next = _setSanitaryObjectRotation(item, object, nextRotation(_sketchObjectRotationDeg(object)));
+        _setSanitaryObjectRotation(item, object, nextRotation(_sketchObjectRotationDeg(object)));
         _selectedPlanId = `sanitary::${item.id}::${object.id}`;
         _saveDraft(false);
         _redrawSanitaryCanvas();
         renderSchoolPlan();
-        UI.showToast(message(_sanitaryObjectLabel(object.type), next), 'success');
         return true;
       }
       if (!_assertSanitaryUnlocked(item, 'girarlo')) return false;
-      const next = _setSanitaryRotation(item, nextRotation(_sanitaryRotationDeg(item)));
+      _setSanitaryRotation(item, nextRotation(_sanitaryRotationDeg(item)));
       _selectedPlanId = `sanitary::${item.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(message('Sanitario', next), 'success');
       return true;
     }
     if (raw.startsWith('site::')) {
@@ -15974,7 +16271,6 @@ const MecFormModule = (() => {
       _selectedPlanId = `site::${element.id}`;
       _saveDraft(false);
       renderSchoolPlan();
-      UI.showToast(message(_siteElementLabel(element.type), element.rotationDeg), 'success');
       return true;
     }
     if (raw.includes('::')) {
@@ -15987,13 +16283,12 @@ const MecFormModule = (() => {
       }
       if (!_assertClassroomUnlocked(room, 'girar el objeto')) return false;
       _pushSketchHistory();
-      const next = _setSketchObjectRotation(object, nextRotation(_sketchObjectRotationDeg(object)));
+      _setSketchObjectRotation(object, nextRotation(_sketchObjectRotationDeg(object)));
       _syncActiveClassroomFromSketch();
       _selectedPlanId = `${room.id}::${object.id}`;
       _saveDraft(false);
       _redrawSketchCanvas();
       renderSchoolPlan();
-      UI.showToast(message(_sketchLabel(object.type), next), 'success');
       return true;
     }
     UI.showToast('El elemento seleccionado no admite giro rapido.', 'warning');
@@ -16002,23 +16297,170 @@ const MecFormModule = (() => {
 
   function orientSelectedPlanItem(orientation = 'horizontal') {
     const angle = _orientationAngle(orientation);
-    const orientationLabel = _orientationLabel(orientation);
-    _transformSelectedPlanRotation(angle, label => `${label} orientado en ${orientationLabel}.`);
+    _transformSelectedPlanRotation(angle);
   }
 
   function rotateSelectedPlanItem(delta = 90) {
     const amount = Number(delta || 0);
-    const direction = amount >= 0 ? 'a la derecha' : 'a la izquierda';
-    const degrees = Math.abs(amount) || 0;
-    _transformSelectedPlanRotation(current => current + amount, label => `${label} rotado ${degrees} grados ${direction}.`);
+    _transformSelectedPlanRotation(current => current + amount);
   }
 
   function flipSelectedPlanItem(axis = 'horizontal') {
     const horizontal = String(axis || '').toLowerCase().startsWith('h');
     _transformSelectedPlanRotation(
-      current => (horizontal ? 180 - current : -current),
-      label => `${label} volteado ${horizontal ? 'horizontalmente' : 'verticalmente'}.`
+      current => (horizontal ? 180 - current : -current)
     );
+  }
+
+  function setPlanClassroomShape(roomId, shape = 'l') {
+    const room = _classroomById(roomId);
+    if (!room) {
+      UI.showToast('Seleccione un aula o espacio para cambiar su forma.', 'warning');
+      return;
+    }
+    if (!_assertClassroomUnlocked(room, 'cambiar su forma')) return;
+    if (shape === 'rect') delete room.planShape;
+    else room.planShape = _defaultPlanShape(shape);
+    _syncRoomShapeObject(room);
+    if (_activeClassroomId === room.id && _data.__classroomSketch) {
+      _data.__classroomSketch.planShape = _clonePlanShape(room.planShape);
+      _syncRoomShapeObject(_data.__classroomSketch);
+      _syncActiveClassroomFromSketch();
+    }
+    _selectedPlanId = `room::${room.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function addPlanClassroomVertex(roomId) {
+    const room = _classroomById(roomId);
+    if (!room) return;
+    if (!_assertClassroomUnlocked(room, 'editar vertices')) return;
+    _insertPlanShapeVertex(room);
+    _syncRoomShapeObject(room);
+    if (_activeClassroomId === room.id && _data.__classroomSketch) {
+      _data.__classroomSketch.planShape = _clonePlanShape(room.planShape);
+      _syncRoomShapeObject(_data.__classroomSketch);
+      _syncActiveClassroomFromSketch();
+    }
+    _selectedPlanId = `room::${room.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function removePlanClassroomVertex(roomId) {
+    const room = _classroomById(roomId);
+    if (!room) return;
+    if (!_assertClassroomUnlocked(room, 'editar vertices')) return;
+    _removePlanShapeVertex(room);
+    _syncRoomShapeObject(room);
+    if (_activeClassroomId === room.id && _data.__classroomSketch) {
+      _data.__classroomSketch.planShape = _clonePlanShape(room.planShape);
+      _syncRoomShapeObject(_data.__classroomSketch);
+      _syncActiveClassroomFromSketch();
+    }
+    _selectedPlanId = `room::${room.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function setPlanSanitaryShape(sanitaryId, shape = 'l') {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    if (!item) {
+      UI.showToast('Seleccione un sanitario para cambiar su forma.', 'warning');
+      return;
+    }
+    if (!_assertSanitaryUnlocked(item, 'cambiar su forma')) return;
+    if (shape === 'rect') delete item.planShape;
+    else item.planShape = _defaultPlanShape(shape);
+    const object = _sanitaryRoomObject(item);
+    if (object) {
+      if (item.planShape) object.planShape = _clonePlanShape(item.planShape);
+      else delete object.planShape;
+    }
+    _selectedPlanId = `sanitary::${item.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function addPlanSanitaryVertex(sanitaryId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'editar vertices')) return;
+    _insertPlanShapeVertex(item);
+    const object = _sanitaryRoomObject(item);
+    if (object) object.planShape = _clonePlanShape(item.planShape);
+    _selectedPlanId = `sanitary::${item.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function removePlanSanitaryVertex(sanitaryId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    if (!item) return;
+    if (!_assertSanitaryUnlocked(item, 'editar vertices')) return;
+    _removePlanShapeVertex(item);
+    const object = _sanitaryRoomObject(item);
+    if (object) object.planShape = _clonePlanShape(item.planShape);
+    _selectedPlanId = `sanitary::${item.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function _planVertexDragConfig(area) {
+    if (!area || !['room-vertex', 'sanitary-vertex'].includes(area.type)) return null;
+    if (area.type === 'room-vertex') {
+      const room = _classroomById(area.roomId);
+      if (!room || !_clonePlanShape(room.planShape)) return null;
+      if (!_assertClassroomUnlocked(room, 'editar vertices')) return null;
+      return {
+        type: 'room',
+        selectedId: `room::${room.id}`,
+        roomId: room.id,
+        index: area.vertexIndex,
+        rect: area.rect,
+        rotation: area.rotation || _roomRotationDeg(room),
+      };
+    }
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === area.sanitaryId);
+    if (!item || !_clonePlanShape(item.planShape)) return null;
+    if (!_assertSanitaryUnlocked(item, 'editar vertices')) return null;
+    return {
+      type: 'sanitary',
+      selectedId: `sanitary::${item.id}`,
+      sanitaryId: item.id,
+      index: area.vertexIndex,
+      rect: area.rect,
+      rotation: area.rotation || _sanitaryRotationDeg(item),
+    };
+  }
+
+  function _movePlanVertex(drag, point) {
+    if (!drag || !point) return false;
+    const localPoint = drag.rotation
+      ? _rotatePointAround(_planRectCenter(drag.rect), point, -drag.rotation)
+      : point;
+    if (drag.type === 'room') {
+      const room = _classroomById(drag.roomId);
+      if (!room) return false;
+      _setPlanShapeVertex(room, drag.index, localPoint, drag.rect);
+      _syncRoomShapeObject(room);
+      if (_activeClassroomId === room.id && _data.__classroomSketch) {
+        _data.__classroomSketch.planShape = _clonePlanShape(room.planShape);
+        _syncRoomShapeObject(_data.__classroomSketch);
+      }
+      _selectedPlanId = `room::${room.id}`;
+      _drawSchoolPlan();
+      return true;
+    }
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === drag.sanitaryId);
+    if (!item) return false;
+    _setPlanShapeVertex(item, drag.index, localPoint, drag.rect);
+    const object = _sanitaryRoomObject(item);
+    if (object) object.planShape = _clonePlanShape(item.planShape);
+    _selectedPlanId = `sanitary::${item.id}`;
+    _drawSchoolPlan();
+    return true;
   }
 
   function _setPlanRotationFromDrag(kind, id, rotation) {
@@ -16101,6 +16543,7 @@ const MecFormModule = (() => {
     let blockDrag = null;
     let rotateDrag = null;
     let resizeDrag = null;
+    let vertexDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
     let planPinch = null;
@@ -16245,6 +16688,7 @@ const MecFormModule = (() => {
         blockDrag = null;
         rotateDrag = null;
         resizeDrag = null;
+        vertexDrag = null;
         suppressClickUntil = Date.now() + 350;
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
@@ -16276,6 +16720,15 @@ const MecFormModule = (() => {
         resizeDrag = resizeConfig;
         pointerCandidate = null;
         _selectedPlanId = resizeConfig.selectedId;
+        _activatePlanSelection(_selectedPlanId);
+        event.preventDefault();
+        return;
+      }
+      const vertexConfig = _planVertexDragConfig(area);
+      if (vertexConfig) {
+        vertexDrag = vertexConfig;
+        pointerCandidate = null;
+        _selectedPlanId = vertexConfig.selectedId;
         _activatePlanSelection(_selectedPlanId);
         event.preventDefault();
         return;
@@ -16335,6 +16788,12 @@ const MecFormModule = (() => {
           else if (resizeDrag.type === 'class-object') _resizePlanClassObject(resizeDrag.roomId, resizeDrag.objectId, rect, resizeDrag.parentRect);
           else if (resizeDrag.type === 'sanitary-object') _resizePlanSanitaryObject(resizeDrag.sanitaryId, resizeDrag.objectId, rect, resizeDrag.parentRect);
         }
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
+      if (vertexDrag) {
+        _movePlanVertex(vertexDrag, currentPoint);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -16439,6 +16898,7 @@ const MecFormModule = (() => {
         blockDrag = null;
         rotateDrag = null;
         resizeDrag = null;
+        vertexDrag = null;
         event.preventDefault();
         return;
       }
@@ -16459,6 +16919,24 @@ const MecFormModule = (() => {
       if (resizeDrag) {
         const selectedId = resizeDrag.selectedId;
         resizeDrag = null;
+        pointerCandidate = null;
+        pointerStart = null;
+        _activePlanDrag = null;
+        _selectedPlanId = selectedId;
+        _activatePlanSelection(_selectedPlanId);
+        _saveDraft(false);
+        renderSchoolPlan();
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
+      if (vertexDrag) {
+        const selectedId = vertexDrag.selectedId;
+        if (vertexDrag.type === 'room') {
+          const room = _classroomById(vertexDrag.roomId);
+          if (room && _activeClassroomId === room.id && _data.__classroomSketch) _syncActiveClassroomFromSketch();
+        }
+        vertexDrag = null;
         pointerCandidate = null;
         pointerStart = null;
         _activePlanDrag = null;
@@ -16516,6 +16994,7 @@ const MecFormModule = (() => {
       blockDrag = null;
       rotateDrag = null;
       resizeDrag = null;
+      vertexDrag = null;
       _activePlanDrag = null;
     });
     canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);

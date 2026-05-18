@@ -4,6 +4,100 @@
 
 ---
 
+## Sesion de actualizacion confiable del Service Worker - 2026-05-16 - v2.6.24
+
+### Objetivo
+- Corregir que el boton `Actualizar app` dejara la pantalla en la version anterior porque el Service Worker antiguo seguia controlando la pagina despues del reload.
+
+### Problema identificado
+- `updateApp()` enviaba `SKIP_WAITING` al SW instalado, eliminaba caches y hacia `window.location.replace()`. Sin embargo, el SW nuevo podia no haber activado antes del reload, de modo que el SW viejo (v2.6.20) volvia a crear su cache `cialpa-app-v2.6.20` con los nuevos archivos y la version seguia igual en pantalla.
+
+### Cambios implementados
+- `updateApp()` en `assets/js/app.js` ahora:
+  1. Elimina **todos** los caches del dominio excepto `cialpa-map-tiles`.
+  2. Desregistra **todos** los Service Workers via `navigator.serviceWorker.getRegistrations()` + `reg.unregister()`.
+  3. Recarga en `window.location.pathname + '?_=<timestamp>'` sin SW que intercepte la respuesta, forzando que el navegador descargue `sw.js` y los archivos de la app frescos desde el servidor.
+- Se eliminaron los pasos anteriores de `_swRegistration.update()` y `SKIP_WAITING` que no eran suficientes.
+- Version y cache actualizados a `v2.6.24`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+
+### Nota de uso
+- Si la app sigue mostrando la version anterior despues de `Actualizar`, significa que el servidor (GitHub Pages u otro) aun sirve los archivos viejos. En ese caso es necesario desplegar los archivos actualizados antes de que el boton funcione.
+
+---
+
+## Sesion de aberturas en cinta Insertar - 2026-05-16 - v2.6.23
+
+### Objetivo
+- Hacer accesibles los botones `+ Puerta` y `+ Ventana` desde el tab `Insertar` de la cinta, que es donde el usuario los busca naturalmente.
+
+### Problema identificado
+- Los botones `+ Puerta` y `+ Ventana` existian en el panel builder (`.school-plan-builder__actions`) al seleccionar un aula o sanitario, pero la cinta `Insertar` no los incluia. El usuario esperaba encontrarlos ahi al igual que los demas elementos de insercion.
+
+### Cambios implementados
+- El tab `Insertar` de la cinta ahora detecta el contexto de seleccion activa. Cuando hay un aula o uno de sus elementos seleccionado, muestra el grupo `Aberturas del aula` con botones `Puerta` y `Ventana` que llaman a `addPlanClassroomElement('door')` y `addPlanClassroomElement('window')`.
+- Cuando hay un sanitario seleccionado, muestra el grupo `Aberturas del sanitario` con botones equivalentes que llaman a `addPlanSanitaryOpening('door')` y `addPlanSanitaryOpening('window')`.
+- `_isPlanRibbonDuplicateAction` ahora filtra `+ Puerta` y `+ Ventana` del panel builder cuando una seleccion de aula o sanitario esta activa, para evitar duplicacion visual con la cinta.
+- El grupo de aberturas no aparece si no hay aula o sanitario activos, evitando botones sin contexto.
+- Version y cache actualizados a `v2.6.23`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+
+---
+
+## Sesion de cortes en muros poligonales - 2026-05-16 - v2.6.22
+
+### Objetivo
+- Hacer que puertas y ventanas ubicadas en aulas o sanitarios con forma L o poligono personalizado generen su corte visual sobre el borde real del polígono y no sobre el rectangulo contenedor.
+
+### Cambios implementados
+- Se agrego la funcion `_openingCutSegmentOnPolygon(polyPoints, objectRect)` en `mec-form.js`: recibe los vertices canvas del poligono y el rect de la abertura, encuentra el borde mas cercano al centro de la abertura proyectando sobre cada segmento, y devuelve un segmento de corte centrado en la proyeccion con largo proporcional a la dimension de la abertura sobre ese borde.
+- `_drawPlanOpeningCuts` acepta ahora un quinto parametro opcional `shapePoints`. Cuando se pasan puntos poligonales (longitud >= 3), usa `_openingCutSegmentOnPolygon`; de lo contrario mantiene el comportamiento rectangular existente con `_openingCutSegment`.
+- Las llamadas en `_drawPlanClassroom` y `_drawPlanSanitaryRoom` ahora pasan `shapePoints` (ya computado en ambas funciones para el dibujo del contorno) a `_drawPlanOpeningCuts`, activando el nuevo camino cuando el aula o sanitario tiene forma personalizada.
+- El comportamiento para rooms rectangulares sin `planShape` queda identico al de v2.6.21.
+- Version y cache actualizados a `v2.6.22`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+
+---
+
+## Sesion de avisos discretos, muros y formas poligonales - 2026-05-18 - v2.6.21
+
+### Objetivo
+- Reducir mensajes emergentes molestos durante acciones frecuentes del plano, especialmente en tablets.
+- Mejorar la lectura arquitectonica de aulas y sanitarios con muros negros gruesos y aberturas visibles como cortes.
+- Iniciar soporte para aulas/espacios y sanitarios no rectangulares mediante formas poligonales editables por vertices.
+
+### Cambios implementados
+- Los avisos `success` ahora son mas breves, compactos y se limitan para evitar acumulacion visual.
+- Las rotaciones, orientaciones y volteos rapidos del plano ya no disparan mensajes emergentes de confirmacion; se mantienen advertencias cuando falta seleccion, hay bloqueo o no se puede completar una accion.
+- Aulas/espacios y sanitarios del plano general se dibujan con muro perimetral negro de mayor grosor, sin el doble contorno interior anterior.
+- Puertas, ventanas y salidas generan un corte visual en el muro negro antes de dibujar la abertura.
+- Las hojas de puerta y ventanas se dibujan con trazo mas fino que el muro para diferenciar claramente pared y abertura.
+- Se agrego forma `L`, volver a `Rectangular`, `+ Vertice` y `- Vertice` en aulas/espacios y sanitarios seleccionados.
+- Cuando un aula/espacio o sanitario tiene forma poligonal, sus vertices se muestran como manijas numeradas y pueden arrastrarse desde el plano.
+- Version y cache actualizados a `v2.6.21`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor HTTP local embebido en `127.0.0.1:8037`: `index.html`, `assets/js/mec-form.js` y `sw.js` servidos correctamente con version/cache `v2.6.21`, muros/cortes y herramientas de vertices.
+
 ## Sesion de cinta compacta de herramientas del plano - 2026-05-18 - v2.6.20
 
 ### Objetivo
