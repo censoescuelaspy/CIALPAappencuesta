@@ -1816,12 +1816,177 @@
 }
 
 .school-plan__toolbar {
+  display: block;
+  margin-bottom: .65rem;
+}
+
+.school-plan-ribbon {
+  width: 100%;
+  border: 1px solid #d8e1eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.school-plan-ribbon__tabs {
+  display: flex;
+  align-items: end;
+  gap: .18rem;
+  padding: .28rem .32rem 0;
+  border-bottom: 1px solid #d8e1eb;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.school-plan-ribbon__tab {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .32rem .62rem .34rem;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: #526071;
+  font-size: .72rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.school-plan-ribbon__tab--active {
+  background: #fff;
+  border-color: #d8e1eb;
+  color: #0f3766;
+  box-shadow: 0 -1px 0 rgba(15, 55, 102, .04);
+}
+
+.school-plan-ribbon__panel {
+  min-height: 62px;
+  display: flex;
+  align-items: stretch;
+  gap: .48rem;
+  padding: .44rem .5rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.school-plan-ribbon__group {
+  min-width: max-content;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: .22rem;
+  padding-right: .52rem;
+  border-right: 1px solid #d8e1eb;
+}
+
+.school-plan-ribbon__group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.school-plan-ribbon__group--wide {
+  min-width: 0;
+}
+
+.school-plan-ribbon__group-title {
+  color: #667085;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.school-plan-ribbon__group-body,
+.school-plan-ribbon__zoom,
+.school-plan-ribbon__basemap,
+.school-plan-ribbon__checks {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: .75rem;
-  margin-bottom: .65rem;
-  flex-wrap: wrap;
+  gap: .28rem;
+  flex-wrap: nowrap;
+}
+
+.school-plan-ribbon__button {
+  min-width: 50px;
+  min-height: 42px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .1rem;
+  padding: .22rem .36rem;
+  line-height: 1.05;
+}
+
+.school-plan-ribbon__button--wide {
+  min-width: 70px;
+}
+
+.school-plan-ribbon__icon {
+  min-height: 15px;
+  font-size: .92rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.school-plan-ribbon__label {
+  max-width: 72px;
+  overflow: hidden;
+  color: inherit;
+  font-size: .58rem;
+  font-weight: 900;
+  line-height: 1.02;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.school-plan-ribbon__button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.school-plan-ribbon__zoom-value {
+  min-width: 44px;
+  color: #44546a;
+  font-size: .78rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.school-plan-ribbon__basemap small {
+  min-width: 92px;
+  color: #667085;
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.school-plan-ribbon__check {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: .26rem;
+  padding: .25rem .42rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #fff;
+  color: #415068;
+  font-size: .66rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.school-plan-ribbon__check input {
+  width: 13px;
+  height: 13px;
+}
+
+.school-plan-ribbon .mec-sketch-toolset--compact {
+  padding: 0;
+  overflow-x: visible;
 }
 
 .school-plan__kpis--side .school-plan-kpi {
@@ -2871,6 +3036,28 @@
     margin-bottom: .5rem;
   }
 
+  .school-plan-ribbon__panel {
+    min-height: 58px;
+    padding: .36rem;
+    gap: .36rem;
+  }
+
+  .school-plan-ribbon__tab {
+    padding: .28rem .46rem .3rem;
+    font-size: .66rem;
+  }
+
+  .school-plan-ribbon__button {
+    min-width: 46px;
+    min-height: 40px;
+    padding: .2rem .3rem;
+  }
+
+  .school-plan-ribbon__label {
+    max-width: 58px;
+    font-size: .54rem;
+  }
+
   .school-plan__layers label {
     min-height: 28px;
     padding: .22rem .38rem;
@@ -3222,6 +3409,25 @@
   .school-plan__layers,
   .school-plan__exports {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .school-plan-ribbon__tab {
+    min-width: 58px;
+    justify-content: center;
+    padding-left: .34rem;
+    padding-right: .34rem;
+  }
+
+  .school-plan-ribbon__tab b {
+    font-size: .6rem;
+  }
+
+  .school-plan-ribbon__group-title {
+    font-size: .54rem;
+  }
+
+  .school-plan-ribbon__button {
+    min-width: 44px;
   }
 }
 

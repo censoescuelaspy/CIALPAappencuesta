@@ -27,6 +27,7 @@ const MecFormModule = (() => {
   let _planTransformStack = [];
   let _activePlanDrag = null;
   let _planMoveMode = false;
+  let _planRibbonTab = 'editar';
   let _planBaseMapPanelOpen = false;
   let _activeCanvasZoom = 1;
   let _schoolPlanResizeBound = false;
@@ -45,6 +46,14 @@ const MecFormModule = (() => {
     etiquetas: true,
     datos: true,
   };
+
+  const PLAN_RIBBON_TABS = [
+    { id: 'editar', label: 'Editar', icon: '&#10022;' },
+    { id: 'insertar', label: 'Insertar', icon: '+' },
+    { id: 'vista', label: 'Vista', icon: '&#8857;' },
+    { id: 'capas', label: 'Capas', icon: '&#9638;' },
+    { id: 'exportar', label: 'Exportar', icon: '&#8681;' },
+  ];
 
   const SKETCH_CANVAS = { width: 760, height: 460 };
   const BLOCK_ELECTRIC_FIELDS = [
@@ -10468,37 +10477,7 @@ const MecFormModule = (() => {
         <section class="school-plan__layout">
           <div class="school-plan__board">
             <div class="school-plan__toolbar">
-              <div class="school-plan__layers">
-                ${Object.entries(_planLayers).map(([key, enabled]) => `
-                  <label>
-                    <input type="checkbox" ${enabled ? 'checked' : ''} onchange="MecFormModule.togglePlanLayer('${_escape(key)}', this.checked)">
-                    <span>${_escape(_planLayerLabel(key))}</span>
-                  </label>`).join('')}
-              </div>
-              <div class="school-plan__exports">
-                <div class="school-plan__zoom">
-                  <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(-0.15)">-</button>
-                  <span>${Math.round(_schoolPlanZoom * 100)}%</span>
-                  <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setSchoolPlanZoom(0.15)">+</button>
-                  <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.toggleSchoolPlanFullscreen()" title="Pantalla completa" aria-label="Pantalla completa">&#x26F6;</button>
-                </div>
-                ${_renderPlanBaseMapToolbar()}
-                <button class="btn ${_planMoveMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">${_planMoveMode ? 'Mover elementos activo' : 'Mover elementos'}</button>
-                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
-                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanDxf()">DXF</button>
-                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
-                <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanPng()">PNG</button>
-                <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.printPlanPdf()">PDF</button>
-                <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
-                <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
-                ${_renderSelectedPlanLockButton('btn-sm')}
-                ${_renderSelectedPlanOrientationButtons('btn-sm', true)}
-                <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
-              </div>
-            </div>
-            <div class="school-plan__tools-row" aria-label="Elementos rapidos para ubicar en el plano">
-              <span class="school-plan__tools-label">Elementos</span>
-              ${_renderSiteElementToolset('plan', 'compact')}
+              ${_renderSchoolPlanRibbon()}
             </div>
             ${_renderPlanBaseMapPanel()}
             <div class="school-plan__canvas-wrap">
@@ -10566,6 +10545,170 @@ const MecFormModule = (() => {
       </article>`;
   }
 
+  function _normalizePlanRibbonTab(tab = _planRibbonTab) {
+    const value = String(tab || '');
+    return PLAN_RIBBON_TABS.some(item => item.id === value) ? value : 'editar';
+  }
+
+  function _renderPlanRibbonButton({ icon = '', label = '', onClick = '', tone = 'btn-outline', active = false, disabled = false, title = '', wide = false } = {}) {
+    const caption = title || label;
+    const state = disabled ? ` disabled title="${_escape(caption || 'Accion no disponible')}"` : ` title="${_escape(caption)}"`;
+    const pressed = active ? ' aria-pressed="true"' : '';
+    const click = disabled ? '' : ` onclick="${_escape(onClick)}"`;
+    return `
+      <button class="btn ${_escape(tone)} btn-sm school-plan-ribbon__button ${active ? 'school-plan-ribbon__button--active' : ''} ${wide ? 'school-plan-ribbon__button--wide' : ''}" type="button"${click}${state} aria-label="${_escape(caption)}"${pressed}>
+        ${icon ? `<span class="school-plan-ribbon__icon" aria-hidden="true">${icon}</span>` : ''}
+        <span class="school-plan-ribbon__label">${_escape(label)}</span>
+      </button>`;
+  }
+
+  function _renderPlanRibbonGroup(title, content, extraClass = '') {
+    if (!String(content || '').trim()) return '';
+    return `
+      <div class="school-plan-ribbon__group ${_escape(extraClass)}">
+        <span class="school-plan-ribbon__group-title">${_escape(title)}</span>
+        <div class="school-plan-ribbon__group-body">${content}</div>
+      </div>`;
+  }
+
+  function _renderSelectedPlanLockRibbonButton() {
+    const action = _selectedPlanLockAction();
+    if (!action) {
+      return _renderPlanRibbonButton({
+        icon: '&#9633;',
+        label: 'Bloquear',
+        disabled: true,
+        title: 'Seleccione un elemento bloqueable',
+      });
+    }
+    const unlocking = String(action.label || '').toLowerCase().startsWith('desbloquear');
+    return _renderPlanRibbonButton({
+      icon: unlocking ? '&#9632;' : '&#9633;',
+      label: unlocking ? 'Desbloq.' : 'Bloquear',
+      onClick: action.onClick,
+      tone: action.tone,
+      title: action.label,
+    });
+  }
+
+  function _renderPlanZoomRibbon() {
+    return `
+      <div class="school-plan-ribbon__zoom">
+        ${_renderPlanRibbonButton({ icon: '-', label: 'Alejar', onClick: 'MecFormModule.setSchoolPlanZoom(-0.15)', title: 'Alejar plano' })}
+        <span class="school-plan-ribbon__zoom-value">${Math.round(_schoolPlanZoom * 100)}%</span>
+        ${_renderPlanRibbonButton({ icon: '+', label: 'Acercar', onClick: 'MecFormModule.setSchoolPlanZoom(0.15)', title: 'Acercar plano' })}
+        ${_renderPlanRibbonButton({ icon: '&#9974;', label: 'Pantalla', onClick: 'MecFormModule.toggleSchoolPlanFullscreen()', title: 'Pantalla completa' })}
+      </div>`;
+  }
+
+  function _renderPlanBaseMapRibbon() {
+    const baseMap = _ensurePlanBaseMap();
+    const active = _planBaseMapVisible(baseMap);
+    const coords = _planBaseMapHasCoords(baseMap)
+      ? `${Number(baseMap.lat).toFixed(5)}, ${Number(baseMap.lng).toFixed(5)}`
+      : 'Sin coordenadas';
+    return `
+      <div class="school-plan-ribbon__basemap">
+        ${_renderPlanRibbonButton({
+          icon: '&#8801;',
+          label: active ? 'Calles on' : 'Calles',
+          onClick: 'MecFormModule.togglePlanBaseMap()',
+          tone: active ? 'btn-primary' : 'btn-outline',
+          active,
+          title: active ? 'Ocultar calles y lineas' : 'Mostrar calles y lineas',
+        })}
+        ${_renderPlanRibbonButton({
+          icon: '&#9881;',
+          label: 'Ajustar',
+          onClick: 'MecFormModule.togglePlanBaseMapPanel()',
+          tone: _planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline',
+          active: _planBaseMapPanelOpen,
+          title: 'Ajustar base mapa',
+        })}
+        ${_renderPlanRibbonButton({ icon: '&#10003;', label: 'Guardar', onClick: 'MecFormModule.savePlanBaseMap()', tone: 'btn-success', title: 'Guardar base mapa' })}
+        <small>${_escape(coords)}</small>
+      </div>`;
+  }
+
+  function _renderPlanLayersRibbon() {
+    return `
+      <div class="school-plan-ribbon__checks">
+        ${Object.entries(_planLayers).map(([key, enabled]) => `
+          <label class="school-plan-ribbon__check">
+            <input type="checkbox" ${enabled ? 'checked' : ''} onchange="MecFormModule.togglePlanLayer('${_escape(key)}', this.checked)">
+            <span>${_escape(_planLayerLabel(key))}</span>
+          </label>`).join('')}
+      </div>`;
+  }
+
+  function _renderPlanRibbonPanel(tab = _planRibbonTab) {
+    const activeTab = _normalizePlanRibbonTab(tab);
+    if (activeTab === 'insertar') {
+      return [
+        _renderPlanRibbonGroup('Ambientes', [
+          _renderPlanRibbonButton({ icon: '+A', label: 'Aula', onClick: 'MecFormModule.newPlanClassroom()', tone: 'btn-primary', title: 'Crear aula' }),
+          _renderPlanRibbonButton({ icon: '+E', label: 'Espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')", title: 'Crear otro espacio' }),
+          _renderPlanRibbonButton({ icon: '+WC', label: 'Sanitario', onClick: 'MecFormModule.addPlanSanitary()', title: 'Crear sanitario' }),
+        ].join('')),
+        _renderPlanRibbonGroup('Exteriores', _renderSiteElementToolset('plan', 'compact'), 'school-plan-ribbon__group--wide'),
+      ].join('');
+    }
+    if (activeTab === 'vista') {
+      return [
+        _renderPlanRibbonGroup('Zoom', _renderPlanZoomRibbon()),
+        _renderPlanRibbonGroup('Base mapa', _renderPlanBaseMapRibbon(), 'school-plan-ribbon__group--wide'),
+      ].join('');
+    }
+    if (activeTab === 'capas') {
+      return _renderPlanRibbonGroup('Mostrar / ocultar', _renderPlanLayersRibbon(), 'school-plan-ribbon__group--wide');
+    }
+    if (activeTab === 'exportar') {
+      return _renderPlanRibbonGroup('Salida', [
+        _renderPlanRibbonButton({ icon: 'JS', label: 'JSON', onClick: 'MecFormModule.exportPlanJson()', title: 'Exportar JSON' }),
+        _renderPlanRibbonButton({ icon: 'DX', label: 'DXF', onClick: 'MecFormModule.exportPlanDxf()', title: 'Exportar DXF' }),
+        _renderPlanRibbonButton({ icon: 'VG', label: 'SVG', onClick: 'MecFormModule.exportPlanSvg()', title: 'Exportar SVG' }),
+        _renderPlanRibbonButton({ icon: 'PN', label: 'PNG', onClick: 'MecFormModule.exportPlanPng()', title: 'Exportar PNG' }),
+        _renderPlanRibbonButton({ icon: 'PF', label: 'PDF', onClick: 'MecFormModule.printPlanPdf()', tone: 'btn-primary', title: 'Generar PDF' }),
+      ].join(''));
+    }
+    const canDelete = Boolean(_selectedPlanId);
+    return [
+      _renderPlanRibbonGroup('Seleccion', [
+        _renderPlanRibbonButton({
+          icon: '&#8596;',
+          label: _planMoveMode ? 'Moviendo' : 'Mover',
+          onClick: 'MecFormModule.togglePlanMoveMode()',
+          tone: _planMoveMode ? 'btn-primary' : 'btn-outline',
+          active: _planMoveMode,
+          title: _planMoveMode ? 'Desactivar movimiento de elementos' : 'Mover elementos en el plano',
+        }),
+        _renderPlanRibbonButton({ icon: '&#8630;', label: 'Deshacer', onClick: 'MecFormModule.undoSketchObject()', tone: 'btn-warning', title: 'Deshacer ultimo cambio' }),
+        _renderPlanRibbonButton({ icon: '&#8631;', label: 'Rehacer', onClick: 'MecFormModule.redoSketchObject()', tone: 'btn-success', title: 'Rehacer cambio' }),
+        _renderSelectedPlanLockRibbonButton(),
+        _renderPlanRibbonButton({ icon: '&#10005;', label: 'Eliminar', onClick: 'MecFormModule.deletePlanSelection()', tone: 'btn-danger', disabled: !canDelete, title: canDelete ? 'Eliminar seleccion' : 'Seleccione un elemento para eliminar' }),
+      ].join('')),
+      _renderPlanRibbonGroup('Orientar', _renderSelectedPlanOrientationButtons('btn-sm', true, true), 'school-plan-ribbon__group--wide'),
+    ].join('');
+  }
+
+  function _renderSchoolPlanRibbon() {
+    const activeTab = _normalizePlanRibbonTab();
+    _planRibbonTab = activeTab;
+    return `
+      <section class="school-plan-ribbon" aria-label="Herramientas del plano">
+        <div class="school-plan-ribbon__tabs" role="tablist" aria-label="Pestanas de herramientas">
+          ${PLAN_RIBBON_TABS.map(tab => `
+            <button class="school-plan-ribbon__tab ${activeTab === tab.id ? 'school-plan-ribbon__tab--active' : ''}" type="button" role="tab" aria-selected="${activeTab === tab.id ? 'true' : 'false'}" onclick="MecFormModule.setPlanRibbonTab('${_escape(tab.id)}')">
+              <span aria-hidden="true">${tab.icon}</span>
+              <b>${_escape(tab.label)}</b>
+            </button>`).join('')}
+        </div>
+        <div class="school-plan-ribbon__panel">
+          ${_renderPlanRibbonPanel(activeTab)}
+        </div>
+      </section>`;
+  }
+
   function _buttonChoiceGroup(options, selected, onClickForOption, className = '') {
     return `
       <div class="mec-choice-buttons ${_escape(className)}">
@@ -10580,6 +10723,7 @@ const MecFormModule = (() => {
 
   function _renderPlanBuilderPanel() {
     const context = _planSelectionContext();
+    const actions = (context.actions || []).filter(action => !_isPlanRibbonDuplicateAction(action));
     return `
       <section class="school-plan-builder">
         <div class="school-plan-builder__state">
@@ -10588,17 +10732,19 @@ const MecFormModule = (() => {
           <small>${_escape(context.detail)}</small>
         </div>
         <div class="school-plan-builder__actions">
-          <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
-          <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
-          ${_renderSelectedPlanLockButton('btn-sm')}
-          ${_renderSelectedPlanOrientationButtons('btn-sm')}
-          ${_selectedPlanId ? '<button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>' : ''}
-          ${context.actions.map(action => `
+          ${actions.map(action => `
             <button class="btn ${_escape(action.tone || 'btn-outline')} btn-sm" type="button" onclick="${_escape(action.onClick)}">
               ${_escape(action.label)}
             </button>`).join('')}
         </div>
       </section>`;
+  }
+
+  function _isPlanRibbonDuplicateAction(action = {}) {
+    const label = String(action.label || '').toLowerCase();
+    return label.startsWith('girar ')
+      || label === '0 grados'
+      || label.startsWith('eliminar ');
   }
 
   function _selectedPlanLockAction(id = _selectedPlanId) {
@@ -10724,10 +10870,20 @@ const MecFormModule = (() => {
     ));
   }
 
-  function _renderSelectedPlanOrientationButtons(sizeClass = 'btn-sm', alwaysVisible = false) {
+  function _renderSelectedPlanOrientationButtons(sizeClass = 'btn-sm', alwaysVisible = false, ribbon = false) {
     const enabled = _isSelectedPlanOrientationTarget();
     if (!enabled && !alwaysVisible) return '';
     const disabled = enabled ? '' : ' disabled title="Seleccione un elemento del plano"';
+    if (ribbon) {
+      return [
+        _renderPlanRibbonButton({ icon: '&#8596;', label: 'Horizontal', onClick: "MecFormModule.orientSelectedPlanItem('horizontal')", disabled: !enabled, title: enabled ? 'Orientar horizontalmente' : 'Seleccione un elemento del plano' }),
+        _renderPlanRibbonButton({ icon: '&#8597;', label: 'Vertical', onClick: "MecFormModule.orientSelectedPlanItem('vertical')", disabled: !enabled, title: enabled ? 'Orientar verticalmente' : 'Seleccione un elemento del plano' }),
+        _renderPlanRibbonButton({ icon: '&#8635;', label: 'Der. 90', onClick: 'MecFormModule.rotateSelectedPlanItem(90)', disabled: !enabled, title: enabled ? 'Rotar a la derecha 90 grados' : 'Seleccione un elemento del plano' }),
+        _renderPlanRibbonButton({ icon: '&#8634;', label: 'Izq. 90', onClick: 'MecFormModule.rotateSelectedPlanItem(-90)', disabled: !enabled, title: enabled ? 'Rotar a la izquierda 90 grados' : 'Seleccione un elemento del plano' }),
+        _renderPlanRibbonButton({ icon: '&#8644;', label: 'Voltear H', onClick: "MecFormModule.flipSelectedPlanItem('horizontal')", disabled: !enabled, title: enabled ? 'Voltear horizontalmente' : 'Seleccione un elemento del plano' }),
+        _renderPlanRibbonButton({ icon: '&#8645;', label: 'Voltear V', onClick: "MecFormModule.flipSelectedPlanItem('vertical')", disabled: !enabled, title: enabled ? 'Voltear verticalmente' : 'Seleccione un elemento del plano' }),
+      ].join('');
+    }
     return `
       <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('horizontal')"${disabled}>Horizontal</button>
       <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('vertical')"${disabled}>Vertical</button>
@@ -10924,6 +11080,13 @@ const MecFormModule = (() => {
     _planLayers[key] = Boolean(enabled);
     if (key === 'datos' && !_planLayers.datos) _hideCanvasHoverTooltip();
     _drawSchoolPlan();
+  }
+
+  function setPlanRibbonTab(tab = 'editar') {
+    const next = _normalizePlanRibbonTab(tab);
+    if (_planRibbonTab === next) return;
+    _planRibbonTab = next;
+    renderSchoolPlan();
   }
 
   function togglePlanMoveMode() {
@@ -18140,6 +18303,7 @@ const MecFormModule = (() => {
     addPlanSanitary,
     deletePlanSelection,
     togglePlanLayer,
+    setPlanRibbonTab,
     togglePlanMoveMode,
     togglePlanBaseMap,
     togglePlanBaseMapPanel,

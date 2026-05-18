@@ -3679,6 +3679,29 @@ textarea.form-control {
   font-size: .66rem;
 }
 
+#module-registro .school-plan-ribbon__panel {
+  min-height: 54px;
+  padding: .32rem .36rem;
+  gap: .34rem;
+}
+
+#module-registro .school-plan-ribbon__tab {
+  min-height: 28px;
+  padding: .26rem .5rem .28rem;
+  font-size: .66rem;
+}
+
+#module-registro .school-plan-ribbon__button {
+  min-width: 46px;
+  min-height: 38px;
+  padding: .18rem .28rem;
+}
+
+#module-registro .school-plan-ribbon__label {
+  max-width: 58px;
+  font-size: .53rem;
+}
+
 #module-registro .school-plan__tools-row {
   gap: .35rem;
   margin-bottom: .5rem;

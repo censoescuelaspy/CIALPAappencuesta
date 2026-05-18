@@ -4,6 +4,34 @@
 
 ---
 
+## Sesion de cinta compacta de herramientas del plano - 2026-05-18 - v2.6.20
+
+### Objetivo
+- Organizar inteligentemente los botones del plano para reducir desorden, espacio ocupado y acciones repetidas.
+- Agrupar herramientas en una cinta tipo Excel con secciones claras e iconos relacionados.
+
+### Cambios implementados
+- La barra larga del plano se reemplazo por una cinta compacta con pestanas: `Editar`, `Insertar`, `Vista`, `Capas` y `Exportar`.
+- `Editar` agrupa mover, deshacer, rehacer, bloquear/desbloquear, eliminar y orientacion/giro/volteo.
+- `Insertar` agrupa aulas, otros espacios, sanitarios y elementos exteriores/tecnicos.
+- `Vista` agrupa zoom, pantalla completa y base mapa.
+- `Capas` concentra los interruptores de visibilidad del plano.
+- `Exportar` concentra JSON, DXF, SVG, PNG y PDF.
+- Se agregaron iconos compactos en los botones principales y se redujo el texto visible para recuperar alto util del plano.
+- El panel de seleccion dejo de repetir acciones que ahora pertenecen a la cinta principal.
+- Version y cache actualizados a `v2.6.20`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor local `py -3 -m http.server 8035 --bind 127.0.0.1`: `index.html`, `assets/js/config.js`, `assets/js/mec-form.js`, `assets/css/mec-form.css` y `sw.js` servidos correctamente con version/cache `v2.6.20` y clases `school-plan-ribbon`.
+- Selenium/Chrome headless local: cinta visible en `Registro guiado` con pestanas `Editar`, `Insertar`, `Vista`, `Capas` y `Exportar`; acciones de edicion e insercion renderizadas sin errores graves.
+
 ## Sesion de giro tipo Word en plano - 2026-05-18 - v2.6.19
 
 ### Objetivo

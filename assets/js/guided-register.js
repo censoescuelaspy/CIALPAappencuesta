@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.19
+ * Version: 2.6.20
  */
 
 const GuidedRegisterModule = (() => {
