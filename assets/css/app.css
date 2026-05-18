@@ -3493,6 +3493,59 @@ textarea.form-control {
   min-height: 0;
 }
 
+.guided-requirements {
+  display: grid;
+  gap: .24rem;
+  margin: .08rem 0 .12rem;
+  padding: 0;
+  list-style: none;
+}
+
+.guided-requirements li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: .32rem;
+  align-items: center;
+  padding: .26rem .34rem;
+  background: #fff;
+  border: 1px solid #fed7aa;
+  border-radius: 6px;
+}
+
+.guided-requirements li > span {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: #9a3412;
+  font-size: .62rem;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.guided-requirements li > strong {
+  min-width: 0;
+  color: #172033;
+  font-size: .66rem;
+  line-height: 1.15;
+}
+
+.guided-requirements li > small {
+  min-width: 0;
+  color: #64748b;
+  font-size: .62rem;
+  line-height: 1.18;
+}
+
+.guided-requirements__item--done {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+
+.guided-requirements__item--done > span {
+  color: #15803d;
+}
+
 .guided-question-control {
   display: grid;
   grid-template-columns: minmax(110px, auto) minmax(80px, 140px);

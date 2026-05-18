@@ -4,6 +4,84 @@
 
 ---
 
+## Cuestionario secuencial con confirmacion de elementos - 2026-05-18 - v2.6.38
+
+### Objetivo
+- Hacer que cada pregunta del cuestionario guiado avance item por item.
+- Bloquear el avance cuando un elemento requiere ubicacion, dimensiones, condicion o caracteristicas pendientes.
+- Limpiar fichas para que no pidan informacion generica que no corresponde al objeto.
+
+### Cambios implementados
+- `Registro guiado` ahora muestra un checklist por bloque, piso, aula/espacio, sanitario y elemento exterior/tecnico con pendientes concretos: ubicacion en plano, dimensiones, condicion y caracteristicas.
+- La etapa de bloques exige medidas, estado y observacion/caracteristica antes de pedir ubicacion en plano.
+- Los pisos incorporan estado y observacion/caracteristicas en su ficha; el flujo no continua si esos datos quedan vacios.
+- Aulas/espacios, sanitarios y elementos exteriores/tecnicos solo pueden confirmarse cuando todos sus pendientes estan completos.
+- Se agrego la accion guiada para seleccionar directamente el elemento pendiente en el plano.
+- La ficha de aulas/espacios agrega `Caracteristicas / uso observado`, persistido en el registro del ambiente.
+- Se limpio la ficha de objetos internos: toma electrica, tablero, iluminacion, ventilador, aire acondicionado, texto, trazo y foto ya no muestran `Material` cuando no corresponde; la ficha de foto deja de usar textos de iluminacion.
+- Version y cache actualizados a `v2.6.38`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+---
+
+## Hit tactil ampliado para redimensionamiento - 2026-05-18 - v2.6.37
+
+### Objetivo
+- Corregir que en tablet el estiramiento desde vertices respondiera bien solo en bloques y no en pisos, aulas/espacios, sanitarios, objetos internos o elementos exteriores.
+- Mantener el comportamiento fino del mouse sin agrandar artificialmente los handles en escritorio.
+
+### Cambios implementados
+- `_bindSchoolPlanCanvas`: la deteccion tactil de areas `*-resize` y `*-vertex` ahora usa un margen ampliado solo cuando `pointerType === 'touch'`.
+- El mouse conserva la deteccion exacta anterior, evitando falsos positivos al trabajar con precision.
+- Se mantiene la regla de v2.6.35 para elementos tecnicos muy pequenos: si el dedo/clic cae dentro del cuerpo, se prioriza mover el elemento en lugar de redimensionarlo.
+- Se recupero `assets/js/mec-form.js` desde Git luego de quedar en 0 bytes por falta de espacio en disco, y se reaplicaron los cambios de v2.6.36 sobre ese archivo.
+- Version y cache actualizados a `v2.6.37`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
+## Movimiento fino tactil y nudge extendido - 2026-05-18 - v2.6.36
+
+### Objetivo
+- Completar el movimiento fino del plano para que tambien funcione con pisos, aulas/espacios, objetos internos y sanitarios.
+- Agregar una alternativa tactil visible para mover elementos en tablets sin depender de teclado fisico.
+- Hacer mas distinguible el volteo visual de elementos tecnicos simetricos.
+
+### Cambios implementados
+- `nudgeSelectedPlanItem(dx, dy)` ahora reutiliza el area real seleccionada del plano y soporta pisos, aulas/espacios, objetos internos de aulas, sanitarios y objetos internos de sanitarios, ademas de bloques y elementos exteriores.
+- El canvas toma foco al tocarlo o hacer clic, para que las flechas de teclado funcionen de forma mas confiable despues de seleccionar un elemento.
+- El panel contextual del constructor muestra un pad compacto `Mover` con botones tactiles de direccion de 5 px cuando hay un elemento seleccionado.
+- El pad tactil respeta las mismas funciones y restricciones del arrastre existente: bloqueos, limites de piso, limites de aula/sanitario y ajuste de objetos internos.
+- Acometida y puesta a tierra incorporan una pequena marca asimetrica para que `Voltear H` y `Voltear V` tengan una diferencia visual perceptible.
+- Version y cache actualizados a `v2.6.36`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Movimiento por teclado y fix drag-resize en elementos pequeños - 2026-05-18 - v2.6.35
 
 ### Problema

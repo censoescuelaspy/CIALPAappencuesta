@@ -269,6 +269,7 @@ const GuidedRegisterModule = (() => {
     if (action === 'confirmClassroomConfigured') return _confirmClassroomConfigured(value);
     if (action === 'confirmSanitaryConfigured') return _confirmSanitaryConfigured(value);
     if (action === 'confirmSiteConfigured') return _confirmSiteConfigured(value);
+    if (action === 'selectPlanItem') return _selectPlanItem(value);
     if (action === 'module') return _openModule(value);
     if (action === 'stage') return _openMecStage(value);
     if (action === 'demo') return _openDemo();
@@ -579,6 +580,12 @@ const GuidedRegisterModule = (() => {
     const blockHasMeasures = _hasMeasures(activeBlock, 'largo_m', 'ancho_m');
     const blockPositioned = _hasPosition(activeBlock?.planPosition || activeBlock?.plano_general);
     const noFloor = _flagValue(_flagKeyParts(blockId, activeFloorLabel, 'noFloor'));
+    const incompleteFloor = activeFloors.find(floor => !_floorReady(floor));
+    const activeBlockSiteElements = siteElements.filter(item => (
+      item?.autoSource?.module === 'bloques' &&
+      (!blockId || item.autoSource.blockId === blockId)
+    ));
+    const incompleteBlockSiteElement = activeBlockSiteElements.find(item => !_siteElementConfigured(item));
     const activeFloorsReady = activeFloors.length
       ? activeFloors.every(floor => _hasMeasures(floor, 'largo_m', 'ancho_m') && _hasPosition(floor))
       : true;
@@ -605,6 +612,8 @@ const GuidedRegisterModule = (() => {
       incompleteClassroom,
       incompleteSanitary,
       incompleteSiteElement,
+      incompleteFloor,
+      incompleteBlockSiteElement,
       blockHasMeasures,
       blockPositioned,
       blockReadyForRooms,
@@ -706,10 +715,12 @@ const GuidedRegisterModule = (() => {
         { label: 'Iniciar bloque', action: 'guidedBlock', primary: true },
       ]);
     }
-    if (!snap.blockHasMeasures) {
-      return _question('Paso 1', 'Medidas obligatorias del bloque', 'Complete largo y ancho antes de continuar. Esas medidas fijan la escala para pisos, aulas y sanitarios.', [
+    const blockPending = _blockRequirementItems(snap.activeBlock);
+    const blockNext = _firstPendingRequirement(blockPending);
+    if (blockNext) {
+      return _question('Paso 1', `Bloque: ${blockNext.title}`, blockNext.help || 'Complete la ficha del bloque antes de continuar.', [
         { label: 'Completar ficha bloque', action: 'blockFicha', primary: true },
-      ]);
+      ], false, _guidedRequirementList(blockPending));
     }
     if (!snap.blockPositioned) {
       return _question('Paso 2', 'Ubicar el bloque en el plano', 'Active el movimiento y arrastre el bloque hasta su posicion real dentro del predio.', [
@@ -724,11 +735,15 @@ const GuidedRegisterModule = (() => {
       ]);
     }
     if (snap.activeFloors.length && !snap.activeFloorsReady) {
-      return _question('Paso 3', 'Graficar y medir el piso', 'El piso debe quedar dibujado sobre el bloque, con posicion, largo, ancho y rotacion antes de cargar ambientes.', [
-        { label: 'Completar piso', action: 'floorGuide', primary: true },
-        { label: 'Ubicar bloque', action: 'positionBlock' },
-      ]);
+      const floor = snap.incompleteFloor || snap.activeFloors.find(item => !_floorReady(item)) || snap.activeFloors[0];
+      const pending = _floorRequirementItems(floor);
+      const next = _firstPendingRequirement(pending);
+      return _question('Paso 3', next ? `Piso: ${next.title}` : 'Graficar y medir el piso', next?.help || 'El piso debe quedar dibujado sobre el bloque, con posicion, largo, ancho y rotacion antes de cargar ambientes.', [
+        { label: next?.plan ? 'Seleccionar piso' : 'Completar piso', action: next?.plan ? 'selectPlanItem' : 'floorGuide', value: `floor::${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Piso 1'}`, primary: true },
+        { label: 'Abrir ficha', action: 'floorGuide' },
+      ], false, _guidedRequirementList(pending));
     }
+    if (snap.incompleteBlockSiteElement) return _siteElementQuestion(snap.incompleteBlockSiteElement, 'bloque');
     const electric = _nextBlockTechnicalQuestion(snap);
     if (electric) return electric;
     return _question('Listo', 'Bloque listo para continuar', 'La estructura principal ya tiene las respuestas minimas para pasar a aulas, sanitarios o exteriores.', [
@@ -822,10 +837,13 @@ const GuidedRegisterModule = (() => {
     }
     if (snap.incompleteClassroom) {
       const label = snap.incompleteClassroom.name || 'Aula pendiente';
-      return _question('Aula pendiente', `Configurar ${label}`, 'Ajuste dimensiones y posicion desde el plano o la ficha. Luego confirme para habilitar la siguiente pregunta.', [
-        { label: 'Abrir ficha', action: 'openClassroomFicha', value: snap.incompleteClassroom.id, primary: true },
+      const pending = _roomRequirementItems(snap.incompleteClassroom);
+      const next = _firstPendingRequirement(pending);
+      return _question('Aula pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Revise la ficha y confirme el guardado para habilitar la siguiente pregunta.', [
+        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openClassroomFicha', value: next?.plan ? `room::${snap.incompleteClassroom.id}` : snap.incompleteClassroom.id, primary: true },
+        { label: 'Abrir ficha', action: 'openClassroomFicha', value: snap.incompleteClassroom.id },
         { label: 'Confirmar configuracion', action: 'confirmClassroomConfigured', value: snap.incompleteClassroom.id },
-      ]);
+      ], false, _guidedRequirementList(pending));
     }
     return _question('Listo', 'Aulas configuradas para este bloque/piso', 'La cantidad declarada coincide con las aulas configuradas y confirmadas.', [
       { label: 'Siguiente', action: 'next', primary: true },
@@ -860,10 +878,13 @@ const GuidedRegisterModule = (() => {
     }
     if (snap.incompleteSanitary) {
       const label = snap.incompleteSanitary.codigo || 'Sanitario pendiente';
-      return _question('Sanitario pendiente', `Configurar ${label}`, 'Complete dimensiones, posicion y ficha. Agregue cabinas o artefactos antes de confirmar.', [
-        { label: 'Abrir ficha', action: 'openSanitaryFicha', value: snap.incompleteSanitary.id, primary: true },
+      const pending = _sanitaryRequirementItems(snap.incompleteSanitary);
+      const next = _firstPendingRequirement(pending);
+      return _question('Sanitario pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Revise la ficha y confirme el guardado para habilitar la siguiente pregunta.', [
+        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openSanitaryFicha', value: next?.plan ? `sanitary::${snap.incompleteSanitary.id}` : snap.incompleteSanitary.id, primary: true },
+        { label: 'Abrir ficha', action: 'openSanitaryFicha', value: snap.incompleteSanitary.id },
         { label: 'Confirmar configuracion', action: 'confirmSanitaryConfigured', value: snap.incompleteSanitary.id },
-      ]);
+      ], false, _guidedRequirementList(pending));
     }
     return _question('Listo', 'Sanitarios configurados', 'Los sanitarios cargados tienen posicion, dimensiones y confirmacion de ficha.', [
       { label: 'Siguiente', action: 'next', primary: true },
@@ -889,11 +910,7 @@ const GuidedRegisterModule = (() => {
       ], true);
     }
     if (snap.incompleteSiteElement) {
-      const label = snap.incompleteSiteElement.ficha?.codigo || snap.incompleteSiteElement.ficha?.subtipo || 'Elemento exterior';
-      return _question('Elemento pendiente', `Configurar ${label}`, 'Ubique el elemento, ajuste sus esquinas si corresponde y complete la ficha emergente antes de continuar.', [
-        { label: 'Abrir ficha', action: 'openSiteFicha', value: snap.incompleteSiteElement.id, primary: true },
-        { label: 'Confirmar configuracion', action: 'confirmSiteConfigured', value: snap.incompleteSiteElement.id },
-      ]);
+      return _siteElementQuestion(snap.incompleteSiteElement, 'exteriores');
     }
     return _question('Listo', 'Exteriores configurados', 'Los elementos exteriores/tecnicos cargados estan ubicados y confirmados.', [
       { label: 'Siguiente', action: 'next', primary: true },
@@ -901,8 +918,187 @@ const GuidedRegisterModule = (() => {
     ], true);
   }
 
+  function _siteElementQuestion(item, origin = 'exteriores') {
+    const label = item?.ficha?.codigo || item?.ficha?.subtipo || _siteElementTypeLabel(item?.type) || 'Elemento pendiente';
+    const pending = _siteElementRequirementItems(item);
+    const next = _firstPendingRequirement(pending);
+    return _question(
+      origin === 'bloque' ? 'Elemento automatico pendiente' : 'Elemento pendiente',
+      `${label}: ${next?.title || 'confirmar guardado'}`,
+      next?.help || 'Revise la ficha y confirme el guardado para habilitar la siguiente pregunta.',
+      [
+        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openSiteFicha', value: next?.plan ? `site::${item.id}` : item.id, primary: true },
+        { label: 'Abrir ficha', action: 'openSiteFicha', value: item.id },
+        { label: 'Confirmar configuracion', action: 'confirmSiteConfigured', value: item.id },
+      ],
+      false,
+      _guidedRequirementList(pending)
+    );
+  }
+
   function _question(kicker, title, body, actions = [], done = false, control = '') {
     return { kicker, title, body, actions, done, control, blocking: !done };
+  }
+
+  function _firstPendingRequirement(items = []) {
+    return (items || []).find(item => !item.done) || null;
+  }
+
+  function _guidedRequirementList(items = []) {
+    if (!items.length) return '';
+    return `
+      <ul class="guided-requirements" aria-label="Pendientes del elemento">
+        ${items.map(item => `
+          <li class="${item.done ? 'guided-requirements__item--done' : ''}">
+            <span aria-hidden="true">${item.done ? '&#10003;' : '!'}</span>
+            <strong>${_escape(item.title)}</strong>
+            <small>${_escape(item.done ? (item.doneText || 'Completado') : (item.help || 'Pendiente'))}</small>
+          </li>`).join('')}
+      </ul>`;
+  }
+
+  function _blockRequirementItems(block) {
+    return [
+      {
+        title: 'Cargar dimensiones',
+        help: 'Complete largo y ancho del bloque. Estas medidas fijan la escala de pisos, aulas y sanitarios.',
+        doneText: `${block?.largo_m || '?'} x ${block?.ancho_m || '?'} m`,
+        done: _hasMeasures(block, 'largo_m', 'ancho_m'),
+      },
+      {
+        title: 'Condicion de calidad',
+        help: 'Registre el estado general del bloque antes de ubicarlo en el plano.',
+        doneText: block?.estado_bloque || 'Estado cargado',
+        done: _hasAnswer(block?.estado_bloque),
+      },
+      {
+        title: 'Caracteristicas / observacion',
+        help: 'Agregue una observacion breve: uso, obra, clausura, danos visibles o contexto relevante.',
+        doneText: 'Observacion registrada',
+        done: _hasAnswer(block?.observacion || block?.observaciones),
+      },
+    ];
+  }
+
+  function _floorRequirementItems(floor) {
+    return [
+      {
+        title: 'Ubicar en plano',
+        help: 'Seleccione el piso y colocalo dentro del bloque antes de continuar.',
+        doneText: 'Tiene posicion en el bloque',
+        done: _hasPosition(floor),
+        plan: true,
+      },
+      {
+        title: 'Cargar dimensiones',
+        help: 'Complete largo y ancho del piso desde la ficha o estirando sus vertices en el plano.',
+        doneText: `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`,
+        done: _hasMeasures(floor, 'largo_m', 'ancho_m'),
+      },
+      {
+        title: 'Condicion de calidad',
+        help: 'Registre el estado general del piso.',
+        doneText: floor?.estado || floor?.estado_piso || 'Estado cargado',
+        done: _hasAnswer(floor?.estado || floor?.estado_piso),
+      },
+      {
+        title: 'Caracteristicas / observacion',
+        help: 'Agregue una observacion breve del piso si hay particularidades, deterioro o restricciones.',
+        doneText: 'Observacion registrada',
+        done: _hasAnswer(floor?.observacion || floor?.observaciones),
+      },
+    ];
+  }
+
+  function _roomRequirementItems(room) {
+    return [
+      {
+        title: 'Ubicar en plano',
+        help: 'Seleccione el ambiente, arrastrelo al lugar correcto y ajuste sus vertices si corresponde.',
+        doneText: 'Tiene geometria en el plano',
+        done: _roomHasGeometry(room),
+        plan: true,
+      },
+      {
+        title: 'Cargar dimensiones',
+        help: 'Complete largo y ancho desde la ficha o estirando el ambiente sobre el plano.',
+        doneText: `${room?.length || '?'} x ${room?.width || '?'} m`,
+        done: _hasMeasures(room, 'length', 'width'),
+      },
+      {
+        title: 'Condicion de calidad',
+        help: 'Registre el estado general del ambiente antes de confirmarlo.',
+        doneText: room?.estado || 'Estado cargado',
+        done: _hasAnswer(room?.estado),
+      },
+      {
+        title: 'Caracteristicas del ambiente',
+        help: 'Registre uso, particularidades, aberturas u observaciones tecnicas en la ficha.',
+        doneText: 'Caracteristicas registradas',
+        done: _hasAnswer(room?.caracteristicas) || _hasAnswer(room?.openings),
+      },
+    ];
+  }
+
+  function _sanitaryRequirementItems(item) {
+    return [
+      {
+        title: 'Ubicar en plano',
+        help: 'Seleccione el sanitario, ubiquelo dentro del piso y ajuste sus vertices si corresponde.',
+        doneText: 'Tiene geometria en el plano',
+        done: _sanitaryHasGeometry(item),
+        plan: true,
+      },
+      {
+        title: 'Cargar dimensiones',
+        help: 'Complete largo y ancho desde la ficha o estirando el sanitario sobre el plano.',
+        doneText: `${item?.largo_m || '?'} x ${item?.ancho_m || '?'} m`,
+        done: _hasMeasures(item, 'largo_m', 'ancho_m'),
+      },
+      {
+        title: 'Condicion de calidad',
+        help: 'Registre el estado general del sanitario.',
+        doneText: item?.estado || 'Estado cargado',
+        done: _hasAnswer(item?.estado),
+      },
+      {
+        title: 'Caracteristicas sanitarias',
+        help: 'Complete uso principal, genero/destino y datos basicos de funcionamiento.',
+        doneText: [item?.uso, item?.genero, item?.agua].filter(Boolean).join(' / ') || 'Caracteristicas cargadas',
+        done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
+      },
+    ];
+  }
+
+  function _siteElementRequirementItems(item) {
+    const ficha = item?.ficha || {};
+    return [
+      {
+        title: 'Ubicar en plano',
+        help: 'Seleccione el elemento, arrastrelo a su lugar real y ajuste el tamano si corresponde.',
+        doneText: 'Tiene posicion y tamano en el plano',
+        done: _siteElementHasPlanRect(item),
+        plan: true,
+      },
+      {
+        title: 'Cargar dimensiones',
+        help: 'Complete las medidas propias del elemento, o estire sus vertices para sincronizarlas con la ficha.',
+        doneText: _siteElementDimensionText(item),
+        done: _siteElementHasMeasures(item),
+      },
+      {
+        title: 'Condicion de calidad',
+        help: 'Registre el estado general observado.',
+        doneText: ficha.estado || 'Estado cargado',
+        done: _hasAnswer(ficha.estado),
+      },
+      {
+        title: 'Caracteristicas tecnicas',
+        help: 'Complete el campo tecnico principal que corresponde a este tipo de elemento.',
+        doneText: _siteElementCharacteristicText(item),
+        done: _siteElementHasCharacteristic(item),
+      },
+    ];
   }
 
   function _guidedQuestionCard(question) {
@@ -970,6 +1166,17 @@ const GuidedRegisterModule = (() => {
     if (mec.setGuidedBlockField(fieldId, value)) _refreshSoon();
   }
 
+  function _selectPlanItem(value = '') {
+    const id = String(value || '').trim();
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!id || !mec?.selectPlanItem) {
+      UI.showToast('No se pudo seleccionar el elemento en el plano.', 'warning');
+      return;
+    }
+    mec.selectPlanItem(id);
+    _refreshSoon();
+  }
+
   function _setScopedFlag(name, value, message = '') {
     const snap = _snapshot();
     const blockId = name === 'noSiteElements' ? (snap.activeBlock?.id || 'predio') : snap.activeBlock?.id;
@@ -988,8 +1195,9 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No hay aula pendiente para confirmar.', 'warning');
       return;
     }
-    if (!_roomReady(room)) {
-      UI.showToast('Complete medidas y posicion del aula antes de confirmar.', 'warning', 5200);
+    const missing = _missingRequirementTitles(_roomRequirementItems(room));
+    if (missing) {
+      UI.showToast(`Falta completar: ${missing}.`, 'warning', 6200);
       return;
     }
     _setFlag(_flagKeyParts(room.blockId || snap.activeBlock?.id, _normalizeFloorLabel(room.floor || snap.activeFloorLabel), `classroomConfigured:${room.id}`), true);
@@ -1005,8 +1213,9 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No hay sanitario pendiente para confirmar.', 'warning');
       return;
     }
-    if (!_sanitaryReady(item)) {
-      UI.showToast('Complete dimensiones, posicion y ficha del sanitario antes de confirmar.', 'warning', 5200);
+    const missing = _missingRequirementTitles(_sanitaryRequirementItems(item));
+    if (missing) {
+      UI.showToast(`Falta completar: ${missing}.`, 'warning', 6200);
       return;
     }
     _setFlag(_flagKeyParts(item.bloque || snap.activeBlock?.id, _normalizeFloorLabel(item.planta || snap.activeFloorLabel), `sanitaryConfigured:${item.id}`), true);
@@ -1022,8 +1231,9 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No hay elemento exterior pendiente para confirmar.', 'warning');
       return;
     }
-    if (!_siteElementReady(item)) {
-      UI.showToast('Ubique el elemento en el plano antes de confirmarlo.', 'warning', 5200);
+    const missing = _missingRequirementTitles(_siteElementRequirementItems(item));
+    if (missing) {
+      UI.showToast(`Falta completar: ${missing}.`, 'warning', 6200);
       return;
     }
     _setFlag(_flagKeyParts('predio', 'exteriores', `siteConfigured:${item.id}`), true);
@@ -1037,9 +1247,12 @@ const GuidedRegisterModule = (() => {
     return _flagValue(_flagKeyParts(room.blockId, _normalizeFloorLabel(room.floor || 'Piso 1'), `classroomConfigured:${room.id}`));
   }
 
+  function _floorReady(floor) {
+    return _floorRequirementItems(floor).every(item => item.done);
+  }
+
   function _roomReady(room) {
-    if (!_hasMeasures(room, 'length', 'width')) return false;
-    return _roomHasGeometry(room);
+    return _roomRequirementItems(room).every(item => item.done);
   }
 
   function _roomHasGeometry(room) {
@@ -1058,7 +1271,10 @@ const GuidedRegisterModule = (() => {
   }
 
   function _sanitaryReady(item) {
-    if (!_hasMeasures(item, 'largo_m', 'ancho_m')) return false;
+    return _sanitaryRequirementItems(item).every(req => req.done);
+  }
+
+  function _sanitaryHasGeometry(item) {
     return (item?.objects || []).some(object => (
       (object.type === 'sanitary-room' || object.type === 'room') &&
       Number(object.w || 0) > 0 &&
@@ -1072,10 +1288,95 @@ const GuidedRegisterModule = (() => {
   }
 
   function _siteElementReady(item) {
+    return _siteElementRequirementItems(item).every(req => req.done);
+  }
+
+  function _siteElementHasPlanRect(item) {
     return Number.isFinite(Number(item?.xRatio)) &&
       Number.isFinite(Number(item?.yRatio)) &&
       Number(item?.wRatio || 0) > 0 &&
       Number(item?.hRatio || 0) > 0;
+  }
+
+  function _siteElementHasMeasures(item) {
+    const ficha = item?.ficha || {};
+    if (['water_tank', 'well'].includes(item?.type)) {
+      return Number(ficha.diametro_m || ficha.ancho_m || ficha.largo_m || 0) > 0;
+    }
+    if (item?.type === 'pillar') {
+      return Number(ficha.diametro_m || ficha.lado_m || ficha.ancho_m || 0) > 0;
+    }
+    return Number(ficha.largo_m || ficha.longitud_m || 0) > 0 && Number(ficha.ancho_m || 0) > 0;
+  }
+
+  function _siteElementDimensionText(item) {
+    const ficha = item?.ficha || {};
+    if (['water_tank', 'well'].includes(item?.type)) {
+      const diameter = ficha.diametro_m || ficha.ancho_m || ficha.largo_m || '';
+      return diameter ? `Diametro ${diameter} m` : 'Medidas cargadas';
+    }
+    if (item?.type === 'pillar') {
+      const measure = ficha.diametro_m || ficha.lado_m || ficha.ancho_m || '';
+      return measure ? `${ficha.forma_pilar || 'Pilar'} ${measure} m` : 'Medidas cargadas';
+    }
+    const length = ficha.largo_m || ficha.longitud_m || '?';
+    const width = ficha.ancho_m || '?';
+    return `${length} x ${width} m`;
+  }
+
+  function _siteElementCharacteristicKey(type) {
+    return {
+      water_tank: 'material',
+      well: 'tipo_pozo',
+      recreation: 'uso',
+      gallery: 'ubicacion_relativa',
+      walkway: 'superficie',
+      open_space: 'uso',
+      pillar: 'material',
+      stair: 'material',
+      ramp: 'material',
+      service_connection: 'tipo_acometida',
+      meter: 'propiedad',
+      main_switchboard: 'proteccion',
+      grounding: 'conductor_visible',
+    }[type] || '';
+  }
+
+  function _siteElementHasCharacteristic(item) {
+    const key = _siteElementCharacteristicKey(item?.type);
+    if (!key) return true;
+    return _hasAnswer(item?.ficha?.[key]);
+  }
+
+  function _siteElementCharacteristicText(item) {
+    const key = _siteElementCharacteristicKey(item?.type);
+    if (!key) return 'Caracteristica cargada';
+    return String(item?.ficha?.[key] || 'Caracteristica cargada');
+  }
+
+  function _siteElementTypeLabel(type) {
+    return {
+      water_tank: 'Tanque de agua',
+      well: 'Pozo / captacion',
+      recreation: 'Recreacion',
+      gallery: 'Galeria',
+      walkway: 'Caminero',
+      open_space: 'Espacio libre',
+      pillar: 'Pilar',
+      stair: 'Escalera de bloque',
+      ramp: 'Rampa de bloque',
+      service_connection: 'Acometida / punto de ingreso',
+      meter: 'Medidor / punto de medicion',
+      main_switchboard: 'Tablero electrico del bloque',
+      grounding: 'Puesta a tierra',
+    }[type] || '';
+  }
+
+  function _missingRequirementTitles(items = []) {
+    return (items || [])
+      .filter(item => !item.done)
+      .map(item => item.title)
+      .join(', ');
   }
 
   function _hasAnswer(value) {
