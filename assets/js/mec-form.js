@@ -10492,6 +10492,7 @@ const MecFormModule = (() => {
                 <button class="btn btn-warning btn-sm" type="button" onclick="MecFormModule.undoSketchObject()">Deshacer</button>
                 <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.redoSketchObject()">Rehacer</button>
                 ${_renderSelectedPlanLockButton('btn-sm')}
+                ${_renderSelectedPlanOrientationButtons('btn-sm', true)}
                 <button class="btn btn-danger btn-sm" type="button" onclick="MecFormModule.deletePlanSelection()">Eliminar</button>
               </div>
             </div>
@@ -10723,11 +10724,13 @@ const MecFormModule = (() => {
     ));
   }
 
-  function _renderSelectedPlanOrientationButtons(sizeClass = 'btn-sm') {
-    if (!_isSelectedPlanOrientationTarget()) return '';
+  function _renderSelectedPlanOrientationButtons(sizeClass = 'btn-sm', alwaysVisible = false) {
+    const enabled = _isSelectedPlanOrientationTarget();
+    if (!enabled && !alwaysVisible) return '';
+    const disabled = enabled ? '' : ' disabled title="Seleccione un elemento del plano"';
     return `
-      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('horizontal')">Horizontal</button>
-      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('vertical')">Vertical</button>`;
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('horizontal')"${disabled}>Horizontal</button>
+      <button class="btn btn-outline ${_escape(sizeClass)}" type="button" onclick="MecFormModule.orientSelectedPlanItem('vertical')"${disabled}>Vertical</button>`;
   }
 
   function _quickOtherSpaceActions() {

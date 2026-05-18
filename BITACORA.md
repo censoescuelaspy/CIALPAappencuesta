@@ -4,6 +4,27 @@
 
 ---
 
+## Sesion de botones visibles de orientacion - 2026-05-18 - v2.6.18
+
+### Objetivo
+- Hacer visibles los botones de orientacion rapida en la barra de herramientas principal del plano.
+
+### Cambios implementados
+- Se agregaron `Horizontal` y `Vertical` junto a las acciones visibles del plano, en la misma zona de `Mover elementos`, exportaciones, deshacer/rehacer, bloqueo y eliminacion.
+- Los botones quedan visibles aunque no haya seleccion; se desactivan hasta seleccionar un elemento orientable.
+- Al seleccionar bloque, piso, aula/espacio, sanitario, exterior/tecnico u objeto interno, los botones se habilitan y aplican orientacion inmediata a `0` o `90` grados.
+- Version y cache actualizados a `v2.6.18`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor local `py -3 -m http.server 8033 --bind 127.0.0.1`: `index.html`, `assets/js/config.js`, `assets/js/mec-form.js` y `sw.js` servidos correctamente con version/cache `v2.6.18`, botones visibles `Horizontal`/`Vertical` y estado deshabilitado sin seleccion.
+
 ## Sesion de orientacion rapida de elementos - 2026-05-18 - v2.6.17
 
 ### Objetivo
