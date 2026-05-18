@@ -11301,6 +11301,8 @@ const MecFormModule = (() => {
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', ${-_siteElementRotationDeg(element)})` },
+          { label: 'Voltear H', onClick: "MecFormModule.flipSelectedPlanItem('horizontal')" },
+          { label: 'Voltear V', onClick: "MecFormModule.flipSelectedPlanItem('vertical')" },
           { label: '+ Exterior', onClick: "MecFormModule.openSiteElementTypePicker('plan')" },
         ],
       };
@@ -12865,7 +12867,8 @@ const MecFormModule = (() => {
   function _planResizeHandles(rect, rotation = 0) {
     if (!rect) return [];
     const center = _planRectCenter(rect);
-    const size = 22;
+    const minDim = Math.min(rect.w, rect.h);
+    const size = minDim < 14 ? 10 : (minDim < 28 ? 14 : 22);
     return [
       { name: 'nw', x: rect.x, y: rect.y },
       { name: 'ne', x: rect.x + rect.w, y: rect.y },
@@ -12881,12 +12884,13 @@ const MecFormModule = (() => {
   function _drawPlanResizeHandles(ctx, rect, rotation = 0) {
     const handles = _planResizeHandles(rect, rotation);
     if (!handles.length) return;
+    const minDim = Math.min(rect.w, rect.h);
+    const half = minDim < 14 ? 3 : (minDim < 28 ? 4 : 5.5);
     ctx.save();
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#111827';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = minDim < 14 ? 1 : (minDim < 28 ? 1.5 : 2);
     handles.forEach(handle => {
-      const half = 5.5;
       ctx.beginPath();
       ctx.rect(handle.x - half, handle.y - half, half * 2, half * 2);
       ctx.fill();
