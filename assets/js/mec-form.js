@@ -82,6 +82,7 @@ const MecFormModule = (() => {
 
   const SITE_ELEMENT_TYPES = [
     { id: 'water_tank', label: 'Tanque de agua', short: 'TQ', tone: '#0e7490' },
+    { id: 'well', label: 'Pozo / captacion', short: 'POZ', tone: '#0f766e' },
     { id: 'recreation', label: 'Espacio recreacion', short: 'REC', tone: '#15803d' },
     { id: 'gallery', label: 'Galeria', short: 'GAL', tone: '#7c3aed' },
     { id: 'walkway', label: 'Caminero', short: 'CAM', tone: '#64748b' },
@@ -1900,6 +1901,29 @@ const MecFormModule = (() => {
       floor.id === target || _floorRecordLabel(floor) === _normalizeFloor(target)) || null;
   }
 
+  function _materializePlanFloorRecord(block, floorIdOrLabel = '') {
+    if (!block) return null;
+    const existing = _blockFloorRecord(block, floorIdOrLabel);
+    if (existing) return existing;
+    const label = _normalizeFloor(floorIdOrLabel || _nextFloorLabelForBlock(block));
+    const record = {
+      id: `piso_${Date.now().toString(36)}_${Math.floor(Math.random() * 1000)}`,
+      label,
+      floor: label,
+      largo_m: block.largo_m || '',
+      ancho_m: block.ancho_m || '',
+      xRatio: .06,
+      yRatio: .16,
+      wRatio: .88,
+      hRatio: .58,
+      rotationDeg: 0,
+      rotacion_grados: '0',
+    };
+    _ensureBlockFloors(block).push(record);
+    _syncBlockFloorCountFromRecords(block);
+    return record;
+  }
+
   function _syncBlockFloorCountFromRecords(block) {
     if (!block) return 0;
     const count = _ensureBlockFloors(block).length;
@@ -2862,6 +2886,14 @@ const MecFormModule = (() => {
         hRatio: Math.max(.04, Math.min(.22, ancho / 120)),
       };
     }
+    if (type === 'well') {
+      const diametro = Number(ficha.diametro_m || ficha.ancho_m || ficha.largo_m || 0);
+      if (!diametro) return null;
+      return {
+        wRatio: Math.max(.035, Math.min(.18, diametro / 90)),
+        hRatio: Math.max(.035, Math.min(.18, diametro / 90)),
+      };
+    }
     if (type === 'pillar') {
       const square = String(ficha.forma_pilar || ficha.seccion || '').toLowerCase().includes('cuad');
       const measure = Number(square ? (ficha.lado_m || ficha.diametro_m) : (ficha.diametro_m || ficha.lado_m));
@@ -2912,6 +2944,10 @@ const MecFormModule = (() => {
       const diametro = Number(element.ficha.diametro_m || element.ficha.ancho_m || 0);
       if (diametro > 0) element.ficha.superficie_m2 = (Math.PI * Math.pow(diametro / 2, 2)).toFixed(2);
     }
+    if (element.type === 'well') {
+      const diametro = Number(element.ficha.diametro_m || element.ficha.ancho_m || 0);
+      if (diametro > 0) element.ficha.superficie_m2 = (Math.PI * Math.pow(diametro / 2, 2)).toFixed(2);
+    }
     if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space', 'stair', 'ramp'].includes(element.type)) {
       element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
       if (element.ficha.perimetro_m !== undefined) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
@@ -2951,6 +2987,17 @@ const MecFormModule = (() => {
         soporte: 'Base elevada',
         tapa: 'Si',
         alimentacion: 'Red publica',
+      },
+      well: {
+        tipo_pozo: 'No verificado',
+        diametro_m: '1.20',
+        profundidad_m: '',
+        superficie_m2: '',
+        brocal: 'No verificable',
+        tapa: 'No verificable',
+        bomba: 'No verificable',
+        potabilidad: 'No verificada',
+        proteccion_sanitaria: 'No verificable',
       },
       recreation: {
         uso: 'Tinglado',
@@ -3074,6 +3121,17 @@ const MecFormModule = (() => {
         { key: 'soporte', label: 'Soporte', options: ['Base elevada', 'Torre metalica', 'Losa', 'A nivel de piso', 'Otro'] },
         { key: 'tapa', label: 'Tapa', options: ['Si', 'No', 'No verificable'] },
         { key: 'alimentacion', label: 'Alimentacion', options: ['Red publica', 'Pozo', 'Mixta', 'No verificada'] },
+      ],
+      well: [
+        { key: 'tipo_pozo', label: 'Tipo de pozo/captacion', options: ['Pozo artesiano', 'Pozo comun', 'Aljibe', 'Captacion superficial', 'No verificado'] },
+        { key: 'diametro_m', label: 'Diametro / boca aprox. (m)', type: 'number', placeholder: 'Ej. 1.20' },
+        { key: 'profundidad_m', label: 'Profundidad aprox. (m)', type: 'number', placeholder: 'Si se conoce' },
+        { key: 'superficie_m2', label: 'Huella aprox. (m2)', type: 'number', placeholder: 'Auto' },
+        { key: 'brocal', label: 'Brocal', options: ['Bueno', 'Regular', 'Malo', 'No tiene', 'No verificable'] },
+        { key: 'tapa', label: 'Tapa/proteccion', options: ['Adecuada', 'Parcial', 'No tiene', 'No verificable'] },
+        { key: 'bomba', label: 'Bomba', options: ['Manual', 'Electrica', 'No tiene', 'No verificable'] },
+        { key: 'potabilidad', label: 'Potabilidad', options: ['Verificada', 'No verificada', 'No potable declarada'] },
+        { key: 'proteccion_sanitaria', label: 'Proteccion sanitaria', options: ['Adecuada', 'Parcial', 'Deficiente', 'No verificable'] },
       ],
       recreation: [
         { key: 'uso', label: 'Uso principal', options: ['Tinglado', 'Cancha abierta', 'Patio', 'Parque infantil', 'Area verde', 'Otro'] },
@@ -3232,6 +3290,7 @@ const MecFormModule = (() => {
     }
     return {
       water_tank: { wRatio: .052, hRatio: .075 },
+      well: { wRatio: .052, hRatio: .052 },
       recreation: { wRatio: .18, hRatio: .11 },
       gallery: { wRatio: .22, hRatio: .045 },
       walkway: { wRatio: .18, hRatio: .024 },
@@ -11638,6 +11697,22 @@ const MecFormModule = (() => {
           sanitaryItems.forEach(item => _drawPlanSanitaryRoom(ctx, item.sanitary, item.x, item.y, item.w, item.h, floorContentRect));
         }
         if (!roomItems.some(item => _roomRotationDeg(item.room))) _drawSharedWallTicks(ctx, roomItems);
+        if (_selectedPlanId === _floorRecordPlanId(block, floor)) {
+          const floorId = _floorRecordId(floor, floorLabel);
+          _drawPlanResizeHandles(ctx, floorRect, 0);
+          _pushPlanResizeHitAreas({
+            id: _floorRecordPlanId(block, floor),
+            type: 'floor-resize',
+            rect: floorRect,
+            blockId: block.id,
+            floorId,
+            floor: floorLabel,
+            blockX: blockRect.x,
+            blockY: blockRect.y,
+            blockW: blockRect.w,
+            blockH: blockRect.h,
+          });
+        }
         if (floorTransform) _planTransformStack.pop();
         ctx.restore();
       });
@@ -12071,6 +12146,23 @@ const MecFormModule = (() => {
       ctx.moveTo(local.x + local.w * .22, local.y + local.h * .62);
       ctx.lineTo(local.x + local.w * .78, local.y + local.h * .62);
       ctx.stroke();
+    } else if (item.type === 'well') {
+      const radius = Math.min(local.w, local.h) / 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.save();
+      ctx.strokeStyle = cfg.tone;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * .62, 0, Math.PI * 2);
+      ctx.moveTo(-radius * .48, 0);
+      ctx.lineTo(radius * .48, 0);
+      ctx.moveTo(0, -radius * .48);
+      ctx.lineTo(0, radius * .48);
+      ctx.stroke();
+      ctx.restore();
     } else if (item.type === 'pillar') {
       const square = String(item.ficha?.forma_pilar || item.ficha?.seccion || '').toLowerCase().includes('cuad');
       const side = Math.min(local.w, local.h);
@@ -12674,6 +12766,16 @@ const MecFormModule = (() => {
       });
     }
     _drawPlanSanitaryOpenings(ctx, item, x, y, w, h);
+    if (selected) {
+      _drawPlanResizeHandles(ctx, rect, 0);
+      _pushPlanResizeHitAreas({
+        id: `sanitary::${item.id}`,
+        type: 'sanitary-resize',
+        rect,
+        sanitaryId: item.id,
+        floorRect,
+      });
+    }
     if (transform) _planTransformStack.pop();
     ctx.restore();
   }
@@ -12890,6 +12992,16 @@ const MecFormModule = (() => {
       });
     }
     _drawPlanOpenings(ctx, room, x, y, w, h);
+    if (selected) {
+      _drawPlanResizeHandles(ctx, rect, 0);
+      _pushPlanResizeHitAreas({
+        id: `room::${room.id}`,
+        type: 'room-resize',
+        rect,
+        roomId: room.id,
+        floorRect,
+      });
+    }
     if (transform) _planTransformStack.pop();
     ctx.restore();
   }
@@ -14557,7 +14669,7 @@ const MecFormModule = (() => {
 
   function _movePlanFloor(blockId, floorId, targetX, targetY, rect, blockRect) {
     const block = _blockById(blockId);
-    const floor = _blockFloorRecord(block, floorId);
+    const floor = _blockFloorRecord(block, floorId) || _materializePlanFloorRecord(block, floorId);
     if (!block || !floor || !rect || !blockRect || floor.virtual) return null;
     if (!_assertBlockUnlocked(block, 'mover el piso')) return null;
     const bounds = {
@@ -14604,6 +14716,90 @@ const MecFormModule = (() => {
     };
     _drawSchoolPlan();
     return clamped;
+  }
+
+  function _movePlanRoom(roomId, targetX, targetY, rect, floorRect) {
+    const room = _classroomById(roomId);
+    if (!room || !rect || !floorRect) return null;
+    if (!_assertClassroomUnlocked(room, 'moverlo')) return null;
+    _activatePlanClassroom(room.id);
+    const activeRoom = _data.__classroomSketch || room;
+    activeRoom.objects = Array.isArray(activeRoom.objects) ? activeRoom.objects : [];
+    let object = _roomObjectForClassroom(activeRoom);
+    const target = _planRectToSketchRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, floorRect, 30, 24);
+    if (!target) return null;
+    if (!object) {
+      object = { id: `room_${Date.now()}_${Math.floor(Math.random() * 1000)}`, type: 'room', ...target, ficha: { codigo: activeRoom.name || 'Ambiente' } };
+      activeRoom.objects.unshift(object);
+    }
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const resolved = _resolveRoomOverlap(previous, { ...target, w: object.w, h: object.h });
+    const dx = Math.round(resolved.x - object.x);
+    const dy = Math.round(resolved.y - object.y);
+    if (!dx && !dy) return null;
+    object.x += dx;
+    object.y += dy;
+    (activeRoom.objects || []).forEach(child => {
+      if (child.id === object.id) return;
+      if (child.type === 'wall') {
+        child.x1 += dx;
+        child.x2 += dx;
+        child.y1 += dy;
+        child.y2 += dy;
+        return;
+      }
+      if (child.type === 'pencil') {
+        child.points = (child.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
+        return;
+      }
+      if (child.x !== undefined) {
+        child.x += dx;
+        child.y += dy;
+      }
+    });
+    _syncActiveClassroomFromSketch();
+    _activePlanDrag = { id: `room::${room.id}`, roomId: room.id, x: targetX, y: targetY, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return { x: targetX, y: targetY, w: rect.w, h: rect.h };
+  }
+
+  function _movePlanSanitary(sanitaryId, targetX, targetY, rect, floorRect) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    if (!item || !rect || !floorRect) return null;
+    if (!_assertSanitaryUnlocked(item, 'moverlo')) return null;
+    _activatePlanSanitary(item.id);
+    const object = _ensureSanitaryRoomObject(item);
+    const target = _planRectToSketchRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, floorRect, 28, 22);
+    if (!object || !target) return null;
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const resolved = _snapSanitaryRoomRect(item, { ...target, w: object.w, h: object.h }, previous);
+    if (_rectOverlapsAny(resolved, _sanitaryRoomBlockers(item), 2)) return null;
+    const dx = Math.round(resolved.x - object.x);
+    const dy = Math.round(resolved.y - object.y);
+    if (!dx && !dy) return null;
+    object.x += dx;
+    object.y += dy;
+    (item.objects || []).forEach(child => {
+      if (child.id === object.id) return;
+      if (child.type === 'wall') {
+        child.x1 += dx;
+        child.x2 += dx;
+        child.y1 += dy;
+        child.y2 += dy;
+        return;
+      }
+      if (child.type === 'pencil') {
+        child.points = (child.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
+        return;
+      }
+      if (child.x !== undefined) {
+        child.x += dx;
+        child.y += dy;
+      }
+    });
+    _activePlanDrag = { id: `sanitary::${item.id}`, sanitaryId: item.id, x: targetX, y: targetY, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return { x: targetX, y: targetY, w: rect.w, h: rect.h };
   }
 
   function _planResizeRectFromHandle(startRect, handleName, point, minW = 24, minH = 18, bounds = null) {
@@ -14684,7 +14880,7 @@ const MecFormModule = (() => {
 
   function _resizePlanFloor(blockId, floorId, rect, blockRect, drag) {
     const block = _blockById(blockId);
-    const floor = _blockFloorRecord(block, floorId);
+    const floor = _blockFloorRecord(block, floorId) || _materializePlanFloorRecord(block, floorId);
     if (!block || !floor || !rect || !blockRect || floor.virtual) return null;
     if (!_assertBlockUnlocked(block, 'redimensionar el piso')) return null;
     const bounds = {
@@ -14843,6 +15039,12 @@ const MecFormModule = (() => {
       else element.ficha.diametro_m = measure;
       return;
     }
+    if (element.type === 'well') {
+      const diametro = Math.max(.1, ((element.wRatio + element.hRatio) / 2) * 90).toFixed(2);
+      element.ficha.diametro_m = diametro;
+      element.ficha.superficie_m2 = (Math.PI * Math.pow(Number(diametro) / 2, 2)).toFixed(2);
+      return;
+    }
     const factorX = ['stair', 'ramp'].includes(element.type) ? 70 : 120;
     const factorY = ['stair', 'ramp'].includes(element.type) ? 38 : 120;
     const largo = Math.max(.2, element.wRatio * factorX);
@@ -14896,7 +15098,7 @@ const MecFormModule = (() => {
     }
     if (area.type === 'floor-resize') {
       const block = _blockById(area.blockId);
-      const floor = _blockFloorRecord(block, area.floorId);
+      const floor = _blockFloorRecord(block, area.floorId) || _materializePlanFloorRecord(block, area.floor || area.floorId);
       if (!block || !floor) return null;
       if (!_assertBlockUnlocked(block, 'redimensionar el piso')) return null;
       const blockRect = { x: area.blockX || 0, y: area.blockY || 0, w: area.blockW || 0, h: area.blockH || 0 };
@@ -15145,6 +15347,7 @@ const MecFormModule = (() => {
       setTimeout(() => { suppressClick = false; }, 120);
     };
     const isSelectableArea = area => Boolean(area?.id);
+    const movablePlanTypes = ['block', 'site-element', 'floor', 'room', 'sanitary'];
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     const angleFromCenter = (center, point) => (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
     canvas.addEventListener('pointerdown', event => {
@@ -15197,7 +15400,7 @@ const MecFormModule = (() => {
         return;
       }
       pointerCandidate = area;
-      if (_planMoveMode && ['block', 'site-element', 'floor'].includes(area.type)) event.preventDefault();
+      if (_planMoveMode && movablePlanTypes.includes(area.type)) event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
       if (activePointers.has(event.pointerId)) rememberPointer(event);
@@ -15256,6 +15459,8 @@ const MecFormModule = (() => {
       if (blockDrag) {
         if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
         else if (blockDrag.type === 'floor') _movePlanFloor(blockDrag.blockId, blockDrag.floorId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.blockRect);
+        else if (blockDrag.type === 'room') _movePlanRoom(blockDrag.roomId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
+        else if (blockDrag.type === 'sanitary') _movePlanSanitary(blockDrag.sanitaryId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
         else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -15267,7 +15472,7 @@ const MecFormModule = (() => {
       }
       _hideCanvasHoverTooltip();
       if (movedTooFar(pointerStart, currentPoint)) {
-        if (_planMoveMode && ['block', 'site-element', 'floor'].includes(pointerCandidate.type)) {
+        if (_planMoveMode && movablePlanTypes.includes(pointerCandidate.type)) {
           if (pointerCandidate.type === 'block' && !_assertBlockUnlocked(_blockById(pointerCandidate.blockId), 'moverlo')) {
             pointerCandidate = null;
             event.preventDefault();
@@ -15286,18 +15491,39 @@ const MecFormModule = (() => {
               return;
             }
           }
+          if (pointerCandidate.type === 'room') {
+            const room = _classroomById(pointerCandidate.roomId);
+            if (!_assertClassroomUnlocked(room, 'moverlo')) {
+              pointerCandidate = null;
+              event.preventDefault();
+              return;
+            }
+          }
+          if (pointerCandidate.type === 'sanitary') {
+            const sanitary = (_data.__sanitaries || []).find(item => item.id === pointerCandidate.sanitaryId);
+            if (!_assertSanitaryUnlocked(sanitary, 'moverlo')) {
+              pointerCandidate = null;
+              event.preventDefault();
+              return;
+            }
+          }
           blockDrag = {
             type: pointerCandidate.type,
             blockId: pointerCandidate.blockId,
             floorId: pointerCandidate.floorId,
             siteId: pointerCandidate.siteId,
+            roomId: pointerCandidate.roomId,
+            sanitaryId: pointerCandidate.sanitaryId,
             rect: { w: pointerCandidate.baseW || pointerCandidate.w, h: pointerCandidate.baseH || pointerCandidate.h },
             blockRect: { x: pointerCandidate.blockX || 0, y: pointerCandidate.blockY || 0, w: pointerCandidate.blockW || 0, h: pointerCandidate.blockH || 0 },
+            floorRect: pointerCandidate.floorRect || null,
             offsetX: pointerStart.x - (pointerCandidate.baseX ?? pointerCandidate.x),
             offsetY: pointerStart.y - (pointerCandidate.baseY ?? pointerCandidate.y),
           };
           if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
           else if (blockDrag.type === 'floor') _movePlanFloor(blockDrag.blockId, blockDrag.floorId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.blockRect);
+          else if (blockDrag.type === 'room') _movePlanRoom(blockDrag.roomId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
+          else if (blockDrag.type === 'sanitary') _movePlanSanitary(blockDrag.sanitaryId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
           else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
           pointerCandidate = null;
           suppressClickUntil = Date.now() + 350;
@@ -15352,6 +15578,8 @@ const MecFormModule = (() => {
         const blockId = blockDrag.blockId;
         const siteId = blockDrag.siteId;
         const floorId = blockDrag.floorId;
+        const roomId = blockDrag.roomId;
+        const sanitaryId = blockDrag.sanitaryId;
         const dragType = blockDrag.type;
         blockDrag = null;
         pointerCandidate = null;
@@ -15359,7 +15587,11 @@ const MecFormModule = (() => {
         _activePlanDrag = null;
         _selectedPlanId = dragType === 'site-element'
           ? `site::${siteId}`
-          : (dragType === 'floor' ? `floor::${blockId}::${floorId}` : `block::${blockId}`);
+          : (dragType === 'floor'
+            ? `floor::${blockId}::${floorId}`
+            : (dragType === 'room'
+              ? `room::${roomId}`
+              : (dragType === 'sanitary' ? `sanitary::${sanitaryId}` : `block::${blockId}`)));
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();

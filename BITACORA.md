@@ -4,6 +4,32 @@
 
 ---
 
+## Sesion de redimensionamiento robusto y posicionamiento extendido - 2026-05-17 - v2.6.12
+
+### Objetivo
+- Corregir que las manijas de redimensionamiento funcionaran solo en bloques.
+- Asegurar que pisos, aulas, sanitarios y elementos exteriores puedan ajustar dimensiones y ubicacion desde el plano.
+- Incorporar pozo/captacion como elemento exterior ubicable, configurable y redimensionable.
+
+### Cambios implementados
+- Las manijas de pisos, aulas y sanitarios se vuelven a dibujar y registrar al final de cada render para quedar por encima de ambientes, aberturas y artefactos.
+- Si un piso era virtual, al redimensionarlo o moverlo se materializa automaticamente como registro real dentro del bloque.
+- El modo `Mover bloques` ahora tambien permite mover aulas/espacios y sanitarios desde el plano general.
+- Las aulas/espacios sincronizan posicion, medidas y elementos hijos al moverse o redimensionarse desde el plano.
+- Los sanitarios sincronizan posicion, medidas, cabinas y artefactos internos al moverse o redimensionarse desde el plano.
+- Los elementos exteriores mantienen ajuste de posicion y dimensiones con ratios dinamicos; se reforzo el soporte para tanque, galeria, espacio libre, recreacion, pilar, escalera, rampa y demas elementos.
+- Se agrego el elemento exterior `Pozo / captacion`, con boton, icono, ficha emergente, campos tecnicos, dibujo en plano y redimensionamiento por esquinas.
+- Version y cache actualizados a `v2.6.12`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
 ## Sesion de redimensionamiento por vertices - 2026-05-17 - v2.6.11
 
 ### Objetivo
