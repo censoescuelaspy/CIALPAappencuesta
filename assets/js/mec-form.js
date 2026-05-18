@@ -10410,7 +10410,7 @@ const MecFormModule = (() => {
                   <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.toggleSchoolPlanFullscreen()" title="Pantalla completa" aria-label="Pantalla completa">&#x26F6;</button>
                 </div>
                 ${_renderPlanBaseMapToolbar()}
-                <button class="btn ${_planMoveMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">${_planMoveMode ? 'Mover bloques activo' : 'Mover bloques'}</button>
+                <button class="btn ${_planMoveMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanMoveMode()">${_planMoveMode ? 'Mover elementos activo' : 'Mover elementos'}</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanJson()">JSON</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanDxf()">DXF</button>
                 <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.exportPlanSvg()">SVG</button>
@@ -11539,6 +11539,117 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
+  function _drawPlanDimensionBadge(ctx, rect, text, tone = '#111827') {
+    if (!rect || !text) return;
+    ctx.save();
+    ctx.font = _canvasFont(900, 9);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const label = String(text);
+    const width = Math.min(Math.max(54, ctx.measureText(label).width + 12), Math.max(58, rect.w + 28));
+    const x = rect.x + rect.w / 2;
+    const y = Math.max(12, rect.y - 13);
+    ctx.fillStyle = 'rgba(255,255,255,.94)';
+    ctx.strokeStyle = tone;
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(x - width / 2, y - 9, width, 18);
+    ctx.strokeRect(x - width / 2, y - 9, width, 18);
+    ctx.fillStyle = tone;
+    ctx.fillText(_truncateLabel(ctx, label, width - 8), x, y + 1);
+    ctx.restore();
+  }
+
+  function _planChildObjectRect(parentObject, object, parentRect, offset = { x: 0, y: 0 }) {
+    if (!parentObject || !object || !parentRect?.w || !parentRect?.h || !parentObject.w || !parentObject.h) return null;
+    const sx = parentRect.w / parentObject.w;
+    const sy = parentRect.h / parentObject.h;
+    const mapPoint = point => ({
+      x: parentRect.x + (point.x - parentObject.x) * sx,
+      y: parentRect.y + (point.y - parentObject.y) * sy,
+    });
+    if (object.type === 'wall') {
+      const p1 = mapPoint({ x: object.x1, y: object.y1 });
+      const p2 = mapPoint({ x: object.x2, y: object.y2 });
+      const x = Math.min(p1.x, p2.x);
+      const y = Math.min(p1.y, p2.y);
+      return { x, y, w: Math.max(10, Math.abs(p2.x - p1.x)), h: Math.max(10, Math.abs(p2.y - p1.y)) };
+    }
+    if (object.type === 'pencil') {
+      const points = (object.points || []).map(mapPoint);
+      if (!points.length) return null;
+      const box = _pencilBounds({ points });
+      return { x: box.x, y: box.y, w: Math.max(12, box.w), h: Math.max(12, box.h) };
+    }
+    if (_isPointSketchObject(object)) {
+      const point = mapPoint(object);
+      return { x: point.x + (offset.x || 0) - 8, y: point.y + (offset.y || 0) - 8, w: 16, h: 16 };
+    }
+    return {
+      x: parentRect.x + (object.x - parentObject.x) * sx,
+      y: parentRect.y + (object.y - parentObject.y) * sy,
+      w: Math.max(8, (object.w || 0) * sx),
+      h: Math.max(8, (object.h || 0) * sy),
+    };
+  }
+
+  function _planChildRectToSketchRect(rect, parentObject, parentRect, minW = 12, minH = 10) {
+    if (!rect || !parentObject || !parentRect?.w || !parentRect?.h || !parentObject.w || !parentObject.h) return null;
+    return {
+      x: Math.round(parentObject.x + ((rect.x - parentRect.x) / parentRect.w) * parentObject.w),
+      y: Math.round(parentObject.y + ((rect.y - parentRect.y) / parentRect.h) * parentObject.h),
+      w: Math.max(minW, Math.round((rect.w / parentRect.w) * parentObject.w)),
+      h: Math.max(minH, Math.round((rect.h / parentRect.h) * parentObject.h)),
+    };
+  }
+
+  function _planChildPointToSketch(point, parentObject, parentRect) {
+    if (!point || !parentObject || !parentRect?.w || !parentRect?.h || !parentObject.w || !parentObject.h) return null;
+    return {
+      x: Math.round(parentObject.x + ((point.x - parentRect.x) / parentRect.w) * parentObject.w),
+      y: Math.round(parentObject.y + ((point.y - parentRect.y) / parentRect.h) * parentObject.h),
+    };
+  }
+
+  function _drawPlanChildControls(ctx, options = {}) {
+    const { id, type, object, rect, parentRect, selected, label, tone = '#111827' } = options;
+    if (!selected || !rect) return;
+    ctx.save();
+    ctx.strokeStyle = tone;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(rect.x - 5, rect.y - 5, rect.w + 10, rect.h + 10);
+    ctx.setLineDash([]);
+    ctx.restore();
+    _drawPlanDimensionBadge(ctx, rect, label, tone);
+    if (!_isResizableSketchObject(object)) return;
+    _drawPlanResizeHandles(ctx, rect, 0);
+    _pushPlanResizeHitAreas({
+      ...options,
+      id,
+      type,
+      rect,
+      parentRect,
+    });
+  }
+
+  function _siteElementDimensionPair(item) {
+    const ficha = item?.ficha || {};
+    if (!item) return { length: '', width: '' };
+    if (item.type === 'pillar') {
+      const measure = ficha.lado_m || ficha.diametro_m || ficha.ancho_m || ficha.largo_m || '';
+      return { length: measure, width: measure };
+    }
+    if (item.type === 'well') {
+      const measure = ficha.diametro_m || ficha.largo_m || ficha.ancho_m || '';
+      return { length: measure, width: measure };
+    }
+    const diameter = ficha.diametro_m || '';
+    return {
+      length: ficha.largo_m || ficha.longitud_m || diameter || '',
+      width: ficha.ancho_m || ficha.profundidad_m || diameter || '',
+    };
+  }
+
   function _drawSchoolPlan() {
     const canvas = _activeSchoolPlanCanvas();
     if (!canvas) return;
@@ -12461,7 +12572,11 @@ const MecFormModule = (() => {
         });
       }
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
-      if (selected) _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
+      if (selected) {
+        const dims = _siteElementDimensionPair(item);
+        _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
+        _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
+      }
     });
   }
 
@@ -12742,6 +12857,7 @@ const MecFormModule = (() => {
       ctx.textAlign = 'left';
       ctx.fillText(item.codigo || 'Sanitario', x + 4, y + 12);
     }
+    if (selected) _drawPlanDimensionLabels(ctx, rect, item.largo_m, item.ancho_m, '#5b21b6');
     if (selected) {
       _drawPlanRotateHandle(ctx, rect, 0);
       _drawPlanResizeHandles(ctx, rect, 0);
@@ -12783,10 +12899,12 @@ const MecFormModule = (() => {
   function _drawPlanSanitaryOpenings(ctx, item, x, y, w, h) {
     const roomObject = _sanitaryRoomObject(item);
     if (!roomObject) return;
+    const parentRect = { x, y, w, h };
     const sx = w / roomObject.w;
     const sy = h / roomObject.h;
+    const fixtureTypes = SANITARY_FIXTURES.map(tool => tool.id);
     const visibleObjects = (item.objects || [])
-      .filter(object => ['door', 'window', 'stall', 'switchboard', ...POINT_SKETCH_TYPES].includes(object.type));
+      .filter(object => ['door', 'window', 'stall', 'switchboard', ...POINT_SKETCH_TYPES, ...fixtureTypes].includes(object.type));
     const pointOffsets = _planPointOffsetMap(visibleObjects, object => ({
       x: x + (object.x - roomObject.x) * sx,
       y: y + (object.y - roomObject.y) * sy,
@@ -12809,7 +12927,8 @@ const MecFormModule = (() => {
           const ow = Math.max(5, object.w * sx);
           const oh = Math.max(5, object.h * sy);
           const length = vertical ? oh : Math.max(8, ow);
-          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16) });
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, parentRect, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16), baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           if (selected) {
             ctx.save();
             ctx.strokeStyle = '#111827';
@@ -12817,6 +12936,7 @@ const MecFormModule = (() => {
             ctx.strokeRect(ox - 7, oy - 7, Math.max(16, ow + 14), Math.max(16, oh + 14));
             ctx.restore();
           }
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
           const scaledObject = { ...object, x: ox, y: oy, w: ow, h: oh };
           const variant = _doorVariant(object);
           if (variant !== 'door') {
@@ -12843,7 +12963,8 @@ const MecFormModule = (() => {
           const ow = Math.max(5, object.w * sx);
           const oh = Math.max(5, object.h * sy);
           const length = vertical ? Math.max(8, object.h * sy) : Math.max(8, object.w * sx);
-          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16) });
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, parentRect, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16), baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           if (selected) {
             ctx.save();
             ctx.strokeStyle = '#111827';
@@ -12851,6 +12972,7 @@ const MecFormModule = (() => {
             ctx.strokeRect(ox - 7, oy - 7, Math.max(16, ow + 14), Math.max(16, oh + 14));
             ctx.restore();
           }
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
           ctx.strokeStyle = '#2b6cb0';
           ctx.lineWidth = 2;
           ctx.beginPath();
@@ -12862,7 +12984,8 @@ const MecFormModule = (() => {
         if (object.type === 'stall') {
           const ow = Math.max(8, object.w * sx);
           const oh = Math.max(8, object.h * sy);
-          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           ctx.fillStyle = 'rgba(107,114,128,.12)';
           ctx.strokeStyle = selected ? '#111827' : 'rgba(75,85,99,.74)';
           ctx.lineWidth = selected ? 2.2 : 1.2;
@@ -12874,12 +12997,14 @@ const MecFormModule = (() => {
             ctx.textAlign = 'center';
             ctx.fillText(_truncateLabel(ctx, object.ficha?.codigo || 'Cbn', Math.max(18, ow - 4)), ox + ow / 2, oy + Math.min(12, oh / 2 + 3));
           }
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
           return;
         }
         if (object.type === 'switchboard') {
           const ow = Math.max(10, object.w * sx);
           const oh = Math.max(9, object.h * sy);
-          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           ctx.fillStyle = 'rgba(254,243,199,.88)';
           ctx.strokeStyle = selected ? '#111827' : '#854d0e';
           ctx.lineWidth = selected ? 2.2 : 1.4;
@@ -12889,9 +13014,36 @@ const MecFormModule = (() => {
           ctx.font = _canvasFont(900, 7);
           ctx.textAlign = 'center';
           ctx.fillText('TB', ox + ow / 2, oy + oh / 2 + 2);
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
           return;
         }
-        _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, x: ox - 8, y: oy - 8, w: 16, h: 16 });
+        if (fixtureTypes.includes(object.type)) {
+          const ow = Math.max(10, object.w * sx);
+          const oh = Math.max(10, object.h * sy);
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
+          ctx.fillStyle = selected ? 'rgba(14,116,144,.2)' : 'rgba(240,249,255,.92)';
+          ctx.strokeStyle = selected ? '#111827' : '#0e7490';
+          ctx.lineWidth = selected ? 2.2 : 1.3;
+          if (object.type === 'toilet' || object.type === 'urinal') {
+            ctx.beginPath();
+            ctx.ellipse(ox + ow / 2, oy + oh / 2, ow / 2, oh / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(ox, oy, ow, oh);
+            ctx.strokeRect(ox, oy, ow, oh);
+          }
+          ctx.fillStyle = '#164e63';
+          ctx.font = _canvasFont(900, 7);
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(_sanitaryObjectShort(object.type), ox + ow / 2, oy + oh / 2);
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
+          return;
+        }
+        const objectRect = _planChildObjectRect(roomObject, object, parentRect, offset || { x: 0, y: 0 }) || { x: ox - 8, y: oy - 8, w: 16, h: 16 };
+        _pushPlanHitArea({ id: planObjectId, type: object.type, sanitaryId: item.id, objectId: object.id, parentRect, x: objectRect.x, y: objectRect.y, w: objectRect.w, h: objectRect.h, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
         if (selected) {
           ctx.save();
           ctx.strokeStyle = '#111827';
@@ -12901,6 +13053,7 @@ const MecFormModule = (() => {
           ctx.stroke();
           ctx.restore();
         }
+        _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
         _drawPlanPointSymbol(ctx, object.type, ox, oy);
       });
   }
@@ -12947,7 +13100,7 @@ const MecFormModule = (() => {
   }
 
   function _drawPlanClassroom(ctx, room, x, y, w, h, floorRect = null) {
-    const selected = _selectedClassroomIdFromPlan() === room.id;
+    const selected = _selectedPlanId === `room::${room.id}` || _activePlanDrag?.id === `room::${room.id}`;
     const rotation = _roomRotationDeg(room);
     const rect = { x, y, w, h };
     ctx.save();
@@ -12968,6 +13121,7 @@ const MecFormModule = (() => {
       ctx.textAlign = 'left';
       ctx.fillText(room.name || 'Aula', x + 6, y + 14);
     }
+    if (selected) _drawPlanDimensionLabels(ctx, rect, room.length, room.width, '#173f68');
     if (selected) {
       _drawPlanRotateHandle(ctx, rect, 0);
       _drawPlanResizeHandles(ctx, rect, 0);
@@ -13009,10 +13163,11 @@ const MecFormModule = (() => {
   function _drawPlanOpenings(ctx, room, x, y, w, h) {
     const roomObject = (room.objects || []).find(object => object.type === 'room');
     if (!roomObject) return;
+    const parentRect = { x, y, w, h };
     const sx = w / roomObject.w;
     const sy = h / roomObject.h;
     const visibleObjects = (room.objects || [])
-      .filter(object => ['door', 'window', 'switchboard', ...POINT_SKETCH_TYPES].includes(object.type));
+      .filter(object => ['door', 'window', 'board', 'switchboard', ...POINT_SKETCH_TYPES].includes(object.type));
     const pointOffsets = _planPointOffsetMap(visibleObjects, object => ({
       x: x + (object.x - roomObject.x) * sx,
       y: y + (object.y - roomObject.y) * sy,
@@ -13033,7 +13188,11 @@ const MecFormModule = (() => {
           const ow = Math.max(8, object.w * sx);
           const oh = Math.max(8, object.h * sy);
           const length = vertical ? oh : Math.max(12, ow);
-          _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16) });
+          const planObjectId = `${room.id}::${object.id}`;
+          const selected = _selectedPlanId === planObjectId;
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16), baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
           const scaledObject = { ...object, x: ox, y: oy, w: ow, h: oh };
           const variant = _doorVariant(object);
           if (variant !== 'door') {
@@ -13060,7 +13219,11 @@ const MecFormModule = (() => {
           const ow = Math.max(8, object.w * sx);
           const oh = Math.max(8, object.h * sy);
           const length = vertical ? oh : Math.max(12, ow);
-          _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16) });
+          const planObjectId = `${room.id}::${object.id}`;
+          const selected = _selectedPlanId === planObjectId;
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox - 8, y: oy - 8, w: Math.max(18, ow + 16), h: Math.max(18, oh + 16), baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
           ctx.strokeStyle = '#2b6cb0';
           ctx.lineWidth = 3;
           ctx.beginPath();
@@ -13072,26 +13235,57 @@ const MecFormModule = (() => {
         if (object.type === 'switchboard') {
           const ow = Math.max(10, object.w * sx);
           const oh = Math.max(9, object.h * sy);
-          _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+          const planObjectId = `${room.id}::${object.id}`;
+          const selected = _selectedPlanId === planObjectId;
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           ctx.fillStyle = 'rgba(254,243,199,.88)';
-          ctx.strokeStyle = '#854d0e';
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = selected ? '#111827' : '#854d0e';
+          ctx.lineWidth = selected ? 2.2 : 1.5;
           ctx.fillRect(ox, oy, ow, oh);
           ctx.strokeRect(ox, oy, ow, oh);
           ctx.fillStyle = '#92400e';
           ctx.font = _canvasFont(900, 7);
           ctx.textAlign = 'center';
           ctx.fillText('TB', ox + ow / 2, oy + oh / 2 + 2);
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
           return;
         }
-        _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 8, y: oy - 8, w: 16, h: 16 });
+        if (object.type === 'board') {
+          const ow = Math.max(20, object.w * sx);
+          const oh = Math.max(10, object.h * sy);
+          const planObjectId = `${room.id}::${object.id}`;
+          const selected = _selectedPlanId === planObjectId;
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
+          ctx.fillStyle = selected ? 'rgba(74,85,104,.24)' : 'rgba(74,85,104,.14)';
+          ctx.strokeStyle = selected ? '#111827' : '#4a5568';
+          ctx.lineWidth = selected ? 2.2 : 1.5;
+          ctx.fillRect(ox, oy, ow, oh);
+          ctx.strokeRect(ox, oy, ow, oh);
+          ctx.fillStyle = '#334155';
+          ctx.font = _canvasFont(900, 7);
+          ctx.textAlign = 'center';
+          ctx.fillText('PIZ', ox + ow / 2, oy + oh / 2 + 2);
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
+          return;
+        }
+        const planObjectId = `${room.id}::${object.id}`;
+        const selected = _selectedPlanId === planObjectId;
+        const objectRect = _planChildObjectRect(roomObject, object, parentRect, offset || { x: 0, y: 0 }) || { x: ox - 8, y: oy - 8, w: 16, h: 16 };
+        _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: objectRect.x, y: objectRect.y, w: objectRect.w, h: objectRect.h, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
+        _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
         _drawPlanPointSymbol(ctx, object.type, ox, oy);
       });
     if (_planLayers.danos) {
       (room.objects || []).filter(object => object.type === 'damage').forEach(object => {
         const ox = x + (object.x - roomObject.x) * sx;
         const oy = y + (object.y - roomObject.y) * sy;
-        _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox - 6, y: oy - 6, w: 18, h: 18 });
+        const planObjectId = `${room.id}::${object.id}`;
+        const selected = _selectedPlanId === planObjectId;
+        const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox - 6, y: oy - 6, w: 18, h: 18 };
+        _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: objectRect.x, y: objectRect.y, w: objectRect.w, h: objectRect.h, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
+        _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#991b1b' });
         ctx.strokeStyle = '#c53030';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -13109,24 +13303,32 @@ const MecFormModule = (() => {
           const oy = y + (object.y - roomObject.y) * sy;
           const ow = Math.max(20, object.w * sx);
           const oh = Math.max(10, object.h * sy);
-          _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+          const planObjectId = `${room.id}::${object.id}`;
+          const selected = _selectedPlanId === planObjectId;
+          const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+          _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
           ctx.fillStyle = '#7c2d12';
           ctx.font = _canvasFont(700, 7);
           ctx.textAlign = 'center';
           ctx.fillText(_truncateLabel(ctx, object.ficha?.observacion || object.text || 'Texto', Math.max(16, ow - 4)), ox + ow / 2, oy + oh / 2 + 2);
+          _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#7c2d12' });
           return;
         }
         const points = object.points || [];
         if (!points.length) return;
         const scaled = points.map(point => ({ x: x + (point.x - roomObject.x) * sx, y: y + (point.y - roomObject.y) * sy }));
         const box = _pencilBounds({ points: scaled });
-        _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: box.x - 4, y: box.y - 4, w: box.w + 8, h: box.h + 8 });
+        const planObjectId = `${room.id}::${object.id}`;
+        const selected = _selectedPlanId === planObjectId;
+        const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: box.x - 4, y: box.y - 4, w: box.w + 8, h: box.h + 8 };
+        _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: objectRect.x - 4, y: objectRect.y - 4, w: objectRect.w + 8, h: objectRect.h + 8, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
         ctx.strokeStyle = '#7c2d12';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(scaled[0].x, scaled[0].y);
         scaled.slice(1).forEach(point => ctx.lineTo(point.x, point.y));
         ctx.stroke();
+        _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#7c2d12' });
       });
     }
     (room.objects || []).filter(object => object.type === 'stair').forEach(object => {
@@ -13134,7 +13336,10 @@ const MecFormModule = (() => {
       const oy = y + (object.y - roomObject.y) * sy;
       const ow = Math.max(18, object.w * sx);
       const oh = Math.max(12, object.h * sy);
-      _pushPlanHitArea({ id: `${room.id}::${object.id}`, type: object.type, roomId: room.id, objectId: object.id, x: ox, y: oy, w: ow, h: oh });
+      const planObjectId = `${room.id}::${object.id}`;
+      const selected = _selectedPlanId === planObjectId;
+      const objectRect = _planChildObjectRect(roomObject, object, parentRect) || { x: ox, y: oy, w: ow, h: oh };
+      _pushPlanHitArea({ id: planObjectId, type: object.type, roomId: room.id, objectId: object.id, parentRect, x: ox, y: oy, w: ow, h: oh, baseX: objectRect.x, baseY: objectRect.y, baseW: objectRect.w, baseH: objectRect.h });
       ctx.strokeStyle = '#4a5568';
       ctx.lineWidth = 1.5;
       ctx.strokeRect(ox, oy, ow, oh);
@@ -13144,6 +13349,7 @@ const MecFormModule = (() => {
         ctx.lineTo(ox + (ow / 5) * i, oy + oh);
         ctx.stroke();
       }
+      _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#4a5568' });
     });
   }
 
@@ -13521,7 +13727,7 @@ const MecFormModule = (() => {
         <div class="modal__body">
           <input type="hidden" id="plan-floor-block-id" value="${_escape(block.id)}">
           <input type="hidden" id="plan-floor-id" value="${_escape(floor.id)}">
-          <p class="mec-hint">Puede mover el piso en el plano con Mover bloques activo, o ajustar aqui medidas, posicion relativa y angulo.</p>
+          <p class="mec-hint">Puede mover el piso en el plano con Mover elementos activo, o ajustar aqui medidas, posicion relativa y angulo.</p>
           <div class="grid-2">
             <div class="form-group">
               <label>Nombre del piso</label>
@@ -14802,6 +15008,101 @@ const MecFormModule = (() => {
     return { x: targetX, y: targetY, w: rect.w, h: rect.h };
   }
 
+  function _movePlanClassObject(roomId, objectId, targetX, targetY, rect, parentRect) {
+    const room = _activatePlanClassroom(roomId, objectId) || _classroomById(roomId);
+    const activeRoom = _data.__classroomSketch || room;
+    const object = (activeRoom?.objects || []).find(item => item.id === objectId);
+    const roomObject = _roomObjectForClassroom(activeRoom);
+    if (!room || !object || !roomObject || !rect || !parentRect) return null;
+    if (!_assertClassroomUnlocked(room, 'mover el objeto')) return null;
+    const planRect = { x: targetX, y: targetY, w: rect.w, h: rect.h };
+    if (_isPointSketchObject(object)) {
+      const point = _planChildPointToSketch({ x: targetX + rect.w / 2, y: targetY + rect.h / 2 }, roomObject, parentRect);
+      if (!point) return null;
+      object.x = point.x;
+      object.y = point.y;
+      _clampSketchPointToActiveRoom(object);
+    } else if (object.type === 'pencil') {
+      const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, 1, 1);
+      const box = _pencilBounds(object);
+      const dx = target.x - box.x;
+      const dy = target.y - box.y;
+      object.points = (object.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
+    } else if (object.type === 'wall') {
+      const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, 1, 1);
+      const box = _sketchObjectBounds(object);
+      const dx = target.x - box.x;
+      const dy = target.y - box.y;
+      object.x1 += dx;
+      object.x2 += dx;
+      object.y1 += dy;
+      object.y2 += dy;
+      _snapWallObject(object);
+    } else {
+      const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, Math.min(18, object.w || 18), Math.min(12, object.h || 12));
+      if (!target) return null;
+      object.x = target.x;
+      object.y = target.y;
+      if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+      else _snapSketchObjectToRoomOrBlock(object);
+    }
+    _syncActiveClassroomFromSketch();
+    _activePlanDrag = { id: `${roomId}::${objectId}`, roomId, objectId, x: targetX, y: targetY, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return planRect;
+  }
+
+  function _movePlanSanitaryObject(sanitaryId, objectId, targetX, targetY, rect, parentRect) {
+    const item = _activatePlanSanitary(sanitaryId, objectId) || (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const object = (item?.objects || []).find(child => child.id === objectId);
+    const roomObject = _sanitaryRoomObject(item);
+    if (!item || !object || !roomObject || !rect || !parentRect) return null;
+    if (!_assertSanitaryUnlocked(item, 'mover el objeto')) return null;
+    const planRect = { x: targetX, y: targetY, w: rect.w, h: rect.h };
+    if (_isPointSketchObject(object)) {
+      const point = _planChildPointToSketch({ x: targetX + rect.w / 2, y: targetY + rect.h / 2 }, roomObject, parentRect);
+      if (!point) return null;
+      object.x = point.x;
+      object.y = point.y;
+      _clampSanitaryChildToRoom(item, object);
+    } else if (object.type === 'pencil') {
+      const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, 1, 1);
+      const box = _pencilBounds(object);
+      const dx = target.x - box.x;
+      const dy = target.y - box.y;
+      object.points = (object.points || []).map(point => ({ x: point.x + dx, y: point.y + dy }));
+    } else if (object.type === 'wall') {
+      const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, 1, 1);
+      const box = _sketchObjectBounds(object);
+      const dx = target.x - box.x;
+      const dy = target.y - box.y;
+      object.x1 += dx;
+      object.x2 += dx;
+      object.y1 += dy;
+      object.y2 += dy;
+      _snapWallObject(object);
+    } else {
+      const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, Math.min(18, object.w || 18), Math.min(12, object.h || 12));
+      if (!target) return null;
+      const previous = { x: object.x, y: object.y };
+      object.x = target.x;
+      object.y = target.y;
+      if (['door', 'window'].includes(object.type)) _clampSanitaryOpeningToRoom(item, object);
+      else _clampSanitaryChildToRoom(item, object);
+      if (object.type === 'stall') {
+        const door = _sanitaryStallDoor(item, object);
+        if (door) {
+          door.x += object.x - previous.x;
+          door.y += object.y - previous.y;
+          _syncSanitaryStallDoor(item, object, door);
+        }
+      }
+    }
+    _activePlanDrag = { id: `sanitary::${sanitaryId}::${objectId}`, sanitaryId, objectId, x: targetX, y: targetY, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return planRect;
+  }
+
   function _planResizeRectFromHandle(startRect, handleName, point, minW = 24, minH = 18, bounds = null) {
     if (!startRect || !handleName || !point) return null;
     const right = startRect.x + startRect.w;
@@ -15076,6 +15377,57 @@ const MecFormModule = (() => {
     return clamped;
   }
 
+  function _resizePlanClassObject(roomId, objectId, rect, parentRect) {
+    const room = _activatePlanClassroom(roomId, objectId) || _classroomById(roomId);
+    const activeRoom = _data.__classroomSketch || room;
+    const object = (activeRoom?.objects || []).find(item => item.id === objectId);
+    const roomObject = _roomObjectForClassroom(activeRoom);
+    if (!room || !object || !roomObject || !rect || !parentRect || !_isResizableSketchObject(object)) return null;
+    if (!_assertClassroomUnlocked(room, 'redimensionar el objeto')) return null;
+    const minW = object.type === 'stair' ? 24 : 16;
+    const minH = object.type === 'stair' ? 18 : 10;
+    const target = _planChildRectToSketchRect(rect, roomObject, parentRect, minW, minH);
+    if (!target) return null;
+    object.x = target.x;
+    object.y = target.y;
+    object.w = target.w;
+    object.h = target.h;
+    if (object.type === 'door') _orientOpeningToSide(object, _openingSide(object));
+    if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 8;
+    if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 8;
+    if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else _snapSketchObjectToRoomOrBlock(object);
+    _syncActiveClassroomFromSketch();
+    _activePlanDrag = { id: `${roomId}::${objectId}`, roomId, objectId, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return rect;
+  }
+
+  function _resizePlanSanitaryObject(sanitaryId, objectId, rect, parentRect) {
+    const item = _activatePlanSanitary(sanitaryId, objectId) || (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
+    const object = (item?.objects || []).find(child => child.id === objectId);
+    const roomObject = _sanitaryRoomObject(item);
+    if (!item || !object || !roomObject || !rect || !parentRect || !_isResizableSketchObject(object)) return null;
+    if (!_assertSanitaryUnlocked(item, 'redimensionar el objeto')) return null;
+    const minW = object.type === 'stall' ? 28 : 16;
+    const minH = object.type === 'stall' ? 24 : 10;
+    const target = _planChildRectToSketchRect(rect, roomObject, parentRect, minW, minH);
+    if (!target) return null;
+    object.x = target.x;
+    object.y = target.y;
+    object.w = target.w;
+    object.h = target.h;
+    if (object.type === 'door') _orientOpeningToSide(object, _openingSide(object));
+    if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 8;
+    if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 8;
+    if (['door', 'window'].includes(object.type)) _clampSanitaryOpeningToRoom(item, object);
+    else _clampSanitaryChildToRoom(item, object);
+    if (object.type === 'stall') _syncSanitaryStallDoor(item, object);
+    _activePlanDrag = { id: `sanitary::${sanitaryId}::${objectId}`, sanitaryId, objectId, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+    _drawSchoolPlan();
+    return rect;
+  }
+
   function _planResizeDragConfig(area) {
     if (!area || !String(area.type || '').endsWith('-resize')) return null;
     const rect = { x: area.baseX ?? area.x, y: area.baseY ?? area.y, w: area.baseW ?? area.w, h: area.baseH ?? area.h };
@@ -15133,6 +15485,44 @@ const MecFormModule = (() => {
       if (!element) return null;
       if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
       return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element) };
+    }
+    if (area.type === 'class-object-resize') {
+      const room = _classroomById(area.roomId);
+      const object = room ? (room.objects || []).find(item => item.id === area.objectId) : null;
+      if (!room || !object || !_isResizableSketchObject(object)) return null;
+      if (!_assertClassroomUnlocked(room, 'redimensionar el objeto')) return null;
+      return {
+        type: 'class-object',
+        selectedId: `${area.roomId}::${area.objectId}`,
+        roomId: area.roomId,
+        objectId: area.objectId,
+        handle: area.handle,
+        rect,
+        parentRect: area.parentRect,
+        bounds: area.parentRect,
+        minW: 12,
+        minH: 10,
+        rotation: 0,
+      };
+    }
+    if (area.type === 'sanitary-object-resize') {
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === area.sanitaryId);
+      const object = item ? (item.objects || []).find(child => child.id === area.objectId) : null;
+      if (!item || !object || !_isResizableSketchObject(object)) return null;
+      if (!_assertSanitaryUnlocked(item, 'redimensionar el objeto')) return null;
+      return {
+        type: 'sanitary-object',
+        selectedId: `sanitary::${area.sanitaryId}::${area.objectId}`,
+        sanitaryId: area.sanitaryId,
+        objectId: area.objectId,
+        handle: area.handle,
+        rect,
+        parentRect: area.parentRect,
+        bounds: area.parentRect,
+        minW: 12,
+        minH: 10,
+        rotation: 0,
+      };
     }
     return null;
   }
@@ -15348,8 +15738,27 @@ const MecFormModule = (() => {
     };
     const isSelectableArea = area => Boolean(area?.id);
     const movablePlanTypes = ['block', 'site-element', 'floor', 'room', 'sanitary'];
+    const isClassObjectArea = area => Boolean(area?.roomId && area?.objectId && !area?.sanitaryId);
+    const isSanitaryObjectArea = area => Boolean(area?.sanitaryId && area?.objectId);
+    const isPlanMovableArea = area => Boolean(area && (
+      movablePlanTypes.includes(area.type) ||
+      isClassObjectArea(area) ||
+      isSanitaryObjectArea(area)
+    ));
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     const angleFromCenter = (center, point) => (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
+    const applyPlanMoveDrag = currentPoint => {
+      if (!blockDrag) return null;
+      const x = currentPoint.x - blockDrag.offsetX;
+      const y = currentPoint.y - blockDrag.offsetY;
+      if (blockDrag.type === 'site-element') return _movePlanSiteElement(blockDrag.siteId, x, y, blockDrag.rect);
+      if (blockDrag.type === 'floor') return _movePlanFloor(blockDrag.blockId, blockDrag.floorId, x, y, blockDrag.rect, blockDrag.blockRect);
+      if (blockDrag.type === 'room') return _movePlanRoom(blockDrag.roomId, x, y, blockDrag.rect, blockDrag.floorRect);
+      if (blockDrag.type === 'sanitary') return _movePlanSanitary(blockDrag.sanitaryId, x, y, blockDrag.rect, blockDrag.floorRect);
+      if (blockDrag.type === 'class-object') return _movePlanClassObject(blockDrag.roomId, blockDrag.objectId, x, y, blockDrag.rect, blockDrag.parentRect);
+      if (blockDrag.type === 'sanitary-object') return _movePlanSanitaryObject(blockDrag.sanitaryId, blockDrag.objectId, x, y, blockDrag.rect, blockDrag.parentRect);
+      return _movePlanBlock(blockDrag.blockId, x, y, blockDrag.rect);
+    };
     canvas.addEventListener('pointerdown', event => {
       _hideCanvasHoverTooltip();
       rememberPointer(event);
@@ -15400,7 +15809,7 @@ const MecFormModule = (() => {
         return;
       }
       pointerCandidate = area;
-      if (_planMoveMode && movablePlanTypes.includes(area.type)) event.preventDefault();
+      if (_planMoveMode && isPlanMovableArea(area)) event.preventDefault();
     });
     canvas.addEventListener('pointermove', event => {
       if (activePointers.has(event.pointerId)) rememberPointer(event);
@@ -15442,8 +15851,8 @@ const MecFormModule = (() => {
         const resizePoint = resizeDrag.rotation
           ? _rotatePointAround(_planRectCenter(resizeDrag.rect), currentPoint, -resizeDrag.rotation)
           : currentPoint;
-        const minW = resizeDrag.type === 'block' ? 70 : resizeDrag.type === 'floor' ? 44 : resizeDrag.type === 'site-element' ? 18 : 24;
-        const minH = resizeDrag.type === 'block' ? 78 : resizeDrag.type === 'floor' ? 32 : resizeDrag.type === 'site-element' ? 14 : 18;
+        const minW = resizeDrag.minW || (resizeDrag.type === 'block' ? 70 : resizeDrag.type === 'floor' ? 44 : resizeDrag.type === 'site-element' ? 18 : 24);
+        const minH = resizeDrag.minH || (resizeDrag.type === 'block' ? 78 : resizeDrag.type === 'floor' ? 32 : resizeDrag.type === 'site-element' ? 14 : 18);
         const rect = _planResizeRectFromHandle(resizeDrag.rect, resizeDrag.handle, resizePoint, minW, minH, resizeDrag.bounds);
         if (rect) {
           if (resizeDrag.type === 'block') _resizePlanBlock(resizeDrag.blockId, rect, resizeDrag);
@@ -15451,17 +15860,15 @@ const MecFormModule = (() => {
           else if (resizeDrag.type === 'room') _resizePlanRoom(resizeDrag.roomId, rect, resizeDrag.floorRect);
           else if (resizeDrag.type === 'sanitary') _resizePlanSanitary(resizeDrag.sanitaryId, rect, resizeDrag.floorRect);
           else if (resizeDrag.type === 'site-element') _resizePlanSiteElement(resizeDrag.siteId, rect);
+          else if (resizeDrag.type === 'class-object') _resizePlanClassObject(resizeDrag.roomId, resizeDrag.objectId, rect, resizeDrag.parentRect);
+          else if (resizeDrag.type === 'sanitary-object') _resizePlanSanitaryObject(resizeDrag.sanitaryId, resizeDrag.objectId, rect, resizeDrag.parentRect);
         }
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
       }
       if (blockDrag) {
-        if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
-        else if (blockDrag.type === 'floor') _movePlanFloor(blockDrag.blockId, blockDrag.floorId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.blockRect);
-        else if (blockDrag.type === 'room') _movePlanRoom(blockDrag.roomId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
-        else if (blockDrag.type === 'sanitary') _movePlanSanitary(blockDrag.sanitaryId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
-        else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
+        applyPlanMoveDrag(currentPoint);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -15472,7 +15879,7 @@ const MecFormModule = (() => {
       }
       _hideCanvasHoverTooltip();
       if (movedTooFar(pointerStart, currentPoint)) {
-        if (_planMoveMode && movablePlanTypes.includes(pointerCandidate.type)) {
+        if (_planMoveMode && isPlanMovableArea(pointerCandidate)) {
           if (pointerCandidate.type === 'block' && !_assertBlockUnlocked(_blockById(pointerCandidate.blockId), 'moverlo')) {
             pointerCandidate = null;
             event.preventDefault();
@@ -15507,24 +15914,41 @@ const MecFormModule = (() => {
               return;
             }
           }
+          if (isClassObjectArea(pointerCandidate)) {
+            const room = _classroomById(pointerCandidate.roomId);
+            if (!_assertClassroomUnlocked(room, 'mover el objeto')) {
+              pointerCandidate = null;
+              event.preventDefault();
+              return;
+            }
+          }
+          if (isSanitaryObjectArea(pointerCandidate)) {
+            const sanitary = (_data.__sanitaries || []).find(item => item.id === pointerCandidate.sanitaryId);
+            if (!_assertSanitaryUnlocked(sanitary, 'mover el objeto')) {
+              pointerCandidate = null;
+              event.preventDefault();
+              return;
+            }
+          }
+          const dragType = isClassObjectArea(pointerCandidate)
+            ? 'class-object'
+            : (isSanitaryObjectArea(pointerCandidate) ? 'sanitary-object' : pointerCandidate.type);
           blockDrag = {
-            type: pointerCandidate.type,
+            type: dragType,
             blockId: pointerCandidate.blockId,
             floorId: pointerCandidate.floorId,
             siteId: pointerCandidate.siteId,
             roomId: pointerCandidate.roomId,
             sanitaryId: pointerCandidate.sanitaryId,
+            objectId: pointerCandidate.objectId,
             rect: { w: pointerCandidate.baseW || pointerCandidate.w, h: pointerCandidate.baseH || pointerCandidate.h },
             blockRect: { x: pointerCandidate.blockX || 0, y: pointerCandidate.blockY || 0, w: pointerCandidate.blockW || 0, h: pointerCandidate.blockH || 0 },
             floorRect: pointerCandidate.floorRect || null,
+            parentRect: pointerCandidate.parentRect || null,
             offsetX: pointerStart.x - (pointerCandidate.baseX ?? pointerCandidate.x),
             offsetY: pointerStart.y - (pointerCandidate.baseY ?? pointerCandidate.y),
           };
-          if (blockDrag.type === 'site-element') _movePlanSiteElement(blockDrag.siteId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
-          else if (blockDrag.type === 'floor') _movePlanFloor(blockDrag.blockId, blockDrag.floorId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.blockRect);
-          else if (blockDrag.type === 'room') _movePlanRoom(blockDrag.roomId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
-          else if (blockDrag.type === 'sanitary') _movePlanSanitary(blockDrag.sanitaryId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect, blockDrag.floorRect);
-          else _movePlanBlock(blockDrag.blockId, currentPoint.x - blockDrag.offsetX, currentPoint.y - blockDrag.offsetY, blockDrag.rect);
+          applyPlanMoveDrag(currentPoint);
           pointerCandidate = null;
           suppressClickUntil = Date.now() + 350;
           event.preventDefault();
@@ -15580,6 +16004,7 @@ const MecFormModule = (() => {
         const floorId = blockDrag.floorId;
         const roomId = blockDrag.roomId;
         const sanitaryId = blockDrag.sanitaryId;
+        const objectId = blockDrag.objectId;
         const dragType = blockDrag.type;
         blockDrag = null;
         pointerCandidate = null;
@@ -15591,7 +16016,11 @@ const MecFormModule = (() => {
             ? `floor::${blockId}::${floorId}`
             : (dragType === 'room'
               ? `room::${roomId}`
-              : (dragType === 'sanitary' ? `sanitary::${sanitaryId}` : `block::${blockId}`)));
+              : (dragType === 'sanitary'
+                ? `sanitary::${sanitaryId}`
+                : (dragType === 'class-object'
+                  ? `${roomId}::${objectId}`
+                  : (dragType === 'sanitary-object' ? `sanitary::${sanitaryId}::${objectId}` : `block::${blockId}`)))));
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();

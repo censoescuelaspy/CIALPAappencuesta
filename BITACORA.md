@@ -4,6 +4,30 @@
 
 ---
 
+## Sesion de redimensionamiento universal en plano - 2026-05-17 - v2.6.13
+
+### Objetivo
+- Lograr que bloque, piso, aulas/espacios, sanitarios, exteriores y objetos internos puedan modificar ubicacion y tamano desde el plano.
+- Mostrar medidas visibles al seleccionar aulas, sanitarios, exteriores y objetos con dimensiones.
+
+### Cambios implementados
+- El boton de movimiento del plano pasa a `Mover elementos`, porque ahora arrastra bloques, pisos, aulas/espacios, sanitarios, exteriores y objetos internos.
+- Aulas/espacios, sanitarios y elementos exteriores muestran guias de largo/ancho al seleccionarse.
+- Puertas, ventanas, pizarrones, tableros, textos, escaleras, cabinas y artefactos sanitarios visibles en el plano reciben seleccion propia, etiqueta de medidas y manijas de redimensionamiento cuando corresponde.
+- Se agrego movimiento directo desde el plano general para objetos internos de aulas y sanitarios, respetando bloqueos y fichas existentes.
+- Se agrego redimensionamiento desde el plano general para objetos internos rectangulares de aulas y sanitarios, sincronizando la ficha y el croquis interno.
+- Los artefactos sanitarios directos como inodoro, urinario, lavamanos y cisternas se dibujan y pueden seleccionarse/moverse/redimensionarse en el plano del sanitario integrado.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Selenium/Chrome headless local con servidor HTTP interno: app visible con sesion admin, version de UI `v2.6.13`, `data-school-plan-canvas` renderizado, boton `Mover elementos` presente y sin errores graves de consola.
+
 ## Sesion de redimensionamiento robusto y posicionamiento extendido - 2026-05-17 - v2.6.12
 
 ### Objetivo
