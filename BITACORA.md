@@ -4,6 +4,28 @@
 
 ---
 
+## Sesion de orientacion rapida de elementos - 2026-05-18 - v2.6.17
+
+### Objetivo
+- Agregar una forma agil de orientar elementos del plano en horizontal o vertical sin depender del arrastre fino de la manija de giro.
+
+### Cambios implementados
+- El panel del elemento seleccionado ahora muestra botones `Horizontal` y `Vertical`.
+- La orientacion horizontal fija el elemento en `0` grados y la vertical en `90` grados.
+- La accion funciona para bloques, pisos, aulas/espacios, sanitarios, elementos exteriores/tecnicos y objetos internos de aulas o sanitarios que admiten giro.
+- La orientacion rapida respeta bloqueos existentes y avisa si el elemento seleccionado no se puede girar.
+- Version y cache actualizados a `v2.6.17`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor local `py -3 -m http.server 8032 --bind 127.0.0.1`: `index.html`, `assets/js/config.js`, `assets/js/mec-form.js` y `sw.js` servidos correctamente con version/cache `v2.6.17` y acciones `Horizontal`/`Vertical`.
+
 ## Sesion de arrastre directo de exteriores - 2026-05-18 - v2.6.16
 
 ### Objetivo
