@@ -4879,7 +4879,7 @@ const MecFormModule = (() => {
     item[fixture.field] = String(next);
     const room = _ensureSanitaryRoomObject(item);
     const size = fixture.id === 'toilet' ? { w: 34, h: 28 } : { w: 30, h: 24 };
-    const rect = _suggestSanitaryStallRect(item, size);
+    const rect = _suggestFixtureRectInStall(item, size) || _suggestSanitaryStallRect(item, size);
     const object = {
       id: `san_obj_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: fixture.id,
@@ -8340,6 +8340,36 @@ const MecFormModule = (() => {
       : snapped;
   }
 
+  function _suggestFixtureRectInStall(item, size) {
+    const room = _sanitaryRoomObject(item);
+    if (!room) return null;
+    const stalls = (item.objects || []).filter(child => child.type === 'stall');
+    if (!stalls.length) return null;
+    const existingFixtures = (item.objects || [])
+      .filter(child => !['stall', 'sanitary-room', 'door', 'wall', 'pencil'].includes(child.type) && child.x !== undefined);
+    for (const stall of stalls) {
+      const margin = 4;
+      const sb = { x: stall.x + margin, y: stall.y + margin, w: stall.w - margin * 2, h: stall.h - margin * 2 };
+      if (sb.w < size.w || sb.h < size.h) continue;
+      const inside = existingFixtures.filter(child => {
+        const cx = child.x + (child.w || 0) / 2;
+        const cy = child.y + (child.h || 0) / 2;
+        return cx >= stall.x && cx <= stall.x + stall.w && cy >= stall.y && cy <= stall.y + stall.h;
+      });
+      const tries = [
+        { x: sb.x, y: sb.y },
+        { x: sb.x + sb.w - size.w, y: sb.y },
+        { x: sb.x, y: sb.y + sb.h - size.h },
+        { x: sb.x + sb.w - size.w, y: sb.y + sb.h - size.h },
+      ];
+      for (const candidate of tries) {
+        const r = _clampRectToBounds({ ...candidate, ...size }, sb);
+        if (!inside.some(other => _rectsOverlap(r, other, 2))) return r;
+      }
+    }
+    return null;
+  }
+
   function _suggestSanitaryStallRect(item, size) {
     const room = _ensureSanitaryRoomObject(item);
     const padding = 6;
@@ -8378,6 +8408,23 @@ const MecFormModule = (() => {
     if (object.type === 'wall') return object;
     if (_isPointSketchObject(object)) {
       return _snapPointToRoomWall(object, room);
+    }
+    if (object.type !== 'stall' && !['door', 'window'].includes(object.type) && object.w !== undefined) {
+      const cx = object.x + (object.w || 0) / 2;
+      const cy = object.y + (object.h || 0) / 2;
+      const containingStall = (item.objects || []).find(child =>
+        child.type === 'stall' && child.id !== object.id &&
+        cx >= child.x && cx <= child.x + child.w &&
+        cy >= child.y && cy <= child.y + child.h
+      );
+      if (containingStall) {
+        const m = 3;
+        const sb = { x: containingStall.x + m, y: containingStall.y + m, w: containingStall.w - m * 2, h: containingStall.h - m * 2 };
+        const snapped = _snapRectToGuides({ x: object.x, y: object.y, w: object.w, h: object.h }, sb, [], 8);
+        object.x = snapped.x;
+        object.y = snapped.y;
+        return object;
+      }
     }
     const rect = _snapSanitaryChildRect(item, object, object);
     object.x = rect.x;
@@ -15547,7 +15594,10 @@ const MecFormModule = (() => {
     if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
-    const clamped = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
+    const clamped = _snapSiteElementRectToTargets(
+      _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight),
+      logicalWidth, logicalHeight
+    );
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _activePlanDrag = {
@@ -16371,7 +16421,7 @@ const MecFormModule = (() => {
   function flipSelectedPlanItem(axis = 'horizontal') {
     const horizontal = String(axis || '').toLowerCase().startsWith('h');
     _transformSelectedPlanRotation(
-      current => (horizontal ? 180 - current : -current)
+      current => horizontal ? (180 - current) : ((current + 180) % 360)
     );
   }
 
