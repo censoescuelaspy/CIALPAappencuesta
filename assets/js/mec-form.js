@@ -12744,8 +12744,9 @@ const MecFormModule = (() => {
     const wRatio = Number(item.wRatio || size.wRatio);
     const hRatio = Number(item.hRatio || size.hRatio);
     const slender = item.type === 'gallery' || item.type === 'walkway';
-    const w = Math.max(item.type === 'pillar' ? 18 : (slender ? 34 : 30), wRatio * logicalWidth);
-    const h = Math.max(item.type === 'pillar' ? 18 : (slender ? 14 : 26), hRatio * logicalHeight);
+    const technical = ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(item.type);
+    const w = Math.max(item.type === 'pillar' ? 18 : (technical ? 6 : (slender ? 34 : 30)), wRatio * logicalWidth);
+    const h = Math.max(item.type === 'pillar' ? 18 : (technical ? 6 : (slender ? 14 : 26)), hRatio * logicalHeight);
     return _clampPlanRect({
       x: Number(item.xRatio || 0) * logicalWidth,
       y: Number(item.yRatio || 0) * logicalHeight,
@@ -14779,8 +14780,9 @@ const MecFormModule = (() => {
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const size = _siteElementDefaultSize(type, shape);
-    const w = Math.max(type === 'pillar' ? 18 : 30, size.wRatio * logicalWidth);
-    const h = Math.max(type === 'pillar' ? 18 : 26, size.hRatio * logicalHeight);
+    const isTechnical = ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(type);
+    const w = Math.max(type === 'pillar' ? 18 : (isTechnical ? 6 : 30), size.wRatio * logicalWidth);
+    const h = Math.max(type === 'pillar' ? 18 : (isTechnical ? 6 : 26), size.hRatio * logicalHeight);
     const occupied = _planOccupiedRectsForSite(logicalWidth, logicalHeight, excludeId);
     const margin = 18;
     const maxX = Math.max(margin, logicalWidth - w - margin);
@@ -14925,8 +14927,9 @@ const MecFormModule = (() => {
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const size = _siteElementDefaultSize(type, shape);
-    const w = Math.max(type === 'pillar' ? 18 : 30, size.wRatio * logicalWidth);
-    const h = Math.max(type === 'pillar' ? 18 : 26, size.hRatio * logicalHeight);
+    const isTechnical = ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(type);
+    const w = Math.max(type === 'pillar' ? 18 : (isTechnical ? 6 : 30), size.wRatio * logicalWidth);
+    const h = Math.max(type === 'pillar' ? 18 : (isTechnical ? 6 : 26), size.hRatio * logicalHeight);
     const blockLayout = _planBlockLayout(_data.__blocks || [], logicalWidth, logicalHeight)
       .find(item => item.block?.id === blockId);
     if (!blockLayout) return _siteElementBlankPosition(type, 'plan', shape);
@@ -16120,10 +16123,11 @@ const MecFormModule = (() => {
       element.ficha.superficie_m2 = (Math.PI * Math.pow(Number(diametro) / 2, 2)).toFixed(2);
       return;
     }
-    const factorX = ['stair', 'ramp'].includes(element.type) ? 70 : 120;
-    const factorY = ['stair', 'ramp'].includes(element.type) ? 38 : 120;
-    const largo = Math.max(.2, element.wRatio * factorX);
-    const ancho = Math.max(.2, element.hRatio * factorY);
+    const isTechEl = ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(element.type);
+    const factorX = isTechEl ? 10 : (['stair', 'ramp'].includes(element.type) ? 70 : 120);
+    const factorY = isTechEl ? 10 : (['stair', 'ramp'].includes(element.type) ? 38 : 120);
+    const largo = Math.max(isTechEl ? .05 : .2, element.wRatio * factorX);
+    const ancho = Math.max(isTechEl ? .05 : .2, element.hRatio * factorY);
     element.ficha.largo_m = largo.toFixed(2);
     element.ficha.ancho_m = ancho.toFixed(2);
     if (element.type === 'water_tank') {
@@ -16257,7 +16261,7 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
       if (!element) return null;
       if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
-      return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element) };
+      return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element), elementType: element.type };
     }
     if (area.type === 'class-object-resize') {
       const room = _classroomById(area.roomId);
@@ -16985,8 +16989,9 @@ const MecFormModule = (() => {
         const resizePoint = resizeDrag.rotation
           ? _rotatePointAround(_planRectCenter(resizeDrag.rect), currentPoint, -resizeDrag.rotation)
           : currentPoint;
-        const minW = resizeDrag.minW || (resizeDrag.type === 'block' ? 70 : resizeDrag.type === 'floor' ? 44 : resizeDrag.type === 'site-element' ? 18 : 24);
-        const minH = resizeDrag.minH || (resizeDrag.type === 'block' ? 78 : resizeDrag.type === 'floor' ? 32 : resizeDrag.type === 'site-element' ? 14 : 18);
+        const isTechnicalDrag = resizeDrag.type === 'site-element' && ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(resizeDrag.elementType);
+        const minW = resizeDrag.minW || (resizeDrag.type === 'block' ? 70 : resizeDrag.type === 'floor' ? 44 : isTechnicalDrag ? 6 : resizeDrag.type === 'site-element' ? 18 : 24);
+        const minH = resizeDrag.minH || (resizeDrag.type === 'block' ? 78 : resizeDrag.type === 'floor' ? 32 : isTechnicalDrag ? 6 : resizeDrag.type === 'site-element' ? 14 : 18);
         const rect = _planResizeRectFromHandle(resizeDrag.rect, resizeDrag.handle, resizePoint, minW, minH, resizeDrag.bounds);
         if (rect) {
           if (resizeDrag.type === 'block') _resizePlanBlock(resizeDrag.blockId, rect, resizeDrag);
