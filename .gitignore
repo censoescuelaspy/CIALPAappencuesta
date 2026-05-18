@@ -8,3 +8,6 @@ Thumbs.db
 
 # Node (por si se usa en desarrollo)
 node_modules/
+
+# Servidores locales de prueba
+server-*.log
