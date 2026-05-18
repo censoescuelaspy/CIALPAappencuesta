@@ -10888,10 +10888,10 @@ const MecFormModule = (() => {
           _renderPlanRibbonButton({ icon: '&#x25A3;', label: 'Cabina', onClick: 'MecFormModule.addPlanSanitaryStall()', tone: 'btn-primary', title: 'Agregar cabina (inodoro con particion) al sanitario seleccionado' }),
         ].join('')));
         groups.push(_renderPlanRibbonGroup('Artefactos del sanitario', [
-          _renderPlanRibbonButton({ icon: 'WC', label: 'Inodoro', onClick: "MecFormModule.addPlanSanitaryFixture('toilet')", title: 'Agregar inodoro suelto al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: '&#x25CE;', label: 'Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')", title: 'Agregar lavamanos al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: '&#x2294;', label: 'Urinario', onClick: "MecFormModule.addPlanSanitaryFixture('urinal')", title: 'Agregar urinario al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: '&#x224B;', label: 'Ducha', onClick: "MecFormModule.addPlanSanitaryFixture('shower')", title: 'Agregar ducha al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x1F6BD;', label: 'Inodoro', onClick: "MecFormModule.addPlanSanitaryFixture('toilet')", title: 'Agregar inodoro suelto al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x1F6B0;', label: 'Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')", title: 'Agregar lavamanos al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x1F6BF;', label: 'Ducha', onClick: "MecFormModule.addPlanSanitaryFixture('shower')", title: 'Agregar ducha al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x29C0;', label: 'Urinario', onClick: "MecFormModule.addPlanSanitaryFixture('urinal')", title: 'Agregar urinario al sanitario seleccionado' }),
         ].join('')));
         groups.push(_renderPlanRibbonGroup('Aberturas del sanitario', [
           _renderPlanRibbonButton({ icon: '&#x25DC;', label: 'Puerta', onClick: "MecFormModule.addPlanSanitaryOpening('door')", tone: 'btn-primary', title: 'Agregar puerta al sanitario seleccionado' }),
@@ -12018,7 +12018,7 @@ const MecFormModule = (() => {
     const markers = [];
     if (hasStair) markers.push({ label: 'Esc', tone: '#4b5563', fill: '#f8fafc' });
     if (hasRamp) markers.push({ label: 'Rmp', tone: '#7c3aed', fill: '#f5f3ff' });
-    if (hasBoard) markers.push({ label: 'TBL', tone: '#854d0e', fill: '#fef3c7' });
+    // TBL badge removido: el tablero aparece como elemento en el plano
     if (!markers.length) return;
     markers.forEach((marker, index) => {
       const mx = x + w - 38 - index * 42;
@@ -12910,6 +12910,8 @@ const MecFormModule = (() => {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((rotation * Math.PI) / 180);
+    if (item.flipH) ctx.scale(-1, 1);
+    if (item.flipV) ctx.scale(1, -1);
     ctx.strokeStyle = selected ? '#111827' : cfg.tone;
     ctx.fillStyle = selected ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.78)';
     ctx.lineWidth = selected ? 3 : 2;
@@ -16420,6 +16422,18 @@ const MecFormModule = (() => {
 
   function flipSelectedPlanItem(axis = 'horizontal') {
     const horizontal = String(axis || '').toLowerCase().startsWith('h');
+    const raw = String(_selectedPlanId || '');
+    if (raw.startsWith('site::')) {
+      const element = _ensureSiteElements().find(item => item.id === raw.replace('site::', ''));
+      if (!element) return;
+      if (!_assertSiteElementUnlocked(element, 'voltearlo')) return;
+      if (horizontal) element.flipH = !element.flipH;
+      else element.flipV = !element.flipV;
+      _selectedPlanId = `site::${element.id}`;
+      _saveDraft(false);
+      renderSchoolPlan();
+      return;
+    }
     _transformSelectedPlanRotation(
       current => horizontal ? (180 - current) : ((current + 180) % 360)
     );
