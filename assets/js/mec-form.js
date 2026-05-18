@@ -92,6 +92,7 @@ const MecFormModule = (() => {
   const WALL_ONLY_POINT_TYPES = ['outlet', 'ac'];
   const CEILING_OR_WALL_POINT_TYPES = ['light', 'fan'];
   const WALL_POINT_SNAP_DISTANCE = 18;
+  const WALL_RECT_TYPES = ['switchboard', 'board'];
 
   const SITE_ELEMENT_TYPES = [
     { id: 'water_tank', label: 'Tanque de agua', short: 'TQ', tone: '#0e7490' },
@@ -6934,7 +6935,9 @@ const MecFormModule = (() => {
         ficha: _defaultSketchFicha(_sketchTool),
       };
     }
-    object = _isPointSketchObject(object) ? _clampSketchPointToActiveRoom(object) : _clampOpeningToRoom(object);
+    if (_isPointSketchObject(object)) object = _clampSketchPointToActiveRoom(object);
+    else if (WALL_RECT_TYPES.includes(object.type)) object = _snapRectToActiveRoomWall(object);
+    else object = _clampOpeningToRoom(object);
     _data.__classroomSketch.objects.push(object);
     _selectedSketchObjectId = object.id;
     _saveDraft(false);
@@ -8906,6 +8909,7 @@ const MecFormModule = (() => {
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
     if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else if (WALL_RECT_TYPES.includes(object.type)) _snapRectToActiveRoomWall(object);
     else _snapSketchObjectToRoomOrBlock(object);
   }
 
@@ -9016,6 +9020,45 @@ const MecFormModule = (() => {
   function _clampSketchPointToActiveRoom(object) {
     const room = _activeSketchRoomObject();
     return room ? _snapPointToRoomWall(object, room) : object;
+  }
+
+  function _snapRectToRoomWall(object, room) {
+    if (!object || !room || object.w === undefined) return object;
+    const cx = object.x + object.w / 2;
+    const cy = object.y + object.h / 2;
+    const distances = [
+      { side: 'top', value: Math.abs(cy - room.y) },
+      { side: 'bottom', value: Math.abs(cy - (room.y + room.h)) },
+      { side: 'left', value: Math.abs(cx - room.x) },
+      { side: 'right', value: Math.abs(cx - (room.x + room.w)) },
+    ].sort((a, b) => a.value - b.value);
+    const { side } = distances[0];
+    if (side === 'top') {
+      object.y = Math.round(room.y);
+      object.x = Math.round(Math.max(room.x, Math.min(object.x, room.x + room.w - object.w)));
+    } else if (side === 'bottom') {
+      object.y = Math.round(room.y + room.h - object.h);
+      object.x = Math.round(Math.max(room.x, Math.min(object.x, room.x + room.w - object.w)));
+    } else if (side === 'left') {
+      object.x = Math.round(room.x);
+      object.y = Math.round(Math.max(room.y, Math.min(object.y, room.y + room.h - object.h)));
+    } else {
+      object.x = Math.round(room.x + room.w - object.w);
+      object.y = Math.round(Math.max(room.y, Math.min(object.y, room.y + room.h - object.h)));
+    }
+    const axisSize = (side === 'left' || side === 'right') ? room.h : room.w;
+    const axisOffset = (side === 'left' || side === 'right') ? (object.y - room.y) : (object.x - room.x);
+    object.attached = {
+      type: 'wall-rect',
+      side,
+      ratio: axisSize ? Math.max(0, Math.min(1, axisOffset / Math.max(1, axisSize - (side === 'left' || side === 'right' ? object.h : object.w)))) : 0,
+    };
+    return object;
+  }
+
+  function _snapRectToActiveRoomWall(object) {
+    const room = _activeSketchRoomObject();
+    return room ? _snapRectToRoomWall(object, room) : object;
   }
 
   function _rectangularSketchBlockers(objectId) {
@@ -9302,6 +9345,9 @@ const MecFormModule = (() => {
           _snapPointToRoomWall(object, room);
         }
       });
+    (_data.__classroomSketch.objects || [])
+      .filter(object => WALL_RECT_TYPES.includes(object.type) && object.attached?.type === 'wall-rect')
+      .forEach(object => _snapRectToRoomWall(object, room));
   }
 
   function _reflowSanitaryOpenings(item) {
@@ -9352,6 +9398,9 @@ const MecFormModule = (() => {
           _snapPointToRoomWall(object, room);
         }
       });
+    (item.objects || [])
+      .filter(object => WALL_RECT_TYPES.includes(object.type) && object.attached?.type === 'wall-rect')
+      .forEach(object => _snapRectToRoomWall(object, room));
   }
 
   function _reflowSanitaryChildren(item) {
@@ -15631,6 +15680,7 @@ const MecFormModule = (() => {
       object.x = target.x;
       object.y = target.y;
       if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+      else if (WALL_RECT_TYPES.includes(object.type)) _snapRectToActiveRoomWall(object);
       else _snapSketchObjectToRoomOrBlock(object);
     }
     _syncActiveClassroomFromSketch();
@@ -15675,6 +15725,7 @@ const MecFormModule = (() => {
       object.x = target.x;
       object.y = target.y;
       if (['door', 'window'].includes(object.type)) _clampSanitaryOpeningToRoom(item, object);
+      else if (WALL_RECT_TYPES.includes(object.type)) _snapRectToRoomWall(object, roomObject);
       else _clampSanitaryChildToRoom(item, object);
       if (object.type === 'stall') {
         const door = _sanitaryStallDoor(item, object);

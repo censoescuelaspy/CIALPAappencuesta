@@ -4,6 +4,33 @@
 
 ---
 
+## Sesion de elementos electricos anclados a pared - 2026-05-18 - v2.6.26
+
+### Objetivo
+- Tableros y pizarrones deben anclarse siempre a la pared mas cercana y conservar esa posicion al redimensionar el aula/sanitario.
+
+### Problema
+`switchboard` (tablero) y `board` (pizarron) son objetos rectangulares. La funcion `_clampOpeningToRoom` retorna sin hacer nada para tipos que no sean door/window, por lo que estos objetos quedaban flotando en el interior del aula sin anclaje a pared. Al redimensionar el aula, se escalaban proporcionalmente pero no se resnapeaban.
+
+### Solucion
+**`assets/js/mec-form.js`:**
+- Nueva constante `WALL_RECT_TYPES = ['switchboard', 'board']`.
+- Nueva funcion `_snapRectToRoomWall(object, room)`: snapea un objeto rectangular al muro mas cercano y guarda `attached = { type: 'wall-rect', side, ratio }`.
+- Nueva funcion `_snapRectToActiveRoomWall(object)`: wrapper que toma el room del sketch activo.
+- `_createSketchObjectAt`: para WALL_RECT_TYPES llama `_snapRectToActiveRoomWall` en lugar de `_clampOpeningToRoom`.
+- `_moveSketchObject` (sketch editor drag): idem, resnap a pared al mover.
+- `_movePlanClassObject` (plan view drag): idem.
+- `_movePlanSanitaryObject` (plan view sanitary drag): idem con `_snapRectToRoomWall(object, roomObject)`.
+- `_reflowAttachedOpenings` y `_reflowSanitaryOpenings`: nuevo bloque que resnapa objetos con `attached.type === 'wall-rect'` despues de cada resize de aula/sanitario.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.26
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.26
+- `index.html` — spans app-version
+
+---
+
 ## Sesion de cabinas y artefactos sanitarios en ribbon - 2026-05-18 - v2.6.25
 
 ### Objetivo
