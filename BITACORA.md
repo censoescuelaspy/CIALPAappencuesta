@@ -4,6 +4,60 @@
 
 ---
 
+## Sesion de cuestionario guiado obligatorio - 2026-05-18 - v2.6.15
+
+### Objetivo
+- Convertir el `Registro guiado` en una secuencia de preguntas una a una, bloqueando el avance hasta responder o completar la accion requerida.
+- Hacer que respuestas como cantidad de aulas, rampa/escalera, acometida, medidor, tablero, puesta a tierra, sanitarios y exteriores disparen la creacion/configuracion inmediata del elemento en el plano.
+- Mantener el plano como centro operativo y reducir la botonera masiva en las etapas de carga tecnica.
+
+### Cambios implementados
+- Las etapas `Bloques y pisos`, `Aulas y espacios`, `Sanitarios` y `Exteriores` ahora muestran una pregunta activa segun el estado real del borrador.
+- El avance con `Siguiente` o con la barra de etapas queda bloqueado si la pregunta activa todavia no fue respondida o confirmada.
+- En bloques se agrego secuencia tecnica: crear/medir bloque, ubicarlo, decidir piso, completar piso, responder escalera/rampa, acometida, medidor, tablero, llave termomagnetica y puesta a tierra.
+- En aulas se pide primero `Cuantas aulas tiene este bloque/piso`; la app inserta aulas una a una y exige confirmar medidas, posicion y ficha antes de continuar.
+- En sanitarios se pregunta si existe sanitario en el bloque/piso; si existe, se exige configurar dimensiones, posicion y ficha antes de avanzar.
+- En exteriores se pregunta si hay elementos exteriores/tecnicos; cada elemento incorporado queda pendiente hasta ubicarse y confirmar ficha.
+- Se guardan respuestas guiadas, cantidades objetivo y confirmaciones por bloque/piso en el estado local del registro guiado.
+- Las etapas secuenciadas ocultan la botonera masiva y usan una tarjeta compacta de pregunta activa.
+- Version y cache actualizados a `v2.6.15`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Servidor local `py -3 -m http.server 8029 --bind 127.0.0.1`: `index.html`, `assets/js/config.js` y `assets/js/guided-register.js` servidos correctamente con version `v2.6.15`, `_activeGuidedQuestion`, `saveClassroomTarget` y `Pregunta obligatoria`.
+
+## Sesion de edicion total de elementos en plano - 2026-05-18 - v2.6.14
+
+### Objetivo
+- Corregir que rampa, acometida y otros elementos exteriores/tecnicos se insertaran pero no se pudieran mover o redimensionar con fluidez.
+- Hacer que el doble clic abra la ficha emergente de cualquier elemento del plano, incluyendo manijas de giro/redimensionamiento y objetos internos.
+- Reducir el espacio muerto de la bandeja del registro guiado para que el plano quede mas cerca y con mayor protagonismo.
+
+### Cambios implementados
+- Los elementos tecnicos que naturalmente se adosan al bloque, como rampa, escalera, acometida, medidor, tablero, puesta a tierra, galeria, caminero y pilar, ya no quedan bloqueados por la regla de no solape contra la estructura principal.
+- Rampa y acometida pueden moverse sobre/junto al bloque y redimensionarse desde sus esquinas sin ser devueltos automaticamente a la posicion anterior.
+- Acometida, medidor, tablero y puesta a tierra ahora guardan largo/ancho visibles en ficha y los sincronizan cuando se estiran desde el plano.
+- El doble clic del plano se unifico para abrir la ficha correcta de bloques, pisos, aulas, sanitarios, exteriores, objetos internos y tambien cuando el clic cae sobre una manija.
+- La tarjeta activa del `Registro guiado` ahora ajusta su altura al slide visible y deja de reservar alto por slides ocultos.
+- Se compacto la grilla de acciones/checks del registro guiado para reducir el espacio en blanco antes de `Plano vivo`.
+- Version y cache actualizados a `v2.6.14`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- Chrome headless local con servidor HTTP interno: UI visible en `v2.6.14`, bandeja guiada ajustando altura al slide activo y sin errores graves de consola.
+
 ## Sesion de redimensionamiento universal en plano - 2026-05-17 - v2.6.13
 
 ### Objetivo

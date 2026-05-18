@@ -2915,15 +2915,16 @@ const MecFormModule = (() => {
         hRatio: Math.max(base.hRatio, Math.min(.16, ancho / 38)),
       };
     }
-    const acceptsMeasures = ['recreation', 'gallery', 'walkway', 'open_space', 'stair', 'ramp'].includes(type);
+    const acceptsMeasures = ['recreation', 'gallery', 'walkway', 'open_space', 'stair', 'ramp', 'service_connection', 'meter', 'main_switchboard', 'grounding'].includes(type);
     if (!acceptsMeasures) return null;
     const largo = Number(ficha.largo_m || ficha.longitud_m || 0);
     const ancho = Number(ficha.ancho_m || 0);
     if (!largo || !ancho) return null;
+    const technical = ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(type);
     const slender = type === 'gallery' || type === 'walkway' || type === 'ramp';
     return {
-      wRatio: Math.max(slender ? .055 : .045, Math.min(.62, largo / 120)),
-      hRatio: Math.max(slender ? .012 : .035, Math.min(slender ? .16 : .36, ancho / 120)),
+      wRatio: Math.max(technical ? .025 : (slender ? .055 : .045), Math.min(technical ? .16 : .62, largo / 120)),
+      hRatio: Math.max(technical ? .025 : (slender ? .012 : .035), Math.min(technical ? .14 : (slender ? .16 : .36), ancho / 120)),
     };
   }
 
@@ -3080,6 +3081,8 @@ const MecFormModule = (() => {
       },
       service_connection: {
         tipo_acometida: 'Aerea',
+        largo_m: '',
+        ancho_m: '',
         punto_ingreso: 'Fachada del bloque',
         altura_m: '',
         proteccion_mecanica: 'No verificable',
@@ -3087,6 +3090,8 @@ const MecFormModule = (() => {
       },
       meter: {
         tipo_medidor: 'Monofasico',
+        largo_m: '',
+        ancho_m: '',
         propiedad: 'Propio del bloque',
         ubicacion_relativa: 'Fachada del bloque',
         altura_m: '',
@@ -3094,6 +3099,8 @@ const MecFormModule = (() => {
         seguridad: 'No verificable',
       },
       main_switchboard: {
+        largo_m: '',
+        ancho_m: '',
         ubicacion_relativa: 'Fachada/interior del bloque',
         proteccion: 'No verificable',
         rotulado: 'No verificable',
@@ -3101,6 +3108,8 @@ const MecFormModule = (() => {
         seguridad: 'No verificable',
       },
       grounding: {
+        largo_m: '',
+        ancho_m: '',
         ubicacion_relativa: 'Junto a tablero o acometida',
         conductor_visible: 'No verificable',
         jabalina_visible: 'No verificable',
@@ -3214,6 +3223,8 @@ const MecFormModule = (() => {
       ],
       service_connection: [
         { key: 'tipo_acometida', label: 'Tipo de acometida', options: ['Aerea', 'Subterranea', 'Compartida con otro bloque', 'No visible'] },
+        { key: 'largo_m', label: 'Largo visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
+        { key: 'ancho_m', label: 'Ancho visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
         { key: 'punto_ingreso', label: 'Punto de ingreso', options: ['Fachada del bloque', 'Poste', 'Gabinete exterior', 'Subterraneo', 'Otro'] },
         { key: 'altura_m', label: 'Altura aprox. visible (m)', type: 'number', placeholder: 'Ej. 3.20' },
         { key: 'proteccion_mecanica', label: 'Proteccion mecanica', options: ['Adecuada', 'Parcial', 'No tiene', 'No verificable'] },
@@ -3221,6 +3232,8 @@ const MecFormModule = (() => {
       ],
       meter: [
         { key: 'tipo_medidor', label: 'Tipo de medidor', options: ['Monofasico', 'Trifasico', 'Digital', 'Analogico', 'No verificable'] },
+        { key: 'largo_m', label: 'Largo visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
+        { key: 'ancho_m', label: 'Ancho visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
         { key: 'propiedad', label: 'Relacion con el bloque', options: ['Propio del bloque', 'Compartido', 'No visible', 'No verificable'] },
         { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Fachada del bloque', 'Gabinete exterior', 'Poste', 'Otro bloque', 'Otro'] },
         { key: 'altura_m', label: 'Altura aprox. (m)', type: 'number', placeholder: 'Ej. 1.60' },
@@ -3228,6 +3241,8 @@ const MecFormModule = (() => {
         { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Expuesto', 'Riesgo', 'No verificable'] },
       ],
       main_switchboard: [
+        { key: 'largo_m', label: 'Largo visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
+        { key: 'ancho_m', label: 'Ancho visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
         { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Interior del bloque', 'Fachada/interior del bloque', 'Gabinete exterior', 'Otro'] },
         { key: 'proteccion', label: 'Proteccion', options: ['Termomagnetica', 'Diferencial', 'Ambas', 'No tiene', 'No verificable'] },
         { key: 'rotulado', label: 'Rotulado', options: ['Si', 'Parcial', 'No', 'No verificable'] },
@@ -3235,6 +3250,8 @@ const MecFormModule = (() => {
         { key: 'seguridad', label: 'Seguridad', options: ['Seguro', 'Regular', 'Sin tapa', 'Expuesto', 'Riesgo', 'No verificable'] },
       ],
       grounding: [
+        { key: 'largo_m', label: 'Largo visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
+        { key: 'ancho_m', label: 'Ancho visible aprox. (m)', type: 'number', placeholder: 'Ajustable desde el plano' },
         { key: 'ubicacion_relativa', label: 'Ubicacion respecto al bloque', options: ['Junto a tablero o acometida', 'Patio tecnico', 'No visible', 'Otro'] },
         { key: 'conductor_visible', label: 'Conductor visible', options: ['Si', 'No', 'No verificable'] },
         { key: 'jabalina_visible', label: 'Jabalina visible', options: ['Si', 'No', 'No verificable'] },
@@ -10126,6 +10143,33 @@ const MecFormModule = (() => {
     }
   }
 
+  function setGuidedBlockField(fieldId, value) {
+    const block = _blockById(_data.__activeBlockId);
+    if (!block) {
+      UI.showToast('Primero cree o seleccione un bloque.', 'warning');
+      return false;
+    }
+    if (!_assertBlockUnlocked(block, 'responder esta pregunta')) return false;
+    _data.bloques = { ...(_data.bloques || {}), [fieldId]: value };
+    block[fieldId] = value;
+    if (BLOCK_ELECTRIC_FIELDS.includes(fieldId) || fieldId === 'tipo_circulacion') {
+      _syncBlockDrivenPlanElements(fieldId, value);
+    }
+    _syncActiveBlock();
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Respuesta registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
+  function openPlanClassroomFicha(roomId = '') {
+    const targetId = roomId || _activeClassroomId || _data.__classroomSketch?.id || '';
+    if (targetId) _activatePlanClassroom(targetId);
+    _selectedPlanId = targetId ? `room::${targetId}` : _selectedPlanId;
+    renderSchoolPlan();
+    setTimeout(() => openClassroomFicha(), 60);
+  }
+
   function editSelectedSketchObject() {
     openSelectedSketchFicha();
   }
@@ -13925,9 +13969,17 @@ const MecFormModule = (() => {
     return [...blockRects, ...siteRects];
   }
 
+  function _siteElementCanOverlapStructures(type) {
+    return ['stair', 'ramp', 'service_connection', 'meter', 'main_switchboard', 'grounding', 'gallery', 'walkway', 'pillar'].includes(type);
+  }
+
   function _planMoveBlockers(kind, id, logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
     const blocks = _data.__blocks?.length ? _data.__blocks : [];
-    const blockRects = blocks.length ? _planBlockLayout(blocks, logicalWidth, logicalHeight)
+    const siteType = kind === 'site'
+      ? (_ensureSiteElements().find(item => item.id === id)?.type || '')
+      : '';
+    const ignoresStructureBlockers = kind === 'site' && _siteElementCanOverlapStructures(siteType);
+    const blockRects = blocks.length && !ignoresStructureBlockers ? _planBlockLayout(blocks, logicalWidth, logicalHeight)
       .filter(item => !(kind === 'block' && item.block?.id === id))
       .filter(Boolean)
       .map(rect => _inflatePlanRect(rect, 2, logicalWidth, logicalHeight)) : [];
@@ -15721,10 +15773,31 @@ const MecFormModule = (() => {
       const sum = points.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 });
       return { x: sum.x / points.length, y: sum.y / points.length };
     };
+    const siteAreaFromPoint = point => {
+      if (!_planLayers.exteriores) return null;
+      const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
+      const siteHit = _findSiteElementAt(point, logical);
+      if (!siteHit?.item || !siteHit.rect) return null;
+      return {
+        id: `site::${siteHit.item.id}`,
+        type: 'site-element',
+        siteId: siteHit.item.id,
+        x: siteHit.rect.x,
+        y: siteHit.rect.y,
+        w: siteHit.rect.w,
+        h: siteHit.rect.h,
+        baseX: siteHit.rect.x,
+        baseY: siteHit.rect.y,
+        baseW: siteHit.rect.w,
+        baseH: siteHit.rect.h,
+      };
+    };
     const hit = event => {
       const point = pointFromEvent(event);
-      return [..._planHitAreas].reverse().find(area =>
-        point.x >= area.x && point.x <= area.x + area.w && point.y >= area.y && point.y <= area.y + area.h);
+      const area = [..._planHitAreas].reverse().find(candidate =>
+        point.x >= candidate.x && point.x <= candidate.x + candidate.w && point.y >= candidate.y && point.y <= candidate.y + candidate.h);
+      if (area && !['block', 'floor', 'room', 'sanitary'].includes(area.type)) return area;
+      return siteAreaFromPoint(point) || area;
     };
     const selectArea = area => {
       if (!area) return;
@@ -15758,6 +15831,45 @@ const MecFormModule = (() => {
       if (blockDrag.type === 'class-object') return _movePlanClassObject(blockDrag.roomId, blockDrag.objectId, x, y, blockDrag.rect, blockDrag.parentRect);
       if (blockDrag.type === 'sanitary-object') return _movePlanSanitaryObject(blockDrag.sanitaryId, blockDrag.objectId, x, y, blockDrag.rect, blockDrag.parentRect);
       return _movePlanBlock(blockDrag.blockId, x, y, blockDrag.rect);
+    };
+    const editAreaFicha = area => {
+      if (!area) return;
+      if (area.siteId) {
+        selectPlanItem(`site::${area.siteId}`);
+        openSiteElementFicha(area.siteId);
+        return;
+      }
+      if (area.objectId && area.sanitaryId) {
+        const planId = `sanitary::${area.sanitaryId}::${area.objectId}`;
+        _selectedPlanId = planId;
+        _activatePlanSelection(planId);
+        editPlanSanitary(area.sanitaryId);
+        setTimeout(() => openSelectedSanitaryObjectFicha(), 180);
+        return;
+      }
+      if (area.objectId && area.roomId) {
+        editPlanObject(`${area.roomId}::${area.objectId}`);
+        return;
+      }
+      if (area.type === 'room' || area.type === 'room-rotate' || area.type === 'room-resize') {
+        editPlanClassroom(area.roomId);
+        return;
+      }
+      if (area.type === 'block' || area.type === 'block-rotate' || area.type === 'block-resize') {
+        selectPlanItem(`block::${area.blockId}`);
+        openPlanSelection();
+        return;
+      }
+      if (area.type === 'floor' || area.type === 'floor-rotate' || area.type === 'floor-resize') {
+        selectPlanItem(`floor::${area.blockId}::${area.floorId}`);
+        openPlanSelection();
+        return;
+      }
+      if (area.type === 'sanitary' || area.type === 'sanitary-rotate' || area.type === 'sanitary-resize') {
+        editPlanSanitary(area.sanitaryId);
+        return;
+      }
+      editPlanObject(area.id);
     };
     canvas.addEventListener('pointerdown', event => {
       _hideCanvasHoverTooltip();
@@ -16058,24 +16170,7 @@ const MecFormModule = (() => {
       if (Date.now() < suppressClickUntil) return;
       const area = hit(event);
       if (!area) return;
-      if (area.type === 'room' || area.type === 'room-rotate') editPlanClassroom(area.roomId);
-      else if (area.type === 'block' || area.type === 'block-rotate') {
-        selectPlanItem(`block::${area.blockId}`);
-        openPlanSelection();
-      }
-      else if (area.type === 'floor' || area.type === 'floor-rotate') {
-        selectPlanItem(`floor::${area.blockId}::${area.floorId}`);
-        openPlanSelection();
-      }
-      else if (area.type === 'sanitary' || area.type === 'sanitary-rotate') editPlanSanitary(area.sanitaryId);
-      else if (area.type === 'site-element' || area.type === 'site-rotate') openSiteElementFicha(area.siteId);
-      else if (String(area.id).startsWith('sanitary::')) {
-        _selectedPlanId = area.id;
-        _activatePlanSelection(area.id);
-        editPlanSanitary(area.sanitaryId);
-        setTimeout(() => openSelectedSanitaryObjectFicha(), 180);
-      }
-      else editPlanObject(area.id);
+      editAreaFicha(area);
     });
     canvas.addEventListener('wheel', event => {
       if (!event.ctrlKey && !event.metaKey) return;
@@ -17742,6 +17837,7 @@ const MecFormModule = (() => {
     toggleModule,
     setSketchTool,
     setSketchField,
+    setGuidedBlockField,
     selectBlock,
     selectBlockForClassrooms,
     selectBlockForSanitaries,
@@ -17769,6 +17865,7 @@ const MecFormModule = (() => {
     setActiveClassroomLocked,
     setPlanClassroomLocked,
     openClassroomFicha,
+    openPlanClassroomFicha,
     closeClassroomFicha,
     deleteActiveClassroom,
     deleteActiveFloor,
