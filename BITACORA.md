@@ -4,6 +4,53 @@
 
 ---
 
+## Cuadricula a escala real y zoom extendido - 2026-05-18 - v2.6.30
+
+### Problema
+La cuadricula de fondo usaba un paso fijo de 20 px sin relacion con metros reales. El usuario reporto que "la escala del poligono no tiene sentido" y pidio que la cuadricula represente 1 m² y que al hacer zoom se pueda ver hasta milimetros. Ademas el zoom maximo (2.8x) era insuficiente para inspeccionar bloques a nivel de detalle metrico.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- `_drawSchoolPlanGrid`: reescrita para derivar `pixelsPerMeter` del primer bloque en `_planBlockLayout` (usando `scaleX`). Calcula intervalos "nice" adaptativos (de 0.001 m / 1 mm hasta 500 m) eligiendo el menor que produzca >= 50 px entre lineas mayores y >= 10 px entre menores. Las lineas se alinean a la esquina del bloque primario (phase offset). Muestra etiqueta de escala en esquina inferior izquierda (ej. "Cuad.: 1 m" / "Cuad.: 50 cm" / "Cuad.: 10 cm").
+- `_setSchoolPlanZoomValue`: zoom maximo extendido de 2.8x a 30x, minimo de 0.55 a 0.1.
+- `_planCanvasWidth` y `_renderPlanBaseMapLayer`: actualizados con nuevos limites de zoom.
+- `setSchoolPlanZoom`: cambiado de paso aditivo (+0.15) a factor multiplicativo (×1.3 / ÷1.3) para que los clics sean proporcionalmente equivalentes en todos los niveles de zoom.
+- Manejador `wheel` (Ctrl+scroll): cambiado a factor multiplicativo ×1.15 por tick.
+
+### Resultado
+Con un bloque de 130 m, la cuadricula a zoom=1 mostrara celdas de 10 m o 20 m (automatico); al hacer zoom hasta 20-30x se ven celdas de 1 m; al 30x en bloques tipicos de 20 m se alcanzan celdas de 10-20 cm.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.30
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.30
+- `index.html` — spans app-version
+
+---
+
+## Sesion de ribbon unificado con iconos - 2026-05-18 - v2.6.27
+
+### Problema
+El grupo "Exteriores" en la pestana Insertar del ribbon usaba `_renderSiteElementToolset('plan', 'compact')` que genera botones con clase `mec-sketch-tool` (grid CSS con `auto-fit minmax(72px, 1fr)`). Al embeberse dentro del panel ribbon (flex, `overflow-x: auto`) estos botones se superponian visualmente con los grupos siguientes porque el grid interno se enrollaba en multiple filas.
+
+### Solucion
+
+**`assets/js/mec-form.js`:**
+- `SITE_ELEMENT_TYPES`: se agregaron propiedades `icon` (Unicode) y `ribbonLabel` (texto corto) a cada entrada.
+- `_renderPlanRibbonPanel` (pestana 'insertar'): el grupo Exteriores ahora usa `_renderPlanRibbonButton` para cada tipo de elemento, igual que los demas grupos. Resultado: todos los botones tienen el mismo estilo, altura y alineacion; el panel hace scroll horizontal si no caben en pantalla.
+- Iconos Unicode asignados: ○ tanque, ⊙ pozo, ◆ recreacion, ≡ galeria, ⇨ caminero, □ esp. libre, ■ pilar, ◫ escalera, ╱ rampa, ↪ acometida, ⦿ medidor, ⚡ tablero, ⏚ p. tierra.
+- Botones Ambientes: iconos mejorados — □ aula, ◧ espacio, ⌀ sanitario.
+- Botones Exportar: iconos mas representativos — {} JSON, ⌕ DXF, ◆ SVG, ▣ PNG, ⎙ PDF.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js` — VERSION 2.6.27
+- `sw.js` — CACHE_NAME cialpa-app-v2.6.27
+- `index.html` — spans app-version
+
+---
+
 ## Sesion de elementos electricos anclados a pared - 2026-05-18 - v2.6.26
 
 ### Objetivo

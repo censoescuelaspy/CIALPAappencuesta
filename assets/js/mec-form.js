@@ -810,7 +810,7 @@ const MecFormModule = (() => {
 
   function _renderPlanBaseMapLayer(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
     const baseMap = _ensurePlanBaseMap();
-    const displayScale = Math.max(.55, Math.min(2.8, Number(_schoolPlanZoom) || 1));
+    const displayScale = Math.max(.1, Math.min(30, Number(_schoolPlanZoom) || 1));
     if (!_planBaseMapVisible(baseMap)) {
       return '<div class="school-plan-basemap school-plan-basemap--empty" data-plan-basemap aria-hidden="true"></div>';
     }
@@ -844,7 +844,7 @@ const MecFormModule = (() => {
 
   function _planCanvasWidth(root = _activeSchoolPlanRoot()) {
     const minWidth = 900;
-    const zoom = Math.max(.55, Math.min(2.8, Number(_schoolPlanZoom) || 1));
+    const zoom = Math.max(.1, Math.min(30, Number(_schoolPlanZoom) || 1));
     const available = Math.floor(((root?.getBoundingClientRect?.().width || 0) - 30) / zoom);
     return Math.max(minWidth, Math.min(1800, Number.isFinite(available) ? available : minWidth));
   }
@@ -9684,14 +9684,15 @@ const MecFormModule = (() => {
       ? (focusConfig.point || _activeSchoolPlanZoomPoint(wrap, previousZoom))
       : null;
     const viewportPoint = focusConfig.viewportPoint || null;
-    _schoolPlanZoom = Math.max(.55, Math.min(2.8, Number(value) || 1));
+    _schoolPlanZoom = Math.max(.1, Math.min(30, Number(value) || 1));
     _applySchoolPlanZoom(canvas);
     if (canvas) _drawSchoolPlan();
     if (point) _scrollCanvasWrapToPoint(wrap, point, _schoolPlanZoom, viewportPoint);
   }
 
   function setSchoolPlanZoom(delta) {
-    _setSchoolPlanZoomValue(_schoolPlanZoom + delta);
+    const factor = delta > 0 ? 1.3 : (1 / 1.3);
+    _setSchoolPlanZoomValue(_schoolPlanZoom * factor);
   }
 
   function _toggleBoardFullscreen(canvasSelector, redraw = null) {
@@ -11990,22 +11991,73 @@ const MecFormModule = (() => {
   }
 
   function _drawSchoolPlanGrid(ctx, logical) {
-    const step = 20;
+    // Derive pixels-per-meter from the primary block layout
+    const blocks = _data.__blocks?.length ? _data.__blocks : [];
+    let ppm = 8;
+    let gridOriginX = 0;
+    let gridOriginY = 0;
+    if (blocks.length) {
+      const layout = _planBlockLayout(blocks, logical.width, logical.height);
+      const primary = layout.find(l => Number.isFinite(l.scaleX) && l.scaleX > 0);
+      if (primary) {
+        ppm = primary.scaleX;
+        gridOriginX = primary.x;
+        gridOriginY = primary.y;
+      }
+    }
+
+    const zoom = _schoolPlanZoom;
+    const effectivePPM = ppm * zoom;
+
+    // Pick the smallest "nice" interval (m) that still produces >= minPx between lines
+    const NICE = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500];
+    const majorM = NICE.find(s => s * effectivePPM >= 50) || NICE[NICE.length - 1];
+    const minorM = NICE.find(s => s * effectivePPM >= 10 && s < majorM) || null;
+    const majorPx = majorM * effectivePPM;
+    const minorPx = minorM ? minorM * effectivePPM : null;
+
+    // Phase: align grid lines to the primary block's origin
+    const phX = ((gridOriginX % majorPx) + majorPx) % majorPx;
+    const phY = ((gridOriginY % majorPx) + majorPx) % majorPx;
+
     ctx.save();
-    ctx.strokeStyle = 'rgba(23, 59, 99, .085)';
+
+    // Minor grid (drawn first, major lines overdraw them)
+    if (minorPx && minorPx >= 4) {
+      const phXm = ((gridOriginX % minorPx) + minorPx) % minorPx;
+      const phYm = ((gridOriginY % minorPx) + minorPx) % minorPx;
+      ctx.strokeStyle = 'rgba(23, 59, 99, .045)';
+      ctx.lineWidth = 0.5;
+      for (let x = phXm; x < logical.width; x += minorPx) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, logical.height); ctx.stroke();
+      }
+      for (let y = phYm; y < logical.height; y += minorPx) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(logical.width, y); ctx.stroke();
+      }
+    }
+
+    // Major grid
+    ctx.strokeStyle = 'rgba(23, 59, 99, .10)';
     ctx.lineWidth = 1;
-    for (let x = step; x < logical.width; x += step) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, logical.height);
-      ctx.stroke();
+    for (let x = phX; x < logical.width; x += majorPx) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, logical.height); ctx.stroke();
     }
-    for (let y = step; y < logical.height; y += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(logical.width, y);
-      ctx.stroke();
+    for (let y = phY; y < logical.height; y += majorPx) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(logical.width, y); ctx.stroke();
     }
+
+    // Scale label (bottom-left corner)
+    const fmtM = v => v >= 1 ? `${v} m` : v >= 0.01 ? `${+(v * 100).toPrecision(2)} cm` : `${+(v * 1000).toPrecision(2)} mm`;
+    const scaleLabel = `Cuad.: ${fmtM(majorM)}`;
+    ctx.font = '9px sans-serif';
+    const tw = ctx.measureText(scaleLabel).width;
+    ctx.fillStyle = 'rgba(248,250,252,.82)';
+    ctx.fillRect(4, logical.height - 16, tw + 6, 13);
+    ctx.fillStyle = 'rgba(23, 59, 99, .55)';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(scaleLabel, 7, logical.height - 10);
+
     ctx.restore();
   }
 
@@ -17141,8 +17193,8 @@ const MecFormModule = (() => {
     canvas.addEventListener('wheel', event => {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
-      const direction = event.deltaY > 0 ? -0.12 : 0.12;
-      _setSchoolPlanZoomValue(_schoolPlanZoom + direction, _zoomFocusFromClient(
+      const direction = event.deltaY > 0 ? (1 / 1.15) : 1.15;
+      _setSchoolPlanZoomValue(_schoolPlanZoom * direction, _zoomFocusFromClient(
         canvas,
         canvas.closest('.school-plan__canvas-wrap'),
         { x: event.clientX, y: event.clientY }
