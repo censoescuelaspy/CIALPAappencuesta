@@ -4,6 +4,30 @@
 
 ---
 
+## Zoom normal al salir de seleccion y base de calles cercana - 2026-05-19 - v2.6.47
+
+### Objetivo
+- Volver al zoom normal cuando el usuario toca o hace clic fuera de un elemento seleccionado.
+- Permitir que la base de calles se acerque lo suficiente para calzar bloques arquitectonicos sobre la referencia.
+
+### Cambios implementados
+- Un clic/toque sobre el vacio del plano limpia la seleccion activa, oculta la accion flotante y devuelve el zoom del plano a `100%`.
+- La base de calles nueva o no confirmada inicia con vista mas cercana: zoom cartografico `19` y escala base `2.5x`.
+- La escala manual de la base se amplio hasta `24x`, manteniendo desplazamiento independiente para alinear la estructura.
+- El panel de base mapa agrega botones directos `Acercar base` y `Alejar base` para calibrar rapidamente en tablet.
+- La metrica de cobertura muestra centimetros por pixel cuando corresponde, evitando lecturas redondeadas a `0.00 m/px`.
+- Version y cache actualizados a `v2.6.47`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores.
+
+---
+
 ## Encabezado unico de escuela en plano vivo - 2026-05-19 - v2.6.46
 
 ### Objetivo

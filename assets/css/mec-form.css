@@ -2426,6 +2426,13 @@
   gap: .35rem;
 }
 
+.school-plan-basemap-panel__scale {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+}
+
 .school-plan-basemap-panel__offset label {
   width: 128px;
 }

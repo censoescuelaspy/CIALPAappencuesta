@@ -9,7 +9,12 @@ const MecFormModule = (() => {
   const STORAGE_KEY = 'cialpa_mec_form_draft_v1';
   const PLAN_CANVAS_ID = 'school-plan-canvas';
   const PLAN_BASEMAP_TILE_SIZE = 256;
-  const PLAN_BASEMAP_DEFAULT_ZOOM = 18;
+  const PLAN_BASEMAP_DEFAULT_ZOOM = 19;
+  const PLAN_BASEMAP_MIN_ZOOM = 14;
+  const PLAN_BASEMAP_FALLBACK_MAX_ZOOM = 19;
+  const PLAN_BASEMAP_DEFAULT_SCALE = 2.5;
+  const PLAN_BASEMAP_MIN_SCALE = .25;
+  const PLAN_BASEMAP_MAX_SCALE = 24;
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
@@ -738,12 +743,34 @@ const MecFormModule = (() => {
       lng: coords.lng,
       zoom: PLAN_BASEMAP_DEFAULT_ZOOM,
       opacity: .56,
-      scale: 1,
+      scale: PLAN_BASEMAP_DEFAULT_SCALE,
       offsetX: 0,
       offsetY: 0,
       savedAt: '',
       confirmed: false,
     };
+  }
+
+  function _planBaseMapMaxZoom() {
+    const configured = typeof APP_CONFIG !== 'undefined'
+      ? (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)
+      : PLAN_BASEMAP_FALLBACK_MAX_ZOOM;
+    return Math.round(_numberInRange(configured, PLAN_BASEMAP_FALLBACK_MAX_ZOOM, PLAN_BASEMAP_MIN_ZOOM, 22));
+  }
+
+  function _clampPlanBaseMapZoom(value, fallback = PLAN_BASEMAP_DEFAULT_ZOOM) {
+    return Math.round(_numberInRange(value, fallback, PLAN_BASEMAP_MIN_ZOOM, _planBaseMapMaxZoom()));
+  }
+
+  function _clampPlanBaseMapScale(value, fallback = PLAN_BASEMAP_DEFAULT_SCALE) {
+    return _numberInRange(value, fallback, PLAN_BASEMAP_MIN_SCALE, PLAN_BASEMAP_MAX_SCALE);
+  }
+
+  function _preferClosePlanBaseMapView(baseMap) {
+    if (!baseMap || baseMap.confirmed) return baseMap;
+    if (Number(baseMap.zoom || 0) < PLAN_BASEMAP_DEFAULT_ZOOM) baseMap.zoom = PLAN_BASEMAP_DEFAULT_ZOOM;
+    if (Number(baseMap.scale || 0) < PLAN_BASEMAP_DEFAULT_SCALE) baseMap.scale = PLAN_BASEMAP_DEFAULT_SCALE;
+    return baseMap;
   }
 
   function _ensureTimeLog() {
@@ -815,9 +842,9 @@ const MecFormModule = (() => {
     if ((merged.lng === '' || merged.lng === undefined || merged.lng === null) && defaults.lng !== '') merged.lng = defaults.lng;
     merged.lat = merged.lat === '' ? '' : _numberInRange(merged.lat, defaults.lat === '' ? '' : defaults.lat, -85, 85);
     merged.lng = merged.lng === '' ? '' : _numberInRange(merged.lng, defaults.lng === '' ? '' : defaults.lng, -180, 180);
-    merged.zoom = Math.round(_numberInRange(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, 14, (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)) || 19));
+    merged.zoom = _clampPlanBaseMapZoom(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM);
     merged.opacity = _numberInRange(merged.opacity, .56, .15, .95);
-    merged.scale = _numberInRange(merged.scale, 1, .35, 4);
+    merged.scale = _clampPlanBaseMapScale(merged.scale, PLAN_BASEMAP_DEFAULT_SCALE);
     merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
     merged.offsetY = _numberInRange(merged.offsetY, 0, -2000, 2000);
     merged.enabled = Boolean(merged.enabled);
@@ -929,7 +956,10 @@ const MecFormModule = (() => {
     if (!metersPerPx) return 'Escala cartografica pendiente.';
     const widthM = metersPerPx * logicalWidth;
     const heightM = metersPerPx * logicalHeight;
-    return `Cobertura aprox. ${widthM.toFixed(0)} x ${heightM.toFixed(0)} m - ${metersPerPx.toFixed(2)} m/px`;
+    const pixelText = metersPerPx >= .1
+      ? `${metersPerPx.toFixed(2)} m/px`
+      : `${(metersPerPx * 100).toFixed(1)} cm/px`;
+    return `Cobertura aprox. ${widthM.toFixed(0)} x ${heightM.toFixed(0)} m - ${pixelText}`;
   }
 
   function _planBaseMapSignature(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
@@ -1051,11 +1081,11 @@ const MecFormModule = (() => {
             <input type="number" step="0.000001" value="${_escape(baseMap.lng)}" onchange="MecFormModule.setPlanBaseMapValue('lng', this.value)">
           </label>
           <label>Zoom cartografico
-            <input type="range" min="14" max="${_escape((typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)) || 19)}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
+            <input type="range" min="${PLAN_BASEMAP_MIN_ZOOM}" max="${_escape(_planBaseMapMaxZoom())}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
             <b>${_escape(baseMap.zoom)}</b>
           </label>
           <label>Escala base
-            <input type="range" min="0.35" max="4" step="0.05" value="${_escape(baseMap.scale)}" onchange="MecFormModule.setPlanBaseMapValue('scale', this.value)">
+            <input type="range" min="${PLAN_BASEMAP_MIN_SCALE}" max="${PLAN_BASEMAP_MAX_SCALE}" step="0.05" value="${_escape(baseMap.scale)}" onchange="MecFormModule.setPlanBaseMapValue('scale', this.value)">
             <b>${Number(baseMap.scale).toFixed(2)}x</b>
           </label>
           <label>Opacidad
@@ -1064,6 +1094,10 @@ const MecFormModule = (() => {
           </label>
         </div>
         <div class="school-plan-basemap-panel__adjust">
+          <div class="school-plan-basemap-panel__scale">
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.zoomPlanBaseMap(0.8)">Alejar base</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="MecFormModule.zoomPlanBaseMap(1.25)">Acercar base</button>
+          </div>
           <div class="school-plan-basemap-panel__nudge">
             <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(0, -20)" aria-label="Mover base arriba">&#8593;</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(-20, 0)" aria-label="Mover base izquierda">&#8592;</button>
@@ -1090,6 +1124,8 @@ const MecFormModule = (() => {
       _planBaseMapPanelOpen = true;
       baseMap.enabled = false;
       UI.showToast('Cargue latitud y longitud para activar la base de calles y lineas.', 'warning', 5200);
+    } else if (baseMap.enabled) {
+      _preferClosePlanBaseMapView(baseMap);
     }
     _saveDraft(false);
     renderSchoolPlan();
@@ -1104,11 +1140,21 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     if (key === 'lat') baseMap.lat = value === '' ? '' : _numberInRange(value, baseMap.lat || 0, -85, 85);
     if (key === 'lng') baseMap.lng = value === '' ? '' : _numberInRange(value, baseMap.lng || 0, -180, 180);
-    if (key === 'zoom') baseMap.zoom = Math.round(_numberInRange(value, baseMap.zoom, 14, (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)) || 19));
-    if (key === 'scale') baseMap.scale = _numberInRange(value, baseMap.scale, .35, 4);
+    if (key === 'zoom') baseMap.zoom = _clampPlanBaseMapZoom(value, baseMap.zoom);
+    if (key === 'scale') baseMap.scale = _clampPlanBaseMapScale(value, baseMap.scale);
     if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, .95);
     if (key === 'offsetX') baseMap.offsetX = _numberInRange(value, baseMap.offsetX, -2000, 2000);
     if (key === 'offsetY') baseMap.offsetY = _numberInRange(value, baseMap.offsetY, -2000, 2000);
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function zoomPlanBaseMap(factor = 1) {
+    const baseMap = _ensurePlanBaseMap();
+    const ratio = Number(factor) || 1;
+    baseMap.scale = _clampPlanBaseMapScale(Number(baseMap.scale || PLAN_BASEMAP_DEFAULT_SCALE) * ratio, baseMap.scale);
     if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
     baseMap.confirmed = false;
     _saveDraft(false);
@@ -1144,6 +1190,7 @@ const MecFormModule = (() => {
     baseMap.lng = coords.lng;
     baseMap.enabled = true;
     baseMap.confirmed = false;
+    _preferClosePlanBaseMapView(baseMap);
     _saveDraft(false);
     renderSchoolPlan();
   }
@@ -17619,6 +17666,26 @@ const MecFormModule = (() => {
       setTimeout(() => { suppressClick = false; }, 120);
     };
     const isSelectableArea = area => Boolean(area?.id);
+    const resetPlanSelectionAndZoom = event => {
+      const shouldReset = Boolean(_selectedPlanId) || Math.abs(Number(_schoolPlanZoom || 1) - 1) > .01;
+      if (!shouldReset) return;
+      const point = event ? pointFromEvent(event) : null;
+      const wrap = canvas.closest('.school-plan__canvas-wrap');
+      const viewportPoint = wrap ? { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } : null;
+      _selectedPlanId = null;
+      _activePlanDrag = null;
+      lastTap = null;
+      _hideCanvasHoverTooltip();
+      _schoolPlanZoom = 1;
+      renderSchoolPlan();
+      if (point && viewportPoint) {
+        requestAnimationFrame(() => {
+          const nextCanvas = _activeSchoolPlanCanvas();
+          const nextWrap = nextCanvas?.closest('.school-plan__canvas-wrap');
+          _scrollCanvasWrapToPoint(nextWrap, point, _schoolPlanZoom, viewportPoint);
+        });
+      }
+    };
     const movablePlanTypes = ['block', 'site-element', 'floor', 'room', 'sanitary'];
     const isClassObjectArea = area => Boolean(area?.roomId && area?.objectId && !area?.sanitaryId);
     const isSanitaryObjectArea = area => Boolean(area?.sanitaryId && area?.objectId);
@@ -17999,7 +18066,10 @@ const MecFormModule = (() => {
       const area = pointerCandidate || hit(event);
       pointerCandidate = null;
       pointerStart = null;
-      if (!isSelectableArea(area)) return;
+      if (!isSelectableArea(area)) {
+        resetPlanSelectionAndZoom(event);
+        return;
+      }
       event.preventDefault();
       if (event.pointerType === 'touch') {
         const now = Date.now();
@@ -18034,14 +18104,20 @@ const MecFormModule = (() => {
     canvas.addEventListener('click', event => {
       if (suppressClick || Date.now() < suppressClickUntil) return;
       const area = hit(event);
-      if (!isSelectableArea(area)) return;
+      if (!isSelectableArea(area)) {
+        resetPlanSelectionAndZoom(event);
+        return;
+      }
       if (_planLayers.datos) _showCanvasHoverTooltip(event, _planHoverInfo(area));
       selectArea(area);
     });
     canvas.addEventListener('dblclick', event => {
       if (Date.now() < suppressClickUntil) return;
       const area = hit(event);
-      if (!area) return;
+      if (!area) {
+        resetPlanSelectionAndZoom(event);
+        return;
+      }
       event.preventDefault();
       selectArea(area);
     });
@@ -19868,6 +19944,7 @@ const MecFormModule = (() => {
     togglePlanBaseMap,
     togglePlanBaseMapPanel,
     setPlanBaseMapValue,
+    zoomPlanBaseMap,
     nudgePlanBaseMap,
     resetPlanBaseMapOffset,
     useSchoolCoordinatesForBaseMap,
