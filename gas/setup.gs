@@ -85,7 +85,7 @@ function normalizarEscuelasSeleccionadasV21() {
 }
 
 function createDefaultAdmin() {
-  const password = 'cialpa2025';
+  const password = 'Adm-' + Utilities.getUuid().slice(0, 8);
   const passwordHash = AuthService._hashPassword(password);
   const sheet = _getSheet(SHEET_NAMES.USUARIOS);
   const existing = _sheetToObjects(SHEET_NAMES.USUARIOS);
@@ -93,8 +93,8 @@ function createDefaultAdmin() {
     SpreadsheetApp.getUi().alert('El usuario admin ya existe.');
     return;
   }
-  sheet.appendRow(['USR_ADMIN_001', 'admin', passwordHash, 'Administrador', 'Sistema', 'admin', 'true', _today(), '', '']);
-  SpreadsheetApp.getUi().alert('Usuario admin creado. Usuario: admin, contraseña: cialpa2025. Cambiar la contraseña inmediatamente.');
+  sheet.appendRow(['USR_ADMIN_001', 'admin', passwordHash, 'Administrador', 'Sistema', 'admin', 'true', _today(), '', '', '']);
+  SpreadsheetApp.getUi().alert('Usuario admin creado. Usuario: admin, contraseña temporal: ' + password + '. Cambiar la contraseña inmediatamente.');
 }
 
 function seedConfig() {

@@ -88,6 +88,26 @@ function _handleRequest(e) {
       return _respond(fgRoute(action, params));
     }
 
+    const writeActions = [
+      'logout',
+      'updateEscuelaEstado',
+      'asignarEscuela',
+      'iniciarSesion',
+      'cerrarSesion',
+      'registrarEventoSesion',
+      'iniciarModulo',
+      'cerrarModulo',
+      'saveEncuestador',
+      'deleteEncuestador',
+      'saveIncidencia',
+      'uploadEvidence',
+      'resolverIncidencia',
+      'setConfig',
+    ];
+    const lock = writeActions.includes(action) ? LockService.getDocumentLock() : null;
+    if (lock) lock.waitLock(15000);
+
+    try {
     // Route to handler
     switch (action) {
       // Auth
@@ -139,6 +159,9 @@ function _handleRequest(e) {
 
       default:
         return _respond({ status: 'error', message: `Acción desconocida: ${action}` });
+    }
+    } finally {
+      if (lock) lock.releaseLock();
     }
 
   } catch (err) {

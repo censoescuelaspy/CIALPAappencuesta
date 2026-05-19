@@ -20,7 +20,7 @@ const AuthService = (() => {
   }
 
   function _generateToken(usuario, rol) {
-    const raw = `${usuario}:${rol}:${Date.now()}:${Math.random()}`;
+    const raw = `${usuario}:${rol}:${Date.now()}:${Utilities.getUuid()}:${Utilities.getUuid()}`;
     const bytes = Utilities.computeDigest(
       Utilities.DigestAlgorithm.SHA_256,
       raw,

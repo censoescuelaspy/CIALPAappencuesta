@@ -4,6 +4,37 @@
 
 ---
 
+## Correcciones de auditoria integral - 2026-05-19 - v2.6.43
+
+### Objetivo
+- Aplicar los arreglos prioritarios detectados en la auditoria profunda del instrumento.
+- Reducir errores de botones visibles, perdida de borradores con fotos, problemas de cache/version y duplicados en sincronizacion offline.
+
+### Cambios implementados
+- Se exportaron las acciones poligonales de aulas y sanitarios (`Forma L`, `+ Vertice`, `- Vertice`, `Rectangular`) que ya existian pero no estaban disponibles en `MecFormModule`.
+- Las evidencias fotograficas ahora se preparan comprimidas y conservan miniatura local; al subir a Drive se retira el `dataUrl` grande del borrador para bajar el riesgo de cuota de `localStorage`.
+- `_saveDraft()` ahora maneja errores de guardado local y avisa cuando el dispositivo no permite persistir el borrador.
+- La cola offline agrega `clientMutationId` / `id_offline_queue` a cada mutacion y reusa esos identificadores al sincronizar.
+- Apps Script reutiliza IDs offline para sesiones, modulos e incidencias, y evita duplicar incidencias ya sincronizadas.
+- El router GAS usa `LockService` para mutaciones principales, reduciendo carreras cuando varias tablets escriben a la vez.
+- El Service Worker solo cachea respuestas validas y el precache ya no aborta toda la instalacion si un archivo puntual falla.
+- El admin inicial de `setup.gs` ya no usa una contraseña fija documentada: genera una temporal y la muestra al ejecutar la funcion.
+- README, checklist y referencias historicas dejaron de exponer la contraseña fija inicial y se actualizaron a la version vigente.
+- Version y cache actualizados a `v2.6.43`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/local-store.js`.
+- `node --check assets/js/stats.js`.
+- Validacion sintactica de `gas/*.gs` mediante `new Function(...)` en Node.
+- Validacion estatica de referencias `MecFormModule.*` sin funciones faltantes.
+- `git diff --check` sin errores.
+
+---
+
 ## Rampa con caida izquierda/derecha - 2026-05-18 - v2.6.42
 
 ### Objetivo
@@ -1986,7 +2017,7 @@ frontend en GitHub Pages + backend Google Apps Script + base de datos Google She
 - Usuario admin insertado manualmente en hoja `usuarios`:
   - id_usuario: `USR_ADMIN_001`
   - usuario: `admin`
-  - password_hash: SHA-256 de `cialpa2025`
+  - password_hash: credencial inicial retirada de la documentacion
   - rol: `admin`, activo: `true`
 
 ### 2.5 Correcciones CORS
@@ -2035,7 +2066,7 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 | Frontend | **PRODUCCIÓN** | https://censoescuelaspy.github.io/CIALPAappencuesta/ |
 | Backend GAS | **PRODUCCIÓN** | Deployment @7, acceso anónimo |
 | Google Sheets | **OPERATIVO** | 9 hojas creadas, admin configurado |
-| Login | **FUNCIONAL** | admin / cialpa2025 ✓ |
+| Login | **FUNCIONAL** | admin con credencial temporal inicial |
 
 ---
 
@@ -2043,7 +2074,7 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 | Tarea | Prioridad | Detalle |
 |---|---|---|
-| Cambiar contraseña admin | **CRÍTICA** | Cambiar `cialpa2025` desde módulo Configuración |
+| Cambiar contraseña admin | **CRÍTICA** | Cambiar la credencial temporal desde módulo Configuración |
 | Importar escuelas | Alta | Ejecutar `importEscuelas()` en GAS con datos del TXT |
 | FORM_URL de producción | Alta | Confirmar URL real del formulario MEC/RUE con el MEC |
 | Geocodificar escuelas | Media | Campo lat/lng vacío en datos actuales |
@@ -2060,7 +2091,7 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 | Spreadsheet | https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit |
 | GAS Editor | https://script.google.com/u/0/home/projects/1dQePnMTegZBIyN9SRYTAkPxDyBUiZejVi6WqXpv6_LrBAIVTir3ne4S2/edit |
 | GitHub repo | https://github.com/censoescuelaspy/CIALPAappencuesta |
-| Admin inicial | usuario: `admin` / contraseña: `cialpa2025` (**cambiar inmediatamente**) |
+| Admin inicial | usuario: `admin` / contraseña temporal generada por `setup.gs` (**cambiar inmediatamente**) |
 
 ---
 

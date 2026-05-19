@@ -62,7 +62,7 @@ GAS_URL: 'https://script.google.com/macros/s/TU_URL_REAL/exec',
 - [ ] En el editor de GAS, abrir `setup.gs`.
 - [ ] Ejecutar la función **`initAll()`**:
       - Crea las 9 hojas con encabezados.
-      - Crea el usuario admin (contraseña: `cialpa2025`).
+      - Crea el usuario admin y muestra la contraseña temporal generada.
       - Carga la configuración inicial y los catálogos.
 - [ ] Verificar en el Spreadsheet que se crearon las hojas:
       `escuelas_seleccionadas`, `usuarios`, `encuestadores`, `sesiones`,

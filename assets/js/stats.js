@@ -480,7 +480,12 @@ const StatsModule = (() => {
     let synced = 0;
     for (const item of pending) {
       try {
-        const result = await API.call(item.endpoint, item.method || 'POST', item.data || {}, { skipLoading: true, skipQueue: true });
+        const payload = {
+          ...(item.data || {}),
+          clientMutationId: item.data?.clientMutationId || item.id,
+          id_offline_queue: item.data?.id_offline_queue || item.id,
+        };
+        const result = await API.call(item.endpoint, item.method || 'POST', payload, { skipLoading: true, skipQueue: true });
         if (result.status !== 'ok') throw new Error(result.message || 'Respuesta invalida');
         await CialpaLocalStore.updateQueueStatus(item.id, 'synced', { syncedAt: new Date().toISOString() });
         synced++;

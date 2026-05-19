@@ -124,17 +124,20 @@ const SheetsService = (() => {
     if (escuelaResult.status !== 'ok') return escuelaResult;
     const escuela = escuelaResult.data;
 
+    const requestedSessionId = _clientMutationId(params);
     const allowMultiple = _configBool('ALLOW_MULTIPLE_SESSIONS', false);
+    _ensureOperationalSheets();
+    _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
     const sesiones = _sheetToObjects(SHEET_NAMES.SESIONES);
+    const existente = requestedSessionId ? sesiones.find(s => String(s.id_sesion) === String(requestedSessionId)) : null;
+    if (existente) return { status: 'ok', data: existente, message: 'La sesion offline ya estaba sincronizada.' };
     const abierta = sesiones.find(s => String(s.id_escuela) === String(escuela.id_escuela) && String(s.estado) === 'en_curso');
     if (abierta && !allowMultiple) {
       return { status: 'error', message: 'Ya existe una sesión activa para esta escuela.', data: abierta, code: 'SESSION_OPEN' };
     }
 
-    _ensureOperationalSheets();
-    _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
     const launch = _resolveLaunchConfig(params);
-    const id_sesion = _genId('SES');
+    const id_sesion = requestedSessionId || _genId('SES');
     const now = new Date();
     const row = {
       id_sesion,
@@ -239,9 +242,13 @@ const SheetsService = (() => {
     if (!params.id_sesion || !params.modulo) return { status: 'error', message: 'id_sesion y modulo son requeridos.' };
     _ensureOperationalSheets();
     _ensureColumns(SHEET_NAMES.MODULOS, _modulosHeaders());
-    const abiertos = _sheetToObjects(SHEET_NAMES.MODULOS).find(r => String(r.id_sesion) === String(params.id_sesion) && String(r.modulo) === String(params.modulo) && String(r.estado) === 'en_curso');
+    const requestedModuleId = _clientMutationId(params);
+    const modulos = _sheetToObjects(SHEET_NAMES.MODULOS);
+    const existente = requestedModuleId ? modulos.find(r => String(r.id_modulo) === String(requestedModuleId)) : null;
+    if (existente) return { status: 'ok', data: existente, message: 'El modulo offline ya estaba sincronizado.' };
+    const abiertos = modulos.find(r => String(r.id_sesion) === String(params.id_sesion) && String(r.modulo) === String(params.modulo) && String(r.estado) === 'en_curso');
     if (abiertos) return { status: 'ok', data: abiertos, message: 'El módulo ya estaba en curso.' };
-    const id_modulo = _genId('MOD');
+    const id_modulo = requestedModuleId || _genId('MOD');
     const now = new Date();
     const row = {
       id_modulo,
@@ -387,7 +394,12 @@ const SheetsService = (() => {
   function saveIncidencia(params) {
     const session = params._session;
     _ensureColumns(SHEET_NAMES.INCIDENCIAS, ['id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion','prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','latitud','longitud']);
-    const id = _genId('INC');
+    const requestedId = _clientMutationId(params);
+    if (requestedId) {
+      const existingIdx = _findRowIndex(SHEET_NAMES.INCIDENCIAS, 'id_incidencia', requestedId);
+      if (existingIdx !== -1) return { status: 'ok', message: 'Incidencia offline ya sincronizada.', data: { id_incidencia: requestedId } };
+    }
+    const id = requestedId || _genId('INC');
     _appendObject(SHEET_NAMES.INCIDENCIAS, ['id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion','prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','latitud','longitud'], {
       id_incidencia: id,
       id_escuela: params.id_escuela || '',
@@ -916,6 +928,10 @@ const SheetsService = (() => {
   function _txt(v) {
     if (v === undefined || v === null) return '';
     return String(v).trim();
+  }
+
+  function _clientMutationId(params) {
+    return _txt(params && (params.clientMutationId || params.id_offline_queue));
   }
 
   function _same(a, b) {

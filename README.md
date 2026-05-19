@@ -1,6 +1,6 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Versión 2.0.0** | Paraguay 2025
+**Versión 2.6.43** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
 
@@ -96,9 +96,9 @@ Sistema web para la gestión del relevamiento de infraestructura y condiciones d
 3. Esperar a que aparezca el mensaje de confirmación.
 4. Verificar en la planilla que se crearon las 9 hojas.
 
-> **Credenciales del admin por defecto:**
+> **Credenciales del admin inicial:**
 > - Usuario: `admin`
-> - Contraseña: `cialpa2025`
+> - Contraseña temporal: se muestra al ejecutar `createDefaultAdmin()`.
 > - **¡Cambiar inmediatamente después del primer login!**
 
 ### Paso 4: Desplegar como Web App
@@ -138,7 +138,7 @@ cp -r /ruta/a/06_APP/* .
 
 # Commit y push
 git add .
-git commit -m "feat: v2.0.0 complete application"
+git commit -m "chore: publicar version vigente"
 git push origin main
 ```
 
@@ -294,7 +294,7 @@ Todas se cargan desde CDN en el `index.html`. No requieren instalación.
 
 ---
 
-*CIALPA — Relevamiento Escolar v2.0.0 · Paraguay 2025*
+*CIALPA — Relevamiento Escolar v2.6.43 · Paraguay 2026*
 
 
 ## Manual del Encuestador

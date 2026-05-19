@@ -58,6 +58,10 @@ const MecFormModule = (() => {
   const PLAN_WALL_THICKNESS = 7;
   const PLAN_OPENING_STROKE = 1.5;
   const PLAN_VERTEX_HANDLE_SIZE = 12;
+  const EVIDENCE_IMAGE_MAX_DIMENSION = 1600;
+  const EVIDENCE_THUMB_MAX_DIMENSION = 720;
+  const EVIDENCE_IMAGE_QUALITY = 0.78;
+  const EVIDENCE_THUMB_QUALITY = 0.64;
 
   const SKETCH_CANVAS = { width: 760, height: 460 };
   const BLOCK_ELECTRIC_FIELDS = [
@@ -188,14 +192,21 @@ const MecFormModule = (() => {
     _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _data.__activeSanitaryId = _activeSanitaryId || '';
     _normalizeNumberedNames();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      savedAt: new Date().toISOString(),
-      schemaVersion: MEC_SCHEMA.version,
-      values: _data,
-    }));
-    if (showToast) UI.showToast('Borrador MEC guardado en este dispositivo.', 'success');
-    const state = document.getElementById('mec-save-state');
-    if (state) state.textContent = _formatSavedAt(new Date().toISOString());
+    _compactUploadedEvidenceInDraft();
+    const savedAt = new Date().toISOString();
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        savedAt,
+        schemaVersion: MEC_SCHEMA.version,
+        values: _data,
+      }));
+      if (showToast) UI.showToast('Borrador MEC guardado en este dispositivo.', 'success');
+      const state = document.getElementById('mec-save-state');
+      if (state) state.textContent = _formatSavedAt(savedAt);
+    } catch (err) {
+      console.warn('[MEC] No se pudo guardar el borrador local:', err);
+      UI.showToast('No se pudo guardar el borrador local. Revise espacio del dispositivo o sincronice evidencias.', 'warning', 7000);
+    }
   }
 
   function _setValue(moduleId, fieldId, value) {
@@ -231,16 +242,19 @@ const MecFormModule = (() => {
     return new Promise(resolve => {
       const reader = new FileReader();
       reader.onload = async () => {
+        const prepared = await _prepareEvidenceImageData(file, reader.result);
         const record = {
           name: file.name,
           indexedName,
-          type: file.type || 'image/jpeg',
-          size: file.size,
+          type: prepared.type || file.type || 'image/jpeg',
+          size: prepared.size || file.size,
+          originalSize: file.size,
           capturedAt: indexedAt,
           label,
           indexKey: _slug(label || file.name || 'evidencia'),
           context: enrichedContext,
-          dataUrl: reader.result,
+          dataUrl: prepared.dataUrl,
+          thumbDataUrl: prepared.thumbDataUrl,
           driveStatus: 'pending',
           driveFolderId: _evidenceFolderId(),
         };
@@ -275,6 +289,99 @@ const MecFormModule = (() => {
     return `${_slug(label || 'evidencia')}_${Date.now()}_${_slug(baseName)}${extension}`;
   }
 
+  function _prepareEvidenceImageData(file, dataUrl) {
+    const fallback = {
+      dataUrl,
+      thumbDataUrl: dataUrl,
+      type: file?.type || 'image/jpeg',
+      size: file?.size || 0,
+    };
+    const type = String(file?.type || '');
+    if (!type.startsWith('image/') || typeof document === 'undefined' || typeof Image === 'undefined') return Promise.resolve(fallback);
+    return Promise.all([
+      _resizeEvidenceDataUrl(dataUrl, EVIDENCE_IMAGE_MAX_DIMENSION, EVIDENCE_IMAGE_QUALITY),
+      _resizeEvidenceDataUrl(dataUrl, EVIDENCE_THUMB_MAX_DIMENSION, EVIDENCE_THUMB_QUALITY),
+    ]).then(([main, thumb]) => ({
+      dataUrl: main || dataUrl,
+      thumbDataUrl: thumb || main || dataUrl,
+      type: 'image/jpeg',
+      size: _dataUrlApproxBytes(main || dataUrl) || file?.size || 0,
+    })).catch(() => fallback);
+  }
+
+  function _resizeEvidenceDataUrl(dataUrl, maxDimension, quality) {
+    return new Promise(resolve => {
+      try {
+        const image = new Image();
+        image.onload = () => {
+          const width = Number(image.naturalWidth || image.width || 0);
+          const height = Number(image.naturalHeight || image.height || 0);
+          if (!width || !height) {
+            resolve(dataUrl);
+            return;
+          }
+          const scale = Math.min(1, Number(maxDimension || 0) / Math.max(width, height));
+          if (scale >= 1) {
+            resolve(dataUrl);
+            return;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(width * scale));
+          canvas.height = Math.max(1, Math.round(height * scale));
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        image.onerror = () => resolve(dataUrl);
+        image.src = dataUrl;
+      } catch {
+        resolve(dataUrl);
+      }
+    });
+  }
+
+  function _dataUrlApproxBytes(dataUrl = '') {
+    const base64 = String(dataUrl || '').split(',')[1] || '';
+    return Math.round(base64.length * 0.75);
+  }
+
+  function _compactUploadedEvidenceRecord(photo) {
+    if (!photo || typeof photo !== 'object') return photo;
+    const uploaded = Boolean(photo.driveFileId || photo.driveStatus === 'uploaded' || photo.driveStatus === 'demo');
+    if (!uploaded || !photo.dataUrl) return photo;
+    const compact = {
+      ...photo,
+      thumbDataUrl: photo.thumbDataUrl || photo.dataUrl,
+    };
+    delete compact.dataUrl;
+    return compact;
+  }
+
+  function _compactUploadedEvidenceInDraft() {
+    const compactList = photos => (Array.isArray(photos) ? photos.map(_compactUploadedEvidenceRecord) : photos);
+    if (_data.__evidence) {
+      Object.keys(_data.__evidence).forEach(key => {
+        _data.__evidence[key] = compactList(_data.__evidence[key]);
+      });
+    }
+    (_data.__classrooms || []).forEach(room => (room.objects || []).forEach(object => {
+      if (object.ficha?.evidencias) object.ficha.evidencias = compactList(object.ficha.evidencias);
+    }));
+    (_data.__sanitaries || []).forEach(item => {
+      if (item.evidencias) item.evidencias = compactList(item.evidencias);
+      (item.objects || []).forEach(object => {
+        if (object.ficha?.evidencias) object.ficha.evidencias = compactList(object.ficha.evidencias);
+      });
+    });
+    (_data.__siteElements || []).forEach(element => {
+      if (element.ficha?.evidencias) element.ficha.evidencias = compactList(element.ficha.evidencias);
+    });
+  }
+
   function _evidenceFolderId() {
     const configured = APP_CONFIG.EVIDENCE_FOLDER_ID || '';
     if (configured) return configured;
@@ -303,7 +410,7 @@ const MecFormModule = (() => {
         context: record.context || {},
       });
       if (result.status === 'ok' && result.data) {
-        return {
+        return _compactUploadedEvidenceRecord({
           ...record,
           driveStatus: result.data.demo ? 'demo' : 'uploaded',
           driveFileId: result.data.id || '',
@@ -312,7 +419,7 @@ const MecFormModule = (() => {
           uploadedAt: result.data.uploadedAt || new Date().toISOString(),
           evidenceId: result.data.evidenceId || '',
           uploadError: '',
-        };
+        });
       }
       return {
         ...record,
@@ -8762,10 +8869,10 @@ const MecFormModule = (() => {
 
   function _tooltipPhotosFromList(photos = [], limit = 4) {
     return (Array.isArray(photos) ? photos : [])
-      .filter(photo => photo && (photo.dataUrl || photo.driveUrl || photo.indexedName || photo.name || photo.label))
+      .filter(photo => photo && (photo.thumbDataUrl || photo.dataUrl || photo.driveUrl || photo.indexedName || photo.name || photo.label))
       .slice(0, limit)
       .map((photo, index) => ({
-        src: photo.dataUrl || '',
+        src: photo.thumbDataUrl || photo.dataUrl || '',
         title: photo.indexedName || photo.name || `Evidencia ${index + 1}`,
         label: photo.context?.elementLabel || photo.label || photo.name || `Foto ${index + 1}`,
         status: photo.driveStatus || (photo.driveUrl ? 'Drive' : 'Local'),
@@ -18320,14 +18427,15 @@ const MecFormModule = (() => {
       return markerNumbers.get(key);
     };
     const push = (photo, meta = {}) => {
-      if (!photo?.dataUrl) return;
+      const imageSrc = photo?.dataUrl || photo?.thumbDataUrl || '';
+      if (!imageSrc) return;
       const number = markerNumber(meta.markerKey || '');
       photos.push({
         markerKey: meta.markerKey || '',
         markerNumber: number,
         title: meta.title || photo.label || photo.name || 'Foto',
         subtitle: meta.subtitle || photo.label || '',
-        dataUrl: photo.dataUrl,
+        dataUrl: imageSrc,
         name: photo.name || '',
         capturedAt: photo.capturedAt || '',
         type: photo.type || '',
@@ -19575,10 +19683,16 @@ const MecFormModule = (() => {
     closePlanFloorFicha,
     savePlanFloorFicha,
     addPlanClassroomElement,
+    setPlanClassroomShape,
+    addPlanClassroomVertex,
+    removePlanClassroomVertex,
     addPlanSanitaryFixture,
     addPlanSanitaryOpening,
     addPlanSanitaryElement,
     addPlanSanitaryStall,
+    setPlanSanitaryShape,
+    addPlanSanitaryVertex,
+    removePlanSanitaryVertex,
     addPlanSiteElement,
     openNewSiteElementFicha,
     closeNewSiteElementFicha,

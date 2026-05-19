@@ -444,7 +444,7 @@ const API = (() => {
     return {
       status: 'ok',
       queued: true,
-      data: _queuedResponseData(endpoint, data, queued),
+      data: _queuedResponseData(endpoint, queued.data || data, queued),
       message: 'Operacion guardada localmente; queda pendiente de sincronizacion.',
     };
   }
@@ -487,7 +487,7 @@ const API = (() => {
     if (endpoint === 'cerrarSesion') {
       return { duracion_minutos: data.duracion_minutos || 0, offline: true };
     }
-    if (endpoint === 'saveIncidencia') return { id_incidencia: queued.id, offline: true };
+    if (endpoint === 'saveIncidencia') return { id_incidencia: data.clientMutationId || queued.id, offline: true };
     return { id_offline_queue: queued.id, offline: true };
   }
 

@@ -128,11 +128,17 @@ const CialpaLocalStore = (() => {
   }
 
   async function enqueue(endpoint, method, data, reason = '') {
+    const id = `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const payload = {
+      ...(data || {}),
+      clientMutationId: data?.clientMutationId || id,
+      id_offline_queue: data?.id_offline_queue || id,
+    };
     const record = {
-      id: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      id,
       endpoint,
       method,
-      data: data || {},
+      data: payload,
       reason,
       status: 'pending',
       createdAt: new Date().toISOString(),

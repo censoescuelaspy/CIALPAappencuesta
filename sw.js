@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.6.42';
+const CACHE_NAME = 'cialpa-app-v2.6.43';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',
@@ -33,7 +33,11 @@ const APP_SHELL = [
 self.addEventListener('install', event => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then(cache => Promise.all(
+      APP_SHELL.map(item => cache.add(item).catch(err => {
+        console.warn('[SW] No se pudo precachear', item, err);
+      }))
+    ))
   );
 });
 
@@ -67,8 +71,7 @@ self.addEventListener('fetch', event => {
     if (!cacheableExternal) return;
     event.respondWith(
       caches.match(request).then(cached => cached || fetch(request).then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        _cacheIfValid(request, response);
         return response;
       }))
     );
@@ -78,10 +81,19 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(request)
       .then(response => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        _cacheIfValid(request, response);
         return response;
       })
       .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
   );
 });
+
+function _cacheIfValid(request, response) {
+  if (!response || !response.ok) return;
+  const cacheableTypes = ['basic', 'cors', 'default'];
+  if (response.type && !cacheableTypes.includes(response.type)) return;
+  const copy = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(request, copy)).catch(err => {
+    console.warn('[SW] No se pudo actualizar cache', request.url, err);
+  });
+}
