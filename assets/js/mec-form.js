@@ -3044,6 +3044,11 @@ const MecFormModule = (() => {
       if (type === 'pillar' && !item.ficha?.forma_pilar && item.ficha?.seccion) {
         ficha.forma_pilar = String(item.ficha.seccion).toLowerCase().includes('cuad') ? 'Cuadrado' : 'Redondo';
       }
+      let rampFallDirection = '';
+      if (type === 'ramp') {
+        rampFallDirection = _rampFallDirection({ ...item, ficha });
+        ficha.sentido_caida = _rampFallDirectionLabel(rampFallDirection);
+      }
       const rotationDeg = _normalizeSiteRotation(item.rotationDeg ?? item.rotacion_grados ?? ficha.rotacion_grados);
       ficha.rotacion_grados = String(rotationDeg);
       const measuredSize = _siteElementSizeFromFicha(type, shape, ficha);
@@ -3057,6 +3062,9 @@ const MecFormModule = (() => {
         hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : (measuredSize?.hRatio || size.hRatio),
         rotationDeg,
         ficha,
+        ...(type === 'ramp' ? { rampFallDirection } : {}),
+        flipH: type === 'ramp' ? false : Boolean(item.flipH),
+        flipV: Boolean(item.flipV),
         autoSource: item.autoSource || null,
         locked: Boolean(item.locked),
         lockedAt: item.lockedAt || '',
@@ -3096,6 +3104,42 @@ const MecFormModule = (() => {
 
   function _siteElementRotationDeg(item) {
     return _normalizeSiteRotation(item?.rotationDeg ?? item?.rotacion_grados ?? item?.ficha?.rotacion_grados ?? 0);
+  }
+
+  function _normalizeRampFallDirection(value) {
+    const text = String(value || '').trim().toLowerCase();
+    if (text.includes('izq') || text.includes('left')) return 'left';
+    return 'right';
+  }
+
+  function _rampFallDirectionLabel(direction) {
+    return _normalizeRampFallDirection(direction) === 'left' ? 'Izquierda' : 'Derecha';
+  }
+
+  function _rampFallDirection(element) {
+    if (!element) return 'right';
+    return _normalizeRampFallDirection(
+      element.rampFallDirection
+      ?? element.slopeDirection
+      ?? element.ficha?.sentido_caida
+      ?? element.ficha?.caida_hacia
+      ?? element.ficha?.caida
+      ?? ''
+    );
+  }
+
+  function _oppositeRampFallDirection(element) {
+    return _rampFallDirection(element) === 'left' ? 'right' : 'left';
+  }
+
+  function _setRampFallDirection(element, direction = 'right') {
+    if (!element || element.type !== 'ramp') return 'right';
+    const normalized = _normalizeRampFallDirection(direction);
+    element.rampFallDirection = normalized;
+    element.flipH = false;
+    element.ficha = element.ficha || {};
+    element.ficha.sentido_caida = _rampFallDirectionLabel(normalized);
+    return normalized;
   }
 
   function _recreationShapeDefaults(shape) {
@@ -3197,6 +3241,9 @@ const MecFormModule = (() => {
     if (element.type === 'pillar') {
       const current = element.ficha.forma_pilar || element.ficha.seccion || 'Redondo';
       element.ficha.forma_pilar = String(current).toLowerCase().includes('cuad') ? 'Cuadrado' : 'Redondo';
+    }
+    if (element.type === 'ramp') {
+      _setRampFallDirection(element, element.ficha.sentido_caida || element.rampFallDirection);
     }
     if (element.type === 'recreation') {
       element.shape = _normalizeRecreationShape(element.ficha.forma || element.shape);
@@ -3335,6 +3382,7 @@ const MecFormModule = (() => {
       ramp: {
         largo_m: '4.00',
         ancho_m: '1.20',
+        sentido_caida: 'Derecha',
         pendiente_pct: '',
         descansos: 'No verificable',
         material: 'Hormigon',
@@ -3477,6 +3525,7 @@ const MecFormModule = (() => {
       ramp: [
         { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 4.00' },
         { key: 'ancho_m', label: 'Ancho libre aprox. (m)', type: 'number', placeholder: 'Ej. 1.20' },
+        { key: 'sentido_caida', label: 'Caida visual', options: ['Derecha', 'Izquierda'] },
         { key: 'pendiente_pct', label: 'Pendiente aprox. (%)', type: 'number', placeholder: 'Ej. 8' },
         { key: 'descansos', label: 'Descansos', options: ['Tiene', 'No tiene', 'No aplica', 'No verificable'] },
         { key: 'material', label: 'Material', options: ['Hormigon', 'Metal', 'Madera', 'Tierra compactada', 'Otro'] },
@@ -8857,6 +8906,7 @@ const MecFormModule = (() => {
       rows: _tooltipRowsFromFicha(element.ficha || {}, [
         { label: 'Tipo', value: _siteElementLabel(element.type) },
         { label: 'Figura', value: shape },
+        { label: 'Caida', value: element.type === 'ramp' ? _rampFallDirectionLabel(_rampFallDirection(element)) : '' },
         { label: 'Medidas', value: element.ficha?.largo_m && element.ficha?.ancho_m ? `${element.ficha.largo_m} x ${element.ficha.ancho_m} m` : '' },
         { label: 'Diam./lado', value: element.type === 'pillar' && (element.ficha?.forma_pilar === 'Cuadrado' ? element.ficha?.lado_m : element.ficha?.diametro_m) ? `${element.ficha.forma_pilar === 'Cuadrado' ? element.ficha.lado_m : element.ficha.diametro_m} m` : '' },
         { label: 'Area', value: _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
@@ -11506,11 +11556,17 @@ const MecFormModule = (() => {
       const element = (_data.__siteElements || []).find(item => item.id === elementId);
       if (!element) return fallback;
       const isTank = element.type === 'water_tank';
+      const isRamp = element.type === 'ramp';
+      const rampFall = isRamp ? _rampFallDirection(element) : '';
       return {
         title: element.ficha?.codigo || _siteElementLabel(element.type),
-        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · ${isTank ? 'infraestructura especial' : 'otro espacio editable'}`,
+        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · ${isRamp ? `caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : (isTank ? 'infraestructura especial' : 'otro espacio editable')}`,
         actions: [
           { label: isTank ? 'Editar tanque' : 'Editar espacio', tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
+          ...(isRamp ? [
+            { label: 'Caida izq.', tone: rampFall === 'left' ? 'btn-primary' : 'btn-outline', onClick: `MecFormModule.setRampFallDirection('${_escape(element.id)}', 'left')` },
+            { label: 'Caida der.', tone: rampFall === 'right' ? 'btn-primary' : 'btn-outline', onClick: `MecFormModule.setRampFallDirection('${_escape(element.id)}', 'right')` },
+          ] : []),
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', ${-_siteElementRotationDeg(element)})` },
@@ -11846,10 +11902,13 @@ const MecFormModule = (() => {
     const locked = _isSiteElementLocked(item);
     const active = _selectedPlanId === id;
     const isTank = item.type === 'water_tank';
+    const isRamp = item.type === 'ramp';
+    const rampFall = isRamp ? _rampFallDirection(item) : '';
     const label = item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`;
     const detail = [
       _siteElementLabel(item.type),
       item.type === 'recreation' ? _recreationShapeLabel(item.shape || item.ficha?.forma) : '',
+      isRamp ? `Caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : '',
       item.ficha?.estado || 'Sin estado',
       item.ficha?.largo_m && item.ficha?.ancho_m ? `${item.ficha.largo_m} x ${item.ficha.ancho_m} m` : '',
       Array.isArray(item.ficha?.evidencias) && item.ficha.evidencias.length ? `${item.ficha.evidencias.length} foto(s)` : '',
@@ -11866,6 +11925,9 @@ const MecFormModule = (() => {
         ${active ? `
           <div class="school-plan-group__children school-plan-group__children--actions">
             <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')">${isTank ? 'Editar tanque' : 'Editar espacio'}</button>
+            ${isRamp ? `
+              <button class="btn ${rampFall === 'left' ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setRampFallDirection('${_escape(item.id)}', 'left')">Caida izq.</button>
+              <button class="btn ${rampFall === 'right' ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setRampFallDirection('${_escape(item.id)}', 'right')">Caida der.</button>` : ''}
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', -15)">Girar -15</button>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', 15)">Girar +15</button>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', ${-_siteElementRotationDeg(item)})">0 grados</button>
@@ -13224,7 +13286,7 @@ const MecFormModule = (() => {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate((rotation * Math.PI) / 180);
-    if (item.flipH) ctx.scale(-1, 1);
+    if (item.type !== 'ramp' && item.flipH) ctx.scale(-1, 1);
     if (item.flipV) ctx.scale(1, -1);
     ctx.strokeStyle = selected ? '#111827' : cfg.tone;
     ctx.fillStyle = selected ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.78)';
@@ -13343,11 +13405,22 @@ const MecFormModule = (() => {
       ctx.stroke();
       ctx.restore();
     } else if (item.type === 'ramp') {
+      const fallLeft = _rampFallDirection(item) === 'left';
+      const x = local.x;
+      const y = local.y;
+      const w = local.w;
+      const h = local.h;
       ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(124,58,237,.10)';
       ctx.beginPath();
-      ctx.moveTo(local.x, local.y + local.h);
-      ctx.lineTo(local.x + local.w, local.y + local.h);
-      ctx.lineTo(local.x + local.w, local.y);
+      if (fallLeft) {
+        ctx.moveTo(x, y + h);
+        ctx.lineTo(x + w, y + h);
+        ctx.lineTo(x + w, y);
+      } else {
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + w, y + h);
+        ctx.lineTo(x, y + h);
+      }
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -13355,12 +13428,44 @@ const MecFormModule = (() => {
       ctx.strokeStyle = cfg.tone;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.moveTo(local.x + 8, local.y + local.h - 8);
-      ctx.lineTo(local.x + local.w - 10, local.y + 10);
-      ctx.moveTo(local.x + local.w - 22, local.y + 10);
-      ctx.lineTo(local.x + local.w - 10, local.y + 10);
-      ctx.lineTo(local.x + local.w - 10, local.y + 22);
+      if (fallLeft) {
+        ctx.moveTo(x + w - 8, y + 8);
+        ctx.lineTo(x + 8, y + h - 8);
+      } else {
+        ctx.moveTo(x + 8, y + 8);
+        ctx.lineTo(x + w - 8, y + h - 8);
+      }
       ctx.stroke();
+      const arrowY = y + h * .58;
+      const startX = fallLeft ? x + w * .72 : x + w * .28;
+      const endX = fallLeft ? x + w * .24 : x + w * .76;
+      const head = Math.max(5, Math.min(9, w * .08));
+      ctx.beginPath();
+      ctx.moveTo(startX, arrowY);
+      ctx.lineTo(endX, arrowY);
+      if (fallLeft) {
+        ctx.lineTo(endX + head, arrowY - head * .55);
+        ctx.moveTo(endX, arrowY);
+        ctx.lineTo(endX + head, arrowY + head * .55);
+      } else {
+        ctx.lineTo(endX - head, arrowY - head * .55);
+        ctx.moveTo(endX, arrowY);
+        ctx.lineTo(endX - head, arrowY + head * .55);
+      }
+      ctx.stroke();
+      ctx.fillStyle = cfg.tone;
+      ctx.beginPath();
+      if (fallLeft) {
+        ctx.moveTo(x + 5, y + h * .5);
+        ctx.lineTo(x + 13, y + h * .34);
+        ctx.lineTo(x + 13, y + h * .66);
+      } else {
+        ctx.moveTo(x + w - 5, y + h * .5);
+        ctx.lineTo(x + w - 13, y + h * .34);
+        ctx.lineTo(x + w - 13, y + h * .66);
+      }
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     } else if (item.type === 'meter') {
       const side = Math.min(local.w, local.h);
@@ -16616,6 +16721,19 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function setRampFallDirection(elementId, direction = 'right') {
+    const element = _ensureSiteElements().find(item => item.id === elementId);
+    if (!element || element.type !== 'ramp') {
+      UI.showToast('Seleccione una rampa para cambiar la caida.', 'warning');
+      return;
+    }
+    if (!_assertSiteElementUnlocked(element, 'cambiar la caida')) return;
+    _setRampFallDirection(element, direction);
+    _selectedPlanId = `site::${element.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function rotatePlanBlock(blockId, delta = 15) {
     const block = _blockById(blockId);
     if (!block) {
@@ -16812,8 +16930,13 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === raw.replace('site::', ''));
       if (!element) return;
       if (!_assertSiteElementUnlocked(element, 'voltearlo')) return;
-      if (horizontal) element.flipH = !element.flipH;
-      else element.flipV = !element.flipV;
+      if (element.type === 'ramp' && horizontal) {
+        _setRampFallDirection(element, _oppositeRampFallDirection(element));
+      } else if (horizontal) {
+        element.flipH = !element.flipH;
+      } else {
+        element.flipV = !element.flipV;
+      }
       _selectedPlanId = `site::${element.id}`;
       _saveDraft(false);
       renderSchoolPlan();
@@ -19132,7 +19255,32 @@ const MecFormModule = (() => {
       const cx = rect.x + rect.w / 2;
       const cy = rect.y + rect.h / 2;
       parts.push(`<g transform="rotate(${_escape(rotation)} ${cx} ${cy})">`);
-      if (item.type === 'water_tank' || item.type === 'pillar') {
+      if (item.type === 'ramp') {
+        const fallLeft = _rampFallDirection(item) === 'left';
+        const x = rect.x;
+        const y = rect.y;
+        const w = rect.w;
+        const h = rect.h;
+        const points = fallLeft
+          ? `${x},${y + h} ${x + w},${y + h} ${x + w},${y}`
+          : `${x},${y} ${x + w},${y + h} ${x},${y + h}`;
+        const diag = fallLeft
+          ? { x1: x + w - 8, y1: y + 8, x2: x + 8, y2: y + h - 8 }
+          : { x1: x + 8, y1: y + 8, x2: x + w - 8, y2: y + h - 8 };
+        const arrowStart = fallLeft ? x + w * .72 : x + w * .28;
+        const arrowEnd = fallLeft ? x + w * .24 : x + w * .76;
+        const arrowY = y + h * .58;
+        const head = Math.max(5, Math.min(9, w * .08));
+        const head1 = fallLeft
+          ? { x: arrowEnd + head, y: arrowY - head * .55 }
+          : { x: arrowEnd - head, y: arrowY - head * .55 };
+        const head2 = fallLeft
+          ? { x: arrowEnd + head, y: arrowY + head * .55 }
+          : { x: arrowEnd - head, y: arrowY + head * .55 };
+        parts.push(`<polygon points="${points}" fill="#ffffff" fill-opacity=".78" stroke="${cfg.tone}" stroke-width="2"/>`);
+        parts.push(`<line x1="${diag.x1}" y1="${diag.y1}" x2="${diag.x2}" y2="${diag.y2}" stroke="${cfg.tone}" stroke-width="1.5"/>`);
+        parts.push(`<path d="M ${arrowStart} ${arrowY} L ${arrowEnd} ${arrowY} L ${head1.x} ${head1.y} M ${arrowEnd} ${arrowY} L ${head2.x} ${head2.y}" fill="none" stroke="${cfg.tone}" stroke-width="1.5"/>`);
+      } else if (item.type === 'water_tank' || item.type === 'pillar') {
         parts.push(`<ellipse cx="${rect.x + rect.w / 2}" cy="${rect.y + rect.h / 2}" rx="${rect.w / 2}" ry="${rect.h / 2}" fill="#ffffff" stroke="${cfg.tone}" stroke-width="2"/>`);
       } else if (item.type === 'recreation' && _recreationShapeConfig(item.shape || item.ficha?.forma).court) {
         const x = rect.x;
@@ -19445,6 +19593,7 @@ const MecFormModule = (() => {
     setSiteElementLocked,
     setSiteElementEvidence,
     rotatePlanSiteElement,
+    setRampFallDirection,
     rotatePlanBlock,
     rotatePlanFloor,
     rotatePlanRoom,

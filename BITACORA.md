@@ -4,6 +4,32 @@
 
 ---
 
+## Rampa con caida izquierda/derecha - 2026-05-18 - v2.6.42
+
+### Objetivo
+- Permitir representar una rampa con caida hacia la izquierda o hacia la derecha sin depender del giro general.
+- Hacer que el boton `Voltear H` tenga un efecto claro sobre la rampa.
+
+### Cambios implementados
+- La rampa guarda `sentido_caida` en ficha con opciones `Derecha` e `Izquierda`.
+- El dibujo de la rampa ahora cambia de forma segun la caida y muestra una flecha interna de direccion.
+- El panel contextual y el arbol del plano agregan botones directos `Caida izq.` y `Caida der.` cuando hay una rampa seleccionada.
+- `Voltear H` sobre una rampa alterna la caida izquierda/derecha en lugar de depender de un volteo visual que se perdia al redibujar.
+- Los volteos de elementos exteriores se preservan al normalizar el modelo, manteniendo el comportamiento esperado en otros elementos.
+- El SVG exportado dibuja la rampa con la misma caida visible del canvas.
+- Version y cache actualizados a `v2.6.42`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-schema.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Arrastre directo de ambientes y borrado de bloque padre - 2026-05-18 - v2.6.41
 
 ### Objetivo
