@@ -545,7 +545,10 @@ const GuidedRegisterModule = (() => {
     const activeStep = STEPS[_activeIndex];
     const slide = activeStep ? root.querySelector(`[data-guided-slide="${activeStep.id}"]`) : null;
     if (!deck || !slide) return;
-    deck.style.height = `${Math.max(84, slide.scrollHeight)}px`;
+    const body = slide.querySelector('.guided-slide__body');
+    const footer = slide.querySelector('.guided-slide__footer');
+    const desiredHeight = (body?.scrollHeight || 0) + (footer?.scrollHeight || 0);
+    deck.style.height = `${Math.max(84, desiredHeight)}px`;
   }
 
   function _setCount(root, key, value) {

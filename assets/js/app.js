@@ -350,6 +350,7 @@ const AppController = (() => {
   let _currentModule = null;
   let _mapInitialized = false;
   let _sidebarHideTimer = null;
+  let _sidebarPeekTimer = null;
   let _deferredInstallPrompt = null;
   let _swRegistration = null;
   let _launchHomeResetBound = false;
@@ -474,6 +475,16 @@ const AppController = (() => {
             <span class="nav-label">${mod.label}</span>
           </a>
         </li>`).join('');
+
+    if (APP_CONFIG.SPREADSHEET_URL) {
+      nav.insertAdjacentHTML('beforeend', `
+        <li class="nav-item nav-item--external">
+          <a href="#" onclick="AppController.openWorkbook(); return false;" title="Abrir libro en linea de registros">
+            <span class="nav-icon">LB</span>
+            <span class="nav-label">Libro en linea</span>
+          </a>
+        </li>`);
+    }
   }
 
   function _renderUserBar() {
@@ -701,16 +712,38 @@ const AppController = (() => {
 
     const toggleBtn = document.getElementById('sidebar-toggle');
     const isAutoHidden = () => document.body.classList.contains('sidebar-auto-hidden');
+    const cancelPeekTimer = () => {
+      clearTimeout(_sidebarPeekTimer);
+      _sidebarPeekTimer = null;
+    };
     const show = () => {
       if (!isAutoHidden()) return;
+      cancelPeekTimer();
       clearTimeout(_sidebarHideTimer);
       document.body.classList.add('sidebar-peek');
       sidebar.classList.add('sidebar--open');
       toggleBtn?.setAttribute('aria-expanded', 'true');
       toggleBtn?.setAttribute('aria-label', 'Ocultar menu');
     };
+    const scheduleShow = (event = null) => {
+      if (!isAutoHidden()) return;
+      if (document.body.classList.contains('sidebar-peek')) {
+        show();
+        return;
+      }
+      if (event && event.clientX > 10) {
+        cancelPeekTimer();
+        return;
+      }
+      if (_sidebarPeekTimer) return;
+      _sidebarPeekTimer = setTimeout(() => {
+        _sidebarPeekTimer = null;
+        show();
+      }, 420);
+    };
     const scheduleHide = (delay = 110) => {
       if (!isAutoHidden()) return;
+      cancelPeekTimer();
       clearTimeout(_sidebarHideTimer);
       _sidebarHideTimer = setTimeout(() => {
         document.body.classList.remove('sidebar-peek');
@@ -720,18 +753,20 @@ const AppController = (() => {
       }, delay);
     };
 
-    hotzone.addEventListener('mouseenter', show);
-    hotzone.addEventListener('mousemove', show);
+    hotzone.addEventListener('mouseenter', scheduleShow);
+    hotzone.addEventListener('mousemove', scheduleShow);
+    hotzone.addEventListener('mouseleave', cancelPeekTimer);
     hotzone.addEventListener('touchstart', show, { passive: true });
     sidebar.addEventListener('mouseenter', show);
     sidebar.addEventListener('mouseleave', () => scheduleHide(90));
     sidebar.addEventListener('touchend', () => scheduleHide(180), { passive: true });
     document.addEventListener('mousemove', event => {
       if (!isAutoHidden()) return;
-      if (event.clientX <= 32) {
-        show();
+      if (event.clientX <= 10) {
+        scheduleShow(event);
         return;
       }
+      if (!document.body.classList.contains('sidebar-peek')) cancelPeekTimer();
       if (document.body.classList.contains('sidebar-peek') && event.clientX > sidebar.offsetWidth + 24) {
         scheduleHide(70);
       }

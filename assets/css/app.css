@@ -182,7 +182,7 @@ body.sidebar-auto-hidden #sidebar {
   width: var(--sidebar-width);
   opacity: 0;
   transform: translateX(calc(56px - var(--sidebar-width)));
-  pointer-events: auto;
+  pointer-events: none;
   box-shadow: none;
 }
 
@@ -199,7 +199,7 @@ body.sidebar-auto-hidden.sidebar-peek #sidebar {
   position: fixed;
   top: 0;
   left: 0;
-  width: 32px;
+  width: 10px;
   height: 100vh;
   z-index: 90;
   display: none;
@@ -210,8 +210,6 @@ body.sidebar-auto-hidden #sidebar-hotzone {
   display: block;
 }
 
-body.sidebar-auto-hidden #sidebar-hotzone:hover + #sidebar,
-body.sidebar-auto-hidden #sidebar:hover,
 body.sidebar-auto-hidden.sidebar-peek #sidebar,
 body.sidebar-auto-hidden #sidebar.sidebar--open {
   min-width: var(--sidebar-width);
@@ -3384,6 +3382,7 @@ textarea.form-control {
 
 .guided-track {
   display: flex;
+  align-items: flex-start;
   transition: transform .32s ease;
   will-change: transform;
 }

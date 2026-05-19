@@ -7947,21 +7947,6 @@ const MecFormModule = (() => {
     ctx.lineWidth = selected ? 3 : 2.3;
     ctx.fillRect(object.x, object.y, object.w, object.h);
     ctx.strokeRect(object.x, object.y, object.w, object.h);
-    ctx.strokeStyle = '#b45309';
-    ctx.lineWidth = 1.2;
-    const rows = 3;
-    for (let i = 1; i < rows; i += 1) {
-      const y = object.y + (object.h / rows) * i;
-      ctx.beginPath();
-      ctx.moveTo(object.x + 4, y);
-      ctx.lineTo(object.x + object.w - 4, y);
-      ctx.stroke();
-    }
-    ctx.fillStyle = '#92400e';
-    ctx.font = _canvasFont(900, 8);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('TB', object.x + object.w / 2, object.y + object.h / 2);
     ctx.restore();
     _labelSketchObject(ctx, object, _sketchVisualLabel(object, selected), object.x + object.w / 2, object.y - 14, true);
   }
@@ -12662,32 +12647,7 @@ const MecFormModule = (() => {
   }
 
   function _drawBlockInfrastructureHints(ctx, block, x, y, w, h) {
-    const circulation = String(block?.tipo_circulacion || '').toLowerCase();
-    const hasStair = circulation.includes('escalera') || circulation.includes('ambas');
-    const hasRamp = circulation.includes('rampa') || circulation.includes('ambas');
-    const tablero = String(block?.tablero_estado || '').toLowerCase();
-    const hasBoard = tablero && !tablero.includes('no existe') && !tablero.includes('no visible');
-    const markers = [];
-    if (hasStair) markers.push({ label: 'Esc', tone: '#4b5563', fill: '#f8fafc' });
-    if (hasRamp) markers.push({ label: 'Rmp', tone: '#7c3aed', fill: '#f5f3ff' });
-    // TBL badge removido: el tablero aparece como elemento en el plano
-    if (!markers.length) return;
-    markers.forEach((marker, index) => {
-      const mx = x + w - 38 - index * 42;
-      const my = y + 38;
-      ctx.save();
-      ctx.fillStyle = marker.fill;
-      ctx.strokeStyle = marker.tone;
-      ctx.lineWidth = 1.6;
-      ctx.fillRect(mx, my, 32, 22);
-      ctx.strokeRect(mx, my, 32, 22);
-      ctx.fillStyle = marker.tone;
-      ctx.font = _canvasFont(900, 9);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(marker.label, mx + 16, my + 11);
-      ctx.restore();
-    });
+    return;
   }
 
   function _drawPlanDimensionLabels(ctx, rect, length, width, tone = '#334155') {
@@ -13781,14 +13741,6 @@ const MecFormModule = (() => {
       ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(254,226,226,.92)';
       ctx.fillRect(local.x, local.y, local.w, local.h);
       ctx.strokeRect(local.x, local.y, local.w, local.h);
-      ctx.save();
-      ctx.strokeStyle = cfg.tone;
-      ctx.lineWidth = 1.2;
-      for (let index = 0; index < 3; index += 1) {
-        const bx = local.x + local.w * (.24 + index * .26);
-        ctx.strokeRect(bx - 4, local.y + local.h * .24, 8, local.h * .52);
-      }
-      ctx.restore();
     } else if (item.type === 'grounding') {
       ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(220,252,231,.88)';
       ctx.fillRect(local.x, local.y, local.w, local.h);
@@ -13865,7 +13817,7 @@ const MecFormModule = (() => {
       ctx.stroke();
       ctx.restore();
     }
-    if (showLabel) {
+    if (showLabel && !_siteElementSuppressInlineLabel(item.type)) {
       ctx.fillStyle = cfg.tone;
       ctx.font = _canvasFont(900, 9);
       ctx.textAlign = 'center';
@@ -13873,6 +13825,10 @@ const MecFormModule = (() => {
       ctx.fillText(_truncateLabel(ctx, item.ficha?.codigo || cfg.short, Math.max(20, local.w - 4)), 0, 0);
     }
     ctx.restore();
+  }
+
+  function _siteElementSuppressInlineLabel(type) {
+    return ['stair', 'ramp', 'service_connection', 'meter', 'main_switchboard', 'grounding'].includes(type);
   }
 
   function _drawSketchSiteElements(ctx, logical) {
@@ -14389,10 +14345,6 @@ const MecFormModule = (() => {
           ctx.lineWidth = selected ? 2.2 : 1.4;
           ctx.fillRect(ox, oy, ow, oh);
           ctx.strokeRect(ox, oy, ow, oh);
-          ctx.fillStyle = '#92400e';
-          ctx.font = _canvasFont(900, 7);
-          ctx.textAlign = 'center';
-          ctx.fillText('TB', ox + ow / 2, oy + oh / 2 + 2);
           _drawPlanChildControls(ctx, { id: planObjectId, type: 'sanitary-object-resize', object, rect: objectRect, parentRect, selected, label: _sanitaryDimensionsText(item, object), sanitaryId: item.id, objectId: object.id, tone: '#111827' });
           return;
         }
@@ -14630,10 +14582,6 @@ const MecFormModule = (() => {
           ctx.lineWidth = selected ? 2.2 : 1.5;
           ctx.fillRect(ox, oy, ow, oh);
           ctx.strokeRect(ox, oy, ow, oh);
-          ctx.fillStyle = '#92400e';
-          ctx.font = _canvasFont(900, 7);
-          ctx.textAlign = 'center';
-          ctx.fillText('TB', ox + ow / 2, oy + oh / 2 + 2);
           _drawPlanChildControls(ctx, { id: planObjectId, type: 'class-object-resize', object, rect: objectRect, parentRect, selected, label: _contextDimensionsText(room, object), roomId: room.id, objectId: object.id, tone: '#111827' });
           return;
         }

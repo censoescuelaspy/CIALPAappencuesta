@@ -4,6 +4,34 @@
 
 ---
 
+## Menos espacio vacio, sidebar intencional y simbolos limpios - 2026-05-19 - v2.6.49
+
+### Objetivo
+- Eliminar el espacio blanco innecesario antes del plano vivo.
+- Evitar que el menu lateral aparezca por roces accidentales del cursor.
+- Agregar acceso directo al libro online de registros.
+- Quitar marcas/simbolos decorativos innecesarios al insertar tablero, rampa y elementos tecnicos.
+
+### Cambios implementados
+- El alto del panel de etapa del `Registro guiado` se calcula con el contenido real activo, evitando que un slide anterior deje alto reservado.
+- La pista de slides deja de estirar las tarjetas al alto previo, reduciendo el bloque blanco antes de `Plano vivo`.
+- La zona sensible del menu lateral baja a una franja de borde de 10 px y exige permanencia breve del cursor antes de abrirse.
+- El menu oculto ya no captura eventos con un panel invisible, reduciendo aperturas accidentales.
+- El panel lateral incorpora el boton `Libro en linea`, conectado a `APP_CONFIG.SPREADSHEET_URL`.
+- Se retiran las marcas automaticas `Esc`/`Rmp` sobre el bloque; la escalera o rampa ya existen como elementos ubicables en el plano.
+- Tableros y elementos tecnicos dejan de imprimir letras o detalle interno innecesario; quedan como figuras seleccionables, movibles y dimensionables.
+- Version y cache actualizados a `v2.6.49`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores.
+
+---
+
 ## Inicio de registro desde ficha del mapa - 2026-05-19 - v2.6.48
 
 ### Objetivo
