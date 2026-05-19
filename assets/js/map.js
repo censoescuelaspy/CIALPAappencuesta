@@ -94,6 +94,7 @@ const MapModule = (() => {
           ${e.observaciones ? `<p><b>Observaciones:</b> ${_escape(e.observaciones)}</p>` : ''}
         </div>
         <div class="map-popup__actions">
+          ${canSurvey ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>` : ''}
           ${canSurvey ? `<button class="btn btn-primary btn-sm" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
           <button class="btn btn-outline btn-sm" onclick='MapModule.focusListItem(${idArg})'>Ver en lista</button>
         </div>
@@ -334,7 +335,10 @@ const MapModule = (() => {
         <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
         <p><b>Tiempo estimado:</b> ${_estimateMinutes(e)} min</p>
         <p><b>Estado:</b> <span class="badge badge--${state}">${_escape(APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento)}</span></p>
-        ${Auth.canAccess('encuestador') ? `<button class="btn btn-primary btn-block mt-2" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
+        ${Auth.canAccess('encuestador') ? `
+          <button class="btn btn-success btn-block mt-2" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>
+          <button class="btn btn-primary btn-block mt-2" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>
+        ` : ''}
       </div>`;
     panel.classList.add('map-info-panel--visible');
   }
@@ -485,6 +489,29 @@ const MapModule = (() => {
   function focusListItem(id) {
     _highlightListItem(id);
     AppController.showModule('mapa');
+  }
+
+  function startGuidedRegister(id) {
+    if (!Auth.requireAuth()) return;
+    const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
+    if (!escuela) {
+      UI.showToast('No se encontro la escuela seleccionada en el mapa.', 'warning');
+      return;
+    }
+    _selectedEscuela = escuela;
+    _highlightListItem(escuela.id_escuela);
+    _updateInfoPanel(escuela);
+    const ready = typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function'
+      ? SurveyModule.setCurrentEscuela(escuela)
+      : true;
+    if (!ready) return;
+    AppController.showModule('registro');
+    setTimeout(() => {
+      try {
+        if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
+      } catch { /* non-fatal */ }
+    }, 160);
+    UI.showToast(`Escuela activa: ${escuela.nombre || escuela.codigo_local || escuela.id_escuela}.`, 'success', 4200);
   }
 
   function invalidateSize() {
@@ -655,6 +682,7 @@ const MapModule = (() => {
     clearFilters,
     flyTo,
     focusListItem,
+    startGuidedRegister,
     invalidateSize,
     getMap,
     getEscuelas,

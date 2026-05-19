@@ -4,6 +4,30 @@
 
 ---
 
+## Inicio de registro desde ficha del mapa - 2026-05-19 - v2.6.48
+
+### Objetivo
+- Permitir que, despues de usar `Cambiar escuela`, la ficha del mapa permita iniciar o continuar directamente el registro guiado de la escuela seleccionada.
+
+### Cambios implementados
+- La ficha lateral del mapa agrega el boton `Iniciar/continuar registro` para usuarios con permiso de encuestador.
+- El popup del marcador tambien incorpora `Iniciar/continuar registro`, junto a `Migrar datos al RUE-MEC` y `Ver en lista`.
+- La accion fija la escuela seleccionada como escuela activa del registro sin obligar a pasar por el modulo de migracion RUE-MEC.
+- Si existe una sesion operativa activa de otra escuela, se bloquea el cambio y se avisa que debe cerrarse antes de iniciar otra.
+- Al confirmar la escuela desde el mapa, la app abre `Registro guiado` y refresca el plano vivo con el contexto de la nueva escuela.
+- Version y cache actualizados a `v2.6.48`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores.
+
+---
+
 ## Zoom normal al salir de seleccion y base de calles cercana - 2026-05-19 - v2.6.47
 
 ### Objetivo

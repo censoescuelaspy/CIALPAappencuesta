@@ -164,6 +164,28 @@ const SurveyModule = (() => {
     });
   }
 
+  function setCurrentEscuela(escuela, options = {}) {
+    if (!Auth.requireAuth()) return false;
+    if (!escuela) return false;
+    const incomingId = String(escuela.id_escuela || escuela.codigo_local || '');
+    const currentId = String(_currentEscuela?.id_escuela || _currentEscuela?.codigo_local || '');
+    if (_state === STATE.IN_PROGRESS && currentId && incomingId && currentId !== incomingId) {
+      UI.showAlert('Sesion activa', `Ya existe una sesion activa en "${_currentEscuela?.nombre}". Debe cerrarse antes de iniciar otra.`, 'warning');
+      AppController.showModule('encuesta');
+      return false;
+    }
+    if (incomingId !== currentId) {
+      _stopTimer();
+      _currentSession = null;
+      _moduleLogs = [];
+      _state = STATE.IDLE;
+      _elapsedSeconds = 0;
+    }
+    _currentEscuela = escuela;
+    if (options.render) _renderSurveyPanel();
+    return true;
+  }
+
   async function startSurvey() {
     if (!Auth.requireAuth()) return;
     if (!_currentEscuela) {
@@ -525,6 +547,7 @@ const SurveyModule = (() => {
 
   return {
     selectEscuela,
+    setCurrentEscuela,
     startSurvey,
     endSurvey,
     startModule,
