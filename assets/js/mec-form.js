@@ -1775,6 +1775,7 @@ const MecFormModule = (() => {
       room.blockId = room.blockId || _data.__activeBlockId || '';
       room.floor = _normalizeFloor(room.floor || 'Piso 1');
       room.objects = Array.isArray(room.objects) ? room.objects : [];
+      _ensureClassroomGeometry(room);
     });
     _renumberClassroomsByBlockFloor();
     if (!_activeClassroomId || !_data.__classrooms.some(room => room.id === _activeClassroomId)) {
@@ -2183,7 +2184,7 @@ const MecFormModule = (() => {
     const widthM = Number(width || 5);
     const size = _roomSizeFromDimensions(lengthM, widthM);
     return {
-      id: id || `room_${Date.now()}`,
+      id: id || `room_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       type: 'room',
       x: rect ? Math.round(rect.x) : Math.round((SKETCH_CANVAS.width - size.w) / 2),
       y: rect ? Math.round(rect.y) : Math.round((SKETCH_CANVAS.height - size.h) / 2),
@@ -2226,6 +2227,102 @@ const MecFormModule = (() => {
     return (room?.objects || []).find(object => object.type === 'room') ||
       (room?.objects || []).find(object => object.type === 'sanitary-room') ||
       null;
+  }
+
+  function _defaultRoomMeasure(maxMeasure, preferred, ratio, minimum) {
+    const max = Number(maxMeasure || 0);
+    if (!Number.isFinite(max) || max <= 0) return preferred;
+    const scaled = Math.min(preferred, max * ratio);
+    const floorMinimum = Math.min(minimum, max * .6);
+    return Math.max(.4, Math.min(max * .95, Math.max(floorMinimum, scaled)));
+  }
+
+  function _defaultRoomDimensionsForBlockFloor(blockId = _data.__activeBlockId, floor = _activeFloor()) {
+    const block = _blockById(blockId) || _activeClassroomBlock();
+    const floorRecord = _blockFloorRecord(block, floor);
+    const maxLength = Number(floorRecord?.largo_m || block?.largo_m || 0);
+    const maxWidth = Number(floorRecord?.ancho_m || block?.ancho_m || 0);
+    return {
+      length: _defaultRoomMeasure(maxLength, 7, .42, 2.4).toFixed(2),
+      width: _defaultRoomMeasure(maxWidth, 5, .45, 2).toFixed(2),
+    };
+  }
+
+  function _roomBlockersForBlockFloor(blockId = _data.__activeBlockId, floor = _activeFloor(), excludeRoomId = '') {
+    const normalizedFloor = _normalizeFloor(floor || 'Piso 1');
+    const block = _blockById(blockId);
+    const roomObjects = (_data.__classrooms || [])
+      .filter(room => room.id !== excludeRoomId)
+      .filter(room => (room.blockId || blockId || '') === (blockId || ''))
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === normalizedFloor)
+      .map(room => _roomObjectForClassroom(room))
+      .filter(Boolean);
+    const sanitaryObjects = (_data.__sanitaries || [])
+      .filter(item => _matchesBlockReference(item.bloque, block))
+      .filter(item => _normalizeFloor(item.planta || 'Piso 1') === normalizedFloor)
+      .map(item => _sanitaryRoomObject(item))
+      .filter(Boolean);
+    return [...roomObjects, ...sanitaryObjects];
+  }
+
+  function _syncClassroomGeometryToActiveSketch(room) {
+    if (!room || room.id !== _activeClassroomId || _data.__classroomSketch?.id !== room.id) return;
+    _data.__classroomSketch.length = room.length;
+    _data.__classroomSketch.width = room.width;
+    _data.__classroomSketch.objects = JSON.parse(JSON.stringify(room.objects || []));
+  }
+
+  function _ensureClassroomGeometry(room) {
+    if (!room) return null;
+    room.objects = Array.isArray(room.objects) ? room.objects : [];
+    const blockId = room.blockId || _data.__activeBlockId;
+    const floor = room.floor || _activeFloor();
+    const block = _blockById(blockId) || _activeClassroomBlock();
+    const floorRecord = _blockFloorRecord(block, floor);
+    const maxLength = Number(floorRecord?.largo_m || block?.largo_m || 0);
+    const maxWidth = Number(floorRecord?.ancho_m || block?.ancho_m || 0);
+    const blockers = _roomBlockersForBlockFloor(blockId, floor, room.id);
+    const defaults = _defaultRoomDimensionsForBlockFloor(blockId, floor);
+    const existing = _roomObjectForClassroom(room);
+    if (existing) {
+      const bounds = _sketchBlockRect();
+      const overlaps = _rectOverlapsAny(existing, blockers, 0);
+      const fillsFloor = blockers.length && (
+        existing.w >= bounds.w * .95 ||
+        existing.h >= bounds.h * .95 ||
+        (maxLength && Number(room.length || 0) >= maxLength * .95) ||
+        (maxWidth && Number(room.width || 0) >= maxWidth * .95)
+      );
+      if (fillsFloor) {
+        const previous = { x: existing.x, y: existing.y, w: existing.w, h: existing.h };
+        room.length = defaults.length;
+        room.width = defaults.width;
+        const rect = _suggestRoomRectForNewClassroom(room.length, room.width, room.id, blockId, floor);
+        existing.x = rect.x;
+        existing.y = rect.y;
+        existing.w = rect.w;
+        existing.h = rect.h;
+        _scaleSketchChildrenToRoom(room.objects, existing, previous);
+        _syncClassroomGeometryToActiveSketch(room);
+      } else if (overlaps) {
+        const rect = _resolveRectOverlapInBounds(existing, blockers, bounds, 0);
+        if (!_rectOverlapsAny(rect, blockers, 0)) {
+          existing.x = rect.x;
+          existing.y = rect.y;
+          existing.w = rect.w;
+          existing.h = rect.h;
+          _syncClassroomGeometryToActiveSketch(room);
+        }
+      }
+      return existing;
+    }
+    if (!Number(room.length || 0) || (blockers.length && maxLength && Number(room.length || 0) >= maxLength * .95)) room.length = defaults.length;
+    if (!Number(room.width || 0) || (blockers.length && maxWidth && Number(room.width || 0) >= maxWidth * .95)) room.width = defaults.width;
+    const rect = _suggestRoomRectForNewClassroom(room.length, room.width, room.id, blockId, floor);
+    const object = _buildRoomObjectFromDimensions(room.length, room.width, null, rect);
+    room.objects.unshift(object);
+    _syncClassroomGeometryToActiveSketch(room);
+    return object;
   }
 
   function _clonePlanShape(shape) {
@@ -2342,14 +2439,17 @@ const MecFormModule = (() => {
     return _layoutPlanRooms(source, 58, 82, SKETCH_CANVAS.width - 116, SKETCH_CANVAS.height - 166);
   }
 
-  function _suggestRoomRectForNewClassroom(length, width) {
+  function _suggestRoomRectForNewClassroom(length, width, excludeRoomId = _activeClassroomId, blockId = _data.__activeBlockId, floor = _activeFloor()) {
     const blockRect = _sketchBlockRect();
-    const size = _roomSizeFromDimensions(Number(length || 7), Number(width || 5));
+    const block = _blockById(blockId) || _activeClassroomBlock();
+    const size = _roomSizeFromDimensionsForBlock(block, Number(length || 7), Number(width || 5));
     const roomBlockers = _sketchRoomsForActiveBlockFloor()
-      .filter(room => room.id !== _activeClassroomId)
+      .filter(room => room.id !== excludeRoomId)
+      .filter(room => (room.blockId || blockId || '') === (blockId || ''))
+      .filter(room => _normalizeFloor(room.floor || 'Piso 1') === _normalizeFloor(floor || 'Piso 1'))
       .map(room => _roomObjectForClassroom(room))
       .filter(Boolean);
-    const blockers = _otherRoomObjectsForActiveFloor(_activeClassroomId);
+    const blockers = _roomBlockersForBlockFloor(blockId, floor, excludeRoomId);
     const padding = 10;
     const clampedSize = {
       w: Math.min(size.w, blockRect.w - padding * 2),
@@ -2388,6 +2488,39 @@ const MecFormModule = (() => {
     const room = _buildRoomObjectFromDimensions(_data.__classroomSketch.length, _data.__classroomSketch.width, null, rect);
     _data.__classroomSketch.objects.unshift(room);
     return room;
+  }
+
+  function _resizeActiveRoomGeometryFromDimensions() {
+    const sketch = _data.__classroomSketch || {};
+    if (!sketch.id) return;
+    _ensureSketchObjects();
+    const length = Number(sketch.length || 0);
+    const width = Number(sketch.width || 0);
+    if (!length || !width) return;
+    let object = _roomObjectForClassroom(sketch);
+    if (!object) {
+      const rect = _suggestRoomRectForNewClassroom(length, width, sketch.id, sketch.blockId || _data.__activeBlockId, sketch.floor || _activeFloor());
+      object = _buildRoomObjectFromDimensions(length, width, null, rect);
+      sketch.objects.unshift(object);
+      _selectedSketchObjectId = object.id;
+      return;
+    }
+    const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
+    const size = _roomSizeFromDimensions(length, width);
+    const target = _clampRectToBlock({
+      x: object.x,
+      y: object.y,
+      w: size.w,
+      h: size.h,
+    });
+    const resolved = _resolveRoomOverlap(object, target);
+    object.x = resolved.x;
+    object.y = resolved.y;
+    object.w = resolved.w;
+    object.h = resolved.h;
+    object.label = `${length}m x ${width}m`;
+    _scaleSketchChildrenToRoom(sketch.objects, object, previous);
+    _reflowAttachedOpenings(object);
   }
 
   function _rectsOverlap(a, b, gap = 0) {
@@ -2588,6 +2721,9 @@ const MecFormModule = (() => {
     const floor = _activeFloor();
     const nextNumber = _nextRoomLikeNumber(cfg.id, _data.__activeBlockId || '', floor);
     _activeClassroomId = `${cfg.id}_${Date.now()}`;
+    const defaults = _defaultRoomDimensionsForBlockFloor(_data.__activeBlockId || '', floor);
+    const rect = _suggestRoomRectForNewClassroom(defaults.length, defaults.width, _activeClassroomId, _data.__activeBlockId || '', floor);
+    const roomObject = _buildRoomObjectFromDimensions(defaults.length, defaults.width, null, rect);
     _data.__classroomSketch = {
       id: _activeClassroomId,
       name: `${cfg.label} ${nextNumber}`,
@@ -2597,20 +2733,20 @@ const MecFormModule = (() => {
       spaceLabel: cfg.label,
       rotationDeg: 0,
       rotacion_grados: '0',
-      length: '',
-      width: '',
+      length: defaults.length,
+      width: defaults.width,
       estado: 'Operativa',
       openings: '',
-      objects: [],
+      objects: [roomObject],
     };
     _data.__classrooms.push(_cloneClassroom(_data.__classroomSketch));
     _syncActiveClassroomFromSketch();
     _startTimeLog('ambiente', _activeClassroomId, _data.__classroomSketch.name || cfg.label);
-    _selectedSketchObjectId = null;
+    _selectedSketchObjectId = roomObject.id;
     _requestSketchCenter();
     _saveDraft(false);
     _render();
-    UI.showToast(`${cfg.label} creada sin geometria. Complete estado/medidas y pulse Dibujar base si corresponde.`, 'success');
+    UI.showToast(`${cfg.label} creada con base editable. Ajuste medidas o arrastrela en el plano.`, 'success');
   }
 
   function newClassroom() {
@@ -10408,6 +10544,7 @@ const MecFormModule = (() => {
     _data.__classroomSketch = _data.__classroomSketch || {};
     if (field === 'floorNumber') _setActiveFloor(value);
     else _data.__classroomSketch[field] = value;
+    if (field === 'length' || field === 'width') _resizeActiveRoomGeometryFromDimensions();
     if (field === 'blockId') {
       _data.__activeBlockId = value;
       const block = _blockById(value);
@@ -13611,7 +13748,7 @@ const MecFormModule = (() => {
     const fallback = [];
     const mapped = [];
     rooms.forEach(room => {
-      const object = _roomObjectForClassroom(room);
+      const object = _roomObjectForClassroom(room) || _ensureClassroomGeometry(room);
       if (!object) {
         fallback.push(room);
         return;

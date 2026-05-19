@@ -4,6 +4,31 @@
 
 ---
 
+## Aulas nuevas con geometria editable - 2026-05-18 - v2.6.40
+
+### Objetivo
+- Corregir que la segunda aula pudiera quedar como fallback visual ocupando todo el piso.
+- Asegurar que cada aula/espacio nuevo nazca con un rectangulo propio, editable, movible y sin solaparse con aulas o sanitarios existentes.
+
+### Cambios implementados
+- `Nueva aula` y `Agregar otro espacio` ahora crean inmediatamente una base geometrica con medidas iniciales acotadas al bloque/piso.
+- La ubicacion sugerida usa aulas y sanitarios del mismo bloque/piso como bloqueadores y prioriza posiciones topeadas al ultimo ambiente existente.
+- Las aulas antiguas o guardadas sin objeto `room` se reparan al renderizar: reciben medidas por defecto, rectangulo propio y dejan de entrar al layout fallback que llenaba el piso.
+- Si un aula sin geometria venia con largo/ancho iguales al piso y ya existen otros ambientes, se reduce a una medida editable para evitar solape.
+- Al modificar `Largo` o `Ancho` desde la ficha, el rectangulo del aula se redimensiona y reacomoda sin esperar a pulsar `Dibujar base`.
+- Version y cache actualizados a `v2.6.40`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-schema.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Orientacion de rampa y altas sin solape - 2026-05-18 - v2.6.39
 
 ### Objetivo
