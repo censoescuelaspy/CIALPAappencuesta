@@ -11397,6 +11397,7 @@ const MecFormModule = (() => {
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', ${-_blockRotationDeg(block)})` },
+          { label: 'Borrar bloque', tone: 'btn-danger', onClick: `MecFormModule.deletePlanBlock('${_escape(block.id)}')` },
         ],
       };
     }
@@ -11420,6 +11421,7 @@ const MecFormModule = (() => {
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}', ${-_floorRotationDeg(floor)})` },
           { label: 'Eliminar piso', tone: 'btn-danger', onClick: `MecFormModule.deletePlanFloor('${_escape(block.id)}', '${_escape(floor.id || floorId)}')` },
+          { label: 'Borrar bloque', tone: 'btn-danger', onClick: `MecFormModule.deletePlanBlock('${_escape(block.id)}')` },
         ],
       };
     }
@@ -11450,6 +11452,7 @@ const MecFormModule = (() => {
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanRoom('${_escape(room.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanRoom('${_escape(room.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanRoom('${_escape(room.id)}', ${-_roomRotationDeg(room)})` },
+          ...(block ? [{ label: 'Borrar bloque', tone: 'btn-danger', onClick: `MecFormModule.deletePlanBlock('${_escape(block.id)}')` }] : []),
         ],
       };
     }
@@ -11458,6 +11461,7 @@ const MecFormModule = (() => {
       const sanitaryId = parts[1] || '';
       const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
       if (!item) return fallback;
+      const block = _blockForSanitary(item);
       if (parts[2]) {
         const object = (item.objects || []).find(child => child.id === parts[2]);
         if (!object) return fallback;
@@ -11493,6 +11497,7 @@ const MecFormModule = (() => {
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSanitary('${_escape(item.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSanitary('${_escape(item.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanSanitary('${_escape(item.id)}', ${-_sanitaryRotationDeg(item)})` },
+          ...(block ? [{ label: 'Borrar bloque', tone: 'btn-danger', onClick: `MecFormModule.deletePlanBlock('${_escape(block.id)}')` }] : []),
         ],
       };
     }
@@ -11567,6 +11572,19 @@ const MecFormModule = (() => {
       ? 'Modo mover activo. Arrastre bloques, pisos y otros espacios del plano general.'
       : 'Plano bloqueado: navegar y seleccionar no mueve elementos.',
       _planMoveMode ? 'info' : 'success');
+  }
+
+  async function deletePlanBlock(blockId = _data.__activeBlockId) {
+    const block = _blockById(blockId);
+    if (!block) {
+      UI.showToast('Seleccione un bloque para eliminarlo.', 'warning');
+      return;
+    }
+    _data.__activeBlockId = block.id;
+    const { id: _id, ...values } = block;
+    _data.bloques = values;
+    _selectedPlanId = `block::${block.id}`;
+    await deleteActiveBlock();
   }
 
   function _selectedPlanTreeContext(id = _selectedPlanId) {
@@ -17257,9 +17275,10 @@ const MecFormModule = (() => {
       isClassObjectArea(area) ||
       isSanitaryObjectArea(area)
     ));
+    const directDragTypes = ['site-element', 'room', 'sanitary'];
     const canDragPlanArea = area => Boolean(
       isPlanMovableArea(area) &&
-      (_planMoveMode || area.type === 'site-element' || area.id === _selectedPlanId)
+      (_planMoveMode || directDragTypes.includes(area.type) || area.id === _selectedPlanId)
     );
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
     const angleFromCenter = (center, point) => (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
@@ -19435,6 +19454,7 @@ const MecFormModule = (() => {
     flipSelectedPlanItem,
     nudgeSelectedPlanItem,
     deletePlanFloor,
+    deletePlanBlock,
     newPlanClassroom,
     addPlanSanitary,
     deletePlanSelection,

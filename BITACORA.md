@@ -4,6 +4,30 @@
 
 ---
 
+## Arrastre directo de ambientes y borrado de bloque padre - 2026-05-18 - v2.6.41
+
+### Objetivo
+- Permitir mover aulas y sanitarios sin depender de activar previamente `Mover`.
+- Hacer accesible el borrado del bloque aunque el piso, aula o sanitario cubra la zona clickeable del bloque.
+
+### Cambios implementados
+- Aulas/espacios y sanitarios ahora inician arrastre directo al mover el puntero sobre ellos, igual que los elementos exteriores.
+- Se mantiene el umbral de movimiento antes de arrastrar para conservar el click simple como seleccion.
+- Se agrego `Borrar bloque` al panel contextual cuando esta seleccionado el bloque, un piso, un aula/espacio o un sanitario del bloque.
+- Nueva accion `deletePlanBlock(blockId)` selecciona el bloque padre correcto y reutiliza la confirmacion existente de `deleteActiveBlock()`.
+- Version y cache actualizados a `v2.6.41`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-schema.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Aulas nuevas con geometria editable - 2026-05-18 - v2.6.40
 
 ### Objetivo
