@@ -4,6 +4,28 @@
 
 ---
 
+## Encabezado unico de escuela en plano vivo - 2026-05-19 - v2.6.46
+
+### Objetivo
+- Eliminar la tarjeta duplicada de `Escuela activa` dentro del registro guiado.
+- Dejar el cambio de escuela en la misma zona compacta de `Plano vivo`.
+
+### Cambios implementados
+- El plano embebido en `Registro guiado` ya no renderiza la barra interna `Escuela activa`, porque el dato ya esta en el encabezado de `Plano vivo`.
+- Se agrego el boton `Cambiar escuela` al encabezado de `Plano vivo`, junto al nombre/codigo/ubicacion de la escuela.
+- En `Plano escuela` y cuestionario MEC se conserva la barra de escuela activa para no perder contexto cuando esas vistas se usan fuera del registro guiado.
+- Se ajusto el encabezado en pantallas angostas para que escuela, estado de guardado y boton no se superpongan.
+- Version y cache actualizados a `v2.6.46`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores.
+
+---
+
 ## Claridad del flujo inicial y zoom de seleccion - 2026-05-19 - v2.6.45
 
 ### Objetivo

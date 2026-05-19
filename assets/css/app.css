@@ -3804,6 +3804,29 @@ textarea.form-control {
   white-space: nowrap;
 }
 
+.guided-plan-panel__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .45rem;
+  min-width: 0;
+}
+
+.guided-plan-panel__school-action {
+  min-height: 30px;
+  border-color: rgba(255,255,255,.42);
+  background: rgba(255,255,255,.1);
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.guided-plan-panel__school-action:hover,
+.guided-plan-panel__school-action:focus-visible {
+  border-color: #ffffff;
+  background: rgba(255,255,255,.18);
+  color: #ffffff;
+}
+
 .guided-plan-surface {
   max-height: none;
   overflow: auto;
@@ -3952,6 +3975,14 @@ textarea.form-control {
 @media (max-width: 760px) {
   .guided-register {
     padding: .65rem;
+  }
+
+  .guided-plan-panel__header {
+    grid-template-columns: 1fr;
+  }
+
+  .guided-plan-panel__actions {
+    justify-content: space-between;
   }
 
   .guided-register__header {

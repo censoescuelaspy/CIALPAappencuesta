@@ -173,7 +173,10 @@ const GuidedRegisterModule = (() => {
                 <strong data-guided-school-name>Sin escuela seleccionada</strong>
                 <small data-guided-school-meta>Seleccione una escuela desde el mapa antes de iniciar la carga.</small>
               </div>
-              <small data-guided-save-state>Sin borrador</small>
+              <div class="guided-plan-panel__actions">
+                <small data-guided-save-state>Sin borrador</small>
+                <button class="btn btn-sm guided-plan-panel__school-action" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
+              </div>
             </div>
             <div id="guided-school-plan-root" class="guided-plan-surface" data-school-plan-root></div>
           </aside>

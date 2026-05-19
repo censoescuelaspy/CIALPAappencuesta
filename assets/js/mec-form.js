@@ -11125,7 +11125,7 @@ const MecFormModule = (() => {
 
     root.innerHTML = `
       <div class="school-plan">
-        ${_renderSchoolContextBar(true)}
+        ${root.id === 'guided-school-plan-root' ? '' : _renderSchoolContextBar(true)}
         ${_renderPlanBuilderPanel()}
 
         <section class="school-plan__layout">
