@@ -20,6 +20,7 @@
 - `escuelas_seleccionadas` agrega columnas de ultimo borrador MEC para ubicar rapidamente si una escuela ya subio datos desde la tablet.
 - Los mensajes de `Datos en Sheets` aclaran que durante la carga se debe revisar `mec_borradores`, fotos en `evidencias` y cierres en `entregas_cierre`.
 - Version y cache actualizados a `v2.6.53`.
+- Backend GAS subido con `clasp` y deployment de produccion actualizado a `@12`.
 
 ### Validaciones ejecutadas
 - `node --check assets/js/mec-form.js`.
@@ -30,6 +31,8 @@
 - `node --check sw.js`.
 - Validacion sintactica de `gas/*.gs` mediante Node.
 - `git diff --check`.
+- `clasp push -f`.
+- `clasp deploy -i AKfycbxmfkifnwz3WoaCzzTAmQO0TuvRwenmiJY3GSdEYqi564TtoCbEOTzD7CTgK4-vaOWKjQ -d "CIALPA v2.6.53 guardado visible en Sheets"`.
 
 ---
 
