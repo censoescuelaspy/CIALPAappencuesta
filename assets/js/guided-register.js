@@ -148,15 +148,6 @@ const GuidedRegisterModule = (() => {
   function _render(root) {
     root.innerHTML = `
       <section class="guided-register" aria-label="Registro guiado CIALPA">
-        <section class="guided-school-context" aria-label="Escuela activa del registro">
-          <div>
-            <span>Escuela activa</span>
-            <strong data-guided-school-name>Sin escuela seleccionada</strong>
-            <small data-guided-school-meta>Seleccione una escuela desde el mapa antes de iniciar la carga.</small>
-          </div>
-          <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
-        </section>
-
         <nav class="guided-steps" aria-label="Etapas del registro guiado">
           ${STEPS.map((step, index) => `
             <button class="guided-step" type="button" data-guided-step="${index}" aria-current="${index === _activeIndex ? 'step' : 'false'}">
@@ -177,9 +168,10 @@ const GuidedRegisterModule = (() => {
 
           <aside class="guided-plan-panel" aria-label="Plano vivo del registro">
             <div class="guided-plan-panel__header">
-              <div>
+              <div class="guided-plan-panel__identity">
                 <span>Plano vivo</span>
-                <strong data-guided-plan-title>Escuela en construccion</strong>
+                <strong data-guided-school-name>Sin escuela seleccionada</strong>
+                <small data-guided-school-meta>Seleccione una escuela desde el mapa antes de iniciar la carga.</small>
               </div>
               <small data-guided-save-state>Sin borrador</small>
             </div>
@@ -741,11 +733,94 @@ const GuidedRegisterModule = (() => {
   }
 
   function _activeGuidedQuestion(stepId, snap = _snapshot()) {
+    if (stepId === 'escuela') return _schoolQuestion(snap);
+    if (stepId === 'predio') return _predioQuestion(snap);
     if (stepId === 'bloques') return _blockQuestion(snap);
     if (stepId === 'ambientes') return _classroomQuestion(snap);
     if (stepId === 'sanitarios') return _sanitaryQuestion(snap);
     if (stepId === 'exteriores') return _siteQuestion(snap);
     return null;
+  }
+
+  function _schoolQuestion(snap) {
+    if (!snap.school.name) {
+      return _question(
+        'Declaracion inicial',
+        'Seleccione o identifique la escuela',
+        'Antes de dibujar, confirme cual es la escuela del relevamiento. Ese dato identifica el plano, las fotos, los bloques, las aulas y la salida PDF.',
+        [
+          { label: 'Elegir en mapa', action: 'module', value: 'mapa', primary: true },
+          { label: 'Datos generales', action: 'stage', value: 'general' },
+          { label: 'Usar ejemplo', action: 'demo' },
+        ],
+        false,
+        '',
+        'Verifique codigo, nombre, departamento, distrito y localidad. Si esta en campo, confirme con la institucion que corresponde al establecimiento visitado antes de cargar mediciones. Si no hay conexion o la escuela no aparece, use Datos generales para dejar identificacion manual y luego continue el plano.',
+        true
+      );
+    }
+    if (!snap.savedAtText) {
+      return _question(
+        'Declaracion inicial',
+        'Declare jornada y responsable de carga',
+        'Complete o revise datos generales y jornada antes de medir. La escuela ya esta identificada, pero falta dejar guardado el contexto operativo.',
+        [
+          { label: 'Datos generales', action: 'stage', value: 'general', primary: true },
+          { label: 'Mi jornada', action: 'module', value: 'jornada' },
+          { label: 'Siguiente', action: 'next' },
+        ],
+        false,
+        '',
+        'Registre fecha de visita, turno o jornada, responsable/encuestador y cualquier observacion inicial de acceso. Estos datos ayudan a reconstruir tiempos, saber quien cargo el relevamiento y vincular evidencia fotografica con la escuela correcta.',
+        false
+      );
+    }
+    return _question(
+      'Listo',
+      'Escuela y jornada identificadas',
+      'El contexto de la carga ya quedo disponible. Ahora prepare el predio base o avance a bloques si no necesita base de calles/coordenadas.',
+      [
+        { label: 'Siguiente', action: 'next', primary: true },
+        { label: 'Mapa', action: 'module', value: 'mapa' },
+      ],
+      true,
+      '',
+      'Mantenga visible el nombre de escuela en Plano vivo: todo lo que agregue desde ahora se vincula a este establecimiento. Si detecta que no es la escuela correcta, vuelva al mapa antes de crear nuevos objetos.',
+      false
+    );
+  }
+
+  function _predioQuestion(snap) {
+    if (!snap.baseMapSaved) {
+      return _question(
+        'Plano de partida',
+        'Declare la referencia del predio',
+        'Defina si usara calles/coordenadas como ayuda visual. No es obligatorio, pero mejora la ubicacion de bloques, accesos, patios, tanques y exteriores.',
+        [
+          { label: 'Calles/lineas', action: 'basemap', primary: true },
+          { label: 'Usar coordenadas', action: 'coords' },
+          { label: 'Guardar base', action: 'saveBasemap' },
+          { label: 'Siguiente', action: 'next' },
+        ],
+        false,
+        '',
+        'Use la base solo como referencia: el plano tecnico final lo construye con medidas reales. Si la escuela tiene coordenadas, pulse Usar coordenadas, ajuste la base si hace falta y luego Guardar base. Si no hay internet o la imagen no ayuda, continue sin base y dibuje bloques a escala con las medidas relevadas.',
+        false
+      );
+    }
+    return _question(
+      'Listo',
+      'Predio base confirmado',
+      'La referencia del predio quedo guardada. Ya puede implantar bloques y exteriores con mas seguridad.',
+      [
+        { label: 'Siguiente', action: 'next', primary: true },
+        { label: 'Revisar base', action: 'basemap' },
+      ],
+      true,
+      '',
+      'La base guardada permite volver a la misma referencia despues de cerrar o actualizar la app. Revise que el norte visual, calles y ubicacion general sean coherentes antes de cargar muchos objetos.',
+      false
+    );
   }
 
   function _blockQuestion(snap) {
@@ -975,8 +1050,17 @@ const GuidedRegisterModule = (() => {
     );
   }
 
-  function _question(kicker, title, body, actions = [], done = false, control = '') {
-    return { kicker, title, body, actions, done, control, blocking: !done };
+  function _question(kicker, title, body, actions = [], done = false, control = '', info = '', blocking) {
+    return {
+      kicker,
+      title,
+      body,
+      actions,
+      done,
+      control,
+      info,
+      blocking: blocking === undefined ? !done : Boolean(blocking),
+    };
   }
 
   function _firstPendingRequirement(items = []) {
@@ -1151,11 +1235,16 @@ const GuidedRegisterModule = (() => {
   }
 
   function _guidedQuestionCard(question) {
+    const info = _guidedQuestionInfo(question);
     return `
       <section class="guided-next-card guided-next-card--question ${question.done ? 'guided-next-card--done' : ''}">
         <span>${_escape(question.kicker)}</span>
         <strong>${_escape(question.title)}</strong>
         <p>${_escape(question.body)}</p>
+        <details class="guided-info-note">
+          <summary><span aria-hidden="true">i</span><strong>Ayuda de campo</strong></summary>
+          <p>${_escape(info)}</p>
+        </details>
         ${question.control || ''}
         <div>
           ${question.actions.map(action => `
@@ -1166,6 +1255,14 @@ const GuidedRegisterModule = (() => {
             </button>`).join('')}
         </div>
       </section>`;
+  }
+
+  function _guidedQuestionInfo(question = {}) {
+    if (question.info) return question.info;
+    if (question.done) {
+      return 'Este punto ya esta completo para avanzar. Puede volver a abrir la ficha o el plano si necesita corregir datos antes de exportar o sincronizar.';
+    }
+    return 'Complete la accion principal antes de avanzar. La informacion de calidad, estado y caracteristicas mejora la auditoria y el PDF, pero la ficha queda disponible para revisar o ampliar datos despues de ubicar el elemento en el plano.';
   }
 
   function _numberControl(name, label, min = '0', value = '') {

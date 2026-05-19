@@ -11175,8 +11175,7 @@ const MecFormModule = (() => {
     const title = context?.title || 'Elemento seleccionado';
     return `
       <div class="school-plan-floating-actions" aria-label="Acciones rapidas del elemento seleccionado">
-        <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openPlanSelection()">Ficha</button>
-        <span>${_escape(title)}</span>
+        <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openPlanSelection()" title="Abrir ficha de ${_escape(title)}">Ficha</button>
       </div>`;
   }
 
@@ -17615,11 +17614,8 @@ const MecFormModule = (() => {
     const selectArea = area => {
       if (!area) return;
       suppressClick = true;
-      const alreadySelected = _selectedPlanId === area.id;
       selectPlanItem(area.id);
-      if (area.type === 'site-element' && alreadySelected) {
-        setTimeout(() => openSiteElementFicha(area.siteId), 80);
-      }
+      _focusSchoolPlanArea(area);
       setTimeout(() => { suppressClick = false; }, 120);
     };
     const isSelectableArea = area => Boolean(area?.id);
@@ -18016,8 +18012,6 @@ const MecFormModule = (() => {
           lastTap = null;
           suppressClickUntil = now + 450;
           selectArea(area);
-          _focusSchoolPlanArea(area);
-          setTimeout(() => editAreaFicha(area), 180);
           return;
         }
         lastTap = { id: area.id, time: now, x: point.x, y: point.y };
@@ -18050,8 +18044,6 @@ const MecFormModule = (() => {
       if (!area) return;
       event.preventDefault();
       selectArea(area);
-      _focusSchoolPlanArea(area);
-      setTimeout(() => editAreaFicha(area), 180);
     });
     canvas.addEventListener('wheel', event => {
       if (!event.ctrlKey && !event.metaKey) return;

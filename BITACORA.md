@@ -4,6 +4,33 @@
 
 ---
 
+## Claridad del flujo inicial y zoom de seleccion - 2026-05-19 - v2.6.45
+
+### Objetivo
+- Integrar la escuela activa en el encabezado del plano sin ocupar una banda extra.
+- Hacer que la seleccion del plano centre y acerque el objeto antes de editar.
+- Aclarar que se debe declarar en `Escuela y jornada` y `Predio base`.
+
+### Cambios implementados
+- El nombre/codigo de la escuela se muestra junto a `Plano vivo`, con la ubicacion en la misma cabecera compacta.
+- Se elimino la banda separada de `Escuela activa` dentro del registro guiado para recuperar alto util.
+- El boton `Ficha` del elemento seleccionado queda como accion flotante sobre el canvas y ya no ocupa espacio de layout.
+- Las solicitudes iniciales explican claramente que declarar: escuela/codigo/jornada/responsable y referencia opcional del predio.
+- Todas las tarjetas de solicitud guiada incorporan ayuda desplegable `(i)` con criterio de campo y explicacion operativa.
+- Al seleccionar, hacer doble clic o doble toque sobre un objeto del plano, el sistema centra y ajusta zoom sin abrir la ficha automaticamente.
+- La ficha queda disponible desde el boton flotante para editar cuando el usuario ya tiene el elemento a la vista.
+- Version y cache actualizados a `v2.6.45`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores.
+
+---
+
 ## Ajustes de flujo guiado, logistica y edicion tactil - 2026-05-19 - v2.6.44
 
 ### Objetivo
