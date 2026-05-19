@@ -320,6 +320,8 @@ const GuidedRegisterModule = (() => {
     if (action === 'confirmClassroomConfigured') return _confirmClassroomConfigured(value);
     if (action === 'confirmSanitaryConfigured') return _confirmSanitaryConfigured(value);
     if (action === 'confirmSiteConfigured') return _confirmSiteConfigured(value);
+    if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
+    if (action === 'workbook') return (typeof AppController !== 'undefined' && AppController.openWorkbook) ? AppController.openWorkbook() : null;
     if (action === 'selectPlanItem') return _selectPlanItem(value);
     if (action === 'module') return _openModule(value);
     if (action === 'stage') return _openMecStage(value);
@@ -674,7 +676,10 @@ const GuidedRegisterModule = (() => {
       : true;
     const blockReadyForRooms = Boolean(activeBlock && blockHasMeasures && blockPositioned && activeFloors.length && activeFloorsReady);
     const classroomTargetKey = _targetKeyParts(blockId, activeFloorLabel, 'classrooms');
+    const savedAtText = _formatDate(saved.savedAt);
+    const completion = _completionStatus(values, savedAtText, school);
     return {
+      values,
       blocks: blocks.length,
       classrooms,
       otherSpaces,
@@ -682,8 +687,9 @@ const GuidedRegisterModule = (() => {
       siteElements: siteElements.length,
       evidence: _countEvidence(values),
       baseMapSaved: Boolean(values.__planBaseMap?.confirmed || values.__planBaseMap?.savedAt),
-      savedAtText: _formatDate(saved.savedAt),
+      savedAtText,
       school,
+      completion,
       planTitle: activeBlock?.bloque_codigo || school.name || values.general?.nombre_institucion || 'Escuela en construccion',
       activeBlock,
       activeFloors,
@@ -708,6 +714,130 @@ const GuidedRegisterModule = (() => {
     };
   }
 
+  function _completionStatus(values = {}, savedAtText = '', school = {}) {
+    const blocks = Array.isArray(values.__blocks) ? values.__blocks : [];
+    const rooms = Array.isArray(values.__classrooms) ? values.__classrooms : [];
+    const sanitaries = Array.isArray(values.__sanitaries) ? values.__sanitaries : [];
+    const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];
+    const pending = [];
+    const add = (scope, title, detail = '', action = '', value = '') => {
+      pending.push({ scope, title, detail, action, value });
+    };
+    const labelBlock = block => block?.bloque_codigo || block?.nombre || block?.id || 'Bloque';
+    const labelFloor = floor => _floorLabel(floor) || 'Piso';
+    const flag = (blockId, floorLabel, name) => _flagValue(_flagKeyParts(blockId, floorLabel, name));
+
+    if (!school.name && !school.code) add('Escuela', 'Identificar escuela', 'Falta codigo o nombre de la escuela.', 'module', 'mapa');
+    if (!savedAtText) add('Escuela', 'Guardar contexto inicial', 'Guarde datos generales, jornada o responsable de carga.', 'stage', 'general');
+    if (!blocks.length) add('Bloques', 'Crear al menos un bloque', 'El relevamiento no tiene estructura arquitectonica.', 'guidedBlock');
+
+    blocks.forEach(block => {
+      const blockLabel = labelBlock(block);
+      _blockRequirementItems(block)
+        .filter(item => !item.done && !item.optional)
+        .forEach(item => add(blockLabel, item.title, item.help || '', 'blockFicha'));
+      if (!_hasPosition(block?.planPosition || block?.plano_general)) {
+        add(blockLabel, 'Ubicar bloque en plano', 'Arrastre el bloque sobre la referencia del predio.', 'positionBlock');
+      }
+
+      const floors = Array.isArray(block?.floors) ? block.floors : [];
+      const noFloor = flag(block?.id, 'Piso 1', 'noFloor');
+      if (!floors.length && !noFloor) {
+        add(blockLabel, 'Responder si tiene piso', 'Agregue un piso o marque que no corresponde.', 'floorGuide');
+      }
+      floors.forEach(floor => {
+        const floorLabel = labelFloor(floor);
+        _floorRequirementItems(floor)
+          .filter(item => !item.done && !item.optional)
+          .forEach(item => add(`${blockLabel} / ${floorLabel}`, item.title, item.help || '', item.plan ? 'selectPlanItem' : 'floorGuide', item.plan ? `floor::${block?.id || ''}::${floor?.id || floorLabel}` : ''));
+
+        const targetKey = _targetKeyParts(block?.id, floorLabel, 'classrooms');
+        const target = _targetValue(targetKey);
+        const floorRooms = rooms.filter(room => room.blockId === block?.id && _normalizeFloorLabel(room.floor || floorLabel) === floorLabel && (!room.spaceKind || room.spaceKind === 'classroom'));
+        if (!Number.isFinite(target)) {
+          add(`${blockLabel} / ${floorLabel}`, 'Declarar cantidad de aulas', 'Registre cuantas aulas tiene este bloque/piso.', 'stage', 'aula');
+        } else if (floorRooms.length < target) {
+          add(`${blockLabel} / ${floorLabel}`, 'Completar aulas declaradas', `Faltan ${target - floorRooms.length} aula(s) de ${target}.`, 'guidedClassroom');
+        }
+
+        const floorSanitaries = sanitaries.filter(item => _matchesBlockReference(item.bloque, block) && _normalizeFloorLabel(item.planta || floorLabel) === floorLabel);
+        if (!floorSanitaries.length && !flag(block?.id, floorLabel, 'noSanitary')) {
+          add(`${blockLabel} / ${floorLabel}`, 'Responder si tiene sanitario', 'Inserte el sanitario o marque que no tiene.', 'sanitary');
+        }
+      });
+
+      _blockTechnicalPending(block).forEach(item => add(blockLabel, item.title, item.detail, item.action, item.value));
+    });
+
+    rooms.forEach(room => {
+      const scope = room.name || 'Ambiente';
+      _roomRequirementItems(room)
+        .filter(item => !item.done && !item.optional)
+        .forEach(item => add(scope, item.title, item.help || '', item.plan ? 'selectPlanItem' : 'openClassroomFicha', item.plan ? `room::${room.id}` : room.id));
+      if (_roomReady(room) && !_roomConfigured(room)) add(scope, 'Confirmar configuracion', 'Pulse Confirmar configuracion para cerrar el ambiente.', 'confirmClassroomConfigured', room.id);
+    });
+
+    sanitaries.forEach(item => {
+      const scope = item.codigo || 'Sanitario';
+      _sanitaryRequirementItems(item)
+        .filter(req => !req.done && !req.optional)
+        .forEach(req => add(scope, req.title, req.help || '', req.plan ? 'selectPlanItem' : 'openSanitaryFicha', req.plan ? `sanitary::${item.id}` : item.id));
+      if (_sanitaryReady(item) && !_sanitaryConfigured(item)) add(scope, 'Confirmar configuracion', 'Pulse Confirmar configuracion para cerrar el sanitario.', 'confirmSanitaryConfigured', item.id);
+    });
+
+    siteElements.forEach(item => {
+      const scope = item?.ficha?.codigo || _siteElementTypeLabel(item?.type) || 'Exterior';
+      _siteElementRequirementItems(item)
+        .filter(req => !req.done && !req.optional)
+        .forEach(req => add(scope, req.title, req.help || '', req.plan ? 'selectPlanItem' : 'openSiteFicha', req.plan ? `site::${item.id}` : item.id));
+      if (_siteElementReady(item) && !_siteElementConfigured(item)) add(scope, 'Confirmar configuracion', 'Pulse Confirmar configuracion para cerrar el elemento exterior.', 'confirmSiteConfigured', item.id);
+    });
+
+    const anyNoSiteFlag = Object.entries(_guidedState.flags || {})
+      .some(([key, value]) => value && key.endsWith('::noSiteElements'));
+    if (!siteElements.length && !anyNoSiteFlag) {
+      add('Exteriores', 'Responder si hay exteriores', 'Agregue elementos exteriores/tecnicos o marque que no hay.', 'site', 'water_tank');
+    }
+
+    return {
+      complete: pending.length === 0,
+      pending,
+      checkedAt: new Date().toISOString(),
+      counts: {
+        blocks: blocks.length,
+        rooms: rooms.length,
+        sanitaries: sanitaries.length,
+        siteElements: siteElements.length,
+        evidence: _countEvidence(values),
+      },
+    };
+  }
+
+  function _blockTechnicalPending(block = {}) {
+    const pending = [];
+    if (!_hasAnswer(block.tipo_circulacion)) {
+      pending.push({ title: 'Responder escalera/rampa', detail: 'Falta circulacion vertical del bloque.', action: 'answerBlockField', value: 'tipo_circulacion::No aplica' });
+    }
+    if (!_hasAnswer(block.acometida_tipo)) {
+      pending.push({ title: 'Responder acometida electrica', detail: 'Falta indicar si existe acometida visible.', action: 'answerBlockField', value: 'acometida_tipo::No visible' });
+      return pending;
+    }
+    if (!_acometidaPresent(block.acometida_tipo)) return pending;
+    if (!_hasAnswer(block.medidor_estado)) {
+      pending.push({ title: 'Responder medidor', detail: 'Falta indicar medidor o punto de medicion.', action: 'answerBlockField', value: 'medidor_estado::No visible' });
+    }
+    if (!_hasAnswer(block.tablero_estado)) {
+      pending.push({ title: 'Responder tablero electrico', detail: 'Falta estado del tablero del bloque.', action: 'answerBlockField', value: 'tablero_estado::No existe / no visible' });
+    }
+    if (_tableroPresent(block.tablero_estado) && !_hasAnswer(block.llave_termomagnetica)) {
+      pending.push({ title: 'Responder llave termomagnetica', detail: 'Falta verificacion de proteccion del tablero.', action: 'answerBlockField', value: 'llave_termomagnetica::No verificable' });
+    }
+    if (!_hasAnswer(block.puesta_tierra)) {
+      pending.push({ title: 'Responder puesta a tierra', detail: 'Falta indicar si la puesta a tierra es visible o verificable.', action: 'answerBlockField', value: 'puesta_tierra::No verificable' });
+    }
+    return pending;
+  }
+
   function _stepDone(id, snap) {
     if (id === 'escuela') return Boolean(snap.savedAtText);
     if (id === 'predio') return snap.baseMapSaved;
@@ -715,7 +845,7 @@ const GuidedRegisterModule = (() => {
     if (id === 'ambientes') return _activeGuidedQuestion('ambientes', snap)?.done || false;
     if (id === 'sanitarios') return _activeGuidedQuestion('sanitarios', snap)?.done || false;
     if (id === 'exteriores') return _activeGuidedQuestion('exteriores', snap)?.done || false;
-    if (id === 'cierre') return snap.blocks + snap.classrooms + snap.sanitaries + snap.siteElements > 0;
+    if (id === 'cierre') return Boolean(snap.completion?.complete);
     return false;
   }
 
@@ -792,6 +922,7 @@ const GuidedRegisterModule = (() => {
     if (stepId === 'ambientes') return _classroomQuestion(snap);
     if (stepId === 'sanitarios') return _sanitaryQuestion(snap);
     if (stepId === 'exteriores') return _siteQuestion(snap);
+    if (stepId === 'cierre') return _closureQuestion(snap);
     return null;
   }
 
@@ -1083,6 +1214,84 @@ const GuidedRegisterModule = (() => {
       { label: 'Siguiente', action: 'next', primary: true },
       { label: 'Agregar exterior', action: 'site', value: 'water_tank' },
     ], true);
+  }
+
+  function _closureQuestion(snap) {
+    const status = snap.completion || { complete: false, pending: [] };
+    const control = _closureControlHtml(status);
+    if (!status.complete) {
+      return _question(
+        'Revision final',
+        `${status.pending.length} pendiente(s) antes del cierre`,
+        'Todavia hay datos o confirmaciones por completar. Use el primer pendiente o valide el formulario antes de guardar el paquete final.',
+        [
+          _pendingAction(status.pending[0]),
+          { label: 'Validar', action: 'validate' },
+          { label: 'Datos en Sheets', action: 'workbook' },
+        ].filter(Boolean),
+        false,
+        control,
+        _storageInfoText(),
+        true
+      );
+    }
+    return _question(
+      'Todo completo',
+      'Sin pendientes detectados',
+      'El relevamiento esta listo para cierre. Al guardar, se registra el paquete final, se prepara el envio por correo y se abre de inmediato la vista PDF.',
+      [
+        { label: 'Guardar completos y abrir PDF', action: 'finalizeComplete', primary: true },
+        { label: 'Ver PDF', action: 'pdf' },
+        { label: 'Datos en Sheets', action: 'workbook' },
+      ],
+      true,
+      control,
+      _storageInfoText(),
+      false
+    );
+  }
+
+  function _pendingAction(item) {
+    if (!item?.action) return null;
+    return {
+      label: item.action === 'selectPlanItem' ? 'Ir al pendiente' : 'Resolver primero',
+      action: item.action,
+      value: item.value || '',
+      primary: true,
+    };
+  }
+
+  function _closureControlHtml(status) {
+    const pending = (status.pending || []).slice(0, 8);
+    const pendingHtml = pending.length
+      ? `<ul class="guided-requirements guided-closure-list" aria-label="Pendientes finales">
+          ${pending.map(item => `
+            <li>
+              <span aria-hidden="true">!</span>
+              <strong>${_escape(item.scope)} - ${_escape(item.title)}</strong>
+              <small>${_escape(item.detail || 'Pendiente de cierre')}</small>
+            </li>`).join('')}
+          ${(status.pending || []).length > pending.length ? `<li class="guided-requirements__item--optional"><span aria-hidden="true">i</span><strong>Mas pendientes</strong><small>${(status.pending || []).length - pending.length} item(s) adicionales.</small></li>` : ''}
+        </ul>`
+      : `<ul class="guided-requirements guided-closure-list" aria-label="Sin pendientes finales">
+          <li class="guided-requirements__item--done">
+            <span aria-hidden="true">&#10003;</span>
+            <strong>Relevamiento completo</strong>
+            <small>No quedan pendientes obligatorios en escuela, bloques, pisos, ambientes, sanitarios ni exteriores.</small>
+          </li>
+        </ul>`;
+    return `
+      ${pendingHtml}
+      <div class="guided-storage-map" aria-label="Mapa de guardado">
+        <strong>Donde quedan guardados los datos</strong>
+        <span><b>Dispositivo</b> borrador local por escuela para continuar sin perder carga.</span>
+        <span><b>Google Sheets</b> escuelas_seleccionadas, sesiones_relevamiento, evidencias y entregas_cierre.</span>
+        <span><b>Drive / correo</b> PDF final y metadatos enviados a ${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.FINAL_REPORT_EMAIL || '' : '')}.</span>
+      </div>`;
+  }
+
+  function _storageInfoText() {
+    return 'El boton Datos en Sheets abre el libro de Google Sheets. La hoja escuelas_seleccionadas muestra el estado de cada escuela; evidencias lista fotos subidas a Drive; entregas_cierre registra cada cierre completo con enlaces al PDF y al JSON de metadatos. El borrador local existe solo en este dispositivo hasta sincronizar.';
   }
 
   function _siteElementQuestion(item, origin = 'exteriores') {
@@ -1439,6 +1648,98 @@ const GuidedRegisterModule = (() => {
     _saveState();
     _updateSnapshot();
     UI.showToast(`${item.ficha?.codigo || 'Elemento exterior'} confirmado.`, 'success');
+  }
+
+  async function _finalizeCompleteRegistration() {
+    const snap = _snapshot();
+    if (!snap.completion?.complete) {
+      UI.showToast(`Todavia hay ${snap.completion?.pending?.length || 0} pendiente(s) antes de cerrar.`, 'warning', 7000);
+      goTo(STEPS.findIndex(step => step.id === 'cierre'));
+      return;
+    }
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.buildFinalDeliveryPackage || !mec?.printPlanPdf) {
+      UI.showToast('No se pudo preparar el paquete final desde el motor del plano.', 'error');
+      return;
+    }
+    const packageData = mec.buildFinalDeliveryPackage(snap.completion);
+    const payload = _finalDeliveryPayload(snap, packageData);
+    let result = null;
+    try {
+      if (typeof API === 'undefined' || !API.guardarCierreCompleto) throw new Error('Endpoint de cierre no disponible.');
+      result = await API.guardarCierreCompleto(payload);
+      if (result?.status && result.status !== 'ok') throw new Error(result.message || 'El servidor rechazo el cierre completo.');
+      const data = result?.data || {};
+      _saveFinalDeliveryState(snap, data, result);
+      if (result?.queued || data.offline) {
+        UI.showToast('Cierre completo guardado localmente. Se enviara PDF/metadatos cuando vuelva la conexion.', 'warning', 8000);
+      } else if (data.email_status === 'enviado') {
+        UI.showToast('Cierre completo guardado. PDF y metadatos enviados por correo.', 'success', 7200);
+      } else {
+        UI.showToast('Cierre completo guardado. Revise la hoja entregas_cierre para confirmar el estado del correo.', 'warning', 8200);
+      }
+    } catch (err) {
+      console.error('[Registro guiado] No se pudo enviar el cierre completo:', err);
+      _saveFinalDeliveryState(snap, { email_status: 'pendiente_local', error: err.message }, null);
+      UI.showToast('No se pudo enviar al servidor ahora. El PDF se abre igual y el cierre queda anotado localmente.', 'warning', 8200);
+    } finally {
+      mec.printPlanPdf();
+      _refreshSoon();
+    }
+  }
+
+  function _finalDeliveryPayload(snap, packageData) {
+    const values = packageData?.values || snap.values || {};
+    const selectedSchool = values.__selectedSchool || {};
+    const session = typeof Auth !== 'undefined' && Auth.getSession ? Auth.getSession() : {};
+    const recipient = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.FINAL_REPORT_EMAIL || '' : '';
+    const idEscuela = selectedSchool.id_escuela || selectedSchool.id || snap.school.code || '';
+    const codigoLocal = selectedSchool.codigo_local || selectedSchool.codigo || snap.school.code || '';
+    const now = new Date().toISOString();
+    return {
+      clientMutationId: _deliveryMutationId(idEscuela || codigoLocal, now),
+      id_escuela: idEscuela,
+      codigo_local: codigoLocal,
+      nombre_escuela: selectedSchool.nombre || selectedSchool.nombre_escuela || snap.school.name || '',
+      destinatario_email: recipient,
+      asunto_email: `CIALPA cierre completo - ${snap.school.code || codigoLocal || 'sin codigo'} - ${snap.school.name || 'escuela'}`,
+      generated_at: now,
+      usuario_cliente: session?.usuario || '',
+      completion: snap.completion,
+      metadata: packageData?.metadata || {},
+      resumen: {
+        escuela: snap.school,
+        conteos: snap.completion?.counts || {},
+        guardado_local: snap.savedAtText || '',
+        version: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '',
+      },
+      values,
+      planModel: packageData?.planModel || {},
+      evidenceIndex: packageData?.evidenceIndex || [],
+      pdfHtml: packageData?.pdfHtml || '',
+    };
+  }
+
+  function _deliveryMutationId(id, iso) {
+    const clean = String(id || 'sin-escuela').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 60);
+    return `ENT-${clean}-${String(iso || Date.now()).replace(/[^0-9TZ]+/g, '').slice(0, 20)}`;
+  }
+
+  function _saveFinalDeliveryState(snap, data = {}, result = null) {
+    const payload = {
+      savedAt: new Date().toISOString(),
+      school: snap.school,
+      complete: Boolean(snap.completion?.complete),
+      pending: snap.completion?.pending || [],
+      result: result ? { status: result.status, message: result.message || '', queued: Boolean(result.queued) } : null,
+      data,
+    };
+    localStorage.setItem(_finalDeliveryStateKey(snap.school), JSON.stringify(payload));
+  }
+
+  function _finalDeliveryStateKey(school = {}) {
+    const id = school.code || school.name || 'sin-escuela';
+    return `cialpa_final_delivery_v1::${String(id).replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 80)}`;
   }
 
   function _roomConfigured(room) {

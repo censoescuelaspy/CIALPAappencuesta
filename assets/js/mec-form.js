@@ -19912,6 +19912,74 @@ const MecFormModule = (() => {
     popup.document.close();
   }
 
+  function _finalDeliveryCounts() {
+    const rooms = _data.__classrooms || [];
+    const classrooms = rooms.filter(room => !room.spaceKind || room.spaceKind === 'classroom').length;
+    return {
+      blocks: (_data.__blocks || []).length,
+      floors: (_data.__blocks || []).reduce((sum, block) => sum + (Array.isArray(block.floors) ? block.floors.length : 0), 0),
+      classrooms,
+      otherSpaces: Math.max(0, rooms.length - classrooms),
+      sanitaries: (_data.__sanitaries || []).length,
+      siteElements: (_data.__siteElements || []).length,
+      evidence: _buildEvidenceIndex().length,
+    };
+  }
+
+  function _finalDeliverySanitizedValues() {
+    const binaryKeys = new Set(['dataUrl', 'thumbDataUrl', 'base64', 'originalDataUrl']);
+    try {
+      return JSON.parse(JSON.stringify(_data, (key, value) => {
+        if (binaryKeys.has(key)) return value ? '[omitido_en_metadatos_finales]' : '';
+        return value;
+      }));
+    } catch {
+      return {};
+    }
+  }
+
+  function _buildFinalDeliveryMetadata(completionStatus = {}) {
+    const school = _planPrintSchoolInfo();
+    return {
+      generatedAt: new Date().toISOString(),
+      app: 'CIALPA - Relevamiento Escolar',
+      appVersion: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version,
+      schemaVersion: MEC_SCHEMA.version,
+      school,
+      counts: _finalDeliveryCounts(),
+      completion: completionStatus || {},
+      storage: {
+        spreadsheetUrl: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.SPREADSHEET_URL : '',
+        evidenceFolderId: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.EVIDENCE_FOLDER_ID : '',
+        evidenceFolderUrl: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.EVIDENCE_FOLDER_URL : '',
+        recipientEmail: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.FINAL_REPORT_EMAIL : '',
+        sheets: [
+          'escuelas_seleccionadas',
+          'sesiones_relevamiento',
+          'modulos_relevamiento',
+          'evidencias',
+          'entregas_cierre',
+        ],
+      },
+    };
+  }
+
+  function buildFinalDeliveryPackage(completionStatus = {}) {
+    _syncActiveClassroomFromSketch();
+    _syncActiveBlock();
+    _ensureClassrooms();
+    _ensureSanitaries();
+    _saveDraft(false);
+    const metadata = _buildFinalDeliveryMetadata(completionStatus);
+    return {
+      metadata,
+      values: _finalDeliverySanitizedValues(),
+      planModel: _buildSchoolPlanModel(),
+      evidenceIndex: _buildEvidenceIndex(),
+      pdfHtml: _planPrintHtml(),
+    };
+  }
+
   function exportJson() {
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -20191,6 +20259,7 @@ const MecFormModule = (() => {
     exportPlanSvg,
     exportPlanPng,
     printPlanPdf,
+    buildFinalDeliveryPackage,
     setSketchZoom,
     setSanitaryZoom,
     setSchoolPlanZoom,

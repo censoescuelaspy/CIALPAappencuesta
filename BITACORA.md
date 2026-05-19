@@ -4,6 +4,35 @@
 
 ---
 
+## Cierre completo con PDF, correo y trazabilidad - 2026-05-19 - v2.6.52
+
+### Objetivo
+- Mostrar claramente cuando una escuela no tiene pendientes obligatorios.
+- Permitir guardar el relevamiento completo, abrir inmediatamente la vista PDF y enviar PDF/metadatos al correo configurado.
+- Aclarar donde se guardan los datos en Google Sheets, Drive y el borrador local del dispositivo.
+
+### Cambios implementados
+- La etapa `Revision y salida` del `Registro guiado` ahora calcula pendientes globales de escuela, bloques, pisos, aulas/ambientes, sanitarios y exteriores.
+- Si faltan datos, muestra una lista concreta de pendientes y un boton para ir al primer punto a resolver.
+- Si no hay pendientes, aparece `Todo completo / Sin pendientes detectados` con la accion `Guardar completos y abrir PDF`.
+- El cierre final arma un paquete con metadatos, resumen, modelo del plano, indice de evidencias y HTML imprimible del PDF.
+- Nuevo endpoint `guardarCierreCompleto` en Apps Script: crea la hoja `entregas_cierre`, guarda metadatos en Drive, intenta generar PDF, registra enlaces en Sheets y envia correo a `censoescuelaspy@gmial.com`.
+- La hoja `escuelas_seleccionadas` suma campos de ultimo cierre, PDF, metadatos y estado de email para ubicar rapido la entrega final.
+- El boton lateral ahora se llama `Datos en Sheets` y avisa que el avance esta en `escuelas_seleccionadas`, las fotos en `evidencias` y los cierres en `entregas_cierre`.
+- Version y cache actualizados a `v2.6.52`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Base mapa calibrable y mas nitida - 2026-05-19 - v2.6.51
 
 ### Objetivo

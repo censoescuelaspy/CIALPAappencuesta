@@ -257,6 +257,7 @@ const API = (() => {
     FORM_ANDROID_INTENT_URL: '',
     FORM_CUSTOM_SCHEME_URL: '',
     FORM_FALLBACK_SECONDS: '2',
+    FINAL_REPORT_EMAIL: 'censoescuelaspy@gmial.com',
     operativo: true,
     fecha_inicio: '2026-04-27',
     fecha_fin: '2026-08-31',
@@ -357,6 +358,18 @@ const API = (() => {
           demo: true,
         },
       };
+      case 'guardarCierreCompleto': return {
+        status: 'ok',
+        message: 'Cierre completo demo registrado.',
+        data: {
+          id_entrega: 'ENT_DEMO_' + Date.now(),
+          pdf_url: '',
+          metadata_url: '',
+          email_status: 'demo',
+          destinatario_email: data.destinatario_email || APP_CONFIG.FINAL_REPORT_EMAIL || '',
+          demo: true,
+        },
+      };
       case 'getIncidencias': return { status: 'ok', data: [] };
       case 'resolverIncidencia': return { status: 'ok' };
       case 'getConfig': return { status: 'ok', data: Object.entries(_DEMO_CONFIG).map(([clave, valor]) => ({ clave, valor, descripcion: 'Parametro demo', editable: 'true' })) };
@@ -430,6 +443,7 @@ const API = (() => {
       'iniciarModulo',
       'cerrarModulo',
       'saveIncidencia',
+      'guardarCierreCompleto',
       'resolverIncidencia',
     ]).has(endpoint);
   }
@@ -488,6 +502,14 @@ const API = (() => {
       return { duracion_minutos: data.duracion_minutos || 0, offline: true };
     }
     if (endpoint === 'saveIncidencia') return { id_incidencia: data.clientMutationId || queued.id, offline: true };
+    if (endpoint === 'guardarCierreCompleto') {
+      return {
+        id_entrega: data.clientMutationId || queued.id,
+        id_offline_queue: queued.id,
+        email_status: 'pendiente_sincronizacion',
+        offline: true,
+      };
+    }
     return { id_offline_queue: queued.id, offline: true };
   }
 
@@ -589,6 +611,7 @@ const API = (() => {
   async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 
   async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
+  async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
   async function getIncidencias(filters = {}) { return call('getIncidencias', 'GET', filters, { skipLoading: true }); }
   async function resolverIncidencia(id, resolucion) { return call('resolverIncidencia', 'POST', { id_incidencia: id, resolucion }); }
@@ -619,6 +642,7 @@ const API = (() => {
     saveEncuestador,
     deleteEncuestador,
     saveIncidencia,
+    guardarCierreCompleto,
     uploadEvidence,
     getIncidencias,
     resolverIncidencia,

@@ -26,6 +26,7 @@ const SHEET_NAMES = {
   AUDITORIA:    'auditoria',
   CATALOGOS:    'catalogos',
   EVIDENCIAS:   'evidencias',
+  ENTREGAS:     'entregas_cierre',
 };
 
 const ADMIN_USERS = ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'];
@@ -101,6 +102,7 @@ function _handleRequest(e) {
       'deleteEncuestador',
       'saveIncidencia',
       'uploadEvidence',
+      'guardarCierreCompleto',
       'resolverIncidencia',
       'setConfig',
     ];
@@ -140,6 +142,7 @@ function _handleRequest(e) {
       // Incidencias
       case 'saveIncidencia':  return _respond(SheetsService.saveIncidencia(params));
       case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));
+      case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));
       case 'getIncidencias':  return _respond(SheetsService.getIncidencias(params));
       case 'resolverIncidencia': return _respond(SheetsService.resolverIncidencia(params));
 

@@ -3609,6 +3609,40 @@ textarea.form-control {
   color: #2b6cb0;
 }
 
+.guided-closure-list {
+  max-height: 180px;
+  overflow: auto;
+}
+
+.guided-next-card .guided-storage-map {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .28rem;
+  padding: .36rem;
+  background: #f8fbff;
+  border: 1px solid #cfe0f3;
+  border-radius: 7px;
+}
+
+.guided-next-card .guided-storage-map > strong {
+  grid-column: 1 / -1;
+  color: #1f3864;
+  font-size: .68rem;
+}
+
+.guided-next-card .guided-storage-map span {
+  color: #334155;
+  font-size: .62rem;
+  line-height: 1.22;
+  text-transform: none;
+}
+
+.guided-next-card .guided-storage-map b {
+  display: block;
+  color: #172033;
+  font-size: .62rem;
+}
+
 .guided-question-control {
   display: grid;
   grid-template-columns: minmax(110px, auto) minmax(80px, 140px);
@@ -4010,6 +4044,11 @@ textarea.form-control {
 
   .guided-slide__actions {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guided-next-card .guided-storage-map,
+  .guided-requirements li {
+    grid-template-columns: 1fr;
   }
 
   .guided-action {

@@ -13,7 +13,8 @@ const SheetsService = (() => {
     'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado',
     'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado',
     'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo',
-    'ultimo_registro_externo'
+    'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url',
+    'email_cierre_estado', 'email_cierre_destino'
   ];
 
   const MODULE_DEFAULTS = [
@@ -496,6 +497,157 @@ const SheetsService = (() => {
     };
   }
 
+  function guardarCierreCompleto(params) {
+    const session = params._session;
+    const deliveryId = _clientMutationId(params) || _genId('ENT');
+    _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
+    const existingIdx = _findRowIndex(SHEET_NAMES.ENTREGAS, 'id_entrega', deliveryId);
+    if (existingIdx !== -1) {
+      const sheet = _getSheet(SHEET_NAMES.ENTREGAS);
+      const headers = _headers(sheet);
+      return {
+        status: 'ok',
+        message: 'El cierre completo ya estaba registrado.',
+        data: _objectFromRow(sheet, existingIdx, headers),
+      };
+    }
+
+    const now = _timestamp();
+    const idEscuela = params.id_escuela || params.codigo_local || '';
+    const escuelaResult = idEscuela ? getEscuela(idEscuela) : { status: 'error' };
+    const escuela = escuelaResult.status === 'ok' ? escuelaResult.data : {};
+    const codigoLocal = params.codigo_local || escuela.codigo_local || '';
+    const nombreEscuela = params.nombre_escuela || escuela.nombre || '';
+    const recipient = params.destinatario_email || _config('FINAL_REPORT_EMAIL', 'censoescuelaspy@gmial.com');
+    const subject = params.asunto_email || `CIALPA cierre completo - ${codigoLocal || idEscuela || 'sin codigo'}`;
+    const folder = DriveApp.getFolderById(EVIDENCE_FOLDER_ID);
+    const baseName = _safeEvidenceFilename(`cialpa_cierre_${codigoLocal || idEscuela || deliveryId}_${Utilities.formatDate(new Date(), TZ, 'yyyyMMdd_HHmmss')}`).replace(/\.[^.]+$/, '');
+
+    const metadata = params.metadata || {};
+    const metadataJson = JSON.stringify({
+      id_entrega: deliveryId,
+      generado_en: now,
+      usuario: session.usuario,
+      resumen: params.resumen || {},
+      completion: params.completion || {},
+      metadata,
+      evidenceIndex: params.evidenceIndex || [],
+    }, null, 2);
+    const metadataBlob = Utilities.newBlob(metadataJson, 'application/json', `${baseName}_metadata.json`);
+    const metadataFile = folder.createFile(metadataBlob);
+
+    const pdfResult = _createFinalPdfFile_(folder, params.pdfHtml || '', baseName);
+    const attachments = [metadataBlob];
+    if (pdfResult.blob) attachments.unshift(pdfResult.blob);
+
+    let emailStatus = 'no_enviado';
+    let emailError = pdfResult.error || '';
+    try {
+      MailApp.sendEmail({
+        to: recipient,
+        subject,
+        htmlBody: _finalDeliveryEmailHtml(params, {
+          deliveryId,
+          codigoLocal,
+          nombreEscuela,
+          pdfUrl: pdfResult.url,
+          metadataUrl: metadataFile.getUrl(),
+          usuario: session.usuario,
+          now,
+        }),
+        attachments,
+      });
+      emailStatus = 'enviado';
+    } catch (err) {
+      emailStatus = 'error';
+      emailError = [emailError, err.message].filter(Boolean).join(' | ');
+    }
+
+    const pendingCount = Array.isArray(params.completion?.pending) ? params.completion.pending.length : 0;
+    const row = {
+      id_entrega: deliveryId,
+      id_escuela: escuela.id_escuela || params.id_escuela || '',
+      codigo_local: codigoLocal,
+      nombre_escuela: nombreEscuela,
+      usuario: session.usuario,
+      fecha_cierre: now,
+      destinatario_email: recipient,
+      estado_cierre: pendingCount ? 'con_pendientes' : 'completo',
+      pendientes: pendingCount,
+      email_status: emailStatus,
+      email_error: emailError,
+      pdf_file_id: pdfResult.id || '',
+      pdf_url: pdfResult.url || '',
+      metadata_file_id: metadataFile.getId(),
+      metadata_url: metadataFile.getUrl(),
+      resumen_json: _jsonForSheet(params.resumen || {}, 45000),
+      metadata_json: _jsonForSheet(metadata, 45000),
+      plan_model_json: _jsonForSheet(params.planModel || {}, 45000),
+      evidence_count: Array.isArray(params.evidenceIndex) ? params.evidenceIndex.length : '',
+      creado_en: now,
+      actualizado_en: now,
+    };
+    _appendObject(SHEET_NAMES.ENTREGAS, _entregasHeaders(), row);
+    if (row.id_escuela || codigoLocal) {
+      _updateEscuelaOperational(row.id_escuela || codigoLocal, {
+        estado_relevamiento: 'finalizada',
+        fecha_ultimo_evento: now,
+        ultimo_cierre_id: deliveryId,
+        ultimo_pdf_url: row.pdf_url,
+        ultimo_metadata_url: row.metadata_url,
+        email_cierre_estado: emailStatus,
+        email_cierre_destino: recipient,
+      });
+    }
+    AuditService.log('CIERRE_COMPLETO', session.usuario, `id_entrega: ${deliveryId}, escuela: ${codigoLocal || idEscuela}, email: ${emailStatus}`);
+    return {
+      status: 'ok',
+      message: emailStatus === 'enviado' ? 'Cierre completo guardado y enviado por correo.' : 'Cierre completo guardado; correo pendiente de revision.',
+      data: row,
+    };
+  }
+
+  function _createFinalPdfFile_(folder, pdfHtml, baseName) {
+    if (!pdfHtml) return { id: '', url: '', error: 'La vista PDF no llego al servidor.' };
+    try {
+      const htmlBlob = Utilities.newBlob(pdfHtml, 'text/html', `${baseName}.html`);
+      const pdfBlob = htmlBlob.getAs(MimeType.PDF).setName(`${baseName}.pdf`);
+      const file = folder.createFile(pdfBlob);
+      return { id: file.getId(), url: file.getUrl(), blob: pdfBlob };
+    } catch (err) {
+      const htmlFile = folder.createFile(Utilities.newBlob(pdfHtml, 'text/html', `${baseName}.html`));
+      return {
+        id: htmlFile.getId(),
+        url: htmlFile.getUrl(),
+        error: `No se pudo convertir a PDF en Apps Script; se guardo HTML imprimible: ${err.message}`,
+      };
+    }
+  }
+
+  function _finalDeliveryEmailHtml(params, links) {
+    const counts = params.completion?.counts || params.metadata?.counts || {};
+    return `
+      <p>Se registro un cierre completo CIALPA.</p>
+      <ul>
+        <li><b>Entrega:</b> ${links.deliveryId}</li>
+        <li><b>Escuela:</b> ${links.codigoLocal || ''} - ${links.nombreEscuela || ''}</li>
+        <li><b>Usuario:</b> ${links.usuario}</li>
+        <li><b>Fecha:</b> ${links.now}</li>
+        <li><b>Bloques:</b> ${counts.blocks || 0}</li>
+        <li><b>Ambientes:</b> ${counts.rooms || counts.classrooms || 0}</li>
+        <li><b>Sanitarios:</b> ${counts.sanitaries || 0}</li>
+        <li><b>Exteriores:</b> ${counts.siteElements || 0}</li>
+      </ul>
+      <p>PDF: <a href="${links.pdfUrl || ''}">${links.pdfUrl || 'Adjunto / pendiente'}</a></p>
+      <p>Metadatos: <a href="${links.metadataUrl || ''}">${links.metadataUrl || 'Adjunto'}</a></p>`;
+  }
+
+  function _jsonForSheet(value, maxChars) {
+    const json = JSON.stringify(value || {});
+    if (json.length <= maxChars) return json;
+    return json.slice(0, Math.max(0, maxChars - 32)) + '... [truncado]';
+  }
+
   function _mimeFromDataUrl(dataUrl) {
     const match = String(dataUrl || '').match(/^data:([^;]+);base64,/);
     return match ? match[1] : '';
@@ -717,6 +869,7 @@ const SheetsService = (() => {
     _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
     _ensureColumns(SHEET_NAMES.EVENTOS, ['id_evento','id_sesion','id_escuela','usuario','tipo_evento','fecha_hora','detalle']);
     _ensureColumns(SHEET_NAMES.MODULOS, _modulosHeaders());
+    _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
   }
 
   function _sesionesHeaders() {
@@ -725,6 +878,10 @@ const SheetsService = (() => {
 
   function _modulosHeaders() {
     return ['id_modulo','id_sesion','id_escuela','usuario','modulo','modulo_nombre','orden','inicio_iso','fin_iso','duracion_minutos','estado','observacion','registros_estimados','registros_completados','creado_en','actualizado_en'];
+  }
+
+  function _entregasHeaders() {
+    return ['id_entrega','id_escuela','codigo_local','nombre_escuela','usuario','fecha_cierre','destinatario_email','estado_cierre','pendientes','email_status','email_error','pdf_file_id','pdf_url','metadata_file_id','metadata_url','resumen_json','metadata_json','plan_model_json','evidence_count','creado_en','actualizado_en'];
   }
 
   function _resolveLaunchConfig(params) {
@@ -992,7 +1149,7 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, uploadEvidence, getIncidencias, resolverIncidencia,
+    saveIncidencia, uploadEvidence, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };
 })();

@@ -112,6 +112,7 @@ function seedConfig() {
     ['MAP_CENTER_LNG', '-58.0', 'Longitud centro del mapa.', 'mapa', 'true', ''],
     ['MAP_ZOOM', '7', 'Zoom inicial del mapa.', 'mapa', 'true', ''],
     ['CONTACTO_EMAIL', 'soporte@cialpa.gov.py', 'Correo de soporte operativo.', 'contacto', 'true', ''],
+    ['FINAL_REPORT_EMAIL', 'censoescuelaspy@gmial.com', 'Destinatario automatico del PDF y metadatos del cierre completo.', 'cierre', 'true', ''],
     ['CONTACTO_TELEFONO', '(021) 000-000', 'Teléfono de soporte operativo.', 'contacto', 'true', ''],
     ['ALLOW_MULTIPLE_SESSIONS', 'false', 'Permitir más de una sesión abierta sobre la misma escuela.', 'seguridad', 'true', ''],
     ['DEFAULT_ESTIMATED_MINUTES', '180', 'Tiempo inicial esperado de relevamiento por escuela, ajustable luego con evidencia empírica.', 'planificacion', 'true', '']
@@ -288,6 +289,7 @@ function _setupSheetsConfigV21_() {
     { name: SHEET_NAMES.EVENTOS, headers: ['id_evento', 'id_sesion', 'id_escuela', 'usuario', 'tipo_evento', 'fecha_hora', 'detalle'] },
     { name: SHEET_NAMES.INCIDENCIAS, headers: ['id_incidencia', 'id_escuela', 'usuario', 'fecha_hora', 'tipo_incidencia', 'descripcion', 'prioridad', 'estado_resolucion', 'evidencia_url'] },
     { name: SHEET_NAMES.EVIDENCIAS, headers: ['id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes','drive_file_id','drive_url','folder_id','label','school_code','school_name','scope','block_label','floor_label','space_label','element_type','element_label','element_id','field_path'] },
+    { name: SHEET_NAMES.ENTREGAS, headers: ['id_entrega','id_escuela','codigo_local','nombre_escuela','usuario','fecha_cierre','destinatario_email','estado_cierre','pendientes','email_status','email_error','pdf_file_id','pdf_url','metadata_file_id','metadata_url','resumen_json','metadata_json','plan_model_json','evidence_count','creado_en','actualizado_en'] },
     { name: SHEET_NAMES.CONFIG, headers: ['clave', 'valor', 'descripcion', 'categoria', 'editable', 'fecha_actualizacion'] },
     { name: SHEET_NAMES.AUDITORIA, headers: ['id_registro', 'usuario', 'accion', 'fecha_hora', 'detalle', 'ip_aproximada'] },
     { name: SHEET_NAMES.CATALOGOS, headers: ['tipo', 'codigo', 'descripcion', 'orden', 'activo'] }
@@ -295,7 +297,7 @@ function _setupSheetsConfigV21_() {
 }
 
 function _escuelasHeadersV21_() {
-  return ['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado', 'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado', 'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo', 'ultimo_registro_externo'];
+  return ['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado', 'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado', 'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo', 'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url', 'email_cierre_estado', 'email_cierre_destino'];
 }
 
 function _sesionesHeadersV21_() {
