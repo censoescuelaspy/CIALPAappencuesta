@@ -4,6 +4,32 @@
 
 ---
 
+## Orientacion de rampa y altas sin solape - 2026-05-18 - v2.6.39
+
+### Objetivo
+- Corregir que la rampa no respondiera de forma clara a los botones `Horizontal` y `Vertical`.
+- Hacer que aulas, sanitarios y cabinas nuevas se ubiquen topeadas al elemento anterior, sin superponerse.
+
+### Cambios implementados
+- La orientacion rapida de elementos exteriores normaliza el eje largo de rampa, escalera, galeria y caminero antes de aplicar `Horizontal` o `Vertical`.
+- El giro de elementos exteriores conserva la seleccion, guarda `rotacion_grados` en ficha y evita que el elemento quede recortado fuera del canvas.
+- La sugerencia de ubicacion de aulas/espacios ahora considera aulas y sanitarios del mismo bloque/piso como bloqueadores.
+- La colocacion automatica permite contacto exacto entre rectangulos, pero sigue rechazando solapes reales.
+- Sanitarios nuevos se acomodan contra aulas o sanitarios existentes sin exigir separacion artificial.
+- Cabinas sanitarias nuevas buscan el primer espacio libre topeado a las cabinas existentes antes de usar una posicion de respaldo.
+- Version y cache actualizados a `v2.6.39`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-schema.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Cuestionario secuencial con confirmacion de elementos - 2026-05-18 - v2.6.38
 
 ### Objetivo

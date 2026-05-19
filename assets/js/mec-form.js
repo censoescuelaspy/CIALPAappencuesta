@@ -2345,31 +2345,40 @@ const MecFormModule = (() => {
   function _suggestRoomRectForNewClassroom(length, width) {
     const blockRect = _sketchBlockRect();
     const size = _roomSizeFromDimensions(Number(length || 7), Number(width || 5));
-    const sameFloor = _sketchRoomsForActiveBlockFloor()
+    const roomBlockers = _sketchRoomsForActiveBlockFloor()
       .filter(room => room.id !== _activeClassroomId)
       .map(room => _roomObjectForClassroom(room))
       .filter(Boolean);
+    const blockers = _otherRoomObjectsForActiveFloor(_activeClassroomId);
     const padding = 10;
     const clampedSize = {
       w: Math.min(size.w, blockRect.w - padding * 2),
       h: Math.min(size.h, blockRect.h - padding * 2),
     };
     const candidates = [];
-    const last = sameFloor[sameFloor.length - 1];
-    if (last) {
-      candidates.push({ x: last.x + last.w, y: last.y });
-      candidates.push({ x: last.x, y: last.y + last.h });
-    }
+    const pushAdjacent = rect => {
+      if (!rect) return;
+      candidates.push({ x: rect.x + rect.w, y: rect.y });
+      candidates.push({ x: rect.x, y: rect.y + rect.h });
+      candidates.push({ x: rect.x - clampedSize.w, y: rect.y });
+      candidates.push({ x: rect.x, y: rect.y - clampedSize.h });
+    };
+    pushAdjacent(roomBlockers[roomBlockers.length - 1] || blockers[blockers.length - 1]);
+    blockers.forEach(pushAdjacent);
     for (let y = blockRect.y + padding; y <= blockRect.y + blockRect.h - clampedSize.h - padding; y += 18) {
       for (let x = blockRect.x + padding; x <= blockRect.x + blockRect.w - clampedSize.w - padding; x += 18) {
         candidates.push({ x, y });
       }
     }
-    const free = candidates.find(candidate => {
-      const rect = _clampRectToBlock({ ...candidate, ...clampedSize });
-      return !sameFloor.some(room => _rectsOverlap(rect, room, 8));
-    }) || { x: blockRect.x + padding, y: blockRect.y + padding };
-    return _clampRectToBlock({ ...free, ...clampedSize });
+    const fallback = { x: blockRect.x + padding, y: blockRect.y + padding, ...clampedSize };
+    const free = candidates
+      .map(candidate => _clampRectToBlock({ ...candidate, ...clampedSize }))
+      .find(rect => !_rectOverlapsAny(rect, blockers, 0))
+      || _nearestFreeRectInBounds(fallback, blockers, blockRect, 0)
+      || _clampRectToBlock(fallback);
+    const snapped = _snapRectToGuides(free, blockRect, blockers, 14);
+    const resolved = _resolveRectOverlapInBounds(snapped, blockers, blockRect, 0);
+    return !_rectOverlapsAny(resolved, blockers, 0) ? resolved : free;
   }
 
   function _ensureActiveRoomObject(rect = null) {
@@ -3947,13 +3956,13 @@ const MecFormModule = (() => {
     const bounds = _sketchBlockRect();
     const blockers = _sanitaryRoomBlockers(item);
     const snapped = _snapRectToGuides(rect, bounds, blockers, 14);
-    const resolved = _resolveRectOverlapInBounds(snapped, blockers, bounds, 2);
-    if (!_rectOverlapsAny(resolved, blockers, 2)) return resolved;
-    const free = _nearestFreeRectInBounds(snapped, blockers, bounds, 2);
+    const resolved = _resolveRectOverlapInBounds(snapped, blockers, bounds, 0);
+    if (!_rectOverlapsAny(resolved, blockers, 0)) return resolved;
+    const free = _nearestFreeRectInBounds(snapped, blockers, bounds, 0);
     if (free) return free;
     if (fallbackRect) {
       const fallback = _clampRectToBounds(fallbackRect, bounds);
-      if (!_rectOverlapsAny(fallback, blockers, 2)) return fallback;
+      if (!_rectOverlapsAny(fallback, blockers, 0)) return fallback;
     }
     return _clampRectToBounds(rect, bounds);
   }
@@ -3980,8 +3989,8 @@ const MecFormModule = (() => {
     }
     const free = candidates
       .map(candidate => _clampRectToBlock({ ...candidate, ...rectSize }))
-      .find(rect => !_rectOverlapsAny(rect, blockers, 2))
-      || _nearestFreeRectInBounds({ x: blockRect.x + padding, y: blockRect.y + padding, ...rectSize }, blockers, blockRect, 2)
+      .find(rect => !_rectOverlapsAny(rect, blockers, 0))
+      || _nearestFreeRectInBounds({ x: blockRect.x + padding, y: blockRect.y + padding, ...rectSize }, blockers, blockRect, 0)
       || { x: blockRect.x + padding, y: blockRect.y + padding, ...rectSize };
     return _snapSanitaryRoomRect(item, free);
   }
@@ -8336,9 +8345,10 @@ const MecFormModule = (() => {
     const bounds = { x: room.x, y: room.y, w: room.w, h: room.h };
     const blockers = object.type === 'stall' ? _sanitaryStallBlockers(item, object.id) : [];
     const snapped = _snapRectToGuides(rect, bounds, blockers, object.type === 'stall' ? 10 : 8);
-    return object.type === 'stall'
-      ? _resolveRectOverlapInBounds(snapped, blockers, bounds, 0)
-      : snapped;
+    if (object.type !== 'stall') return snapped;
+    const resolved = _resolveRectOverlapInBounds(snapped, blockers, bounds, 0);
+    if (!_rectOverlapsAny(resolved, blockers, 0)) return resolved;
+    return _nearestFreeRectInBounds(snapped, blockers, bounds, 0) || resolved;
   }
 
   function _suggestFixtureRectInStall(item, size) {
@@ -8399,6 +8409,7 @@ const MecFormModule = (() => {
     const free = candidates
       .map(candidate => _clampRectToBounds({ ...candidate, ...rectSize }, bounds))
       .find(rect => !blockers.some(other => _rectsOverlap(rect, other, 0)))
+      || _nearestFreeRectInBounds({ x: room.x + padding, y: room.y + padding, ...rectSize }, blockers, bounds, 0)
       || _clampRectToBounds({ x: room.x + padding, y: room.y + padding, ...rectSize }, bounds);
     return free;
   }
@@ -10569,9 +10580,12 @@ const MecFormModule = (() => {
     }
     const previousRoom = (_data.__classroomSketch.objects || []).find(object => object.type === 'room');
     const size = _roomSizeFromDimensions(length, width);
-    const rect = previousRoom
+    const proposedRect = previousRoom
       ? _clampRectToBlock({ x: previousRoom.x, y: previousRoom.y, w: size.w, h: size.h })
       : _suggestRoomRectForNewClassroom(length, width);
+    const rect = previousRoom
+      ? _resolveRoomOverlap(previousRoom, proposedRect)
+      : proposedRect;
     const room = _buildRoomObjectFromDimensions(length, width, previousRoom?.id, rect);
     _data.__classroomSketch.objects = [
       room,
@@ -15839,7 +15853,7 @@ const MecFormModule = (() => {
     if (!object || !target) return null;
     const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
     const resolved = _snapSanitaryRoomRect(item, { ...target, w: object.w, h: object.h }, previous);
-    if (_rectOverlapsAny(resolved, _sanitaryRoomBlockers(item), 2)) return null;
+    if (_rectOverlapsAny(resolved, _sanitaryRoomBlockers(item), 0)) return null;
     const dx = Math.round(resolved.x - object.x);
     const dy = Math.round(resolved.y - object.y);
     if (!dx && !dy) return null;
@@ -16178,7 +16192,7 @@ const MecFormModule = (() => {
     if (!object || !target) return null;
     const previous = { x: object.x, y: object.y, w: object.w, h: object.h };
     const resolved = _snapSanitaryRoomRect(item, target, previous);
-    if (_rectOverlapsAny(resolved, _sanitaryRoomBlockers(item), 2)) return null;
+    if (_rectOverlapsAny(resolved, _sanitaryRoomBlockers(item), 0)) return null;
     object.x = resolved.x;
     object.y = resolved.y;
     object.w = resolved.w;
@@ -16389,6 +16403,51 @@ const MecFormModule = (() => {
     return null;
   }
 
+  function _normalizeSiteElementLongAxis(element, logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    if (!['gallery', 'walkway', 'stair', 'ramp'].includes(element?.type)) return;
+    const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+    if (!rect || rect.w >= rect.h) return;
+    const center = _planRectCenter(rect);
+    const swapped = _clampPlanRect({
+      x: center.x - rect.h / 2,
+      y: center.y - rect.w / 2,
+      w: rect.h,
+      h: rect.w,
+    }, logicalWidth, logicalHeight);
+    element.xRatio = swapped.x / logicalWidth;
+    element.yRatio = swapped.y / logicalHeight;
+    element.wRatio = Math.max(.006, swapped.w / logicalWidth);
+    element.hRatio = Math.max(.006, swapped.h / logicalHeight);
+  }
+
+  function _keepSiteElementRotatedBoundsInCanvas(element, logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    if (!element) return;
+    const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+    const bounds = _rotatedSiteElementBounds(rect, element);
+    const margin = 8;
+    let dx = 0;
+    let dy = 0;
+    if (bounds.x < margin) dx = margin - bounds.x;
+    if (bounds.y < margin) dy = margin - bounds.y;
+    if (bounds.x + bounds.w > logicalWidth - margin) dx = logicalWidth - margin - (bounds.x + bounds.w);
+    if (bounds.y + bounds.h > logicalHeight - margin) dy = logicalHeight - margin - (bounds.y + bounds.h);
+    if (!dx && !dy) return;
+    const moved = _clampPlanRect({ x: rect.x + dx, y: rect.y + dy, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
+    element.xRatio = moved.x / logicalWidth;
+    element.yRatio = moved.y / logicalHeight;
+  }
+
+  function _setSiteElementRotation(element, rotation, options = {}) {
+    if (!element) return;
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+    if (options.normalizeLongAxis) _normalizeSiteElementLongAxis(element, logicalWidth, logicalHeight);
+    element.rotationDeg = _normalizeSiteRotation(rotation);
+    element.rotacion_grados = String(element.rotationDeg);
+    element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
+    _keepSiteElementRotatedBoundsInCanvas(element, logicalWidth, logicalHeight);
+  }
+
   function rotatePlanSiteElement(elementId, delta = 15) {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element) {
@@ -16396,8 +16455,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'rotarlo')) return;
-    element.rotationDeg = _normalizeSiteRotation(_siteElementRotationDeg(element) + Number(delta || 0));
-    element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
+    _setSiteElementRotation(element, _siteElementRotationDeg(element) + Number(delta || 0));
     _selectedPlanId = `site::${element.id}`;
     _saveDraft(false);
     renderSchoolPlan();
@@ -16480,7 +16538,7 @@ const MecFormModule = (() => {
     return _orientationAngle(orientation) === 90 ? 'vertical' : 'horizontal';
   }
 
-  function _transformSelectedPlanRotation(transform) {
+  function _transformSelectedPlanRotation(transform, options = {}) {
     const raw = String(_selectedPlanId || '');
     if (!raw) {
       UI.showToast('Seleccione un elemento del plano para girarlo.', 'warning');
@@ -16552,8 +16610,9 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === raw.replace('site::', ''));
       if (!element) return false;
       if (!_assertSiteElementUnlocked(element, 'girarlo')) return false;
-      element.rotationDeg = nextRotation(_siteElementRotationDeg(element));
-      element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
+      _setSiteElementRotation(element, nextRotation(_siteElementRotationDeg(element)), {
+        normalizeLongAxis: Boolean(options.normalizeSiteLongAxis),
+      });
       _selectedPlanId = `site::${element.id}`;
       _saveDraft(false);
       renderSchoolPlan();
@@ -16583,7 +16642,7 @@ const MecFormModule = (() => {
 
   function orientSelectedPlanItem(orientation = 'horizontal') {
     const angle = _orientationAngle(orientation);
-    _transformSelectedPlanRotation(angle);
+    _transformSelectedPlanRotation(angle, { normalizeSiteLongAxis: true });
   }
 
   function rotateSelectedPlanItem(delta = 90) {
@@ -16792,8 +16851,7 @@ const MecFormModule = (() => {
     if (kind === 'site') {
       const element = _ensureSiteElements().find(item => item.id === id);
       if (!element) return null;
-      element.rotationDeg = next;
-      element.ficha = { ...(element.ficha || {}), rotacion_grados: String(next) };
+      _setSiteElementRotation(element, next);
       return { id: `site::${id}`, value: next };
     }
     return null;
