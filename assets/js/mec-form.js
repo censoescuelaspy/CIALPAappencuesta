@@ -175,16 +175,105 @@ const MecFormModule = (() => {
     _syncPendingEvidenceUploads();
   }
 
+  function _schoolIdentityValues(school) {
+    const values = [
+      school?.id_escuela,
+      school?.codigo_local,
+      school?.codigo,
+      school?.id,
+    ];
+    return values
+      .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
+      .map(value => String(value).trim());
+  }
+
+  function _sameSchoolIdentity(left, right) {
+    const leftValues = _schoolIdentityValues(left);
+    const rightValues = _schoolIdentityValues(right);
+    return leftValues.some(value => rightValues.includes(value));
+  }
+
+  function _schoolDraftStorageKey(school) {
+    const id = _schoolIdentityValues(school)[0] || '';
+    return id ? `${STORAGE_KEY}::school::${_slug(id)}` : '';
+  }
+
+  function _schoolSnapshot(school) {
+    return {
+      id_escuela: school?.id_escuela || '',
+      codigo_local: school?.codigo_local || school?.codigo || '',
+      nombre: school?.nombre || school?.nombre_escuela || '',
+      syncedAt: new Date().toISOString(),
+    };
+  }
+
+  function _normalizeDraftPayload(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const values = raw.values || raw;
+    if (!values || typeof values !== 'object') return null;
+    return JSON.parse(JSON.stringify(values));
+  }
+
+  function _readDraftFromStorage(key) {
+    if (!key) return null;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      return _normalizeDraftPayload(JSON.parse(raw));
+    } catch {
+      return null;
+    }
+  }
+
+  function _draftFromSchoolRecord(school) {
+    if (!school?.mec_draft) return null;
+    try {
+      const raw = typeof school.mec_draft === 'string'
+        ? JSON.parse(school.mec_draft)
+        : school.mec_draft;
+      return _normalizeDraftPayload(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function _draftForSchool(school, options = {}) {
+    if (!school) return null;
+    const scoped = _readDraftFromStorage(_schoolDraftStorageKey(school));
+    if (scoped) return scoped;
+    if (options.allowGlobal) {
+      const globalDraft = _readDraftFromStorage(STORAGE_KEY);
+      if (globalDraft && _sameSchoolIdentity(globalDraft.__selectedSchool, school)) return globalDraft;
+    }
+    const remote = _draftFromSchoolRecord(school);
+    if (remote) return remote;
+    return null;
+  }
+
+  function _applyDraftValues(values = {}) {
+    _data = values && typeof values === 'object' ? values : {};
+    _activeModuleId = _data.__activeModuleId || 'general';
+    _activeClassroomId = _data.__activeClassroomId || _data.__classroomSketch?.id || null;
+    _activeSanitaryId = _data.__activeSanitaryId || null;
+    _selectedSketchObjectId = null;
+    _selectedSanitaryObjectId = null;
+    _selectedPlanId = null;
+    _activePlanDrag = null;
+    _migrateElectricityDraftToBlocks();
+  }
+
   function _loadDraft() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
-      _data = saved.values || saved || {};
-      _activeModuleId = _data.__activeModuleId || _activeModuleId;
-      _activeClassroomId = _data.__activeClassroomId || _data.__classroomSketch?.id || _activeClassroomId;
-      _activeSanitaryId = _data.__activeSanitaryId || _activeSanitaryId;
-      _migrateElectricityDraftToBlocks();
+      const school = _selectedSchoolFromContext();
+      const values = school
+        ? (_draftForSchool(school, { allowGlobal: true }) || {})
+        : (_readDraftFromStorage(STORAGE_KEY) || {});
+      _applyDraftValues(values);
+      if (school && !_sameSchoolIdentity(_data.__selectedSchool, school)) {
+        _data.__selectedSchool = _schoolSnapshot(school);
+      }
     } catch {
-      _data = {};
+      _applyDraftValues({});
     }
   }
 
@@ -200,11 +289,14 @@ const MecFormModule = (() => {
     _compactUploadedEvidenceInDraft();
     const savedAt = new Date().toISOString();
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      const payload = JSON.stringify({
         savedAt,
         schemaVersion: MEC_SCHEMA.version,
         values: _data,
-      }));
+      });
+      localStorage.setItem(STORAGE_KEY, payload);
+      const schoolKey = _schoolDraftStorageKey(_data.__selectedSchool);
+      if (schoolKey) localStorage.setItem(schoolKey, payload);
       if (showToast) UI.showToast('Borrador MEC guardado en este dispositivo.', 'success');
       const state = document.getElementById('mec-save-state');
       if (state) state.textContent = _formatSavedAt(savedAt);
@@ -672,25 +764,14 @@ const MecFormModule = (() => {
     return '';
   }
 
-  function _prefillGeneralFromSelectedSchool(force = false) {
-    const school = _selectedSchoolFromContext();
+  function _prefillGeneralFromSelectedSchool(force = false, explicitSchool = null) {
+    const school = explicitSchool || _selectedSchoolFromContext();
     if (!school) return;
     const selectedId = String(school.id_escuela || school.codigo_local || '');
-    const changedSchool = selectedId && selectedId !== String(_data.__selectedSchool?.id_escuela || _data.__selectedSchool?.codigo_local || '');
-    if (school.mec_draft && (force || changedSchool || !_data.__selectedSchool?.id_escuela)) {
-      _data = JSON.parse(JSON.stringify(school.mec_draft));
-      _activeModuleId = _data.__activeModuleId || 'general';
-      _activeClassroomId = _data.__activeClassroomId || _data.__classroomSketch?.id || null;
-      _activeSanitaryId = _data.__activeSanitaryId || null;
-      _selectedSketchObjectId = null;
-      _selectedSanitaryObjectId = null;
-      _data.__selectedSchool = {
-        id_escuela: school.id_escuela || '',
-        codigo_local: school.codigo_local || '',
-        nombre: school.nombre || school.nombre_escuela || '',
-        syncedAt: new Date().toISOString(),
-      };
-      return;
+    let changedSchool = selectedId && !_sameSchoolIdentity(_data.__selectedSchool, school);
+    if (changedSchool) {
+      _applyDraftValues(_draftForSchool(school, { allowGlobal: true }) || {});
+      changedSchool = selectedId && !_sameSchoolIdentity(_data.__selectedSchool, school);
     }
     _data.general = _data.general || {};
     const mapping = {
@@ -708,12 +789,7 @@ const MecFormModule = (() => {
       if (!value) return;
       if (force || changedSchool || !_data.general[field]) _data.general[field] = String(value);
     });
-    _data.__selectedSchool = {
-      id_escuela: school.id_escuela || '',
-      codigo_local: school.codigo_local || '',
-      nombre: school.nombre || school.nombre_escuela || '',
-      syncedAt: new Date().toISOString(),
-    };
+    _data.__selectedSchool = _schoolSnapshot(school);
   }
 
   function _numberInRange(value, fallback = 0, min = -Infinity, max = Infinity) {
@@ -10793,11 +10869,36 @@ const MecFormModule = (() => {
     nextModule();
   }
 
+  function setSelectedSchool(school, options = {}) {
+    if (!school) return false;
+    const currentSchool = _data.__selectedSchool || null;
+    if (currentSchool && _sameSchoolIdentity(currentSchool, school)) {
+      _prefillGeneralFromSelectedSchool(Boolean(options.force), school);
+      _saveDraft(false);
+      if (options.render) _render();
+      return true;
+    }
+    const hasCurrentDraft = currentSchool && Object.keys(_data || {}).length > 0;
+    if (hasCurrentDraft && !_sameSchoolIdentity(currentSchool, school)) _saveDraft(false);
+    _applyDraftValues(_draftForSchool(school, { allowGlobal: true }) || {});
+    _prefillGeneralFromSelectedSchool(true, school);
+    _selectedPlanId = null;
+    _activePlanDrag = null;
+    _selectedSketchObjectId = null;
+    _selectedSanitaryObjectId = null;
+    _saveDraft(false);
+    if (options.render) _render();
+    return true;
+  }
+
   async function resetDraft() {
     const confirmed = await UI.showConfirm('Limpiar borrador MEC', '¿Desea borrar las respuestas guardadas localmente para esta prueba?');
     if (!confirmed) return;
+    const schoolKey = _schoolDraftStorageKey(_data.__selectedSchool || _selectedSchoolFromContext());
     localStorage.removeItem(STORAGE_KEY);
-    _data = {};
+    if (schoolKey) localStorage.removeItem(schoolKey);
+    _applyDraftValues({});
+    _prefillGeneralFromSelectedSchool(true);
     _render();
     UI.showToast('Borrador MEC limpiado.', 'success');
   }
@@ -17642,7 +17743,7 @@ const MecFormModule = (() => {
       isClassObjectArea(area) ||
       isSanitaryObjectArea(area)
     ));
-    const directDragTypes = ['site-element', 'room', 'sanitary'];
+    const directDragTypes = ['site-element', 'floor', 'room', 'sanitary'];
     const canDragPlanArea = area => Boolean(
       isPlanMovableArea(area) &&
       (_planMoveMode || directDragTypes.includes(area.type) || area.id === _selectedPlanId)
@@ -19765,6 +19866,7 @@ const MecFormModule = (() => {
     validate,
     saveNow,
     saveSketchAndNext,
+    setSelectedSchool,
     resetDraft,
     exportJson,
     toggleModule,

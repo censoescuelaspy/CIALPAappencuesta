@@ -4,6 +4,33 @@
 
 ---
 
+## Cambio de escuela con borrador propio y pisos editables - 2026-05-19 - v2.6.50
+
+### Objetivo
+- Al iniciar/continuar registro desde el mapa, abrir la escuela seleccionada sin conservar nombres ni plano de la escuela anterior.
+- Recuperar el borrador/plano local de esa escuela cuando ya fue trabajado en el mismo dispositivo.
+- Permitir mover y estirar pisos nuevos dentro del bloque desde el plano.
+
+### Cambios implementados
+- El borrador MEC ahora se guarda tambien por escuela, usando una clave local derivada de `id_escuela` o `codigo_local`.
+- Al cambiar de escuela desde `Mapa` o desde `Migrar datos al RUE-MEC`, `SurveyModule.setCurrentEscuela()` ordena a `MecFormModule` cargar el borrador correcto.
+- Si la escuela seleccionada ya tiene borrador local, se restaura su plano; si no existe, se inicia un borrador limpio con los datos generales de la escuela.
+- El borrador global `cialpa_mec_form_draft_v1` se mantiene como copia compatible para el resto de modulos, pero deja de arrastrar escuelas anteriores.
+- El estado del `Registro guiado` queda separado por escuela para no heredar paso activo, banderas o metas de aulas de otra escuela.
+- `Limpiar borrador MEC` borra tambien la copia local especifica de la escuela activa.
+- Los pisos se agregan al arrastre directo del plano, igual que ambientes, sanitarios y elementos exteriores, manteniendo seleccion y redimensionamiento por manijas.
+- Version y cache actualizados a `v2.6.50`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores.
+
+---
+
 ## Menos espacio vacio, sidebar intencional y simbolos limpios - 2026-05-19 - v2.6.49
 
 ### Objetivo

@@ -149,7 +149,7 @@ const SurveyModule = (() => {
     const escuelas = MapModule.getEscuelas();
     const escuela = escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
     if (escuela) {
-      _currentEscuela = escuela;
+      if (!setCurrentEscuela(escuela)) return;
       AppController.showModule('encuesta');
       _renderSurveyPanel();
       return;
@@ -157,7 +157,7 @@ const SurveyModule = (() => {
 
     API.getEscuela(id).then(result => {
       if (result.status === 'ok') {
-        _currentEscuela = result.data;
+        if (!setCurrentEscuela(result.data)) return;
         AppController.showModule('encuesta');
         _renderSurveyPanel();
       }
@@ -182,6 +182,9 @@ const SurveyModule = (() => {
       _elapsedSeconds = 0;
     }
     _currentEscuela = escuela;
+    if (typeof MecFormModule !== 'undefined' && typeof MecFormModule.setSelectedSchool === 'function') {
+      MecFormModule.setSelectedSchool(escuela, { render: false });
+    }
     if (options.render) _renderSurveyPanel();
     return true;
   }

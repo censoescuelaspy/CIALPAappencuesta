@@ -15,6 +15,53 @@ const GuidedRegisterModule = (() => {
   let _touchStartY = 0;
   let _guidedState = { targets: {}, flags: {} };
 
+  function _schoolIdentityValues(school) {
+    const values = [
+      school?.id_escuela,
+      school?.codigo_local,
+      school?.codigo,
+      school?.id,
+    ];
+    return values
+      .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
+      .map(value => String(value).trim());
+  }
+
+  function _slug(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 120) || 'item';
+  }
+
+  function _guidedStateKeyForSchool(school) {
+    const id = _schoolIdentityValues(school)[0] || '';
+    return id ? `${STATE_KEY}::school::${_slug(id)}` : '';
+  }
+
+  function _currentSchoolForState() {
+    const surveySchool = typeof SurveyModule !== 'undefined' && SurveyModule.getCurrentEscuela?.();
+    if (surveySchool) return surveySchool;
+    try {
+      const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {};
+      return (saved.values || saved || {}).__selectedSchool || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function _readGuidedState(key) {
+    if (!key) return null;
+    try {
+      return JSON.parse(localStorage.getItem(key) || 'null') || null;
+    } catch {
+      return null;
+    }
+  }
+
   const STEPS = [
     {
       id: 'escuela',
@@ -1624,7 +1671,9 @@ const GuidedRegisterModule = (() => {
 
   function _loadState() {
     try {
-      const saved = JSON.parse(localStorage.getItem(STATE_KEY) || '{}') || {};
+      const school = _currentSchoolForState();
+      const scopedKey = _guidedStateKeyForSchool(school);
+      const saved = _readGuidedState(scopedKey || STATE_KEY) || {};
       _activeIndex = Math.max(0, Math.min(STEPS.length - 1, Number(saved.activeIndex || 0)));
       _guidedState = {
         targets: saved.targets && typeof saved.targets === 'object' ? saved.targets : {},
@@ -1637,12 +1686,15 @@ const GuidedRegisterModule = (() => {
   }
 
   function _saveState() {
-    localStorage.setItem(STATE_KEY, JSON.stringify({
+    const payload = JSON.stringify({
       activeIndex: _activeIndex,
       targets: _guidedState.targets || {},
       flags: _guidedState.flags || {},
       updatedAt: new Date().toISOString(),
-    }));
+    });
+    localStorage.setItem(STATE_KEY, payload);
+    const scopedKey = _guidedStateKeyForSchool(_currentSchoolForState());
+    if (scopedKey) localStorage.setItem(scopedKey, payload);
   }
 
   function _escape(value) {
