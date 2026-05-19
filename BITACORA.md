@@ -4,6 +4,35 @@
 
 ---
 
+## Guardado visible en Sheets del borrador MEC - 2026-05-19 - v2.6.53
+
+### Objetivo
+- Que cada escuela cargada tenga una fila verificable en el Excel durante la carga, no solo al cierre final.
+- Evitar la confusion entre borrador local del dispositivo, evidencias en Drive y registros visibles en Google Sheets.
+- Permitir guardar manualmente en Sheets desde `Revision y salida`.
+
+### Cambios implementados
+- Nuevo endpoint `guardarBorradorMec` en Apps Script, con bloqueo de escritura y actualizacion por escuela/usuario.
+- Nueva hoja `mec_borradores`, con una fila por escuela y campos de usuario, fecha, conteos, resumen, JSON del borrador e indice de evidencias.
+- El borrador MEC se sincroniza automaticamente a Sheets de forma diferida cuando hay sesion y conexion.
+- El boton `Guardar ahora` del MEC y la etapa `Revision y salida` incorporan guardado manual remoto.
+- Antes del cierre completo, `Registro guiado` fuerza una sincronizacion del borrador a `mec_borradores` y luego intenta `entregas_cierre`.
+- `escuelas_seleccionadas` agrega columnas de ultimo borrador MEC para ubicar rapidamente si una escuela ya subio datos desde la tablet.
+- Los mensajes de `Datos en Sheets` aclaran que durante la carga se debe revisar `mec_borradores`, fotos en `evidencias` y cierres en `entregas_cierre`.
+- Version y cache actualizados a `v2.6.53`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
 ## Cierre completo con PDF, correo y trazabilidad - 2026-05-19 - v2.6.52
 
 ### Objetivo

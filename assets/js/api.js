@@ -358,6 +358,16 @@ const API = (() => {
           demo: true,
         },
       };
+      case 'guardarBorradorMec': return {
+        status: 'ok',
+        message: 'Borrador MEC demo guardado.',
+        data: {
+          id_borrador: data.clientMutationId || 'MEC_DRAFT_DEMO_' + Date.now(),
+          sheet: 'mec_borradores',
+          updatedAt: new Date().toISOString(),
+          demo: true,
+        },
+      };
       case 'guardarCierreCompleto': return {
         status: 'ok',
         message: 'Cierre completo demo registrado.',
@@ -443,6 +453,7 @@ const API = (() => {
       'iniciarModulo',
       'cerrarModulo',
       'saveIncidencia',
+      'guardarBorradorMec',
       'guardarCierreCompleto',
       'resolverIncidencia',
     ]).has(endpoint);
@@ -507,6 +518,15 @@ const API = (() => {
         id_entrega: data.clientMutationId || queued.id,
         id_offline_queue: queued.id,
         email_status: 'pendiente_sincronizacion',
+        offline: true,
+      };
+    }
+    if (endpoint === 'guardarBorradorMec') {
+      return {
+        id_borrador: data.clientMutationId || queued.id,
+        id_offline_queue: queued.id,
+        sheet: 'mec_borradores',
+        updatedAt: iso,
         offline: true,
       };
     }
@@ -611,6 +631,7 @@ const API = (() => {
   async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 
   async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
+  async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
   async function getIncidencias(filters = {}) { return call('getIncidencias', 'GET', filters, { skipLoading: true }); }
@@ -642,6 +663,7 @@ const API = (() => {
     saveEncuestador,
     deleteEncuestador,
     saveIncidencia,
+    guardarBorradorMec,
     guardarCierreCompleto,
     uploadEvidence,
     getIncidencias,

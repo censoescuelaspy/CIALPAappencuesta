@@ -14,7 +14,8 @@ const SheetsService = (() => {
     'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado',
     'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo',
     'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url',
-    'email_cierre_estado', 'email_cierre_destino'
+    'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id',
+    'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'
   ];
 
   const MODULE_DEFAULTS = [
@@ -497,6 +498,80 @@ const SheetsService = (() => {
     };
   }
 
+  function guardarBorradorMec(params) {
+    const session = params._session || {};
+    const idEscuela = params.id_escuela || params.codigo_local || '';
+    const codigoLocalParam = params.codigo_local || idEscuela || '';
+    if (!idEscuela && !codigoLocalParam) {
+      return { status: 'error', message: 'Identificador de escuela requerido para guardar el borrador MEC.' };
+    }
+
+    _ensureColumns(SHEET_NAMES.MEC_DRAFTS, _mecDraftHeaders());
+    const draftId = _clientMutationId(params) || `MEC-DRAFT-${_safeKey(idEscuela || codigoLocalParam)}`;
+    const existingIdx = _findRowIndex(SHEET_NAMES.MEC_DRAFTS, 'id_borrador', draftId);
+    const sheet = _getSheet(SHEET_NAMES.MEC_DRAFTS);
+    const headers = _headers(sheet);
+    const now = _timestamp();
+    const escuelaResult = idEscuela ? getEscuela(idEscuela) : { status: 'error' };
+    const escuela = escuelaResult.status === 'ok' ? escuelaResult.data : {};
+    const counts = params.counts || {};
+    const evidenceIndex = Array.isArray(params.evidenceIndex) ? params.evidenceIndex : [];
+    const createdAt = existingIdx !== -1 ? (_getByHeader(sheet, existingIdx, headers, 'creado_en') || now) : now;
+    const row = {
+      id_borrador: draftId,
+      id_escuela: escuela.id_escuela || params.id_escuela || '',
+      codigo_local: params.codigo_local || escuela.codigo_local || codigoLocalParam,
+      nombre_escuela: params.nombre_escuela || escuela.nombre || '',
+      usuario: session.usuario || params.usuario_cliente || '',
+      fecha_guardado: now,
+      estado_borrador: params.estado_borrador || 'en_curso',
+      motivo: params.motivo || '',
+      app_version: params.app_version || '',
+      schema_version: params.schema_version || '',
+      bloques: counts.blocks || 0,
+      pisos: counts.floors || 0,
+      aulas: counts.classrooms || 0,
+      otros_espacios: counts.otherSpaces || 0,
+      sanitarios: counts.sanitaries || 0,
+      exteriores: counts.siteElements || 0,
+      evidencias: counts.evidence || evidenceIndex.length || 0,
+      base_mapa_confirmada: params.resumen && params.resumen.baseMapConfirmed ? 'true' : 'false',
+      resumen_json: _jsonForSheet(params.resumen || {}, 22000),
+      draft_json: _jsonForSheet(params.values || {}, 45000),
+      evidence_index_json: _jsonForSheet(evidenceIndex, 30000),
+      creado_en: createdAt,
+      actualizado_en: now,
+    };
+
+    if (existingIdx !== -1) {
+      Object.entries(row).forEach(([key, value]) => _setByHeader(sheet, existingIdx, headers, key, value));
+    } else {
+      _appendObject(SHEET_NAMES.MEC_DRAFTS, _mecDraftHeaders(), row);
+    }
+
+    const escuelaIdForUpdate = row.id_escuela || row.codigo_local;
+    if (escuelaIdForUpdate) {
+      _updateEscuelaOperational(escuelaIdForUpdate, {
+        estado_relevamiento: 'en_curso',
+        fecha_ultimo_evento: now,
+        ultimo_borrador_mec_id: draftId,
+        ultimo_borrador_mec_at: now,
+        ultimo_borrador_mec_usuario: row.usuario,
+      });
+    }
+    AuditService.log('GUARDAR_BORRADOR_MEC', row.usuario || 'sistema', `id_borrador: ${draftId}, escuela: ${row.codigo_local || row.id_escuela}`);
+    return {
+      status: 'ok',
+      message: 'Borrador MEC guardado en la hoja mec_borradores.',
+      data: {
+        id_borrador: draftId,
+        sheet: SHEET_NAMES.MEC_DRAFTS,
+        updatedAt: now,
+        codigo_local: row.codigo_local,
+      },
+    };
+  }
+
   function guardarCierreCompleto(params) {
     const session = params._session;
     const deliveryId = _clientMutationId(params) || _genId('ENT');
@@ -869,6 +944,7 @@ const SheetsService = (() => {
     _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
     _ensureColumns(SHEET_NAMES.EVENTOS, ['id_evento','id_sesion','id_escuela','usuario','tipo_evento','fecha_hora','detalle']);
     _ensureColumns(SHEET_NAMES.MODULOS, _modulosHeaders());
+    _ensureColumns(SHEET_NAMES.MEC_DRAFTS, _mecDraftHeaders());
     _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
   }
 
@@ -882,6 +958,10 @@ const SheetsService = (() => {
 
   function _entregasHeaders() {
     return ['id_entrega','id_escuela','codigo_local','nombre_escuela','usuario','fecha_cierre','destinatario_email','estado_cierre','pendientes','email_status','email_error','pdf_file_id','pdf_url','metadata_file_id','metadata_url','resumen_json','metadata_json','plan_model_json','evidence_count','creado_en','actualizado_en'];
+  }
+
+  function _mecDraftHeaders() {
+    return ['id_borrador','id_escuela','codigo_local','nombre_escuela','usuario','fecha_guardado','estado_borrador','motivo','app_version','schema_version','bloques','pisos','aulas','otros_espacios','sanitarios','exteriores','evidencias','base_mapa_confirmada','resumen_json','draft_json','evidence_index_json','creado_en','actualizado_en'];
   }
 
   function _resolveLaunchConfig(params) {
@@ -1091,6 +1171,10 @@ const SheetsService = (() => {
     return _txt(params && (params.clientMutationId || params.id_offline_queue));
   }
 
+  function _safeKey(value) {
+    return _txt(value).replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 70) || 'sin-escuela';
+  }
+
   function _same(a, b) {
     return _txt(a).toLowerCase() === _txt(b).toLowerCase();
   }
@@ -1149,7 +1233,7 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, uploadEvidence, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    saveIncidencia, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };
 })();

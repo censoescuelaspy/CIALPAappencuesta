@@ -320,6 +320,7 @@ const GuidedRegisterModule = (() => {
     if (action === 'confirmClassroomConfigured') return _confirmClassroomConfigured(value);
     if (action === 'confirmSanitaryConfigured') return _confirmSanitaryConfigured(value);
     if (action === 'confirmSiteConfigured') return _confirmSiteConfigured(value);
+    if (action === 'syncSheets') return _syncDraftToSheets();
     if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
     if (action === 'workbook') return (typeof AppController !== 'undefined' && AppController.openWorkbook) ? AppController.openWorkbook() : null;
     if (action === 'selectPlanItem') return _selectPlanItem(value);
@@ -1227,6 +1228,7 @@ const GuidedRegisterModule = (() => {
         [
           _pendingAction(status.pending[0]),
           { label: 'Validar', action: 'validate' },
+          { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
           { label: 'Datos en Sheets', action: 'workbook' },
         ].filter(Boolean),
         false,
@@ -1241,6 +1243,7 @@ const GuidedRegisterModule = (() => {
       'El relevamiento esta listo para cierre. Al guardar, se registra el paquete final, se prepara el envio por correo y se abre de inmediato la vista PDF.',
       [
         { label: 'Guardar completos y abrir PDF', action: 'finalizeComplete', primary: true },
+        { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
         { label: 'Ver PDF', action: 'pdf' },
         { label: 'Datos en Sheets', action: 'workbook' },
       ],
@@ -1285,13 +1288,13 @@ const GuidedRegisterModule = (() => {
       <div class="guided-storage-map" aria-label="Mapa de guardado">
         <strong>Donde quedan guardados los datos</strong>
         <span><b>Dispositivo</b> borrador local por escuela para continuar sin perder carga.</span>
-        <span><b>Google Sheets</b> escuelas_seleccionadas, sesiones_relevamiento, evidencias y entregas_cierre.</span>
+        <span><b>Google Sheets</b> mec_borradores guarda lo cargado; escuelas_seleccionadas muestra estado; evidencias fotos; entregas_cierre cierre final.</span>
         <span><b>Drive / correo</b> PDF final y metadatos enviados a ${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.FINAL_REPORT_EMAIL || '' : '')}.</span>
       </div>`;
   }
 
   function _storageInfoText() {
-    return 'El boton Datos en Sheets abre el libro de Google Sheets. La hoja escuelas_seleccionadas muestra el estado de cada escuela; evidencias lista fotos subidas a Drive; entregas_cierre registra cada cierre completo con enlaces al PDF y al JSON de metadatos. El borrador local existe solo en este dispositivo hasta sincronizar.';
+    return 'El boton Datos en Sheets abre el libro de Google Sheets. Durante la carga, revise mec_borradores: ahi queda una fila por escuela con resumen y JSON del borrador. escuelas_seleccionadas muestra estado general; evidencias lista fotos subidas a Drive; entregas_cierre registra cada cierre completo con enlaces al PDF y metadatos.';
   }
 
   function _siteElementQuestion(item, origin = 'exteriores') {
@@ -1663,6 +1666,11 @@ const GuidedRegisterModule = (() => {
       return;
     }
     const packageData = mec.buildFinalDeliveryPackage(snap.completion);
+    if (mec.syncDraftToSheets) {
+      await mec.syncDraftToSheets('cierre', { silent: true }).catch(err => {
+        console.warn('[Registro guiado] No se pudo sincronizar borrador MEC antes del cierre:', err);
+      });
+    }
     const payload = _finalDeliveryPayload(snap, packageData);
     let result = null;
     try {
@@ -1686,6 +1694,15 @@ const GuidedRegisterModule = (() => {
       mec.printPlanPdf();
       _refreshSoon();
     }
+  }
+
+  async function _syncDraftToSheets() {
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.syncDraftToSheets) {
+      UI.showToast('El guardado en Sheets no esta disponible en esta version.', 'warning', 6500);
+      return;
+    }
+    await mec.syncDraftToSheets('manual', { silent: false }).catch(() => null);
   }
 
   function _finalDeliveryPayload(snap, packageData) {

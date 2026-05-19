@@ -43,6 +43,11 @@ const MecFormModule = (() => {
   let _schoolPlanResizeTimer = null;
   let _evidenceSyncRunning = false;
   let _evidenceOnlineBound = false;
+  let _draftSyncTimer = null;
+  let _draftSyncRunning = false;
+  let _lastDraftSyncAt = 0;
+  const DRAFT_SYNC_DEBOUNCE_MS = 18000;
+  const DRAFT_SYNC_MIN_INTERVAL_MS = 12000;
   const _sketchHistory = [];
   const _sketchRedo = [];
   const _planLayers = {
@@ -175,6 +180,7 @@ const MecFormModule = (() => {
     if (!_evidenceOnlineBound && typeof window !== 'undefined') {
       _evidenceOnlineBound = true;
       window.addEventListener('online', () => _syncPendingEvidenceUploads());
+      window.addEventListener('online', () => _scheduleDraftSync('online'));
     }
     _syncPendingEvidenceUploads();
   }
@@ -304,9 +310,124 @@ const MecFormModule = (() => {
       if (showToast) UI.showToast('Borrador MEC guardado en este dispositivo.', 'success');
       const state = document.getElementById('mec-save-state');
       if (state) state.textContent = _formatSavedAt(savedAt);
+      _scheduleDraftSync(showToast ? 'manual-local' : 'auto');
     } catch (err) {
       console.warn('[MEC] No se pudo guardar el borrador local:', err);
       UI.showToast('No se pudo guardar el borrador local. Revise espacio del dispositivo o sincronice evidencias.', 'warning', 7000);
+    }
+  }
+
+  function _scheduleDraftSync(reason = 'auto') {
+    if (typeof API === 'undefined' || !API.guardarBorradorMec) return;
+    if (typeof Auth === 'undefined' || !Auth.getToken || !Auth.getToken()) return;
+    const school = _draftSyncSchoolInfo();
+    if (!school.id_escuela && !school.codigo_local && !school.code) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    clearTimeout(_draftSyncTimer);
+    _draftSyncTimer = setTimeout(() => {
+      syncDraftToSheets(reason, { silent: true }).catch(err => console.warn('[MEC] No se pudo sincronizar borrador MEC:', err));
+    }, DRAFT_SYNC_DEBOUNCE_MS);
+  }
+
+  function _draftSyncSchoolInfo() {
+    const selected = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    const printable = _planPrintSchoolInfo();
+    return {
+      id_escuela: selected.id_escuela || selected.id || printable.code || '',
+      codigo_local: selected.codigo_local || selected.codigo || printable.code || '',
+      nombre_escuela: selected.nombre || selected.nombre_escuela || printable.name || '',
+      departamento: selected.departamento || printable.department || '',
+      distrito: selected.distrito || printable.district || '',
+      localidad: selected.localidad || printable.location || '',
+    };
+  }
+
+  function _draftSyncMutationId(id) {
+    const clean = String(id || 'sin-escuela').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 70);
+    return `MEC-DRAFT-${clean}`;
+  }
+
+  function _buildDraftSyncPayload(reason = 'manual') {
+    if (_data.__classroomSketch && _data.__classrooms && (_activeClassroomId || _data.__classroomSketch.id)) _syncActiveClassroomFromSketch();
+    _syncActiveBlock();
+    const school = _draftSyncSchoolInfo();
+    const id = school.id_escuela || school.codigo_local || school.code || '';
+    const counts = _finalDeliveryCounts();
+    const evidenceIndex = _buildEvidenceIndex();
+    const savedAtText = document.getElementById('mec-save-state')?.textContent || '';
+    return {
+      clientMutationId: _draftSyncMutationId(id),
+      id_escuela: school.id_escuela || '',
+      codigo_local: school.codigo_local || id,
+      nombre_escuela: school.nombre_escuela || '',
+      generated_at: new Date().toISOString(),
+      app_version: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version,
+      schema_version: MEC_SCHEMA.version,
+      motivo: reason,
+      estado_borrador: reason === 'cierre' ? 'cierre' : 'en_curso',
+      counts,
+      resumen: {
+        school,
+        counts,
+        evidenceCount: evidenceIndex.length,
+        savedAtText,
+        activeModule: _activeModuleId,
+        baseMapConfirmed: Boolean(_data.__planBaseMap?.confirmed),
+        storage: {
+          localStorage: STORAGE_KEY,
+          sheet: 'mec_borradores',
+        },
+      },
+      values: _finalDeliverySanitizedValues(),
+      evidenceIndex,
+    };
+  }
+
+  async function syncDraftToSheets(reason = 'manual', options = {}) {
+    const silent = options.silent === true;
+    const manual = !silent || reason === 'manual';
+    if (typeof API === 'undefined' || !API.guardarBorradorMec) {
+      if (manual) UI.showToast('El guardado en Sheets no esta disponible en esta version del backend.', 'warning', 7200);
+      return null;
+    }
+    if (typeof Auth === 'undefined' || !Auth.getToken || !Auth.getToken()) {
+      if (manual) UI.showToast('Inicie sesion para guardar el borrador en Google Sheets.', 'warning', 6200);
+      return null;
+    }
+    const nowMs = Date.now();
+    if (!manual && nowMs - _lastDraftSyncAt < DRAFT_SYNC_MIN_INTERVAL_MS) return null;
+    if (_draftSyncRunning) return null;
+    const payload = _buildDraftSyncPayload(reason);
+    if (!payload.id_escuela && !payload.codigo_local) {
+      if (manual) UI.showToast('Seleccione una escuela antes de guardar el borrador en Sheets.', 'warning', 6200);
+      return null;
+    }
+    _draftSyncRunning = true;
+    try {
+      const result = await API.guardarBorradorMec(payload);
+      if (result?.status && result.status !== 'ok') throw new Error(result.message || 'El servidor rechazo el borrador MEC.');
+      _lastDraftSyncAt = Date.now();
+      _data.__lastRemoteDraftSync = {
+        at: new Date().toISOString(),
+        status: result?.status || 'ok',
+        queued: Boolean(result?.queued),
+        sheet: result?.data?.sheet || 'mec_borradores',
+        id_borrador: result?.data?.id_borrador || payload.clientMutationId,
+      };
+      if (manual) {
+        if (result?.queued || result?.data?.offline) {
+          UI.showToast('Sin conexion: el borrador MEC quedo en cola local para subir a Sheets.', 'warning', 7600);
+        } else {
+          UI.showToast('Borrador MEC guardado en Google Sheets: hoja mec_borradores.', 'success', 6800);
+        }
+      }
+      return result;
+    } catch (err) {
+      console.error('[MEC] Error al guardar borrador MEC en Sheets:', err);
+      if (manual) UI.showToast(`No se pudo guardar en Sheets: ${err.message}`, 'warning', 7600);
+      throw err;
+    } finally {
+      _draftSyncRunning = false;
     }
   }
 
@@ -10981,10 +11102,11 @@ const MecFormModule = (() => {
     if (previous) selectModule(previous.id);
   }
 
-  function saveNow() {
+  async function saveNow() {
     _saveDraft(false);
     _updateProgress();
-    UI.showToast('Autoguardado activo: los cambios ya se guardan solos.', 'info');
+    UI.showToast('Borrador local guardado. Sincronizando con Google Sheets...', 'info', 4200);
+    await syncDraftToSheets('manual', { silent: false }).catch(() => null);
   }
 
   function saveSketchAndNext() {
@@ -19955,6 +20077,7 @@ const MecFormModule = (() => {
         recipientEmail: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.FINAL_REPORT_EMAIL : '',
         sheets: [
           'escuelas_seleccionadas',
+          'mec_borradores',
           'sesiones_relevamiento',
           'modulos_relevamiento',
           'evidencias',
@@ -20260,6 +20383,7 @@ const MecFormModule = (() => {
     exportPlanPng,
     printPlanPdf,
     buildFinalDeliveryPackage,
+    syncDraftToSheets,
     setSketchZoom,
     setSanitaryZoom,
     setSchoolPlanZoom,

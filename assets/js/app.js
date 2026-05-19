@@ -479,7 +479,7 @@ const AppController = (() => {
     if (APP_CONFIG.SPREADSHEET_URL) {
       nav.insertAdjacentHTML('beforeend', `
         <li class="nav-item nav-item--external">
-          <a href="#" onclick="AppController.openWorkbook(); return false;" title="Abrir Google Sheets: escuelas, sesiones, evidencias y entregas finales">
+          <a href="#" onclick="AppController.openWorkbook(); return false;" title="Abrir Google Sheets: mec_borradores, escuelas, evidencias y entregas finales">
             <span class="nav-icon">LB</span>
             <span class="nav-label">Datos en Sheets</span>
           </a>
@@ -697,7 +697,7 @@ const AppController = (() => {
   }
 
   function openWorkbook() {
-    UI.showToast('Se abre Google Sheets. Los cierres completos quedan en la hoja entregas_cierre; el avance por escuela queda en escuelas_seleccionadas y las fotos en evidencias.', 'info', 9000);
+    UI.showToast('Se abre Google Sheets. Durante la carga revise mec_borradores; el estado general esta en escuelas_seleccionadas, fotos en evidencias y cierres en entregas_cierre.', 'info', 10000);
     _openConfiguredUrl(APP_CONFIG.SPREADSHEET_URL, 'El libro en línea');
   }
 
