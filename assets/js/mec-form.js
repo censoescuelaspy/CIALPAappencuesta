@@ -15,6 +15,9 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_DEFAULT_SCALE = 2.5;
   const PLAN_BASEMAP_MIN_SCALE = .25;
   const PLAN_BASEMAP_MAX_SCALE = 24;
+  const PLAN_BASEMAP_DEFAULT_OPACITY = .84;
+  const PLAN_BASEMAP_DEFAULT_CONTRAST = 1.18;
+  const PLAN_BASEMAP_DEFAULT_SATURATION = 1.08;
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
@@ -34,6 +37,7 @@ const MecFormModule = (() => {
   let _planMoveMode = false;
   let _planRibbonTab = 'editar';
   let _planBaseMapPanelOpen = false;
+  let _planBaseMapDragMode = false;
   let _activeCanvasZoom = 1;
   let _schoolPlanResizeBound = false;
   let _schoolPlanResizeTimer = null;
@@ -818,10 +822,13 @@ const MecFormModule = (() => {
       lat: coords.lat,
       lng: coords.lng,
       zoom: PLAN_BASEMAP_DEFAULT_ZOOM,
-      opacity: .56,
+      opacity: PLAN_BASEMAP_DEFAULT_OPACITY,
       scale: PLAN_BASEMAP_DEFAULT_SCALE,
       offsetX: 0,
       offsetY: 0,
+      rotationDeg: 0,
+      contrast: PLAN_BASEMAP_DEFAULT_CONTRAST,
+      saturation: PLAN_BASEMAP_DEFAULT_SATURATION,
       savedAt: '',
       confirmed: false,
     };
@@ -842,10 +849,25 @@ const MecFormModule = (() => {
     return _numberInRange(value, fallback, PLAN_BASEMAP_MIN_SCALE, PLAN_BASEMAP_MAX_SCALE);
   }
 
+  function _planBaseMapRotationDeg(value = 0) {
+    const number = Number(value) || 0;
+    const normalized = ((((number + 180) % 360) + 360) % 360) - 180;
+    return Number(normalized.toFixed(2));
+  }
+
+  function _planBaseMapCssFilter(baseMap = _data.__planBaseMap) {
+    const contrast = _numberInRange(baseMap?.contrast, PLAN_BASEMAP_DEFAULT_CONTRAST, .75, 1.75);
+    const saturation = _numberInRange(baseMap?.saturation, PLAN_BASEMAP_DEFAULT_SATURATION, .5, 1.8);
+    return `contrast(${_cssNumber(contrast)}) saturate(${_cssNumber(saturation)})`;
+  }
+
   function _preferClosePlanBaseMapView(baseMap) {
     if (!baseMap || baseMap.confirmed) return baseMap;
     if (Number(baseMap.zoom || 0) < PLAN_BASEMAP_DEFAULT_ZOOM) baseMap.zoom = PLAN_BASEMAP_DEFAULT_ZOOM;
     if (Number(baseMap.scale || 0) < PLAN_BASEMAP_DEFAULT_SCALE) baseMap.scale = PLAN_BASEMAP_DEFAULT_SCALE;
+    if (!Number.isFinite(Number(baseMap.opacity)) || Number(baseMap.opacity) <= .56) baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
+    if (!Number.isFinite(Number(baseMap.contrast))) baseMap.contrast = PLAN_BASEMAP_DEFAULT_CONTRAST;
+    if (!Number.isFinite(Number(baseMap.saturation))) baseMap.saturation = PLAN_BASEMAP_DEFAULT_SATURATION;
     return baseMap;
   }
 
@@ -919,10 +941,13 @@ const MecFormModule = (() => {
     merged.lat = merged.lat === '' ? '' : _numberInRange(merged.lat, defaults.lat === '' ? '' : defaults.lat, -85, 85);
     merged.lng = merged.lng === '' ? '' : _numberInRange(merged.lng, defaults.lng === '' ? '' : defaults.lng, -180, 180);
     merged.zoom = _clampPlanBaseMapZoom(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM);
-    merged.opacity = _numberInRange(merged.opacity, .56, .15, .95);
+    merged.opacity = _numberInRange(merged.opacity, PLAN_BASEMAP_DEFAULT_OPACITY, .15, 1);
     merged.scale = _clampPlanBaseMapScale(merged.scale, PLAN_BASEMAP_DEFAULT_SCALE);
     merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
     merged.offsetY = _numberInRange(merged.offsetY, 0, -2000, 2000);
+    merged.rotationDeg = _planBaseMapRotationDeg(merged.rotationDeg ?? merged.rotacion_grados ?? merged.rotation ?? 0);
+    merged.contrast = _numberInRange(merged.contrast, PLAN_BASEMAP_DEFAULT_CONTRAST, .75, 1.75);
+    merged.saturation = _numberInRange(merged.saturation, PLAN_BASEMAP_DEFAULT_SATURATION, .5, 1.8);
     merged.enabled = Boolean(merged.enabled);
     merged.confirmed = Boolean(merged.confirmed);
     _data.__planBaseMap = merged;
@@ -986,10 +1011,19 @@ const MecFormModule = (() => {
       y: logicalHeight / 2 + Number(baseMap.offsetY || 0),
     };
     const mapScale = Number(baseMap.scale || 1);
-    const minWorldX = centerWorld.x + (0 - centerCanvas.x) / mapScale;
-    const maxWorldX = centerWorld.x + (logicalWidth - centerCanvas.x) / mapScale;
-    const minWorldY = centerWorld.y + (0 - centerCanvas.y) / mapScale;
-    const maxWorldY = centerWorld.y + (logicalHeight - centerCanvas.y) / mapScale;
+    const rotation = Math.abs(Number(baseMap.rotationDeg || 0));
+    const rotated = rotation > .01 && Math.abs(rotation - 180) > .01;
+    const halfW = logicalWidth / 2;
+    const halfH = logicalHeight / 2;
+    const radius = rotated ? Math.hypot(halfW, halfH) : 0;
+    const minPlanX = rotated ? halfW - radius : 0;
+    const maxPlanX = rotated ? halfW + radius : logicalWidth;
+    const minPlanY = rotated ? halfH - radius : 0;
+    const maxPlanY = rotated ? halfH + radius : logicalHeight;
+    const minWorldX = centerWorld.x + (minPlanX - centerCanvas.x) / mapScale;
+    const maxWorldX = centerWorld.x + (maxPlanX - centerCanvas.x) / mapScale;
+    const minWorldY = centerWorld.y + (minPlanY - centerCanvas.y) / mapScale;
+    const maxWorldY = centerWorld.y + (maxPlanY - centerCanvas.y) / mapScale;
     const minTileX = Math.floor(minWorldX / PLAN_BASEMAP_TILE_SIZE) - 1;
     const maxTileX = Math.ceil(maxWorldX / PLAN_BASEMAP_TILE_SIZE) + 1;
     const minTileY = Math.floor(minWorldY / PLAN_BASEMAP_TILE_SIZE) - 1;
@@ -1049,6 +1083,10 @@ const MecFormModule = (() => {
       baseMap.scale,
       baseMap.offsetX,
       baseMap.offsetY,
+      baseMap.rotationDeg,
+      baseMap.contrast,
+      baseMap.saturation,
+      _planBaseMapDragMode ? 1 : 0,
       logicalWidth,
       logicalHeight,
       _schoolPlanZoom,
@@ -1062,12 +1100,16 @@ const MecFormModule = (() => {
       return '<div class="school-plan-basemap school-plan-basemap--empty" data-plan-basemap aria-hidden="true"></div>';
     }
     const items = _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale);
+    const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
+    const originX = (logicalWidth * displayScale) / 2;
+    const originY = (logicalHeight * displayScale) / 2;
+    const filter = _planBaseMapCssFilter(baseMap);
     const images = items.map(item => `
       <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
         style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`).join('');
     return `
       <div class="school-plan-basemap" data-plan-basemap aria-hidden="true">
-        <div class="school-plan-basemap__tiles" style="opacity:${_cssNumber(baseMap.opacity)}">${images}</div>
+        <div class="school-plan-basemap__tiles" style="opacity:${_cssNumber(baseMap.opacity)};filter:${filter};transform:rotate(${_cssNumber(rotation)}deg);transform-origin:${_cssNumber(originX)}px ${_cssNumber(originY)}px;">${images}</div>
         <span class="school-plan-basemap__attribution">${_planBaseMapAttribution()}</span>
       </div>`;
   }
@@ -1078,9 +1120,11 @@ const MecFormModule = (() => {
     const items = _planBaseMapTileItems(logicalWidth, logicalHeight, 1);
     if (!items.length) return '';
     const id = `plan-basemap-clip-${Date.now().toString(36)}`;
+    const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
+    const transform = rotation ? ` transform="rotate(${_cssNumber(rotation)} ${_cssNumber(logicalWidth / 2)} ${_cssNumber(logicalHeight / 2)})"` : '';
     return `
       <defs><clipPath id="${id}"><rect x="0" y="0" width="${_cssNumber(logicalWidth)}" height="${_cssNumber(logicalHeight)}"/></clipPath></defs>
-      <g clip-path="url(#${id})" opacity="${_cssNumber(baseMap.opacity)}">
+      <g clip-path="url(#${id})" opacity="${_cssNumber(baseMap.opacity)}"${transform}>
         ${items.map(item => `<image href="${_escape(item.url)}" x="${_cssNumber(item.x)}" y="${_cssNumber(item.y)}" width="${_cssNumber(item.w)}" height="${_cssNumber(item.h)}" preserveAspectRatio="none"/>`).join('')}
       </g>`;
   }
@@ -1130,6 +1174,7 @@ const MecFormModule = (() => {
       <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
         <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Calles activo' : 'Calles/lineas'}</button>
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
+        <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
         <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base mapa</button>
         <small>${_escape(coords)}</small>
       </div>`;
@@ -1139,6 +1184,9 @@ const MecFormModule = (() => {
     if (!_planBaseMapPanelOpen) return '';
     const baseMap = _ensurePlanBaseMap();
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
+    const dragHint = _planBaseMapDragMode
+      ? 'Arrastre sobre el plano para mover la base. Use la rueda sin Ctrl para escalar la base.'
+      : 'Active Mover base para arrastrar calles y lineas sin mover bloques.';
     return `
       <section class="school-plan-basemap-panel" aria-label="Configuracion de base mapa">
         <div class="school-plan-basemap-panel__header">
@@ -1146,6 +1194,7 @@ const MecFormModule = (() => {
             <span>Base de calles y lineas calibrable</span>
             <strong>${_escape(_planBaseMapMetricText(900, _planCanvasHeight()))}</strong>
             <small>${_escape(savedText)}</small>
+            <small>${_escape(dragHint)}</small>
           </div>
           <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.useSchoolCoordinatesForBaseMap()">Usar coordenadas escuela</button>
         </div>
@@ -1164,15 +1213,31 @@ const MecFormModule = (() => {
             <input type="range" min="${PLAN_BASEMAP_MIN_SCALE}" max="${PLAN_BASEMAP_MAX_SCALE}" step="0.05" value="${_escape(baseMap.scale)}" onchange="MecFormModule.setPlanBaseMapValue('scale', this.value)">
             <b>${Number(baseMap.scale).toFixed(2)}x</b>
           </label>
+          <label>Rotacion base
+            <input type="range" min="-180" max="180" step="1" value="${_escape(baseMap.rotationDeg)}" onchange="MecFormModule.setPlanBaseMapValue('rotationDeg', this.value)">
+            <b>${Number(baseMap.rotationDeg).toFixed(0)} grados</b>
+          </label>
           <label>Opacidad
-            <input type="range" min="0.15" max="0.95" step="0.05" value="${_escape(baseMap.opacity)}" onchange="MecFormModule.setPlanBaseMapValue('opacity', this.value)">
+            <input type="range" min="0.15" max="1" step="0.05" value="${_escape(baseMap.opacity)}" onchange="MecFormModule.setPlanBaseMapValue('opacity', this.value)">
             <b>${Math.round(Number(baseMap.opacity) * 100)}%</b>
+          </label>
+          <label>Nitidez / contraste
+            <input type="range" min="0.75" max="1.75" step="0.05" value="${_escape(baseMap.contrast)}" onchange="MecFormModule.setPlanBaseMapValue('contrast', this.value)">
+            <b>${Math.round(Number(baseMap.contrast) * 100)}%</b>
+          </label>
+          <label>Color de lineas
+            <input type="range" min="0.5" max="1.8" step="0.05" value="${_escape(baseMap.saturation)}" onchange="MecFormModule.setPlanBaseMapValue('saturation', this.value)">
+            <b>${Math.round(Number(baseMap.saturation) * 100)}%</b>
           </label>
         </div>
         <div class="school-plan-basemap-panel__adjust">
           <div class="school-plan-basemap-panel__scale">
+            <button type="button" class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.zoomPlanBaseMap(0.8)">Alejar base</button>
             <button type="button" class="btn btn-primary btn-sm" onclick="MecFormModule.zoomPlanBaseMap(1.25)">Acercar base</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.rotatePlanBaseMap(-2)">Girar izq.</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.rotatePlanBaseMap(2)">Girar der.</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="MecFormModule.enhancePlanBaseMap()">Realzar lineas</button>
           </div>
           <div class="school-plan-basemap-panel__nudge">
             <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.nudgePlanBaseMap(0, -20)" aria-label="Mover base arriba">&#8593;</button>
@@ -1188,6 +1253,7 @@ const MecFormModule = (() => {
               <input type="number" step="1" value="${_escape(Math.round(baseMap.offsetY))}" onchange="MecFormModule.setPlanBaseMapValue('offsetY', this.value)">
             </label>
             <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.resetPlanBaseMapOffset()">Centrar base</button>
+            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.resetPlanBaseMapTransform()">Reiniciar ajuste</button>
           </div>
         </div>
       </section>`;
@@ -1199,9 +1265,12 @@ const MecFormModule = (() => {
     if (baseMap.enabled && !_planBaseMapHasCoords(baseMap)) {
       _planBaseMapPanelOpen = true;
       baseMap.enabled = false;
+      _planBaseMapDragMode = false;
       UI.showToast('Cargue latitud y longitud para activar la base de calles y lineas.', 'warning', 5200);
     } else if (baseMap.enabled) {
       _preferClosePlanBaseMapView(baseMap);
+    } else {
+      _planBaseMapDragMode = false;
     }
     _saveDraft(false);
     renderSchoolPlan();
@@ -1212,13 +1281,33 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function togglePlanBaseMapDragMode() {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapDragMode && !_planBaseMapHasCoords(baseMap)) {
+      _planBaseMapPanelOpen = true;
+      renderSchoolPlan();
+      UI.showToast('Cargue coordenadas antes de mover la base mapa.', 'warning', 5200);
+      return;
+    }
+    if (!_planBaseMapDragMode) {
+      baseMap.enabled = true;
+      _preferClosePlanBaseMapView(baseMap);
+    }
+    _planBaseMapDragMode = !_planBaseMapDragMode;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function setPlanBaseMapValue(key, value) {
     const baseMap = _ensurePlanBaseMap();
     if (key === 'lat') baseMap.lat = value === '' ? '' : _numberInRange(value, baseMap.lat || 0, -85, 85);
     if (key === 'lng') baseMap.lng = value === '' ? '' : _numberInRange(value, baseMap.lng || 0, -180, 180);
     if (key === 'zoom') baseMap.zoom = _clampPlanBaseMapZoom(value, baseMap.zoom);
     if (key === 'scale') baseMap.scale = _clampPlanBaseMapScale(value, baseMap.scale);
-    if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, .95);
+    if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, 1);
+    if (key === 'rotationDeg') baseMap.rotationDeg = _planBaseMapRotationDeg(value);
+    if (key === 'contrast') baseMap.contrast = _numberInRange(value, baseMap.contrast, .75, 1.75);
+    if (key === 'saturation') baseMap.saturation = _numberInRange(value, baseMap.saturation, .5, 1.8);
     if (key === 'offsetX') baseMap.offsetX = _numberInRange(value, baseMap.offsetX, -2000, 2000);
     if (key === 'offsetY') baseMap.offsetY = _numberInRange(value, baseMap.offsetY, -2000, 2000);
     if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
@@ -1231,6 +1320,26 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     const ratio = Number(factor) || 1;
     baseMap.scale = _clampPlanBaseMapScale(Number(baseMap.scale || PLAN_BASEMAP_DEFAULT_SCALE) * ratio, baseMap.scale);
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function rotatePlanBaseMap(delta = 0) {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.rotationDeg = _planBaseMapRotationDeg(Number(baseMap.rotationDeg || 0) + Number(delta || 0));
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function enhancePlanBaseMap() {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.opacity = .92;
+    baseMap.contrast = 1.35;
+    baseMap.saturation = 1.18;
     if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
     baseMap.confirmed = false;
     _saveDraft(false);
@@ -1250,6 +1359,20 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     baseMap.offsetX = 0;
     baseMap.offsetY = 0;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function resetPlanBaseMapTransform() {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.offsetX = 0;
+    baseMap.offsetY = 0;
+    baseMap.rotationDeg = 0;
+    baseMap.scale = PLAN_BASEMAP_DEFAULT_SCALE;
+    baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
+    baseMap.contrast = PLAN_BASEMAP_DEFAULT_CONTRAST;
+    baseMap.saturation = PLAN_BASEMAP_DEFAULT_SATURATION;
     baseMap.confirmed = false;
     _saveDraft(false);
     renderSchoolPlan();
@@ -1282,6 +1405,7 @@ const MecFormModule = (() => {
     baseMap.enabled = true;
     baseMap.confirmed = true;
     baseMap.savedAt = new Date().toISOString();
+    _planBaseMapDragMode = false;
     _saveDraft(false);
     renderSchoolPlan();
     UI.showToast('Base mapa guardada para construir el plano sobre calles y lineas de referencia.', 'success', 5600);
@@ -11271,7 +11395,7 @@ const MecFormModule = (() => {
               ${_renderPlanFloatingActions()}
               <div class="school-plan__canvas-stage" style="${_schoolPlanStageStyle(canvasWidth, canvasHeight)}">
                 ${_renderPlanBaseMapLayer(canvasWidth, canvasHeight)}
-                <canvas id="${canvasId}" data-school-plan-canvas width="${canvasWidth}" height="${canvasHeight}" style="width:${Math.round(canvasWidth * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
+                <canvas id="${canvasId}" class="${_planBaseMapDragMode ? 'school-plan__canvas--basemap-drag' : ''}" data-school-plan-canvas width="${canvasWidth}" height="${canvasHeight}" style="width:${Math.round(canvasWidth * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
               </div>
             </div>
           </div>
@@ -11423,6 +11547,16 @@ const MecFormModule = (() => {
           active: _planBaseMapPanelOpen,
           title: 'Ajustar base mapa',
         })}
+        ${_renderPlanRibbonButton({
+          icon: '&#8596;',
+          label: _planBaseMapDragMode ? 'Mover on' : 'Mover',
+          onClick: 'MecFormModule.togglePlanBaseMapDragMode()',
+          tone: _planBaseMapDragMode ? 'btn-primary' : 'btn-outline',
+          active: _planBaseMapDragMode,
+          title: 'Arrastrar la base mapa para alinearla con el plano',
+        })}
+        ${_renderPlanRibbonButton({ icon: '-', label: 'Base -', onClick: 'MecFormModule.zoomPlanBaseMap(0.8)', title: 'Alejar base mapa' })}
+        ${_renderPlanRibbonButton({ icon: '+', label: 'Base +', onClick: 'MecFormModule.zoomPlanBaseMap(1.25)', title: 'Acercar base mapa' })}
         ${_renderPlanRibbonButton({ icon: '&#10003;', label: 'Guardar', onClick: 'MecFormModule.savePlanBaseMap()', tone: 'btn-success', title: 'Guardar base mapa' })}
         <small>${_escape(coords)}</small>
       </div>`;
@@ -13043,7 +13177,7 @@ const MecFormModule = (() => {
     _planHitAreas = [];
     _planTransformStack = [];
     ctx.clearRect(0, 0, logical.width, logical.height);
-    ctx.fillStyle = _planBaseMapVisible(_data.__planBaseMap) ? 'rgba(248,250,252,.28)' : '#f8fafc';
+    ctx.fillStyle = _planBaseMapVisible(_data.__planBaseMap) ? 'rgba(248,250,252,.10)' : '#f8fafc';
     ctx.fillRect(0, 0, logical.width, logical.height);
     _drawSchoolPlanGrid(ctx, logical);
 
@@ -17611,6 +17745,7 @@ const MecFormModule = (() => {
     let rotateDrag = null;
     let resizeDrag = null;
     let vertexDrag = null;
+    let baseMapDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
     let lastTap = null;
@@ -17637,6 +17772,15 @@ const MecFormModule = (() => {
       if (!points.length) return null;
       const sum = points.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 });
       return { x: sum.x / points.length, y: sum.y / points.length };
+    };
+    const canDragBaseMap = () => Boolean(_planBaseMapDragMode && _planBaseMapVisible(_ensurePlanBaseMap()));
+    const applyBaseMapDrag = currentPoint => {
+      if (!baseMapDrag) return;
+      const baseMap = _ensurePlanBaseMap();
+      baseMap.offsetX = _numberInRange(baseMapDrag.offsetX + currentPoint.x - baseMapDrag.start.x, 0, -2000, 2000);
+      baseMap.offsetY = _numberInRange(baseMapDrag.offsetY + currentPoint.y - baseMapDrag.start.y, 0, -2000, 2000);
+      baseMap.confirmed = false;
+      _refreshPlanBaseMapLayer(canvas, true);
     };
     const siteAreaFromPoint = point => {
       if (!_planLayers.exteriores) return null;
@@ -17822,8 +17966,23 @@ const MecFormModule = (() => {
         rotateDrag = null;
         resizeDrag = null;
         vertexDrag = null;
+        baseMapDrag = null;
         suppressClickUntil = Date.now() + 350;
         canvas.setPointerCapture?.(event.pointerId);
+        event.preventDefault();
+        return;
+      }
+      if (canDragBaseMap()) {
+        pointerStart = pointFromEvent(event);
+        const baseMap = _ensurePlanBaseMap();
+        baseMapDrag = {
+          start: pointerStart,
+          offsetX: Number(baseMap.offsetX || 0),
+          offsetY: Number(baseMap.offsetY || 0),
+        };
+        pointerCandidate = null;
+        canvas.setPointerCapture?.(event.pointerId);
+        suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
       }
@@ -17881,6 +18040,12 @@ const MecFormModule = (() => {
         return;
       }
       const currentPoint = pointFromEvent(event);
+      if (baseMapDrag) {
+        applyBaseMapDrag(currentPoint);
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
       if (rotateDrag) {
         const angle = angleFromCenter(rotateDrag.center, currentPoint);
         const rotation = _planRotationDeg(rotateDrag.startRotation + angle - rotateDrag.startAngle);
@@ -18033,6 +18198,17 @@ const MecFormModule = (() => {
         rotateDrag = null;
         resizeDrag = null;
         vertexDrag = null;
+        baseMapDrag = null;
+        event.preventDefault();
+        return;
+      }
+      if (baseMapDrag) {
+        baseMapDrag = null;
+        pointerCandidate = null;
+        pointerStart = null;
+        _saveDraft(false);
+        renderSchoolPlan();
+        suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
       }
@@ -18147,6 +18323,7 @@ const MecFormModule = (() => {
       rotateDrag = null;
       resizeDrag = null;
       vertexDrag = null;
+      baseMapDrag = null;
       _activePlanDrag = null;
     });
     canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);
@@ -18171,6 +18348,12 @@ const MecFormModule = (() => {
       selectArea(area);
     });
     canvas.addEventListener('wheel', event => {
+      if (_planBaseMapDragMode && _planBaseMapVisible(_data.__planBaseMap) && !event.ctrlKey && !event.metaKey) {
+        event.preventDefault();
+        zoomPlanBaseMap(event.deltaY > 0 ? (1 / 1.08) : 1.08);
+        suppressClickUntil = Date.now() + 350;
+        return;
+      }
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
       const direction = event.deltaY > 0 ? (1 / 1.15) : 1.15;
@@ -19993,10 +20176,14 @@ const MecFormModule = (() => {
     togglePlanMoveMode,
     togglePlanBaseMap,
     togglePlanBaseMapPanel,
+    togglePlanBaseMapDragMode,
     setPlanBaseMapValue,
     zoomPlanBaseMap,
+    rotatePlanBaseMap,
+    enhancePlanBaseMap,
     nudgePlanBaseMap,
     resetPlanBaseMapOffset,
+    resetPlanBaseMapTransform,
     useSchoolCoordinatesForBaseMap,
     savePlanBaseMap,
     exportPlanJson,

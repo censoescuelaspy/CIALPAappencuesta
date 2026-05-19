@@ -4,6 +4,30 @@
 
 ---
 
+## Base mapa calibrable y mas nitida - 2026-05-19 - v2.6.51
+
+### Objetivo
+- Permitir mover, rotar, acercar/alejar y realzar la base de calles antes de dibujar los bloques.
+- Mejorar la lectura de la base mapa para que sus lineas no queden demasiado opacas.
+
+### Cambios implementados
+- La base mapa incorpora modo `Mover base`, que permite arrastrar calles y lineas directamente sobre el plano sin seleccionar ni mover bloques.
+- El panel `Base mapa` agrega rotacion, contraste/nitidez, color de lineas, opacidad hasta `100%`, giro fino izquierda/derecha y reinicio completo del ajuste.
+- La rueda del mouse ajusta la escala de la base cuando `Mover base` esta activo; el zoom normal del plano con `Ctrl` se conserva.
+- Las teselas de la base cubren correctamente el canvas aun cuando la base esta rotada.
+- El dibujo del plano deja la capa inferior mas visible y reduce la cuadricula blanca superpuesta sobre las calles.
+- Se agrego un preset `Realzar lineas` para subir opacidad, contraste y color de la referencia.
+- Version y cache actualizados a `v2.6.51`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Cambio de escuela con borrador propio y pisos editables - 2026-05-19 - v2.6.50
 
 ### Objetivo
