@@ -4,6 +4,33 @@
 
 ---
 
+## Ajustes de flujo guiado, logistica y edicion tactil - 2026-05-19 - v2.6.44
+
+### Objetivo
+- Mantener visible la escuela activa durante la carga.
+- Recuperar el acceso a planificacion/logistica y mejorar la confianza al editar fichas y objetos del plano.
+
+### Cambios implementados
+- `Registro guiado`, cuestionario MEC y plano muestran una banda de `Escuela activa` con codigo/ubicacion y acceso a `Mapa`.
+- El menu lateral recupera `Mi Jornada` y `Planificacion`, respetando permisos existentes.
+- Las preguntas de calidad/caracteristicas quedan como recomendadas en la tarjeta superior y ya no bloquean la confirmacion cuando posicion y dimensiones estan completas.
+- Las fichas de ambientes y sanitarios agregan `Guardar ficha`, cerrando el tiempo operativo del elemento y reforzando el guardado manual.
+- El boton `Instalar` en iPad/iPhone abre instrucciones especificas para Safari y `Agregar a pantalla de inicio`.
+- Doble clic o doble toque sobre elementos del plano centra el objeto y ajusta zoom antes de abrir la ficha.
+- El plano incorpora un boton flotante `Ficha` siempre visible cuando hay seleccion.
+- Se recupero la accion `Apertura` para puertas seleccionadas desde el plano general, tanto en aulas/ambientes como en sanitarios.
+- Version y cache actualizados a `v2.6.44`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Correcciones de auditoria integral - 2026-05-19 - v2.6.43
 
 ### Objetivo

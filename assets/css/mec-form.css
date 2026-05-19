@@ -72,6 +72,55 @@
   font-size: .92rem;
 }
 
+.mec-school-context {
+  position: sticky;
+  top: 0;
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .75rem;
+  padding: .62rem .75rem;
+  background: #ffffff;
+  border: 1px solid #cfe0f3;
+  border-left: 5px solid #2b6cb0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-school-context--compact {
+  position: relative;
+  top: auto;
+  z-index: 1;
+  margin-bottom: .55rem;
+}
+
+.mec-school-context div {
+  min-width: 0;
+}
+
+.mec-school-context span,
+.mec-school-context small {
+  display: block;
+  color: #607086;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.mec-school-context span {
+  color: #2b6cb0;
+  text-transform: uppercase;
+}
+
+.mec-school-context strong {
+  display: block;
+  color: #172033;
+  font-size: .98rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
 .mec-shell {
   display: grid;
   grid-template-columns: 204px minmax(0, 1fr);
@@ -2153,12 +2202,40 @@
 }
 
 .school-plan__canvas-wrap {
+  position: relative;
   width: 100%;
   max-height: 72vh;
   overflow: auto;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
   background: #f8fafc;
+}
+
+.school-plan-floating-actions {
+  position: sticky;
+  top: .55rem;
+  left: .55rem;
+  z-index: 18;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  max-width: min(520px, calc(100vw - 3rem));
+  margin: .55rem;
+  padding: .35rem .45rem;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid #cfe0f3;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
+}
+
+.school-plan-floating-actions span {
+  min-width: 0;
+  color: #27364a;
+  font-size: .78rem;
+  font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .school-plan__canvas-stage {
@@ -2655,6 +2732,11 @@
 }
 
 @media (max-width: 600px) {
+  .mec-school-context {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .mec-command__stats,
   .mec-field-grid,
   .mec-rail__actions {

@@ -531,6 +531,40 @@ const MecFormModule = (() => {
     };
   }
 
+  function _activeSchoolContext() {
+    const selected = _selectedSchoolFromContext() || _data.__selectedSchool || {};
+    const general = _data.general || {};
+    const code = _firstPresent(selected, ['codigo_establecimiento', 'codigo_local', 'codigo', 'CODIGO', 'id_escuela', 'id']) ||
+      general.codigo_establecimiento || general.codigo_local || '';
+    const name = _firstPresent(selected, ['nombre', 'nombre_escuela', 'institucion', 'NOMBRE', 'nombre_establecimiento']) ||
+      general.nombre_institucion || general.nombre_establecimiento || '';
+    const location = [
+      general.departamento || selected.departamento,
+      general.distrito || selected.distrito,
+      general.localidad || selected.localidad,
+    ].filter(Boolean).join(' / ');
+    return {
+      code,
+      name,
+      location,
+      hasSchool: Boolean(code || name),
+      meta: [code ? `Codigo ${code}` : '', location].filter(Boolean).join(' - '),
+    };
+  }
+
+  function _renderSchoolContextBar(compact = false) {
+    const school = _activeSchoolContext();
+    return `
+      <section class="mec-school-context ${compact ? 'mec-school-context--compact' : ''}" aria-label="Escuela activa">
+        <div>
+          <span>Escuela activa</span>
+          <strong>${_escape(school.name || 'Sin escuela seleccionada')}</strong>
+          <small>${_escape(school.meta || 'Seleccione una escuela desde el mapa antes de iniciar la carga.')}</small>
+        </div>
+        <button class="btn btn-outline btn-sm" type="button" onclick="AppController.showModule('mapa')">Cambiar escuela</button>
+      </section>`;
+  }
+
   function _fieldEvidenceContext(moduleId, fieldId) {
     const module = MEC_SCHEMA.modules.find(item => item.id === moduleId);
     const field = module?.sections.flatMap(section => section.fields).find(item => item.id === fieldId);
@@ -1257,6 +1291,8 @@ const MecFormModule = (() => {
           </div>
         </div>
       </div>
+
+      ${_renderSchoolContextBar()}
 
       <div class="mec-shell">
         <aside class="mec-rail">
@@ -5606,6 +5642,7 @@ const MecFormModule = (() => {
       return;
     }
     const locked = _isSanitaryLocked(item);
+    _startTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
     const modalId = 'modal-sanitary-ficha';
     document.getElementById(modalId)?.remove();
     const modal = document.createElement('div');
@@ -5664,11 +5701,28 @@ const MecFormModule = (() => {
         <div class="modal__footer">
           <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setSanitaryLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
           <button class="btn btn-danger" onclick="MecFormModule.deleteSanitary('${_escape(item.id)}')" ${locked ? 'disabled' : ''}>Eliminar sanitario</button>
+          <button class="btn btn-success" onclick="MecFormModule.saveSanitaryFicha()" ${locked ? 'disabled' : ''}>Guardar ficha</button>
           <button class="btn btn-primary" onclick="MecFormModule.closeSanitaryFicha()">Cerrar ficha</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
     UI.openModal(modalId);
+  }
+
+  function saveSanitaryFicha() {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
+    if (!item) {
+      UI.showToast('Seleccione un sanitario para guardar la ficha.', 'warning');
+      return;
+    }
+    if (_isSanitaryLocked(item)) {
+      UI.showToast('El sanitario esta bloqueado. Desbloqueelo para guardar cambios.', 'warning');
+      return;
+    }
+    const record = _finishTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast(`Ficha sanitaria guardada${record?.durationSeconds ? ` (${_formatDuration(record.durationSeconds)})` : ''}.`, 'success');
   }
 
   function closeSanitaryFicha() {
@@ -9897,6 +9951,38 @@ const MecFormModule = (() => {
     return _canvasViewportCenterPoint(wrap, zoom);
   }
 
+  function _planAreaFocusPoint(area) {
+    const rect = _planAreaBaseRect(area) || area;
+    if (!rect) return null;
+    const x = Number(rect.x);
+    const y = Number(rect.y);
+    const w = Number(rect.w);
+    const h = Number(rect.h);
+    if (![x, y, w, h].every(Number.isFinite)) return null;
+    return { x: x + w / 2, y: y + h / 2 };
+  }
+
+  function _focusSchoolPlanArea(area, options = {}) {
+    const canvas = _activeSchoolPlanCanvas();
+    const wrap = canvas?.closest('.school-plan__canvas-wrap');
+    const rect = _planAreaBaseRect(area) || area;
+    const point = _planAreaFocusPoint(area);
+    if (!canvas || !wrap || !rect || !point) return;
+    const maxSide = Math.max(1, Math.max(Number(rect.w || 0), Number(rect.h || 0)));
+    const fitZoom = Math.min(
+      (wrap.clientWidth * .72) / maxSide,
+      (wrap.clientHeight * .62) / Math.max(1, Number(rect.h || 0))
+    );
+    const targetZoom = Math.max(_schoolPlanZoom, Math.min(12, Math.max(1.35, fitZoom || 1.35)));
+    _setSchoolPlanZoomValue(options.zoom || targetZoom, {
+      point,
+      viewportPoint: {
+        x: wrap.clientWidth / 2,
+        y: wrap.clientHeight / 2,
+      },
+    });
+  }
+
   function _centerSketchOnActiveRoom(force = false) {
     if (!force && !_pendingSketchCenter) return;
     const wrap = document.querySelector('.mec-sketch-canvas-wrap');
@@ -10760,6 +10846,7 @@ const MecFormModule = (() => {
     const locked = _isClassroomLocked(room);
     const typeLabel = _roomSpaceLabel(room);
     const typeText = typeLabel.toLowerCase();
+    _startTimeLog('ambiente', room.id, _classroomHierarchyLabel(room) || room.name || typeLabel);
     const modalId = 'modal-classroom-ficha';
     document.getElementById(modalId)?.remove();
     const modal = document.createElement('div');
@@ -10827,11 +10914,30 @@ const MecFormModule = (() => {
         <div class="modal__footer">
           <button class="btn btn-danger" onclick="MecFormModule.deleteActiveClassroom()" ${locked ? 'disabled' : ''}>Eliminar ${_escape(typeText)}</button>
           <button class="btn ${locked ? 'btn-warning' : 'btn-outline'}" onclick="MecFormModule.setActiveClassroomLocked(${locked ? 'false' : 'true'})">${locked ? `Desbloquear ${_escape(typeText)}` : `Bloquear ${_escape(typeText)}`}</button>
+          <button class="btn btn-success" onclick="MecFormModule.saveClassroomFicha()" ${locked ? 'disabled' : ''}>Guardar ficha</button>
           <button class="btn btn-primary" onclick="MecFormModule.closeClassroomFicha()">Cerrar ficha</button>
         </div>
       </div>`;
     document.body.appendChild(modal);
     UI.openModal(modalId);
+  }
+
+  function saveClassroomFicha() {
+    const room = _activeClassroomRecord();
+    if (!room) {
+      UI.showToast('Seleccione un ambiente para guardar la ficha.', 'warning');
+      return;
+    }
+    if (_isClassroomLocked(room)) {
+      UI.showToast('El ambiente esta bloqueado. Desbloqueelo para guardar cambios.', 'warning');
+      return;
+    }
+    _syncActiveClassroomFromSketch();
+    const current = _activeClassroomRecord() || room;
+    const record = _finishTimeLog('ambiente', current.id, _classroomHierarchyLabel(current) || current.name || _roomSpaceLabel(current));
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast(`Ficha del ambiente guardada${record?.durationSeconds ? ` (${_formatDuration(record.durationSeconds)})` : ''}.`, 'success');
   }
 
   function closeClassroomFicha() {
@@ -11019,6 +11125,7 @@ const MecFormModule = (() => {
 
     root.innerHTML = `
       <div class="school-plan">
+        ${_renderSchoolContextBar(true)}
         ${_renderPlanBuilderPanel()}
 
         <section class="school-plan__layout">
@@ -11028,6 +11135,7 @@ const MecFormModule = (() => {
             </div>
             ${_renderPlanBaseMapPanel()}
             <div class="school-plan__canvas-wrap">
+              ${_renderPlanFloatingActions()}
               <div class="school-plan__canvas-stage" style="${_schoolPlanStageStyle(canvasWidth, canvasHeight)}">
                 ${_renderPlanBaseMapLayer(canvasWidth, canvasHeight)}
                 <canvas id="${canvasId}" data-school-plan-canvas width="${canvasWidth}" height="${canvasHeight}" style="width:${Math.round(canvasWidth * _schoolPlanZoom)}px;height:${Math.round(canvasHeight * _schoolPlanZoom)}px;" aria-label="Plano general de la escuela"></canvas>
@@ -11059,6 +11167,17 @@ const MecFormModule = (() => {
     _drawSchoolPlan();
     _applySchoolPlanZoom();
     _bindSchoolPlanCanvas();
+  }
+
+  function _renderPlanFloatingActions() {
+    if (!_selectedPlanId) return '';
+    const context = _planSelectionContext(_selectedPlanId);
+    const title = context?.title || 'Elemento seleccionado';
+    return `
+      <div class="school-plan-floating-actions" aria-label="Acciones rapidas del elemento seleccionado">
+        <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openPlanSelection()">Ficha</button>
+        <span>${_escape(title)}</span>
+      </div>`;
   }
 
   function _activeSchoolPlanRoot() {
@@ -11628,6 +11747,7 @@ const MecFormModule = (() => {
           detail: `${item.codigo || 'Sanitario'} · ${_sanitaryObjectLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
           actions: [
             { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+            ...(object.type === 'door' ? [{ label: 'Apertura', onClick: 'MecFormModule.flipSelectedSanitaryDoorSwing()' }] : []),
             { label: 'Abrir sanitario', onClick: `MecFormModule.editPlanSanitary('${_escape(item.id)}')` },
           ],
         };
@@ -11693,6 +11813,7 @@ const MecFormModule = (() => {
         detail: `${room.name || _roomSpaceLabel(room)} · ${_sketchLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
         actions: [
           { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
+          ...(object.type === 'door' ? [{ label: 'Apertura', onClick: 'MecFormModule.flipSelectedDoorSwing()' }] : []),
           { label: `Abrir ${_roomSpaceLabel(room).toLowerCase()}`, onClick: `MecFormModule.editPlanClassroom('${_escape(room.id)}')` },
         ],
       };
@@ -14779,13 +14900,15 @@ const MecFormModule = (() => {
       return;
     }
     if (raw.startsWith('room::')) {
-      editPlanClassroom(raw.replace('room::', ''));
+      openPlanClassroomFicha(raw.replace('room::', ''));
       return;
     }
     if (raw.startsWith('sanitary::')) {
       const parts = raw.split('::');
-      editPlanSanitary(parts[1] || '');
-      if (parts[2]) setTimeout(() => openSelectedSanitaryObjectFicha(), 180);
+      _selectedPlanId = raw;
+      _activatePlanSelection(raw);
+      if (parts[2]) openSelectedSanitaryObjectFicha();
+      else openSelectedSanitaryFicha();
       return;
     }
     if (raw.startsWith('site::')) {
@@ -14805,6 +14928,7 @@ const MecFormModule = (() => {
     }
     _selectedPlanId = `block::${block.id}`;
     _activatePlanSelection(_selectedPlanId);
+    _startTimeLog('bloque', block.id, block.bloque_codigo || 'Bloque');
     document.getElementById('modal-plan-block-ficha')?.remove();
     const modal = document.createElement('div');
     modal.id = 'modal-plan-block-ficha';
@@ -14889,6 +15013,7 @@ const MecFormModule = (() => {
       const { id: _id, ...values } = block;
       _data.bloques = values;
     }
+    const record = _finishTimeLog('bloque', block.id, block.bloque_codigo || 'Bloque');
     _selectedPlanId = `block::${block.id}`;
     if (hasMeasures && !hasPlanPosition) _planMoveMode = true;
     _saveDraft(false);
@@ -14897,7 +15022,7 @@ const MecFormModule = (() => {
     renderSchoolPlan();
     UI.showToast(hasMeasures && !hasPlanPosition
       ? 'Ficha del bloque actualizada. Ahora arrastre el bloque hasta su ubicacion en el plano.'
-      : 'Ficha del bloque actualizada.',
+      : `Ficha del bloque actualizada${record?.durationSeconds ? ` (${_formatDuration(record.durationSeconds)})` : ''}.`,
       hasMeasures && !hasPlanPosition ? 'info' : 'success',
       6200);
   }
@@ -17393,6 +17518,7 @@ const MecFormModule = (() => {
     let vertexDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
+    let lastTap = null;
     let planPinch = null;
     const activePointers = new Map();
     const pointFromEvent = event => {
@@ -17535,8 +17661,7 @@ const MecFormModule = (() => {
         const planId = `sanitary::${area.sanitaryId}::${area.objectId}`;
         _selectedPlanId = planId;
         _activatePlanSelection(planId);
-        editPlanSanitary(area.sanitaryId);
-        setTimeout(() => openSelectedSanitaryObjectFicha(), 180);
+        openSelectedSanitaryObjectFicha();
         return;
       }
       if (area.objectId && area.roomId) {
@@ -17544,7 +17669,7 @@ const MecFormModule = (() => {
         return;
       }
       if (area.type === 'room' || area.type === 'room-rotate' || area.type === 'room-resize') {
-        editPlanClassroom(area.roomId);
+        openPlanClassroomFicha(area.roomId);
         return;
       }
       if (area.type === 'block' || area.type === 'block-rotate' || area.type === 'block-resize') {
@@ -17558,7 +17683,9 @@ const MecFormModule = (() => {
         return;
       }
       if (area.type === 'sanitary' || area.type === 'sanitary-rotate' || area.type === 'sanitary-resize') {
-        editPlanSanitary(area.sanitaryId);
+        _selectedPlanId = `sanitary::${area.sanitaryId}`;
+        _activatePlanSelection(_selectedPlanId);
+        openSelectedSanitaryFicha();
         return;
       }
       editPlanObject(area.id);
@@ -17878,6 +18005,23 @@ const MecFormModule = (() => {
       pointerStart = null;
       if (!isSelectableArea(area)) return;
       event.preventDefault();
+      if (event.pointerType === 'touch') {
+        const now = Date.now();
+        const point = pointFromEvent(event);
+        const sameTap = lastTap &&
+          lastTap.id === area.id &&
+          now - lastTap.time < 460 &&
+          Math.hypot(point.x - lastTap.x, point.y - lastTap.y) < 28;
+        if (sameTap) {
+          lastTap = null;
+          suppressClickUntil = now + 450;
+          selectArea(area);
+          _focusSchoolPlanArea(area);
+          setTimeout(() => editAreaFicha(area), 180);
+          return;
+        }
+        lastTap = { id: area.id, time: now, x: point.x, y: point.y };
+      }
       if (event.pointerType === 'touch' && _planLayers.datos) _showCanvasHoverTooltip(event, _planHoverInfo(area));
       selectArea(area);
     });
@@ -17904,7 +18048,10 @@ const MecFormModule = (() => {
       if (Date.now() < suppressClickUntil) return;
       const area = hit(event);
       if (!area) return;
-      editAreaFicha(area);
+      event.preventDefault();
+      selectArea(area);
+      _focusSchoolPlanArea(area);
+      setTimeout(() => editAreaFicha(area), 180);
     });
     canvas.addEventListener('wheel', event => {
       if (!event.ctrlKey && !event.metaKey) return;
@@ -19636,6 +19783,7 @@ const MecFormModule = (() => {
     setPlanClassroomLocked,
     openClassroomFicha,
     openPlanClassroomFicha,
+    saveClassroomFicha,
     closeClassroomFicha,
     deleteActiveClassroom,
     deleteActiveFloor,
@@ -19652,6 +19800,7 @@ const MecFormModule = (() => {
     setSanitaryStallFixture,
     removeSanitaryStallFixture,
     openSelectedSanitaryFicha,
+    saveSanitaryFicha,
     closeSanitaryFicha,
     openSelectedSanitaryObjectFicha,
     closeSanitaryObjectFicha,

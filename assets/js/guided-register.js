@@ -148,6 +148,15 @@ const GuidedRegisterModule = (() => {
   function _render(root) {
     root.innerHTML = `
       <section class="guided-register" aria-label="Registro guiado CIALPA">
+        <section class="guided-school-context" aria-label="Escuela activa del registro">
+          <div>
+            <span>Escuela activa</span>
+            <strong data-guided-school-name>Sin escuela seleccionada</strong>
+            <small data-guided-school-meta>Seleccione una escuela desde el mapa antes de iniciar la carga.</small>
+          </div>
+          <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
+        </section>
+
         <nav class="guided-steps" aria-label="Etapas del registro guiado">
           ${STEPS.map((step, index) => `
             <button class="guided-step" type="button" data-guided-step="${index}" aria-current="${index === _activeIndex ? 'step' : 'false'}">
@@ -519,6 +528,10 @@ const GuidedRegisterModule = (() => {
     if (save) save.textContent = snap.savedAtText || 'Sin borrador';
     const planTitle = root.querySelector('[data-guided-plan-title]');
     if (planTitle) planTitle.textContent = snap.planTitle;
+    const schoolName = root.querySelector('[data-guided-school-name]');
+    if (schoolName) schoolName.textContent = snap.school.name || 'Sin escuela seleccionada';
+    const schoolMeta = root.querySelector('[data-guided-school-meta]');
+    if (schoolMeta) schoolMeta.textContent = snap.school.meta || 'Seleccione una escuela desde el mapa antes de iniciar la carga.';
     root.querySelectorAll('[data-guided-step-state]').forEach(label => {
       const step = STEPS.find(item => item.id === label.dataset.guidedStepState);
       const done = _stepDone(step?.id, snap);
@@ -545,6 +558,30 @@ const GuidedRegisterModule = (() => {
     if (el) el.textContent = String(value || 0);
   }
 
+  function _schoolContext(values = {}) {
+    const school = values.__selectedSchool || {};
+    const general = values.general || {};
+    const code = _firstPresent(school, ['codigo_establecimiento', 'codigo_local', 'codigo', 'id_escuela', 'id']) ||
+      general.codigo_establecimiento || general.codigo_local || '';
+    const name = _firstPresent(school, ['nombre', 'nombre_escuela', 'nombre_establecimiento', 'institucion']) ||
+      general.nombre_institucion || general.nombre_establecimiento || '';
+    const location = [
+      general.departamento || school.departamento,
+      general.distrito || school.distrito,
+      general.localidad || school.localidad,
+    ].filter(Boolean).join(' / ');
+    const meta = [code ? `Codigo ${code}` : '', location].filter(Boolean).join(' - ');
+    return { code, name, location, meta };
+  }
+
+  function _firstPresent(source, keys = []) {
+    for (const key of keys) {
+      const value = source?.[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+    }
+    return '';
+  }
+
   function _snapshot() {
     let saved = {};
     try {
@@ -553,6 +590,7 @@ const GuidedRegisterModule = (() => {
       saved = {};
     }
     const values = saved.values || saved || {};
+    const school = _schoolContext(values);
     const rooms = Array.isArray(values.__classrooms) ? values.__classrooms : [];
     const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];
     const blocks = Array.isArray(values.__blocks) ? values.__blocks : [];
@@ -600,7 +638,8 @@ const GuidedRegisterModule = (() => {
       evidence: _countEvidence(values),
       baseMapSaved: Boolean(values.__planBaseMap?.confirmed || values.__planBaseMap?.savedAt),
       savedAtText: _formatDate(saved.savedAt),
-      planTitle: activeBlock?.bloque_codigo || values.general?.nombre_institucion || 'Escuela en construccion',
+      school,
+      planTitle: activeBlock?.bloque_codigo || school.name || values.general?.nombre_institucion || 'Escuela en construccion',
       activeBlock,
       activeFloors,
       firstFloor,
@@ -941,7 +980,7 @@ const GuidedRegisterModule = (() => {
   }
 
   function _firstPendingRequirement(items = []) {
-    return (items || []).find(item => !item.done) || null;
+    return (items || []).find(item => !item.done && !item.optional) || null;
   }
 
   function _guidedRequirementList(items = []) {
@@ -949,10 +988,10 @@ const GuidedRegisterModule = (() => {
     return `
       <ul class="guided-requirements" aria-label="Pendientes del elemento">
         ${items.map(item => `
-          <li class="${item.done ? 'guided-requirements__item--done' : ''}">
-            <span aria-hidden="true">${item.done ? '&#10003;' : '!'}</span>
+          <li class="${item.done ? 'guided-requirements__item--done' : ''} ${item.optional ? 'guided-requirements__item--optional' : ''}">
+            <span aria-hidden="true">${item.done ? '&#10003;' : (item.optional ? 'i' : '!')}</span>
             <strong>${_escape(item.title)}</strong>
-            <small>${_escape(item.done ? (item.doneText || 'Completado') : (item.help || 'Pendiente'))}</small>
+            <small>${_escape(item.done ? (item.doneText || 'Completado') : `${item.optional ? 'Recomendado: ' : ''}${item.help || 'Pendiente'}`)}</small>
           </li>`).join('')}
       </ul>`;
   }
@@ -970,12 +1009,14 @@ const GuidedRegisterModule = (() => {
         help: 'Registre el estado general del bloque antes de ubicarlo en el plano.',
         doneText: block?.estado_bloque || 'Estado cargado',
         done: _hasAnswer(block?.estado_bloque),
+        optional: true,
       },
       {
         title: 'Caracteristicas / observacion',
         help: 'Agregue una observacion breve: uso, obra, clausura, danos visibles o contexto relevante.',
         doneText: 'Observacion registrada',
         done: _hasAnswer(block?.observacion || block?.observaciones),
+        optional: true,
       },
     ];
   }
@@ -1000,12 +1041,14 @@ const GuidedRegisterModule = (() => {
         help: 'Registre el estado general del piso.',
         doneText: floor?.estado || floor?.estado_piso || 'Estado cargado',
         done: _hasAnswer(floor?.estado || floor?.estado_piso),
+        optional: true,
       },
       {
         title: 'Caracteristicas / observacion',
         help: 'Agregue una observacion breve del piso si hay particularidades, deterioro o restricciones.',
         doneText: 'Observacion registrada',
         done: _hasAnswer(floor?.observacion || floor?.observaciones),
+        optional: true,
       },
     ];
   }
@@ -1030,12 +1073,14 @@ const GuidedRegisterModule = (() => {
         help: 'Registre el estado general del ambiente antes de confirmarlo.',
         doneText: room?.estado || 'Estado cargado',
         done: _hasAnswer(room?.estado),
+        optional: true,
       },
       {
         title: 'Caracteristicas del ambiente',
         help: 'Registre uso, particularidades, aberturas u observaciones tecnicas en la ficha.',
         doneText: 'Caracteristicas registradas',
         done: _hasAnswer(room?.caracteristicas) || _hasAnswer(room?.openings),
+        optional: true,
       },
     ];
   }
@@ -1060,12 +1105,14 @@ const GuidedRegisterModule = (() => {
         help: 'Registre el estado general del sanitario.',
         doneText: item?.estado || 'Estado cargado',
         done: _hasAnswer(item?.estado),
+        optional: true,
       },
       {
         title: 'Caracteristicas sanitarias',
         help: 'Complete uso principal, genero/destino y datos basicos de funcionamiento.',
         doneText: [item?.uso, item?.genero, item?.agua].filter(Boolean).join(' / ') || 'Caracteristicas cargadas',
         done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
+        optional: true,
       },
     ];
   }
@@ -1091,12 +1138,14 @@ const GuidedRegisterModule = (() => {
         help: 'Registre el estado general observado.',
         doneText: ficha.estado || 'Estado cargado',
         done: _hasAnswer(ficha.estado),
+        optional: true,
       },
       {
         title: 'Caracteristicas tecnicas',
         help: 'Complete el campo tecnico principal que corresponde a este tipo de elemento.',
         doneText: _siteElementCharacteristicText(item),
         done: _siteElementHasCharacteristic(item),
+        optional: true,
       },
     ];
   }
@@ -1248,11 +1297,11 @@ const GuidedRegisterModule = (() => {
   }
 
   function _floorReady(floor) {
-    return _floorRequirementItems(floor).every(item => item.done);
+    return _floorRequirementItems(floor).every(item => item.done || item.optional);
   }
 
   function _roomReady(room) {
-    return _roomRequirementItems(room).every(item => item.done);
+    return _roomRequirementItems(room).every(item => item.done || item.optional);
   }
 
   function _roomHasGeometry(room) {
@@ -1271,7 +1320,7 @@ const GuidedRegisterModule = (() => {
   }
 
   function _sanitaryReady(item) {
-    return _sanitaryRequirementItems(item).every(req => req.done);
+    return _sanitaryRequirementItems(item).every(req => req.done || req.optional);
   }
 
   function _sanitaryHasGeometry(item) {
@@ -1288,7 +1337,7 @@ const GuidedRegisterModule = (() => {
   }
 
   function _siteElementReady(item) {
-    return _siteElementRequirementItems(item).every(req => req.done);
+    return _siteElementRequirementItems(item).every(req => req.done || req.optional);
   }
 
   function _siteElementHasPlanRect(item) {
@@ -1374,7 +1423,7 @@ const GuidedRegisterModule = (() => {
 
   function _missingRequirementTitles(items = []) {
     return (items || [])
-      .filter(item => !item.done)
+      .filter(item => !item.done && !item.optional)
       .map(item => item.title)
       .join(', ');
   }

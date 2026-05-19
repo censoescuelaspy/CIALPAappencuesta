@@ -463,7 +463,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['registro', 'mapa', 'encuestadores', 'estadisticas'];
+    const primaryModules = ['registro', 'mapa', 'jornada', 'planificacion', 'encuestadores', 'estadisticas'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])
@@ -576,15 +576,66 @@ const AppController = (() => {
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   }
 
+  function _isAppleMobile() {
+    const ua = navigator.userAgent || '';
+    const platform = navigator.platform || '';
+    const isiPadOS = platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    return /iPad|iPhone|iPod/.test(ua) || isiPadOS;
+  }
+
   function _refreshInstallButtons() {
     const installed = _isStandalone();
+    const appleMobile = _isAppleMobile();
     ['install-app-btn-header', 'install-app-btn-home'].forEach(id => {
       const btn = document.getElementById(id);
       if (!btn) return;
       btn.disabled = installed;
-      btn.textContent = installed ? 'App instalada' : (id.includes('home') ? 'Instalar app en celular' : 'Instalar');
+      btn.textContent = installed
+        ? 'App instalada'
+        : (appleMobile ? (id.includes('home') ? 'Instalar en iPad/iPhone' : 'Instalar iOS') : (id.includes('home') ? 'Instalar app en celular' : 'Instalar'));
       btn.title = installed ? 'La app ya está instalada en este dispositivo.' : 'Instalar CIALPA como app web en el celular.';
+      if (appleMobile && !installed) btn.title = 'En iPad/iPhone use Safari: Compartir > Agregar a pantalla de inicio.';
     });
+  }
+
+  function _showAppleInstallHelp() {
+    const modalId = 'modal-ios-install-help';
+    document.getElementById(modalId)?.remove();
+    const modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'modal modal--dialog install-help-modal';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal__overlay" onclick="AppController.closeInstallHelp()"></div>
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h3>Instalar CIALPA en iPad/iPhone</h3>
+          <button class="modal__close" onclick="AppController.closeInstallHelp()">&times;</button>
+        </div>
+        <div class="modal__body install-help-modal__body">
+          <p>En iOS/iPadOS el navegador no muestra el instalador automatico. La instalacion se hace desde Safari:</p>
+          <ol>
+            <li>Abra esta pagina en <strong>Safari</strong>.</li>
+            <li>Toque <strong>Compartir</strong>.</li>
+            <li>Elija <strong>Agregar a pantalla de inicio</strong>.</li>
+            <li>Confirme con <strong>Agregar</strong>.</li>
+          </ol>
+          <p class="text-muted">Despues abra CIALPA desde el icono de la pantalla de inicio.</p>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn-primary" onclick="AppController.closeInstallHelp()">Entendido</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    if (typeof UI !== 'undefined' && UI.openModal) UI.openModal(modalId);
+    else modal.style.display = 'block';
+  }
+
+  function closeInstallHelp() {
+    const modal = document.getElementById('modal-ios-install-help');
+    if (!modal) return;
+    modal.classList.remove('modal--visible');
+    setTimeout(() => modal.remove(), 200);
   }
 
   async function installApp() {
@@ -593,6 +644,10 @@ const AppController = (() => {
       return;
     }
     if (!_deferredInstallPrompt) {
+      if (_isAppleMobile()) {
+        _showAppleInstallHelp();
+        return;
+      }
       UI.showToast('Si el navegador no muestra instalación automática, use el menú del navegador: Compartir/Agregar a pantalla de inicio.', 'info', 8000);
       return;
     }
@@ -878,6 +933,7 @@ const AppController = (() => {
     showApp,
     showModule,
     installApp,
+    closeInstallHelp,
     updateApp,
     openWorkbook,
     openEvidenceFolder,
