@@ -4,6 +4,61 @@
 
 ---
 
+## Reparacion de guardado en libro online - 2026-05-19 - v2.6.56
+
+### Objetivo
+- Resolver que los registros cargados desde el formulario no aparecian en el libro online.
+- Confirmar la diferencia entre el archivo piloto historico y el libro configurado actualmente por la app.
+- Dejar preparado el backend correcto para publicar desde la cuenta propietaria del Apps Script.
+
+### Diagnostico
+- `H:\Mi unidad\encuesta_piloto\encuesta_piloto.gsheet` corresponde al Spreadsheet `1uYXF7pxg8jz6sz2uWe75GgtX7I4hJDhqoqtXb83ob44` y contiene la estructura historica `respuestas`, `schemas`, `fotos`, `escuelas_muestra`, `asigna_escuelas_usuarios` y `usuarios`.
+- La app publicada esta configurada para el libro operativo `muestreo_escuelas_cialpa`, Spreadsheet `1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg`, con hoja principal `escuelas_seleccionadas`.
+- El Web App publico estable usado para recuperar el mapa (`AKfycbwKls1jXCwh-Np9UMoir2VD3LtQlxxdJ0e3cetBeQDzJCnSNWAIHYnapTaPD1fgC75M`) respondia `Accion desconocida: guardarBorradorMec`, por lo que el frontend nuevo no tenia un backend capaz de escribir el borrador MEC en Sheets.
+- Los deployments nuevos `@11`, `@13` y `@14` devuelven HTTP 403, por eso no se pueden usar como URL publica aunque tengan el codigo nuevo.
+- El proyecto Apps Script `muestreo_escuelas_cialpa` es propiedad de `censoescuelaspy@gmail.com`; la sesion local de `clasp` esta autenticada como `dmeza.py@gmail.com`, que figura como editor.
+- Como el Web App esta configurado con `executeAs: USER_DEPLOYING`, los deployments publicados o actualizados desde una cuenta editora que no queda autorizada para ejecutar pueden devolver HTTP 403 aun con `ANYONE_ANONYMOUS`.
+- La reautorizacion de `clasp` desde `dmeza.py@gmail.com` fue bloqueada por Google con el mensaje `Se bloqueo esta app`, por lo que no conviene insistir con ese flujo OAuth para produccion.
+
+### Cambios implementados
+- Se actualiza version/cache de la app a `v2.6.56` para forzar refresco del Service Worker.
+- Se intento actualizar el deployment publico estable `AKfycbwKls1jXCwh-Np9UMoir2VD3LtQlxxdJ0e3cetBeQDzJCnSNWAIHYnapTaPD1fgC75M` a la version `@13`; la URL paso a responder HTTP 403.
+- Se hizo rollback del deployment publico estable a `@10`, pero la URL continuo devolviendo HTTP 403.
+- Se creo el deployment `@14` con el backend actual; tambien devuelve HTTP 403.
+- Se verifico por metadata de Drive que el propietario real del Apps Script es `censoescuelaspy@gmail.com` y que `dmeza.py@gmail.com` es editor.
+- Se retiro el diagnostico temporal y los scopes explicitos agregados durante la prueba, dejando `gas/appsscript.json` nuevamente con inferencia normal de permisos.
+- Se subio a Apps Script el codigo limpio actual con `clasp push -f`; queda pendiente publicar desde la cuenta propietaria.
+- Se publico desde la cuenta propietaria un nuevo deployment publico: `AKfycbwwFYlYkar_mnYy4hW7ne_qt85xHQnUk2VeALniVDPtu5MUP5B7pEZHEnFIlo5zxuY`.
+- Se actualizo `APP_CONFIG.GAS_URL` para apuntar al nuevo Web App publico validado.
+
+### Validaciones ejecutadas
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- `clasp deployments`: el deployment publico estable esta nuevamente en `@10`; los deployments `@11`, `@13` y `@14` devuelven HTTP 403.
+- Prueba HTTP sin escritura contra la URL publica estable: `guardarBorradorMec` responde `Accion desconocida: guardarBorradorMec`, confirmando que el backend publicado es anterior al guardado en Sheets.
+- Prueba HTTP posterior al intento de redeploy/rollback: la URL publica estable responde HTTP 403.
+- Prueba HTTP contra todos los deployments listados: solo `@HEAD` responde HTTP 200 con HTML de error; los deployments versionados responden HTTP 403.
+- `clasp show-authorized-user`: sesion local en `dmeza.py@gmail.com`.
+- Metadata Drive del Apps Script: propietario `censoescuelaspy@gmail.com`, editor `dmeza.py@gmail.com`.
+- `clasp run diagnosticoPermisos`: `Unable to run script function. Please make sure you have permission to run the script function.`
+- `node -e "JSON.parse(...gas/appsscript.json...)"`: OK.
+- `clasp push -f`: codigo GAS limpio subido a HEAD.
+- Prueba HTTP contra nuevo deployment propietario: `login` responde JSON publico `Usuario y contraseña son requeridos`.
+- Prueba HTTP contra nuevo deployment propietario: `getEscuelas` responde `status: ok` con datos de escuelas.
+- Prueba HTTP sin escritura contra nuevo deployment propietario: `guardarBorradorMec` con token valido y sin escuela responde `Identificador de escuela requerido para guardar el borrador MEC`, confirmando que el endpoint nuevo esta publicado.
+- `APP_CONFIG.GAS_URL` actualizado al nuevo deployment propietario.
+
+### Pendiente operativo
+- Publicar en GitHub Pages el frontend `v2.6.56` con la nueva URL GAS.
+- Despues de publicado, pedir a los usuarios `Actualizar app` o abrir con cache-buster para que el Service Worker tome `cialpa-app-v2.6.56`.
+- Verificar en campo que `Guardar ahora` cree o actualice una fila en `mec_borradores`.
+
+---
+
 ## Renovacion de sesion al cambiar backend - 2026-05-19 - v2.6.55
 
 ### Objetivo
