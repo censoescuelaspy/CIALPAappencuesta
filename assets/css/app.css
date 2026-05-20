@@ -830,10 +830,11 @@ td {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(255,255,255,.85);
+  border: 1px solid #172033;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 2px 7px rgba(23,32,51,.25);
 }
 
-.map-list-item__dot--pendiente { opacity: .45; }
+.map-list-item__dot--pendiente { opacity: .9; }
 .map-list-item__dot--cerrada { opacity: 1; }
 
 .map-list-item__info { flex: 1; min-width: 0; }
@@ -937,11 +938,12 @@ td {
   justify-content: center;
   color: #fff;
   font-weight: 700;
-  border: 3px solid rgba(255,255,255,.7);
+  border: 4px solid rgba(255,255,255,.95);
+  box-shadow: 0 5px 16px rgba(23,32,51,.28), 0 0 0 1px rgba(23,32,51,.25);
 }
-.cluster-small  { width: 36px; height: 36px; background: rgba(108,117,125,.85); font-size: .8rem; }
-.cluster-medium { width: 44px; height: 44px; background: rgba(253,126,20,.85);  font-size: .85rem; }
-.cluster-large  { width: 52px; height: 52px; background: rgba(220,53,69,.85);   font-size: .9rem; }
+.cluster-small  { width: 36px; height: 36px; background: rgba(52,101,164,.95); font-size: .8rem; }
+.cluster-medium { width: 44px; height: 44px; background: rgba(232,76,34,.95); font-size: .85rem; }
+.cluster-large  { width: 52px; height: 52px; background: rgba(188,47,47,.96); font-size: .9rem; }
 
 /* ── Survey module ────────────────────────────────────────── */
 .survey-empty {
@@ -1368,6 +1370,85 @@ td {
 [data-admin-content] { display: none; }
 [data-admin-content].active { display: block; }
 
+.enc-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+  margin-bottom: 1rem;
+}
+
+.enc-admin-kpi {
+  min-height: 82px;
+  padding: .85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.enc-admin-kpi small {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: .78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .02em;
+}
+
+.enc-admin-kpi strong {
+  display: block;
+  margin-top: .3rem;
+  color: var(--color-secondary);
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.enc-admin-kpi--active strong { color: var(--color-success); }
+.enc-admin-kpi--inactive strong { color: var(--color-danger); }
+.enc-admin-kpi--role strong { color: var(--color-primary); }
+
+.enc-admin-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: flex-end;
+  padding: .9rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.enc-admin-search {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+
+.enc-admin-filter {
+  flex: 0 1 330px;
+  min-width: 240px;
+}
+
+.enc-admin-filter label,
+.enc-admin-search label {
+  display: block;
+  margin-bottom: .35rem;
+  color: var(--color-text-muted);
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.enc-admin-table th,
+.enc-admin-table td {
+  vertical-align: middle;
+}
+
+.enc-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
 .config-item {
   display: flex;
   align-items: center;
@@ -1391,6 +1472,13 @@ td {
   border-radius: var(--radius-md);
   padding: 1rem;
   margin-bottom: 1rem;
+}
+
+@media (max-width: 780px) {
+  .enc-admin-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .enc-admin-toolbar { align-items: stretch; }
+  .enc-admin-search,
+  .enc-admin-filter { flex-basis: 100%; min-width: 0; }
 }
 
 /* ── Jornada ──────────────────────────────────────────────── */

@@ -4,6 +4,37 @@
 
 ---
 
+## Administracion de encuestadores, mapa mas visible e insercion clara - 2026-05-20 - v2.6.59
+
+### Objetivo
+- Dar a administradores una vista directa para agregar, editar, quitar y reactivar encuestadores.
+- Mejorar la visibilidad de los puntos de escuelas en el mapa.
+- Hacer mas evidentes las herramientas de insercion de fallas/grietas, luces, aire acondicionado, enchufes y otros elementos tecnicos.
+
+### Cambios implementados
+- La vista `Encuestadores` ahora incluye resumen operativo, buscador, filtros por estado/rol y tabla con rol, correo, estado y acciones.
+- `Quitar` inactiva al encuestador sin borrar la cuenta, y los inactivos pueden reactivarse desde la misma tabla.
+- El backend `getEncuestadores` permite incluir inactivos solo para administradores autorizados.
+- `saveEncuestador` actualiza correctamente estado activo/inactivo, contrasena opcional y el usuario espejo de login.
+- Los marcadores del mapa son mas grandes, con opacidad alta, doble borde y mejor contraste; los clusters tambien ganan color y sombra.
+- La cinta `Insertar` muestra herramientas de aula/sanitario cuando existe un aula o sanitario activo, aunque no este seleccionado exactamente en ese momento.
+- Las herramientas se rotulan como `Enchufe`, `Luz`, `Aire acond.` y `Falla/grieta` para que el equipo de campo las encuentre mas rapido.
+- Version y cache actualizados a `v2.6.59`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/admin.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
 ## Actualizacion forzada, filtros del mapa y arquitectura de datos - 2026-05-20 - v2.6.58
 
 ### Objetivo

@@ -649,7 +649,7 @@ const API = (() => {
   async function cerrarModulo(datos) { return call('cerrarModulo', 'POST', datos); }
   async function getModulosSesion(id_sesion) { return call('getModulosSesion', 'GET', { id_sesion }, { skipLoading: true }); }
 
-  async function getEncuestadores() { return call('getEncuestadores', 'GET', {}, { skipLoading: true }); }
+  async function getEncuestadores(filters = {}) { return call('getEncuestadores', 'GET', filters, { skipLoading: true }); }
   async function saveEncuestador(datos) { return call('saveEncuestador', 'POST', datos); }
   async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 

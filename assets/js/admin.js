@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.5.18
+ * Version: 2.6.59
  */
 
 const AdminModule = (() => {
@@ -9,6 +9,7 @@ const AdminModule = (() => {
 
   let _encuestadores = [];
   let _auditFilters = {};
+  let _encuestadorFiltersBound = false;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -108,14 +109,74 @@ const AdminModule = (() => {
   // ── Encuestadores ─────────────────────────────────────────────────────────
 
   async function loadEncuestadores() {
+    _bindEncuestadorFilters();
     try {
-      const result = await API.getEncuestadores();
+      const result = await API.getEncuestadores({ incluir_inactivos: true });
       if (result.status !== 'ok') throw new Error(result.message);
       _encuestadores = result.data || [];
-      _renderEncuestadoresTable(_encuestadores);
+      _renderEncuestadoresSummary(_encuestadores);
+      _renderEncuestadoresTable(_filterEncuestadores(_encuestadores));
     } catch (err) {
       UI.showToast('Error al cargar encuestadores: ' + err.message, 'error');
     }
+  }
+
+  function _bindEncuestadorFilters() {
+    if (_encuestadorFiltersBound) return;
+    const form = document.getElementById('enc-filter-form');
+    if (!form) return;
+    _encuestadorFiltersBound = true;
+    const refresh = () => _renderEncuestadoresTable(_filterEncuestadores(_encuestadores));
+    form.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', refresh);
+      input.addEventListener('change', refresh);
+    });
+  }
+
+  function _isActive(row) {
+    const value = String(row?.activo ?? '').toLowerCase();
+    return row?.activo === true || !['false', '0', 'no', 'inactivo'].includes(value);
+  }
+
+  function _filterEncuestadores(rows) {
+    const q = String(document.getElementById('enc-filter-search')?.value || '').trim().toLowerCase();
+    const estado = String(document.getElementById('enc-filter-estado')?.value || '');
+    const rol = String(document.getElementById('enc-filter-rol')?.value || '');
+    return (rows || []).filter(row => {
+      const active = _isActive(row);
+      if (estado === 'activo' && !active) return false;
+      if (estado === 'inactivo' && active) return false;
+      if (rol && String(row.rol || 'encuestador') !== rol) return false;
+      if (!q) return true;
+      return [
+        row.id_encuestador,
+        row.usuario,
+        row.nombres,
+        row.apellidos,
+        row.documento,
+        row.telefono,
+        row.correo,
+        row.zona_asignada,
+        row.rol,
+      ].some(value => String(value || '').toLowerCase().includes(q));
+    });
+  }
+
+  function _renderEncuestadoresSummary(rows) {
+    const total = rows.length;
+    const activos = rows.filter(_isActive).length;
+    const inactivos = total - activos;
+    const superiores = rows.filter(row => ['supervisor', 'admin'].includes(String(row.rol || '').toLowerCase())).length;
+    const values = {
+      'enc-total': total,
+      'enc-activos': activos,
+      'enc-inactivos': inactivos,
+      'enc-supervisores': superiores,
+    };
+    Object.entries(values).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    });
   }
 
   function _renderEncuestadoresTable(rows) {
@@ -126,7 +187,7 @@ const AdminModule = (() => {
 
     if (!rows.length) {
       bodies.forEach(tbody => {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No hay encuestadores registrados. Los usuarios se administran en la hoja usuarios/encuestadores o desde este panel. Primer acceso: nombre.apellido y contraseña numérica de 6 dígitos.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No hay encuestadores para los filtros seleccionados.</td></tr>';
       });
       return;
     }
@@ -136,20 +197,28 @@ const AdminModule = (() => {
         <td>${_escapeHtml(r.id_encuestador)}</td>
         <td>${_escapeHtml(r.usuario)}</td>
         <td>${_escapeHtml(`${r.nombres || ''} ${r.apellidos || ''}`.trim())}</td>
+        <td><span class="badge badge--info">${_escapeHtml(_roleLabel(r.rol || 'encuestador'))}</span></td>
         <td>${_escapeHtml(r.documento || '—')}</td>
         <td>${_escapeHtml(r.telefono || '—')}</td>
+        <td>${_escapeHtml(r.correo || '—')}</td>
         <td>${_escapeHtml(r.zona_asignada || '—')}</td>
         <td>
-          <span class="badge ${r.activo === 'true' || r.activo === true ? 'badge--success' : 'badge--danger'}">
-            ${r.activo === 'true' || r.activo === true ? 'Activo' : 'Inactivo'}
+          <span class="badge ${_isActive(r) ? 'badge--success' : 'badge--danger'}">
+            ${_isActive(r) ? 'Activo' : 'Inactivo'}
           </span>
         </td>
-        <td>
+        <td class="enc-admin-actions">
           <button class="btn btn-xs btn-outline" onclick='AdminModule.editEncuestador(${_jsString(r.id_encuestador)})'>Editar</button>
-          <button class="btn btn-xs btn-danger" onclick='AdminModule.deleteEncuestador(${_jsString(r.id_encuestador)}, ${_jsString(r.usuario)})'>Eliminar</button>
+          ${_isActive(r)
+            ? `<button class="btn btn-xs btn-danger" onclick='AdminModule.deleteEncuestador(${_jsString(r.id_encuestador)}, ${_jsString(r.usuario)})'>Quitar</button>`
+            : `<button class="btn btn-xs btn-success" onclick='AdminModule.setEncuestadorActivo(${_jsString(r.id_encuestador)}, true)'>Reactivar</button>`}
         </td>
       </tr>`).join('');
     bodies.forEach(tbody => { tbody.innerHTML = html; });
+  }
+
+  function _roleLabel(rol) {
+    return { admin: 'Admin', supervisor: 'Supervisor', encuestador: 'Encuestador' }[rol] || rol || 'Encuestador';
   }
 
   function openNewEncuestador() {
@@ -179,6 +248,7 @@ const AdminModule = (() => {
       form.elements['correo'].value = enc?.correo || '';
       form.elements['zona_asignada'].value = enc?.zona_asignada || '';
       form.elements['rol'].value = enc?.rol || 'encuestador';
+      if (form.elements['password']) form.elements['password'].value = '';
       if (form.elements['activo']) {
         form.elements['activo'].checked = enc?.activo === 'true' || enc?.activo === true || isNew;
       }
@@ -203,6 +273,7 @@ const AdminModule = (() => {
       zona_asignada: form.elements['zona_asignada'].value,
       rol: form.elements['rol'].value,
       activo: form.elements['activo']?.checked ? 'true' : 'false',
+      password: form.elements['password']?.value || '',
     };
 
     if (!datos.usuario || !datos.nombres || !datos.apellidos) {
@@ -222,12 +293,12 @@ const AdminModule = (() => {
   }
 
   async function deleteEncuestador(id, usuario) {
-    const confirmed = await UI.showConfirm('Eliminar encuestador', `¿Eliminar a "${usuario}"? Esta acción no se puede deshacer.`);
+    const confirmed = await UI.showConfirm('Quitar encuestador', `¿Quitar a "${usuario}" de la operacion activa? La cuenta queda inactiva y se puede reactivar luego.`);
     if (!confirmed) return;
     try {
       const result = await API.deleteEncuestador(id);
       if (result.status !== 'ok') throw new Error(result.message);
-      UI.showToast('Encuestador eliminado.', 'success');
+      UI.showToast('Encuestador inactivado.', 'success');
       loadEncuestadores();
     } catch (err) {
       UI.showToast('Error: ' + err.message, 'error');
@@ -235,6 +306,19 @@ const AdminModule = (() => {
   }
 
   // ── Audit log ─────────────────────────────────────────────────────────────
+
+  async function setEncuestadorActivo(id, activo) {
+    const enc = _encuestadores.find(e => e.id_encuestador === id);
+    if (!enc) return;
+    try {
+      const result = await API.saveEncuestador({ ...enc, activo: activo ? 'true' : 'false', password: '' });
+      if (result.status !== 'ok') throw new Error(result.message);
+      UI.showToast(activo ? 'Encuestador reactivado.' : 'Encuestador inactivado.', 'success');
+      loadEncuestadores();
+    } catch (err) {
+      UI.showToast('Error al actualizar estado: ' + err.message, 'error');
+    }
+  }
 
   async function loadAuditoria(page = 1) {
     try {
@@ -312,6 +396,7 @@ const AdminModule = (() => {
     editEncuestador,
     saveEncuestador,
     deleteEncuestador,
+    setEncuestadorActivo,
     loadAuditoria,
     applyAuditFilters,
   };

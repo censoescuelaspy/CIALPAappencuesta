@@ -11699,8 +11699,10 @@ const MecFormModule = (() => {
     const activeTab = _normalizePlanRibbonTab(tab);
     if (activeTab === 'insertar') {
       const sel = String(_selectedPlanId || '');
-      const hasRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
-      const hasSanitary = sel.startsWith('sanitary::');
+      const hasSelectedRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
+      const hasSelectedSanitary = sel.startsWith('sanitary::');
+      const hasRoom = hasSelectedRoom || Boolean(_selectedPlanRoomId());
+      const hasSanitary = hasSelectedSanitary || Boolean(_selectedPlanSanitaryId());
       const groups = [
         _renderPlanRibbonGroup('Ambientes', [
           _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Aula', onClick: 'MecFormModule.newPlanClassroom()', tone: 'btn-primary', title: 'Crear nueva aula' }),
@@ -11717,14 +11719,14 @@ const MecFormModule = (() => {
           _renderPlanRibbonButton({ icon: '&#x25AD;', label: 'Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')", tone: 'btn-secondary', title: 'Agregar ventana al aula seleccionada' }),
         ].join('')));
         groups.push(_renderPlanRibbonGroup('Electricidad y equipos del aula', [
-          _renderPlanRibbonButton({ icon: '&#x25C9;', label: 'Toma', onClick: "MecFormModule.addPlanClassroomElement('outlet')", title: 'Agregar toma corriente al aula seleccionada' }),
+          _renderPlanRibbonButton({ icon: '&#x25C9;', label: 'Enchufe', onClick: "MecFormModule.addPlanClassroomElement('outlet')", title: 'Agregar enchufe o toma corriente al aula activa' }),
           _renderPlanRibbonButton({ icon: '&#x26A1;', label: 'Tablero', onClick: "MecFormModule.addPlanClassroomElement('switchboard')", title: 'Agregar tablero al aula seleccionada' }),
-          _renderPlanRibbonButton({ icon: '&#x25CE;', label: 'Foco', onClick: "MecFormModule.addPlanClassroomElement('light')", title: 'Agregar foco o iluminacion al aula seleccionada' }),
+          _renderPlanRibbonButton({ icon: '&#x25CE;', label: 'Luz', onClick: "MecFormModule.addPlanClassroomElement('light')", title: 'Agregar luz, foco o iluminacion al aula activa' }),
           _renderPlanRibbonButton({ icon: '&#x273A;', label: 'Ventilador', onClick: "MecFormModule.addPlanClassroomElement('fan')", title: 'Agregar ventilador al aula seleccionada' }),
-          _renderPlanRibbonButton({ icon: 'A/C', label: 'Aire', onClick: "MecFormModule.addPlanClassroomElement('ac')", title: 'Agregar aire acondicionado al aula seleccionada' }),
+          _renderPlanRibbonButton({ icon: 'A/C', label: 'Aire acond.', onClick: "MecFormModule.addPlanClassroomElement('ac')", title: 'Agregar aire acondicionado al aula activa' }),
         ].join('')));
         groups.push(_renderPlanRibbonGroup('Marcas y apoyo del aula', [
-          _renderPlanRibbonButton({ icon: '!', label: 'Falla', onClick: "MecFormModule.addPlanClassroomElement('damage')", tone: 'btn-warning', title: 'Marcar falla, dano u observacion del aula' }),
+          _renderPlanRibbonButton({ icon: '!', label: 'Falla/grieta', onClick: "MecFormModule.addPlanClassroomElement('damage')", tone: 'btn-warning', title: 'Marcar falla, grieta, dano u observacion del aula activa' }),
           _renderPlanRibbonButton({ icon: '&#x25A4;', label: 'Pizarron', onClick: "MecFormModule.addPlanClassroomElement('board')", title: 'Agregar pizarron al aula seleccionada' }),
           _renderPlanRibbonButton({ icon: '&#x25EB;', label: 'Escalera', onClick: "MecFormModule.addPlanClassroomElement('stair')", title: 'Agregar escalera al aula seleccionada' }),
           _renderPlanRibbonButton({ icon: 'T', label: 'Texto', onClick: "MecFormModule.addPlanClassroomElement('text')", title: 'Agregar texto o nota al aula seleccionada' }),
@@ -11745,12 +11747,12 @@ const MecFormModule = (() => {
           _renderPlanRibbonButton({ icon: '&#x25AD;', label: 'Ventana', onClick: "MecFormModule.addPlanSanitaryOpening('window')", tone: 'btn-secondary', title: 'Agregar ventana al sanitario seleccionado' }),
         ].join('')));
         groups.push(_renderPlanRibbonGroup('Electricidad y equipos del sanitario', [
-          _renderPlanRibbonButton({ icon: '&#x25C9;', label: 'Toma', onClick: "MecFormModule.addPlanSanitaryElement('outlet')", title: 'Agregar toma corriente al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x25C9;', label: 'Enchufe', onClick: "MecFormModule.addPlanSanitaryElement('outlet')", title: 'Agregar enchufe o toma corriente al sanitario activo' }),
           _renderPlanRibbonButton({ icon: '&#x26A1;', label: 'Tablero', onClick: "MecFormModule.addPlanSanitaryElement('switchboard')", title: 'Agregar tablero al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: '&#x25CE;', label: 'Foco', onClick: "MecFormModule.addPlanSanitaryElement('light')", title: 'Agregar foco o iluminacion al sanitario seleccionado' }),
+          _renderPlanRibbonButton({ icon: '&#x25CE;', label: 'Luz', onClick: "MecFormModule.addPlanSanitaryElement('light')", title: 'Agregar luz, foco o iluminacion al sanitario activo' }),
           _renderPlanRibbonButton({ icon: '&#x273A;', label: 'Ventilador', onClick: "MecFormModule.addPlanSanitaryElement('fan')", title: 'Agregar ventilador al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: 'A/C', label: 'Aire', onClick: "MecFormModule.addPlanSanitaryElement('ac')", title: 'Agregar aire acondicionado al sanitario seleccionado' }),
-          _renderPlanRibbonButton({ icon: '!', label: 'Falla', onClick: "MecFormModule.addPlanSanitaryElement('damage')", tone: 'btn-warning', title: 'Marcar falla, dano u observacion del sanitario' }),
+          _renderPlanRibbonButton({ icon: 'A/C', label: 'Aire acond.', onClick: "MecFormModule.addPlanSanitaryElement('ac')", title: 'Agregar aire acondicionado al sanitario activo' }),
+          _renderPlanRibbonButton({ icon: '!', label: 'Falla/grieta', onClick: "MecFormModule.addPlanSanitaryElement('damage')", tone: 'btn-warning', title: 'Marcar falla, grieta, dano u observacion del sanitario activo' }),
         ].join('')));
       }
       return groups.join('');
@@ -11849,11 +11851,13 @@ const MecFormModule = (() => {
     const label = String(action.label || '').toLowerCase();
     if (label.startsWith('girar ') || label === '0 grados' || label.startsWith('eliminar ')) return true;
     const sel = String(_selectedPlanId || '');
-    const hasRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
-    const hasSanitary = sel.startsWith('sanitary::');
+    const hasSelectedRoom = sel.startsWith('room::') || (sel.includes('::') && !sel.startsWith('sanitary::') && !sel.startsWith('site::') && !sel.startsWith('block::') && !sel.startsWith('floor::'));
+    const hasSelectedSanitary = sel.startsWith('sanitary::');
+    const hasRoom = hasSelectedRoom || Boolean(_selectedPlanRoomId());
+    const hasSanitary = hasSelectedSanitary || Boolean(_selectedPlanSanitaryId());
     if ((hasRoom || hasSanitary) && (label === '+ puerta' || label === '+ ventana')) return true;
-    if (hasRoom && ['+ toma', '+ tablero', '+ foco', '+ ventilador', '+ aire', '+ dano', '+ daño', '+ escalera'].includes(label)) return true;
-    if (hasSanitary && ['+ cabina', '+ inodoro', '+ lavamanos', '+ toma', '+ tablero', '+ foco', '+ ventilador', '+ aire', '+ dano', '+ daño'].includes(label)) return true;
+    if (hasRoom && ['+ toma', '+ enchufe', '+ tablero', '+ foco', '+ luz', '+ ventilador', '+ aire', '+ aire acond.', '+ dano', '+ daño', '+ falla', '+ falla/grieta', '+ escalera'].includes(label)) return true;
+    if (hasSanitary && ['+ cabina', '+ inodoro', '+ lavamanos', '+ toma', '+ enchufe', '+ tablero', '+ foco', '+ luz', '+ ventilador', '+ aire', '+ aire acond.', '+ dano', '+ daño', '+ falla', '+ falla/grieta'].includes(label)) return true;
     return false;
   }
 
@@ -12124,12 +12128,12 @@ const MecFormModule = (() => {
           { label: `Abrir ${typeLabel.toLowerCase()}`, tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           { label: '+ Puerta', onClick: "MecFormModule.addPlanClassroomElement('door')" },
           { label: '+ Ventana', onClick: "MecFormModule.addPlanClassroomElement('window')" },
-          { label: '+ Toma', onClick: "MecFormModule.addPlanClassroomElement('outlet')" },
+          { label: '+ Enchufe', onClick: "MecFormModule.addPlanClassroomElement('outlet')" },
           { label: '+ Tablero', onClick: "MecFormModule.addPlanClassroomElement('switchboard')" },
-          { label: '+ Foco', onClick: "MecFormModule.addPlanClassroomElement('light')" },
+          { label: '+ Luz', onClick: "MecFormModule.addPlanClassroomElement('light')" },
           { label: '+ Ventilador', onClick: "MecFormModule.addPlanClassroomElement('fan')" },
-          { label: '+ Aire', onClick: "MecFormModule.addPlanClassroomElement('ac')" },
-          { label: '+ Daño', onClick: "MecFormModule.addPlanClassroomElement('damage')" },
+          { label: '+ Aire acond.', onClick: "MecFormModule.addPlanClassroomElement('ac')" },
+          { label: '+ Falla/grieta', onClick: "MecFormModule.addPlanClassroomElement('damage')" },
           { label: '+ Escalera', onClick: "MecFormModule.addPlanClassroomElement('stair')" },
           { label: 'Forma L', onClick: `MecFormModule.setPlanClassroomShape('${_escape(room.id)}', 'l')` },
           { label: '+ Vertice', onClick: `MecFormModule.addPlanClassroomVertex('${_escape(room.id)}')` },
@@ -12172,11 +12176,11 @@ const MecFormModule = (() => {
           { label: '+ Lavamanos', onClick: "MecFormModule.addPlanSanitaryFixture('sink')" },
           { label: '+ Puerta', onClick: "MecFormModule.addPlanSanitaryOpening('door')" },
           { label: '+ Ventana', onClick: "MecFormModule.addPlanSanitaryOpening('window')" },
-          { label: '+ Toma', onClick: "MecFormModule.addPlanSanitaryElement('outlet')" },
+          { label: '+ Enchufe', onClick: "MecFormModule.addPlanSanitaryElement('outlet')" },
           { label: '+ Tablero', onClick: "MecFormModule.addPlanSanitaryElement('switchboard')" },
-          { label: '+ Foco', onClick: "MecFormModule.addPlanSanitaryElement('light')" },
+          { label: '+ Luz', onClick: "MecFormModule.addPlanSanitaryElement('light')" },
           { label: '+ Ventilador', onClick: "MecFormModule.addPlanSanitaryElement('fan')" },
-          { label: '+ Aire', onClick: "MecFormModule.addPlanSanitaryElement('ac')" },
+          { label: '+ Aire acond.', onClick: "MecFormModule.addPlanSanitaryElement('ac')" },
           { label: 'Forma L', onClick: `MecFormModule.setPlanSanitaryShape('${_escape(item.id)}', 'l')` },
           { label: '+ Vertice', onClick: `MecFormModule.addPlanSanitaryVertex('${_escape(item.id)}')` },
           { label: '- Vertice', onClick: `MecFormModule.removePlanSanitaryVertex('${_escape(item.id)}')` },
@@ -15538,7 +15542,7 @@ const MecFormModule = (() => {
   function _selectedPlanRoomId() {
     const raw = String(_selectedPlanId || '');
     if (raw.startsWith('room::')) return raw.replace('room::', '');
-    if (raw && raw.includes('::') && !raw.startsWith('sanitary::') && !raw.startsWith('site::')) return raw.split('::')[0];
+    if (raw && raw.includes('::') && !raw.startsWith('sanitary::') && !raw.startsWith('site::') && !raw.startsWith('block::') && !raw.startsWith('floor::')) return raw.split('::')[0];
     return _activeClassroomId || (_data.__classrooms || [])[0]?.id || '';
   }
 

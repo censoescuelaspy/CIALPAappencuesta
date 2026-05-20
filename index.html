@@ -92,7 +92,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.58</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.59</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +119,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.58</strong>
+      Edición vigente<br><strong class="app-version">v2.6.59</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -210,7 +210,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.58</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.59</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -543,28 +543,79 @@
            ====================================================== -->
       <div id="module-encuestadores" class="module-panel" data-min-role="admin">
         <div class="page-header">
-          <h2>Gestión de Encuestadores</h2>
-          <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">
-            + Nuevo Encuestador
-          </button>
+          <div>
+            <h2>Administrar encuestadores</h2>
+            <p class="text-muted">Alta, edicion, estado y roles de usuarios de campo.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="AdminModule.loadEncuestadores()">Actualizar</button>
+            <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo encuestador</button>
+          </div>
         </div>
         <div class="page-content">
+          <div class="enc-admin-summary">
+            <div class="enc-admin-kpi">
+              <small>Total</small>
+              <strong id="enc-total">0</strong>
+            </div>
+            <div class="enc-admin-kpi enc-admin-kpi--active">
+              <small>Activos</small>
+              <strong id="enc-activos">0</strong>
+            </div>
+            <div class="enc-admin-kpi enc-admin-kpi--inactive">
+              <small>Inactivos</small>
+              <strong id="enc-inactivos">0</strong>
+            </div>
+            <div class="enc-admin-kpi enc-admin-kpi--role">
+              <small>Supervisores/admin</small>
+              <strong id="enc-supervisores">0</strong>
+            </div>
+          </div>
+
+          <form id="enc-filter-form" class="enc-admin-toolbar">
+            <div class="enc-admin-search">
+              <label for="enc-filter-search">Buscar</label>
+              <input id="enc-filter-search" type="text" class="form-control form-control-sm" placeholder="Usuario, nombre, documento, telefono o zona" autocomplete="off" />
+            </div>
+            <div class="enc-admin-filter">
+              <label>Estado</label>
+              <input id="enc-filter-estado" type="hidden" value="" />
+              <div class="choice-button-strip">
+                <button class="choice-button choice-button--active" type="button" data-choice-target="enc-filter-estado" data-choice-value="">Todos</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-estado" data-choice-value="activo">Activos</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-estado" data-choice-value="inactivo">Inactivos</button>
+              </div>
+            </div>
+            <div class="enc-admin-filter">
+              <label>Rol</label>
+              <input id="enc-filter-rol" type="hidden" value="" />
+              <div class="choice-button-strip">
+                <button class="choice-button choice-button--active" type="button" data-choice-target="enc-filter-rol" data-choice-value="">Todos</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-rol" data-choice-value="encuestador">Encuestador</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-rol" data-choice-value="supervisor">Supervisor</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-rol" data-choice-value="admin">Admin</button>
+              </div>
+            </div>
+          </form>
+
           <div class="table-wrapper card">
-            <table>
+            <table class="enc-admin-table">
               <thead>
                 <tr>
                   <th>ID</th>
                   <th>Usuario</th>
                   <th>Nombre</th>
+                  <th>Rol</th>
                   <th>Documento</th>
                   <th>Teléfono</th>
+                  <th>Correo</th>
                   <th>Zona</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="enc-tbody">
-                <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+                <tr><td colspan="10" class="text-center text-muted">Cargando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -873,10 +924,10 @@
               <div class="table-wrapper card">
                 <table>
                   <thead>
-                    <tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Zona</th><th>Estado</th><th>Acciones</th></tr>
+                    <tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Documento</th><th>Teléfono</th><th>Correo</th><th>Zona</th><th>Estado</th><th>Acciones</th></tr>
                   </thead>
                   <tbody id="enc-tbody-admin">
-                    <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+                    <tr><td colspan="10" class="text-center text-muted">Cargando...</td></tr>
                   </tbody>
                 </table>
               </div>

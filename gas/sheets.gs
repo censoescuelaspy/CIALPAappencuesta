@@ -366,8 +366,11 @@ const SheetsService = (() => {
     return { status: 'ok', data: rows };
   }
 
-  function getEncuestadores() {
-    const rows = _sheetToObjects(SHEET_NAMES.ENCUESTADORES).filter(r => String(r.activo).toLowerCase() !== 'false');
+  function getEncuestadores(params) {
+    const session = params && params._session;
+    const includeInactive = params && (params.incluir_inactivos === true || String(params.incluir_inactivos).toLowerCase() === 'true');
+    let rows = _sheetToObjects(SHEET_NAMES.ENCUESTADORES);
+    if (!includeInactive || !_isAuthorizedAdmin(session)) rows = rows.filter(r => String(r.activo).toLowerCase() !== 'false');
     return { status: 'ok', data: rows };
   }
 
@@ -376,6 +379,7 @@ const SheetsService = (() => {
     if (!_isAuthorizedAdmin(session)) return { status: 'error', message: 'Solo administradores autorizados pueden gestionar usuarios.' };
     const { id_encuestador, usuario, nombres, apellidos, documento, telefono, correo, zona_asignada, rol, activo, password } = params;
     if (!usuario || !nombres) return { status: 'error', message: 'Usuario y nombres son requeridos.' };
+    const activeValue = activo === false || String(activo).toLowerCase() === 'false' ? 'false' : 'true';
     _ensureColumns(SHEET_NAMES.ENCUESTADORES, ['id_encuestador','usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol','foto_url','activo','fecha_alta','fecha_actualizacion']);
     _ensureColumns(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual']);
 
@@ -384,10 +388,10 @@ const SheetsService = (() => {
       if (existing.some(e => _same(e.usuario, usuario))) return { status: 'error', message: 'Ya existe un encuestador con ese usuario.' };
       const newId = _genId('ENC');
       _appendObject(SHEET_NAMES.ENCUESTADORES, ['id_encuestador','usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol','foto_url','activo','fecha_alta','fecha_actualizacion'], {
-        id_encuestador: newId, usuario, nombres, apellidos: apellidos || '', documento: documento || '', telefono: telefono || '', correo: correo || '', zona_asignada: zona_asignada || '', rol: rol || 'encuestador', foto_url: '', activo: activo === false ? 'false' : 'true', fecha_alta: _today(), fecha_actualizacion: _today()
+        id_encuestador: newId, usuario, nombres, apellidos: apellidos || '', documento: documento || '', telefono: telefono || '', correo: correo || '', zona_asignada: zona_asignada || '', rol: rol || 'encuestador', foto_url: '', activo: activeValue, fecha_alta: _today(), fecha_actualizacion: _today()
       });
       _appendObject(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual'], {
-        id_usuario: _genId('USR'), usuario, password_hash: password ? AuthService._hashPassword(password) : '', nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activo === false ? 'false' : 'true', fecha_alta: _today(), ultimo_acceso: '', token_actual: ''
+        id_usuario: _genId('USR'), usuario, password_hash: password ? AuthService._hashPassword(password) : '', nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activeValue, fecha_alta: _today(), ultimo_acceso: '', token_actual: ''
       });
       AuditService.log('CREATE_ENCUESTADOR', session.usuario, `usuario: ${usuario}`);
       return { status: 'ok', message: 'Encuestador creado.', data: { id_encuestador: newId } };
@@ -397,10 +401,15 @@ const SheetsService = (() => {
     const rowIdx = _findRowIndex(SHEET_NAMES.ENCUESTADORES, 'id_encuestador', id_encuestador);
     if (rowIdx === -1) return { status: 'error', message: 'Encuestador no encontrado.' };
     const headers = _headers(sheet);
+    const previousUsuario = _getByHeader(sheet, rowIdx, headers, 'usuario') || usuario;
+    const existing = _sheetToObjects(SHEET_NAMES.ENCUESTADORES);
+    if (!_same(previousUsuario, usuario) && existing.some(e => !_same(e.id_encuestador, id_encuestador) && _same(e.usuario, usuario))) {
+      return { status: 'error', message: 'Ya existe un encuestador con ese usuario.' };
+    }
     ['usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol'].forEach(k => _setByHeader(sheet, rowIdx, headers, k, params[k] || ''));
-    _setByHeader(sheet, rowIdx, headers, 'activo', activo === false ? 'false' : 'true');
+    _setByHeader(sheet, rowIdx, headers, 'activo', activeValue);
     _setByHeader(sheet, rowIdx, headers, 'fecha_actualizacion', _today());
-    _updateUsuarioMirror(usuario, { nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activo === false ? 'false' : 'true', password });
+    _updateUsuarioMirror(previousUsuario, { usuario, nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activeValue, password });
     AuditService.log('UPDATE_ENCUESTADOR', session.usuario, `id: ${id_encuestador}, usuario: ${usuario}`);
     return { status: 'ok', message: 'Encuestador actualizado.' };
   }
@@ -1192,6 +1201,7 @@ const SheetsService = (() => {
     if (rowIdx === -1) return;
     const sheet = _getSheet(SHEET_NAMES.USUARIOS);
     const headers = _headers(sheet);
+    if (fields.usuario !== undefined) _setByHeader(sheet, rowIdx, headers, 'usuario', fields.usuario);
     if (fields.nombres !== undefined) _setByHeader(sheet, rowIdx, headers, 'nombres', fields.nombres);
     if (fields.apellidos !== undefined) _setByHeader(sheet, rowIdx, headers, 'apellidos', fields.apellidos);
     if (fields.rol !== undefined) _setByHeader(sheet, rowIdx, headers, 'rol', fields.rol);

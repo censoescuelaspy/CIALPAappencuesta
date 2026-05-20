@@ -54,18 +54,19 @@ const MapModule = (() => {
   function _getIcon(e) {
     const name = _surveyorName(e);
     const color = _surveyorColor(name);
-    const opacity = _isClosed(e) ? 1 : 0.38;
-    const stroke = _isClosed(e) ? '#172033' : '#ffffff';
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
-      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" fill-opacity="${opacity}" stroke="${stroke}" stroke-width="2"/>
-      <circle cx="14" cy="14" r="6" fill="#fff" fill-opacity="0.85"/>
+    const opacity = _isClosed(e) ? 1 : 0.92;
+    const stroke = '#172033';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 28 36">
+      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" fill-opacity="${opacity}" stroke="#ffffff" stroke-width="4"/>
+      <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 22 14 22S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" fill-opacity="${opacity}" stroke="${stroke}" stroke-width="1.75"/>
+      <circle cx="14" cy="14" r="6.4" fill="#fff" fill-opacity="0.96" stroke="${stroke}" stroke-width="1"/>
     </svg>`;
     return L.divIcon({
       className: '',
       html: svg,
-      iconSize: [28, 36],
-      iconAnchor: [14, 36],
-      popupAnchor: [0, -36],
+      iconSize: [34, 44],
+      iconAnchor: [17, 44],
+      popupAnchor: [0, -44],
     });
   }
 
@@ -166,12 +167,18 @@ const MapModule = (() => {
           iconCreateFunction: cluster => {
             const count = cluster.getChildCount();
             let cls = 'cluster-small';
-            if (count > 50) cls = 'cluster-large';
-            else if (count > 10) cls = 'cluster-medium';
+            let size = 36;
+            if (count > 50) {
+              cls = 'cluster-large';
+              size = 52;
+            } else if (count > 10) {
+              cls = 'cluster-medium';
+              size = 44;
+            }
             return L.divIcon({
               html: `<div class="${cls}"><span>${count}</span></div>`,
               className: 'marker-cluster',
-              iconSize: L.point(40, 40),
+              iconSize: L.point(size, size),
             });
           },
         })

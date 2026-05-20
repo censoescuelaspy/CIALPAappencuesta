@@ -137,7 +137,7 @@ function _handleRequest(e) {
       case 'getModulosSesion':return _respond(SheetsService.getModulosSesion(params));
 
       // Encuestadores
-      case 'getEncuestadores':return _respond(SheetsService.getEncuestadores());
+      case 'getEncuestadores':return _respond(SheetsService.getEncuestadores(params));
       case 'saveEncuestador': return _respond(SheetsService.saveEncuestador(params));
       case 'deleteEncuestador': return _respond(SheetsService.deleteEncuestador(params));
 
