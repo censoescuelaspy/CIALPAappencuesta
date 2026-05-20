@@ -1,0 +1,14 @@
+{
+  "name": "cialpa-sanitarios-aberturas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "simulate:api": "node tools/simulation/cialpa_api_simulator.mjs",
+    "simulate:ui": "playwright test --config=tools/simulation/playwright.config.mjs",
+    "metrics:web": "node tools/simulation/cialpa_web_metrics.mjs",
+    "embed:schools": "node tools/simulation/embed_schools_csv.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}

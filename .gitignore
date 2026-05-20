@@ -8,6 +8,19 @@ Thumbs.db
 
 # Node (por si se usa en desarrollo)
 node_modules/
+npm-debug.log*
 
 # Servidores locales de prueba
 server-*.log
+
+# Reportes de Playwright
+test-results/
+tools/simulation/playwright-report/
+tools/simulation/test-results/
+tools/simulation/tools/
+tools/simulation/*.csv
+tools/simulation/metrics/
+
+# Credenciales locales
+.env
+.env.*

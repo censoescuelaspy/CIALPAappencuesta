@@ -4,6 +4,134 @@
 
 ---
 
+## Actualizacion forzada, filtros del mapa y arquitectura de datos - 2026-05-20 - v2.6.58
+
+### Objetivo
+- Corregir casos donde el boton `Actualizar app` no lograba traer la version nueva en navegadores con Service Worker/cache persistente.
+- Ordenar los filtros de la vista `Mapa` para que el usuario entienda rapidamente que esta filtrando.
+- Dejar una propuesta tecnica para migrar los datos recolectados a una base de datos estructurada, segura e integra.
+
+### Cambios implementados
+- El Service Worker se registra con `sw.js?v=APP_CONFIG.VERSION` y `updateViaCache: 'none'` para reducir cacheo del propio `sw.js`.
+- `Actualizar app` ahora elimina caches de app, conserva cache de teselas de mapa, intenta actualizar/desregistrar Service Workers y recarga con `v=VERSION` + timestamp.
+- Los filtros del mapa se reorganizan en grupos `Buscar escuela`, `Territorio` y `Operacion`.
+- El filtro de territorio separa departamento, distrito y zona con rotulos claros.
+- El filtro operativo separa estado, encuestador y muestra.
+- Se agrega filtro de distrito dinamico, recalculado segun departamento seleccionado.
+- Se agrega filtro `Piloto sorteada`, usando `en_muestra_piloto` del padron embebido.
+- La busqueda del mapa ahora contempla nombre, codigo, departamento, distrito y localidad.
+- Se crea `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` con modelo recomendado de base PostgreSQL, tablas principales, sincronizacion offline, controles de seguridad, auditoria e integridad.
+- Para publicar en GitHub sin exponer datos nominales/contactos, `gas/escuelas_embebidas.gs` queda como stub publico sin filas; el padron completo se regenera localmente antes de subir GAS desde la cuenta propietaria.
+- Version y cache actualizados a `v2.6.58`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages.
+- Regenerar `gas/escuelas_embebidas.gs` localmente con `npm run embed:schools` y publicar GAS desde la cuenta propietaria si se quiere activar el padron embebido completo.
+- Probar en un navegador que venia mostrando version anterior usando `Actualizar app` y, si persiste, abrir con `?v=2.6.58&_=timestamp`.
+- Revisar con el equipo si la base objetivo sera Cloud SQL PostgreSQL, Supabase, AlloyDB u otra opcion administrada.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
+## Restauracion de herramientas de insercion y padron embebido - 2026-05-20 - v2.6.57
+
+### Objetivo
+- Recuperar en la cinta `Insertar` los elementos que ya existian en el motor del plano pero habian quedado poco visibles o ausentes para el usuario de campo.
+- Preparar el backend GAS para leer el padron completo de escuelas desde un CSV embebido en el proyecto, evitando la lectura completa de Sheets en `getEscuelas`.
+- Incorporar la muestra piloto sorteada con marca y orden, sin perder el listado completo.
+- Mantener fallback automatico a `escuelas_seleccionadas` si el CSV embebido se regenera vacio o solo con encabezado.
+
+### Cambios implementados
+- La cinta `Insertar` vuelve a mostrar para aulas: puerta, ventana, toma, tablero, foco, ventilador, aire acondicionado, falla/observacion, pizarron, escalera y texto.
+- La cinta `Insertar` vuelve a mostrar para sanitarios: cabina, artefactos, puerta, ventana, toma, tablero, foco, ventilador, aire acondicionado y falla/observacion.
+- El panel contextual evita duplicar acciones que ya estan disponibles en la cinta.
+- Se localiza `lista_oficial_escuelas_2025.gsheet`, Spreadsheet `1Auz5pIrUzAdc2uN0UkiBNwlV3stjq0bPcnCcsEraWmU`, con hojas `listado_ini`, `muestra_piloto_def` y `ref_filtro`.
+- Se exporta `listado_ini` como padron completo y `muestra_piloto_def` como muestra piloto sorteada.
+- Se agrega `tools/simulation/embed_schools_csv.mjs` y script `npm run embed:schools` para regenerar `gas/escuelas_embebidas.gs` desde los CSV locales.
+- La generacion local de `gas/escuelas_embebidas.gs` valida 5462 escuelas del padron completo y 86 escuelas piloto; la copia apta para repositorio publico queda sin filas sensibles y mantiene fallback a Sheets.
+- El parser CSV embebido detecta separador coma/punto y coma, usa cache en memoria de ejecucion y mantiene fallback seguro.
+- La muestra piloto se cruza por codigo local, marcando `en_muestra_piloto: true`, `orden_muestra_piloto` y `prioridad_operativa: piloto`.
+- `getEscuelas` y `getEscuela` usan el CSV embebido cuando contiene filas; si esta vacio o solo tiene encabezado, siguen usando la hoja actual.
+- `getEscuelas` acepta filtros opcionales `muestra_piloto`/`piloto` y orden `orden=piloto` para devolver la muestra sorteada en secuencia.
+- Las mutaciones operativas crean una fila minima en `escuelas_seleccionadas` cuando una escuela proviene del CSV embebido y todavia no existe en la hoja.
+- Se amplian alias de encabezados comunes para codigo, nombre, departamento, distrito, localidad, zona, latitud y longitud, incluyendo encabezados reales del MEC.
+- Las coordenadas en grados/minutos/segundos del padron oficial se convierten a decimales negativos para Paraguay.
+- Version y cache actualizados a `v2.6.57`.
+
+### Pendiente operativo
+- Subir el GAS y publicar desde la cuenta propietaria para que el backend use el padron embebido.
+- Probar `getEscuelas` con el CSV completo y comparar tiempo contra lectura desde Sheets.
+
+### Validaciones ejecutadas
+- `npm.cmd run embed:schools`: genera `gas/escuelas_embebidas.gs` con 5462 escuelas y 86 piloto.
+- Prueba local con `Utilities.parseCsv` simulado: `getEscuelas({})` devuelve `total: 5462`, `source: embedded_csv`.
+- Prueba local con `getEscuelas({ muestra_piloto: true, orden: 'piloto' })`: devuelve 86 escuelas y la primera es codigo `1005052`, orden `1`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check tools/simulation/embed_schools_csv.mjs`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check` sin errores; solo advertencia esperada de normalizacion LF/CRLF en Windows.
+
+---
+
+## Simulador de cargas y prueba controlada de borradores - 2026-05-20
+
+### Objetivo
+- Preparar una herramienta segura para validar el circuito `login` -> `getEscuelas` -> `guardarBorradorMec`.
+- Permitir simulaciones de carga minima sin tocar la interfaz ni depender de tablets reales.
+- Evitar escrituras accidentales en produccion dejando el modo de escritura bloqueado hasta usar `--write`.
+- Generar metricas repetibles de comportamiento de la app web publicada sin requerir credenciales.
+
+### Cambios implementados
+- Se agrega `tools/simulation/cialpa_api_simulator.mjs`, ejecutable con Node 22 y sin dependencias obligatorias.
+- El simulador lee `APP_CONFIG.GAS_URL` y `APP_CONFIG.VERSION` desde `assets/js/config.js`.
+- El modo por defecto es solo lectura: login, lectura de escuelas y listado parcial.
+- El modo escritura requiere `--write` y una escuela explicita con `--school=CODIGO` o `--use-first-school`.
+- Cada carga simulada usa `clientMutationId` con prefijo `SIM-MEC`, `motivo: simulacion_api_*` y `estado_borrador: simulado` para reconocerla en `mec_borradores`.
+- Se agrega base opcional de Playwright en `tools/simulation/cialpa_ui_smoke.spec.mjs` para validar login y llegada a `Registro guiado`.
+- Se agrega `tools/simulation/cialpa_web_metrics.mjs` para medir carga web en escritorio, tablet y movil.
+- Se agrega `package.json` con scripts `simulate:api`, `simulate:ui` y `metrics:web`.
+- Se instala `@playwright/test` y se genera `package-lock.json` para fijar la dependencia.
+- Se instala Chromium de Playwright para poder ejecutar smoke tests de navegador.
+- El reporte de metricas guarda JSON completo y resumen Markdown en `tools/simulation/metrics/`.
+- `.gitignore` incorpora reportes de Playwright, `test-results`, `node_modules` y archivos `.env`.
+
+### Validaciones ejecutadas
+- `node --check tools/simulation/cialpa_api_simulator.mjs`.
+- `node --check tools/simulation/cialpa_ui_smoke.spec.mjs`.
+- `node --check tools/simulation/playwright.config.mjs`.
+- `node --check tools/simulation/cialpa_web_metrics.mjs`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `node tools/simulation/cialpa_api_simulator.mjs --help`: OK.
+- `node tools/simulation/cialpa_api_simulator.mjs --list-schools` sin credenciales: falla de forma segura con aviso de variables requeridas.
+- `npm.cmd install`: OK.
+- `npx.cmd playwright install chromium`: OK.
+- `npm.cmd run simulate:api -- --help`: OK.
+- `npm.cmd run simulate:ui`: OK, 2 pruebas saltadas correctamente por falta de `CIALPA_USER`/`CIALPA_PASSWORD`.
+- `npm.cmd run metrics:web -- --help`: OK.
+- `npm.cmd run metrics:web` en sandbox sin red: genera reporte de falla controlada por `net::ERR_NETWORK_ACCESS_DENIED`.
+- `npm.cmd run metrics:web` con red habilitada: OK, version visible `v2.6.56`, 25 requests por vista, 0 fallidas, 0 errores de consola, cache `cialpa-app-v2.6.56`.
+- Reporte generado: `tools/simulation/metrics/web-metrics-20260520T180019Z.md` y `.json`.
+- `git diff --check` sin errores; solo advertencia esperada de normalizacion LF/CRLF en Windows.
+
+### Pendiente operativo
+- Ejecutar con credenciales reales en modo solo lectura para listar escuelas.
+- Ejecutar una escritura controlada con `--write --school=CODIGO --count=1` y verificar la fila en `mec_borradores`.
+- Ejecutar el smoke test UI con credenciales reales para validar login y llegada a `Registro guiado`.
+- Repetir `npm.cmd run metrics:web -- --cache-bust` despues de cada publicacion para comparar regresiones de carga.
+
+---
+
 ## Reparacion de guardado en libro online - 2026-05-19 - v2.6.56
 
 ### Objetivo

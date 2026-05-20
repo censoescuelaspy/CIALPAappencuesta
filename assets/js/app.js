@@ -568,7 +568,9 @@ const AppController = (() => {
   async function _registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
-      _swRegistration = await navigator.serviceWorker.register('./sw.js');
+      _swRegistration = await navigator.serviceWorker.register(`./sw.js?v=${encodeURIComponent(APP_CONFIG.VERSION)}`, {
+        updateViaCache: 'none',
+      });
       _swRegistration.addEventListener('updatefound', () => {
         const worker = _swRegistration.installing;
         if (!worker) return;
@@ -671,6 +673,7 @@ const AppController = (() => {
 
   async function updateApp() {
     UI.showToast('Limpiando caché y reiniciando la app…', 'info');
+    const freshUrl = _freshAppUrl();
     try {
       if ('caches' in window) {
         const keys = await caches.keys();
@@ -680,12 +683,24 @@ const AppController = (() => {
       }
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map(reg => reg.unregister()));
+        await Promise.all(regs.map(async reg => {
+          try { await reg.update(); } catch (_) {}
+          return reg.unregister();
+        }));
       }
+      try { await fetch(freshUrl, { cache: 'reload', credentials: 'same-origin' }); } catch (_) {}
     } catch (err) {
       console.warn('Actualización manual incompleta:', err);
     }
-    window.location.replace(window.location.pathname + '?_=' + Date.now());
+    window.location.replace(freshUrl);
+  }
+
+  function _freshAppUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', APP_CONFIG.VERSION);
+    url.searchParams.set('_', String(Date.now()));
+    url.hash = '';
+    return url.toString();
   }
 
   function _openConfiguredUrl(url, label) {
@@ -920,9 +935,11 @@ const AppController = (() => {
       applyBtn.addEventListener('click', () => {
         const filters = {
           departamento: document.getElementById('filter-departamento')?.value || '',
+          distrito: document.getElementById('filter-distrito')?.value || '',
           zona: document.getElementById('filter-zona')?.value || '',
           encuestador: document.getElementById('filter-encuestador')?.value || '',
           estado: document.getElementById('filter-estado')?.value || '',
+          piloto: document.getElementById('filter-piloto')?.value || '',
           q: document.getElementById('filter-search')?.value || '',
         };
         MapModule.applyFilters(filters);
@@ -934,6 +951,7 @@ const AppController = (() => {
       clearBtn.dataset.bound = 'true';
       clearBtn.addEventListener('click', () => {
         document.getElementById('map-filter-form')?.reset();
+        if (typeof MapModule.populateDistrictButtons === 'function') MapModule.populateDistrictButtons('');
         UI.refreshButtonChoices(document.getElementById('map-filter-form'));
         MapModule.clearFilters();
       });
@@ -946,11 +964,16 @@ const AppController = (() => {
         document.getElementById('map-filter-apply')?.click();
       });
     }
-    ['filter-departamento', 'filter-zona', 'filter-encuestador', 'filter-estado'].forEach(id => {
+    ['filter-departamento', 'filter-distrito', 'filter-zona', 'filter-encuestador', 'filter-estado', 'filter-piloto'].forEach(id => {
       const input = document.getElementById(id);
       if (input && input.dataset.bound !== 'true') {
         input.dataset.bound = 'true';
-        input.addEventListener('change', () => document.getElementById('map-filter-apply')?.click());
+        input.addEventListener('change', () => {
+          if (id === 'filter-departamento' && typeof MapModule.populateDistrictButtons === 'function') {
+            MapModule.populateDistrictButtons(input.value || '');
+          }
+          document.getElementById('map-filter-apply')?.click();
+        });
       }
     });
   }

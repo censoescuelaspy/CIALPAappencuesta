@@ -12,7 +12,8 @@ const SheetsService = (() => {
     'id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona',
     'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado',
     'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado',
-    'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo',
+    'prioridad_operativa', 'en_muestra_piloto', 'orden_muestra_piloto',
+    'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo',
     'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url',
     'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id',
     'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'
@@ -31,8 +32,10 @@ const SheetsService = (() => {
   ];
 
   function getEscuelas(filters) {
-    const rawRows = _sheetToObjects(SHEET_NAMES.ESCUELAS);
-    let rows = rawRows.map((r, idx) => _normalizarEscuela(r, idx + 2)).filter(r => r.codigo_local || r.id_escuela || r.nombre);
+    const source = _escuelasRawRows_();
+    let rows = source.rows
+      .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || idx + 2))
+      .filter(r => r.codigo_local || r.id_escuela || r.nombre);
 
     filters = filters || {};
     const session = filters._session;
@@ -53,25 +56,47 @@ const SheetsService = (() => {
     if (filters.supervisor) rows = rows.filter(r => _same(r.supervisor_asignado, filters.supervisor));
     if (filters.zona) rows = rows.filter(r => _same(r.zona, filters.zona));
     if (filters.distrito) rows = rows.filter(r => _same(r.distrito, filters.distrito));
+    if (_isTrueish(filters.muestra_piloto) || _isTrueish(filters.piloto)) {
+      rows = rows.filter(r => _isTrueish(r.en_muestra_piloto) || _isTrueish(r.muestra_piloto));
+    }
     if (filters.q) {
       const q = _txt(filters.q).toLowerCase();
       rows = rows.filter(r => (`${r.nombre} ${r.codigo_local} ${r.departamento} ${r.distrito} ${r.localidad}`).toLowerCase().includes(q));
     }
+    if (_same(filters.orden, 'piloto') || _same(filters.sort, 'piloto') || _same(filters.order, 'piloto')) {
+      rows = rows.slice().sort((a, b) => {
+        const ao = _num(a.orden_muestra_piloto || a.orden_visita) || 999999;
+        const bo = _num(b.orden_muestra_piloto || b.orden_visita) || 999999;
+        return ao - bo || String(a.codigo_local || '').localeCompare(String(b.codigo_local || ''));
+      });
+    }
 
-    return { status: 'ok', data: rows, meta: { total: rows.length, schema: 'canonical_v2_1' } };
+    return {
+      status: 'ok',
+      data: rows,
+      meta: {
+        total: rows.length,
+        schema: 'canonical_v2_1',
+        source: source.source,
+        embedded_updated_at: source.embeddedUpdatedAt || '',
+      }
+    };
   }
 
   function getEscuela(id) {
-    const rawRows = _sheetToObjects(SHEET_NAMES.ESCUELAS);
-    const found = rawRows.map((r, idx) => _normalizarEscuela(r, idx + 2)).find(r => _idMatch(r, id));
+    const source = _escuelasRawRows_();
+    const found = source.rows
+      .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || idx + 2))
+      .find(r => _idMatch(r, id));
     if (!found) return { status: 'error', message: 'Escuela no encontrada.' };
-    return { status: 'ok', data: found };
+    return { status: 'ok', data: found, meta: { source: source.source } };
   }
 
   function updateEscuelaEstado(params) {
     const session = params._session;
     const id = params.id_escuela || params.codigo_local;
-    const rowIdx = _findEscuelaRow(id);
+    let rowIdx = _findEscuelaRow(id);
+    if (rowIdx === -1) rowIdx = _appendEmbeddedEscuelaOperationalRow_(id);
     if (rowIdx === -1) return { status: 'error', message: 'Escuela no encontrada.' };
 
     _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
@@ -103,7 +128,8 @@ const SheetsService = (() => {
   function asignarEscuela(params) {
     const session = params._session;
     if (!['admin', 'supervisor'].includes(String(session.rol))) return { status: 'error', message: 'Acceso restringido.' };
-    const rowIdx = _findEscuelaRow(params.id_escuela || params.codigo_local);
+    let rowIdx = _findEscuelaRow(params.id_escuela || params.codigo_local);
+    if (rowIdx === -1) rowIdx = _appendEmbeddedEscuelaOperationalRow_(params.id_escuela || params.codigo_local);
     if (rowIdx === -1) return { status: 'error', message: 'Escuela no encontrada.' };
     _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
     const sheet = _getSheet(SHEET_NAMES.ESCUELAS);
@@ -862,29 +888,106 @@ const SheetsService = (() => {
     return { status: 'ok', data: rows };
   }
 
+  function _escuelasRawRows_() {
+    let embeddedRows = [];
+    if (typeof getEmbeddedEscuelasRecords_ === 'function') {
+      try {
+        embeddedRows = getEmbeddedEscuelasRecords_() || [];
+      } catch (err) {
+        Logger.log('No se pudo leer el CSV embebido de escuelas: ' + err);
+        embeddedRows = [];
+      }
+    }
+
+    if (embeddedRows.length) {
+      return {
+        rows: embeddedRows,
+        source: 'embedded_csv',
+        embeddedUpdatedAt: typeof getEmbeddedEscuelasUpdatedAt_ === 'function' ? getEmbeddedEscuelasUpdatedAt_() : '',
+      };
+    }
+
+    return {
+      rows: _sheetToObjects(SHEET_NAMES.ESCUELAS),
+      source: 'sheet',
+      embeddedUpdatedAt: '',
+    };
+  }
+
+  function _appendEmbeddedEscuelaOperationalRow_(id) {
+    if (typeof getEmbeddedEscuelasRecords_ !== 'function') return -1;
+    const rows = getEmbeddedEscuelasRecords_() || [];
+    if (!rows.length) return -1;
+
+    const found = rows
+      .map((r, idx) => _normalizarEscuela(r, r.__embedded_csv_row || idx + 2))
+      .find(r => _idMatch(r, id));
+    if (!found) return -1;
+
+    _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
+    const existing = _findEscuelaRow(found.id_escuela || found.codigo_local);
+    if (existing !== -1) return existing;
+
+    const sheet = _getSheet(SHEET_NAMES.ESCUELAS);
+    const headers = _headers(sheet);
+    const now = _timestamp();
+    const row = {
+      id_escuela: found.id_escuela,
+      codigo_local: found.codigo_local,
+      nombre: found.nombre,
+      departamento: found.departamento,
+      distrito: found.distrito,
+      localidad: found.localidad,
+      zona: found.zona,
+      latitud: found.latitud,
+      longitud: found.longitud,
+      estado_relevamiento: found.estado_relevamiento || 'pendiente',
+      encuestador_asignado: found.encuestador_asignado || '',
+      supervisor_asignado: found.supervisor_asignado || '',
+      fecha_ultimo_evento: now,
+      observaciones: found.observaciones || 'Fila operativa creada desde CSV embebido.',
+      orden_visita: found.orden_visita || '',
+      fecha_programada: found.fecha_programada || '',
+      turno_programado: found.turno_programado || '',
+      prioridad_operativa: found.prioridad_operativa || 'media',
+      en_muestra_piloto: found.en_muestra_piloto || '',
+      orden_muestra_piloto: found.orden_muestra_piloto || '',
+      tiempo_estimado_min: found.tiempo_estimado_min || '',
+      ultima_sesion_id: found.ultima_sesion_id || '',
+      folio_externo: found.folio_externo || '',
+      ultimo_registro_externo: found.ultimo_registro_externo || '',
+    };
+
+    sheet.appendRow(headers.map(h => row[h] !== undefined ? row[h] : ''));
+    return sheet.getLastRow();
+  }
+
   function _normalizarEscuela(r, rowNumber) {
-    const codigo = _first(r, ['codigo_local', 'CODIGO', 'Código', 'Codigo', 'Código de Local Escolar', 'Código Local Escolar', 'Cod_Local', 'local_escolar_codigo']);
+    const codigo = _first(r, ['codigo_local', 'CODIGO', 'codigo', 'Codigo', 'CODIGO_LOCAL', 'codigo_local_escolar', 'CODIGO_LOCAL_ESCOLAR', 'CODIGO ESTABLECIMIENTO', 'codigo_establecimiento', 'cod_local', 'COD_LOCAL', 'Código', 'Código del local escolar', 'Código de Local Escolar', 'Código Local Escolar', 'Cod_Local', 'local_escolar_codigo']);
     const id = _first(r, ['id_escuela', 'ID_ESCUELA', 'id', 'ID']) || (codigo ? `ESC_${_digits(codigo) || codigo}` : `ESC_ROW_${rowNumber}`);
-    const lat = _first(r, ['latitud', 'LAT_DEC', 'Latitud', 'LATITUD', 'lat', 'LAT']);
-    const lng = _first(r, ['longitud', 'LNG_DEC', 'Longitud', 'LONGITUD', 'lng', 'LNG', 'lon', 'LON']);
+    const lat = _first(r, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'Latitud', 'LATITUD', 'lat_corr', 'LAT_CORR']);
+    const lng = _first(r, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'Longitud', 'LONGITUD', 'long_corr', 'lng_corr', 'LONG_CORR']);
     const estado = _first(r, ['estado_relevamiento', 'ESTADO_RELEVAMIENTO']) || 'pendiente';
-    const matricula = _first(r, ['MATRICULA', 'matricula', 'Matrícula']);
+    const matricula = _first(r, ['MATRICULA', 'matricula', 'Matrícula', 'Matrícula del local escolar', 'cantidad matricula']);
     const aulas = _first(r, ['AULAS_EST', 'aulas_est', 'aulas']);
     const obsBase = _first(r, ['observaciones', 'OBSERVACIONES']) || '';
+    const muestraPiloto = _first(r, ['en_muestra_piloto', 'muestra_piloto', 'EN_MUESTRA_PILOTO', 'MUESTRA_PILOTO']);
+    const ordenMuestraPiloto = _first(r, ['orden_muestra_piloto', 'ORDEN_MUESTRA_PILOTO']);
     const extraObs = [];
     if (matricula !== '') extraObs.push(`Matrícula: ${matricula}`);
     if (aulas !== '') extraObs.push(`Aulas estimadas: ${aulas}`);
+    if (_isTrueish(muestraPiloto)) extraObs.push(`Muestra piloto${ordenMuestraPiloto ? ` #${ordenMuestraPiloto}` : ''}`);
 
     return {
       id_escuela: _txt(id),
       codigo_local: _txt(codigo),
-      nombre: _txt(_first(r, ['nombre', 'NOMBRE', 'Nombre', 'Nombre de Local Escolar', 'NOMBRE_LOCAL'])),
-      departamento: _txt(_first(r, ['departamento', 'DEPTO', 'Departamento'])),
-      distrito: _txt(_first(r, ['distrito', 'DIST', 'Distrito'])),
-      localidad: _txt(_first(r, ['localidad', 'LOCALIDAD', 'Localidad'])),
-      zona: _zona(_first(r, ['zona', 'ZONA', 'Zona'])),
-      latitud: _num(lat),
-      longitud: _num(lng),
+      nombre: _txt(_first(r, ['nombre', 'NOMBRE', 'Nombre', 'Nombre del local escolar (*)', 'Nombre de Local Escolar', 'NOMBRE_LOCAL', 'NOMBRE_INSTITUCION', 'nombre_institucion', 'INSTITUCION', 'institucion', 'LOCAL', 'local'])),
+      departamento: _txt(_first(r, ['departamento', 'DEPTO', 'Departamento', 'DEPARTAMENTO', 'departamento_nombre'])),
+      distrito: _txt(_first(r, ['distrito', 'DIST', 'Distrito', 'DISTRITO', 'distrito_nombre'])),
+      localidad: _txt(_first(r, ['localidad', 'LOCALIDAD', 'Localidad', 'BARRIO_LOCALIDAD', 'barrio_localidad'])),
+      zona: _zona(_first(r, ['zona', 'ZONA', 'Zona', 'AREA', 'area', 'AMBITO', 'ambito'])),
+      latitud: _coord(lat, 'lat'),
+      longitud: _coord(lng, 'lng'),
       estado_relevamiento: _estado(estado),
       encuestador_asignado: _txt(_first(r, ['encuestador_asignado', 'ENCUESTADOR_ASIGNADO', 'encuestador'])),
       supervisor_asignado: _txt(_first(r, ['supervisor_asignado', 'SUPERVISOR_ASIGNADO', 'supervisor'])),
@@ -894,6 +997,8 @@ const SheetsService = (() => {
       fecha_programada: _txt(_first(r, ['fecha_programada', 'FECHA_PROGRAMADA'])),
       turno_programado: _txt(_first(r, ['turno_programado', 'TURNO_PROGRAMADO'])),
       prioridad_operativa: _txt(_first(r, ['prioridad_operativa', 'PRIORIDAD_OPERATIVA'])) || 'media',
+      en_muestra_piloto: _isTrueish(muestraPiloto) ? 'true' : 'false',
+      orden_muestra_piloto: _txt(ordenMuestraPiloto),
       tiempo_estimado_min: _txt(_first(r, ['tiempo_estimado_min', 'TIEMPO_ESTIMADO_MIN'])),
       ultima_sesion_id: _txt(_first(r, ['ultima_sesion_id', 'ULTIMA_SESION_ID'])),
       folio_externo: _txt(_first(r, ['folio_externo', 'FOLIO_EXTERNO'])),
@@ -927,7 +1032,8 @@ const SheetsService = (() => {
   }
 
   function _updateEscuelaOperational(id, fields) {
-    const rowIdx = _findEscuelaRow(id);
+    let rowIdx = _findEscuelaRow(id);
+    if (rowIdx === -1) rowIdx = _appendEmbeddedEscuelaOperationalRow_(id);
     if (rowIdx === -1) return false;
     _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
     const sheet = _getSheet(SHEET_NAMES.ESCUELAS);
@@ -1188,6 +1294,46 @@ const SheetsService = (() => {
     if (typeof v === 'number') return v;
     const n = parseFloat(String(v).replace(',', '.'));
     return isNaN(n) ? '' : n;
+  }
+
+  function _coord(v, axis) {
+    if (v === undefined || v === null || v === '') return '';
+    if (typeof v === 'number') return v;
+    const text = _txt(v);
+    if (!text) return '';
+
+    let value = '';
+    const hasDms = /[º°'"]/i.test(text);
+    if (hasDms) {
+      const parts = text.match(/(-?\d+(?:[.,]\d+)?)[^\d-]+(\d+(?:[.,]\d+)?)?[^\d-]*(\d+(?:[.,]\d+)?)?/);
+      if (parts) {
+        const deg = Math.abs(parseFloat(String(parts[1]).replace(',', '.'))) || 0;
+        const min = parseFloat(String(parts[2] || 0).replace(',', '.')) || 0;
+        const sec = parseFloat(String(parts[3] || 0).replace(',', '.')) || 0;
+        value = deg + (min / 60) + (sec / 3600);
+        if (/^-/.test(parts[1]) || /[SOW]/i.test(text)) value = -Math.abs(value);
+      }
+    }
+
+    if (value === '') {
+      const n = parseFloat(text.replace(',', '.'));
+      if (isNaN(n)) return '';
+      value = n;
+    }
+
+    if (!/^-/.test(text) && !/[NSEWO]/i.test(text)) {
+      if (axis === 'lat' && value >= 19 && value <= 28) value = -Math.abs(value);
+      if (axis === 'lng' && value >= 54 && value <= 63) value = -Math.abs(value);
+    }
+
+    if (axis === 'lat' && Math.abs(value) > 35) return '';
+    if (axis === 'lng' && Math.abs(value) > 80) return '';
+    return value;
+  }
+
+  function _isTrueish(v) {
+    const t = _txt(v).toLowerCase();
+    return ['true', '1', 'si', 'sí', 's', 'piloto', 'muestra'].includes(t);
   }
 
   function _isNumeric(v) {

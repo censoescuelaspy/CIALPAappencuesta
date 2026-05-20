@@ -565,7 +565,82 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 }
 
 .map-sidebar__filters .choice-button-strip {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  grid-template-columns: none;
+  gap: .35rem;
+  overflow-x: auto;
+  padding-bottom: .15rem;
+  scrollbar-width: thin;
+}
+
+.map-sidebar__filters .choice-button {
+  flex: 0 0 auto;
+  min-width: 78px;
+  max-width: 168px;
+  min-height: 32px;
+  padding: .35rem .5rem;
+  text-align: left;
+}
+
+.map-filter-form {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+}
+
+.map-filter-search label,
+.map-filter-label {
+  display: block;
+  margin-bottom: .24rem;
+  color: var(--color-secondary);
+  font-size: .68rem;
+  font-weight: 850;
+  line-height: 1.15;
+  text-transform: uppercase;
+}
+
+.map-filter-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.map-filter-group summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .08rem;
+  padding: .48rem .6rem;
+  color: var(--color-secondary);
+  cursor: pointer;
+  list-style-position: outside;
+}
+
+.map-filter-group summary span {
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+.map-filter-group summary small {
+  color: var(--color-text-muted);
+  font-size: .68rem;
+  font-weight: 650;
+}
+
+.map-filter-group[open] summary {
+  border-bottom: 1px solid var(--color-border);
+  background: rgba(7, 77, 94, .045);
+}
+
+.map-filter-group__body {
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  padding: .55rem .6rem .65rem;
+}
+
+.map-filter-field {
+  min-width: 0;
 }
 
 .choice-button {
@@ -2311,10 +2386,8 @@ td {
   }
 
   .map-sidebar__filters {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: .4rem;
     padding: .5rem;
+    overflow-y: auto;
   }
 
   .map-sidebar__filters .form-control {
@@ -2323,6 +2396,7 @@ td {
 
   .map-sidebar__filter-btns {
     gap: .35rem;
+    padding-top: .4rem;
   }
 
   .map-sidebar__counts {
@@ -2609,7 +2683,6 @@ td {
   }
 
   .map-sidebar__filters {
-    grid-template-columns: 1fr;
     padding: .45rem;
   }
 

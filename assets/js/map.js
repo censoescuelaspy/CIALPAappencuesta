@@ -259,9 +259,10 @@ const MapModule = (() => {
       if (filters.zona && e.zona !== filters.zona) return false;
       if (filters.encuestador && e.encuestador_asignado !== filters.encuestador) return false;
       if (filters.estado && e.estado_relevamiento !== filters.estado) return false;
+      if (String(filters.piloto || '').toLowerCase() === 'true' && String(e.en_muestra_piloto || '').toLowerCase() !== 'true') return false;
       if (filters.q) {
         const q = filters.q.toLowerCase();
-        const haystack = `${e.nombre} ${e.codigo_local} ${e.localidad}`.toLowerCase();
+        const haystack = `${e.nombre} ${e.codigo_local} ${e.departamento} ${e.distrito} ${e.localidad}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -660,14 +661,27 @@ const MapModule = (() => {
     const departamentos = [...new Set(_escuelas.map(e => e.departamento).filter(Boolean))].sort();
     const encuestadores = [...new Set(_escuelas.map(e => e.encuestador_asignado).filter(Boolean))].sort();
 
-    _populateButtonChoices('filter-departamento', departamentos, 'Todos los departamentos');
-    _populateButtonChoices('filter-encuestador', encuestadores, 'Todos los encuestadores');
+    _populateButtonChoices('filter-departamento', departamentos, 'Todos');
+    populateDistrictButtons();
+    _populateButtonChoices('filter-encuestador', encuestadores, 'Todos');
+  }
+
+  function populateDistrictButtons(departamento = '') {
+    const selectedDepartment = departamento || document.getElementById('filter-departamento')?.value || '';
+    const distritos = [...new Set(_escuelas
+      .filter(e => !selectedDepartment || e.departamento === selectedDepartment)
+      .map(e => e.distrito)
+      .filter(Boolean))]
+      .sort();
+    _populateButtonChoices('filter-distrito', distritos, 'Todos');
   }
 
   function _populateButtonChoices(id, options, placeholder) {
     const input = document.getElementById(id);
     const list = document.querySelector(`[data-choice-list="${id}"]`);
     if (!input || !list) return;
+    const current = String(input.value || '');
+    input.value = current && options.includes(current) ? current : '';
     list.innerHTML = [
       `<button class="choice-button" type="button" data-choice-target="${_escape(id)}" data-choice-value="">${_escape(placeholder)}</button>`,
       ...options.map(option => `<button class="choice-button" type="button" data-choice-target="${_escape(id)}" data-choice-value="${_escape(option)}">${_escape(option)}</button>`),
@@ -689,6 +703,7 @@ const MapModule = (() => {
     getSelectedEscuela,
     getFiltered,
     populateFilterButtons,
+    populateDistrictButtons,
     toggleRoutes,
     promptAutoAssign,
     autoAssignClusters,
