@@ -38,6 +38,12 @@ function migrarBackendV21() {
   SpreadsheetApp.getUi().alert('Migración v2.1 completada. La app ya puede leer la hoja escuelas_seleccionadas con el esquema de muestreo original.');
 }
 
+function repararEstadosFinalizadosDesdeCierres() {
+  const result = SheetsService.repararEstadosFinalizadosDesdeCierres();
+  SpreadsheetApp.getUi().alert(result.message);
+  return result;
+}
+
 function normalizarEscuelasSeleccionadasV21() {
   const sheet = _getSheet(SHEET_NAMES.ESCUELAS);
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());

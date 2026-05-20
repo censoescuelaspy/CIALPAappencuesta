@@ -557,6 +557,8 @@ const SheetsService = (() => {
     const timeTracking = _timeTrackingFromDraftParams(params);
     const timeFields = _draftTimeFields_(timeTracking);
     const createdAt = existingIdx !== -1 ? (_getByHeader(sheet, existingIdx, headers, 'creado_en') || now) : now;
+    const draftStatus = _draftStatusFromParams_(params);
+    const operationalStatus = _operationalStateFromDraft_(draftStatus, params.motivo, escuela.estado_relevamiento);
     const row = {
       id_borrador: draftId,
       id_escuela: escuela.id_escuela || params.id_escuela || '',
@@ -564,7 +566,7 @@ const SheetsService = (() => {
       nombre_escuela: params.nombre_escuela || escuela.nombre || '',
       usuario: session.usuario || params.usuario_cliente || '',
       fecha_guardado: now,
-      estado_borrador: params.estado_borrador || 'en_curso',
+      estado_borrador: draftStatus,
       motivo: params.motivo || '',
       app_version: params.app_version || '',
       schema_version: params.schema_version || '',
@@ -599,7 +601,7 @@ const SheetsService = (() => {
     const escuelaIdForUpdate = row.id_escuela || row.codigo_local;
     if (escuelaIdForUpdate) {
       _updateEscuelaOperational(escuelaIdForUpdate, {
-        estado_relevamiento: 'en_curso',
+        estado_relevamiento: operationalStatus,
         fecha_ultimo_evento: now,
         ultimo_borrador_mec_id: draftId,
         ultimo_borrador_mec_at: now,
@@ -635,19 +637,21 @@ const SheetsService = (() => {
   function guardarCierreCompleto(params) {
     const session = params._session;
     const deliveryId = _clientMutationId(params) || _genId('ENT');
+    const now = _timestamp();
     _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
     const existingIdx = _findRowIndex(SHEET_NAMES.ENTREGAS, 'id_entrega', deliveryId);
     if (existingIdx !== -1) {
       const sheet = _getSheet(SHEET_NAMES.ENTREGAS);
       const headers = _headers(sheet);
+      const existing = _objectFromRow(sheet, existingIdx, headers);
+      _markSchoolFinalizedFromDelivery_(existing, params, existing.fecha_cierre || now);
       return {
         status: 'ok',
         message: 'El cierre completo ya estaba registrado.',
-        data: _objectFromRow(sheet, existingIdx, headers),
+        data: existing,
       };
     }
 
-    const now = _timestamp();
     const idEscuela = params.id_escuela || params.codigo_local || '';
     const escuelaResult = idEscuela ? getEscuela(idEscuela) : { status: 'error' };
     const escuela = escuelaResult.status === 'ok' ? escuelaResult.data : {};
@@ -724,29 +728,72 @@ const SheetsService = (() => {
       actualizado_en: now,
     };
     _appendObject(SHEET_NAMES.ENTREGAS, _entregasHeaders(), row);
-    if (row.id_escuela || codigoLocal) {
-      _updateEscuelaOperational(row.id_escuela || codigoLocal, {
-        estado_relevamiento: 'finalizada',
-        fecha_ultimo_evento: now,
-        ultimo_cierre_id: deliveryId,
-        ultimo_pdf_url: row.pdf_url,
-        ultimo_metadata_url: row.metadata_url,
-        email_cierre_estado: emailStatus,
-        email_cierre_destino: recipient,
-        tiempo_real_min: closeTimeFields.tiempo_escuela_min,
-        tiempo_aulas_min: closeTimeFields.tiempo_aulas_min,
-        tiempo_aulas_promedio_min: closeTimeFields.tiempo_aulas_promedio_min,
-        tiempo_sanitarios_min: closeTimeFields.tiempo_sanitarios_min,
-        tiempo_sanitarios_promedio_min: closeTimeFields.tiempo_sanitarios_promedio_min,
-        tiempo_exteriores_min: closeTimeFields.tiempo_exteriores_min,
-      });
-    }
+    _markSchoolFinalizedFromDelivery_(row, params, now, closeTimeFields);
     AuditService.log('CIERRE_COMPLETO', session.usuario, `id_entrega: ${deliveryId}, escuela: ${codigoLocal || idEscuela}, email: ${emailStatus}`);
     return {
       status: 'ok',
       message: emailStatus === 'enviado' ? 'Cierre completo guardado y enviado por correo.' : 'Cierre completo guardado; correo pendiente de revision.',
       data: row,
     };
+  }
+
+  function repararEstadosFinalizadosDesdeCierres() {
+    _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
+    _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
+    const sheet = _getSheet(SHEET_NAMES.ENTREGAS);
+    const headers = _headers(sheet);
+    const lastRow = sheet.getLastRow();
+    const now = _timestamp();
+    let updated = 0;
+    let skipped = 0;
+    if (lastRow < 2) {
+      return { status: 'ok', message: 'No hay cierres registrados para reparar.', data: { updated, skipped } };
+    }
+    for (let rowIdx = 2; rowIdx <= lastRow; rowIdx++) {
+      const row = _objectFromRow(sheet, rowIdx, headers);
+      const status = _txt(row.estado_cierre).toLowerCase();
+      if (status && status !== 'completo' && status !== 'con_pendientes') {
+        skipped += 1;
+        continue;
+      }
+      if (_markSchoolFinalizedFromDelivery_(row, {}, row.fecha_cierre || now)) updated += 1;
+      else skipped += 1;
+    }
+    return {
+      status: 'ok',
+      message: `Reparacion completada. Escuelas finalizadas actualizadas: ${updated}. Omitidas: ${skipped}.`,
+      data: { updated, skipped },
+    };
+  }
+
+  function _markSchoolFinalizedFromDelivery_(row, params, now, timeFields) {
+    row = row || {};
+    params = params || {};
+    const id = row.id_escuela || row.codigo_local || params.id_escuela || params.codigo_local || '';
+    if (!id) return false;
+    const metadata = params.metadata || {};
+    const timeSource = metadata.timeTracking || params.timeTracking || (params.resumen && params.resumen.timeTracking) || null;
+    const finalTimeFields = timeFields || _draftTimeFields_(timeSource || {});
+    const update = {
+      estado_relevamiento: 'finalizada',
+      fecha_ultimo_evento: now || row.fecha_cierre || _timestamp(),
+      ultimo_cierre_id: row.id_entrega || _clientMutationId(params) || '',
+      ultimo_pdf_url: row.pdf_url || '',
+      ultimo_metadata_url: row.metadata_url || '',
+      email_cierre_estado: row.email_status || '',
+      email_cierre_destino: row.destinatario_email || params.destinatario_email || '',
+    };
+    if (timeFields || timeSource) {
+      Object.assign(update, {
+        tiempo_real_min: finalTimeFields.tiempo_escuela_min,
+        tiempo_aulas_min: finalTimeFields.tiempo_aulas_min,
+        tiempo_aulas_promedio_min: finalTimeFields.tiempo_aulas_promedio_min,
+        tiempo_sanitarios_min: finalTimeFields.tiempo_sanitarios_min,
+        tiempo_sanitarios_promedio_min: finalTimeFields.tiempo_sanitarios_promedio_min,
+        tiempo_exteriores_min: finalTimeFields.tiempo_exteriores_min,
+      });
+    }
+    return _updateEscuelaOperational(id, update);
   }
 
   function _createFinalPdfFile_(folder, pdfHtml, baseName) {
@@ -1221,6 +1268,23 @@ const SheetsService = (() => {
     };
   }
 
+  function _draftStatusFromParams_(params) {
+    const status = _txt(params && params.estado_borrador);
+    if (status) return status;
+    return _draftMeansFinalState_(params && params.motivo) ? 'finalizada' : 'en_curso';
+  }
+
+  function _draftMeansFinalState_(value) {
+    const t = _txt(value).toLowerCase();
+    return /cierre|cerrad|final|termin|complet|entrega/.test(t);
+  }
+
+  function _operationalStateFromDraft_(draftStatus, reason, currentState) {
+    if (_draftMeansFinalState_(`${draftStatus || ''} ${reason || ''}`)) return 'finalizada';
+    if (_same(currentState, 'finalizada')) return 'finalizada';
+    return 'en_curso';
+  }
+
   function _dbSyncQueueHeaders() {
     return ['id_mutacion','tipo_entidad','estado','intentos','ultimo_error','database_url','codigo_local','id_escuela','usuario','fecha_evento','app_version','payload_json','payload_file_id','payload_file_url','payload_file_error','creado_en','actualizado_en'];
   }
@@ -1684,6 +1748,7 @@ const SheetsService = (() => {
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
     saveIncidencia, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };
 })();

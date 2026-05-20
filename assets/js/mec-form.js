@@ -357,6 +357,8 @@ const MecFormModule = (() => {
     const evidenceIndex = _buildEvidenceIndex();
     const timeTracking = _timeLogSummary();
     const savedAtText = document.getElementById('mec-save-state')?.textContent || '';
+    const reasonText = String(reason || '').toLowerCase();
+    const finalSync = /cierre|final|termin|complet|entrega/.test(reasonText);
     return {
       clientMutationId: _draftSyncMutationId(id),
       id_escuela: school.id_escuela || '',
@@ -366,7 +368,7 @@ const MecFormModule = (() => {
       app_version: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : MEC_SCHEMA.version,
       schema_version: MEC_SCHEMA.version,
       motivo: reason,
-      estado_borrador: reason === 'cierre' ? 'cierre' : 'en_curso',
+      estado_borrador: finalSync ? 'finalizada' : 'en_curso',
       counts,
       timeTracking,
       resumen: {

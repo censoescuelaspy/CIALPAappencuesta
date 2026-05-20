@@ -4,6 +4,36 @@
 
 ---
 
+## Correccion de estado finalizado en Sheets - 2026-05-20 - v2.6.64
+
+### Objetivo
+- Corregir que las escuelas con cierre guardado no aparezcan como terminadas/finalizadas.
+- Evitar que un autoguardado posterior del borrador MEC vuelva a marcar una escuela cerrada como `en_curso`.
+- Dejar una reparacion manual para cierres ya registrados en `entregas_cierre`.
+
+### Cambios implementados
+- El borrador MEC enviado con motivo de cierre ahora sube con `estado_borrador: finalizada`.
+- `guardarBorradorMec` traduce estados/motivos de cierre, finalizacion, completado o entrega a `estado_relevamiento: finalizada`.
+- Si una escuela ya esta `finalizada`, los autoguardados comunes conservan ese estado en lugar de degradarlo a `en_curso`.
+- `guardarCierreCompleto` repara tambien `escuelas_seleccionadas` cuando recibe un cierre duplicado ya registrado.
+- Se agrega la funcion GAS `repararEstadosFinalizadosDesdeCierres()` para reconstruir estados finalizados desde la hoja `entregas_cierre`.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.64`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el deployment desde la cuenta propietaria.
+- Ejecutar `repararEstadosFinalizadosDesdeCierres()` una vez desde Apps Script para marcar como finalizadas las entregas ya existentes.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.64`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
 ## Preparacion operativa Cloud SQL/Cloud Run para PostgreSQL - 2026-05-20 - v2.6.63
 
 ### Objetivo
