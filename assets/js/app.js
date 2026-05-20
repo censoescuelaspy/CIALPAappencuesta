@@ -901,12 +901,13 @@ const AppController = (() => {
 
     try {
       const result = await API.getEscuelas();
-      if (result.status === 'ok') {
-        MapModule.loadMarkers(result.data || []);
-        MapModule.populateFilterButtons();
-        MapModule.updateOfflineStatus();
-        _bindMapFilters();
+      if (result.status !== 'ok') {
+        throw new Error(result.message || 'No se pudo cargar el listado de escuelas.');
       }
+      MapModule.loadMarkers(result.data || []);
+      MapModule.populateFilterButtons();
+      MapModule.updateOfflineStatus();
+      _bindMapFilters();
     } catch (err) {
       UI.showToast('Error al cargar escuelas: ' + err.message, 'error');
     }

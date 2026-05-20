@@ -533,6 +533,24 @@ const API = (() => {
     return { id_offline_queue: queued.id, offline: true };
   }
 
+  function _isInvalidSessionResponse(json, endpoint, skipAuth) {
+    if (skipAuth || endpoint === 'login') return false;
+    if (!json || json.status !== 'error') return false;
+    const code = String(json.code || '');
+    const message = String(json.message || '');
+    return code === '401' || /token/i.test(message);
+  }
+
+  function _handleInvalidSession(json) {
+    const message = json?.message || 'Sesion vencida. Inicie sesion nuevamente.';
+    if (typeof Auth !== 'undefined' && Auth.expireSession) {
+      Auth.expireSession('Sesion vencida o invalida. Inicie sesion nuevamente.');
+    }
+    const error = new Error(message);
+    error.invalidSession = true;
+    return error;
+  }
+
   async function call(endpoint, method = 'GET', data = {}, options = {}) {
     const { skipAuth = false, skipLoading = false, skipQueue = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS } = options;
     if (!skipLoading) _incrementLoading();
@@ -576,6 +594,9 @@ const API = (() => {
         } catch {
           throw new Error('Respuesta inválida del servidor, no es JSON.');
         }
+        if (_isInvalidSessionResponse(json, endpoint, skipAuth)) {
+          throw _handleInvalidSession(json);
+        }
         if (method === 'GET' && typeof CialpaLocalStore !== 'undefined') {
           CialpaLocalStore.rememberApi(endpoint, method, data, json).catch(err =>
             console.warn('[API] No se pudo cachear respuesta local:', err)
@@ -585,11 +606,13 @@ const API = (() => {
         return json;
       } catch (err) {
         lastError = err;
+        if (err?.invalidSession) break;
         if (attempt < retries) await _sleep(APP_CONFIG.API_RETRY_DELAY_MS * attempt);
       }
     }
 
     if (!skipLoading) _decrementLoading();
+    if (lastError?.invalidSession) throw lastError;
     const msg = lastError?.message || 'Error de conexión con el servidor.';
 
     if (method === 'GET') {

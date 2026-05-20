@@ -4,6 +4,29 @@
 
 ---
 
+## Renovacion de sesion al cambiar backend - 2026-05-19 - v2.6.55
+
+### Objetivo
+- Evitar que el mapa quede vacio cuando el navegador conserva un token viejo despues de cambiar el deployment GAS.
+- Mostrar login nuevamente ante `Token invalido` en lugar de seguir intentando cargar escuelas con una sesion vencida.
+
+### Cambios implementados
+- La sesion local ahora queda ligada a `APP_CONFIG.GAS_URL`; si el backend cambia, la app descarta la sesion anterior y pide iniciar sesion otra vez.
+- `login` ya no envia un token viejo en el payload, evitando que una sesion rota contamine el nuevo inicio.
+- La capa API detecta respuestas `401` o mensajes con `token`, limpia la sesion y abre la pantalla de login.
+- El mapa ahora convierte respuestas no exitosas de `getEscuelas` en un aviso claro, en vez de dejar la vista sin datos.
+- Version y cache actualizados a `v2.6.55`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+---
+
 ## Recuperacion urgente del mapa con backend publico - 2026-05-19 - v2.6.54
 
 ### Objetivo

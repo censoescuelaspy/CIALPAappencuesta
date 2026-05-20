@@ -9,6 +9,10 @@ const Auth = (() => {
 
   // ── Private helpers ──────────────────────────────────────────────────────
 
+  function _backendUrl() {
+    return APP_CONFIG.GAS_URL || 'demo';
+  }
+
   function _getSession() {
     try {
       const raw = sessionStorage.getItem(APP_CONFIG.SESSION_KEY);
@@ -16,6 +20,10 @@ const Auth = (() => {
       const session = JSON.parse(raw);
       // Check expiry
       if (Date.now() > session.expiresAt) {
+        _clearSession();
+        return null;
+      }
+      if (session.backendUrl !== _backendUrl()) {
         _clearSession();
         return null;
       }
@@ -29,6 +37,8 @@ const Auth = (() => {
   function _setSession(data) {
     const session = {
       ...data,
+      backendUrl: _backendUrl(),
+      appVersion: APP_CONFIG.VERSION,
       loginAt: Date.now(),
       expiresAt: Date.now() + APP_CONFIG.SESSION_TIMEOUT_MS,
     };
@@ -38,6 +48,10 @@ const Auth = (() => {
 
   function _clearSession() {
     sessionStorage.removeItem(APP_CONFIG.SESSION_KEY);
+    if (_sessionCheckInterval) {
+      clearInterval(_sessionCheckInterval);
+      _sessionCheckInterval = null;
+    }
   }
 
   function _applyRoleVisibility(role) {
@@ -95,7 +109,7 @@ const Auth = (() => {
 
     UI.setLoading(true, 'Verificando credenciales...');
     try {
-      const result = await API.call('login', 'POST', { usuario, password });
+      const result = await API.call('login', 'POST', { usuario, password }, { skipAuth: true });
 
       if (result.status !== 'ok') {
         throw new Error(result.message || 'Credenciales inválidas.');
@@ -127,7 +141,18 @@ const Auth = (() => {
       }
     }
     _clearSession();
-    if (_sessionCheckInterval) clearInterval(_sessionCheckInterval);
+  }
+
+  function expireSession(message = 'Sesion vencida. Inicie sesion nuevamente.') {
+    _clearSession();
+    try {
+      UI.showToast?.(message, 'warning', 8000);
+    } catch {
+      // UI can be unavailable during early boot.
+    }
+    if (typeof AppController !== 'undefined' && AppController.showLoginScreen) {
+      AppController.showLoginScreen();
+    }
   }
 
   function getSession() {
@@ -201,6 +226,8 @@ const Auth = (() => {
     login,
     logout,
     getSession,
+    clearSession: _clearSession,
+    expireSession,
     isLoggedIn,
     getRole,
     getToken,
