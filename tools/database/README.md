@@ -118,6 +118,12 @@ Al finalizar imprime la URL que debe configurarse en Apps Script:
 DATABASE_SYNC_URL=https://<servicio>/sync/mec-draft
 ```
 
+Tambien imprime el comando para recuperar el token desde Secret Manager sin mostrarlo automaticamente:
+
+```powershell
+gcloud secrets versions access latest --secret=cialpa-database-sync-token --project=ID_DEL_PROYECTO_GCP
+```
+
 Para instancias ya existentes se pueden usar `-SkipSqlCreate`, `-SkipBuild`, `-SqlInstance`, `-DatabaseName`, `-DbUser`, `-DbPassword`, `-SyncToken` y `-RuntimeServiceAccount`.
 
 Luego de verificar `/health` con `schema: "ok"`, se puede redeplegar con `-NoApplySchemaOnStart` para evitar revisar el esquema en cada arranque.
