@@ -17,6 +17,12 @@
 - El mapa ahora convierte respuestas no exitosas de `getEscuelas` en un aviso claro, en vez de dejar la vista sin datos.
 - Version y cache actualizados a `v2.6.55`.
 
+### Estado publicado
+- Commit publicado en `main`: `cf84a6d` - `fix: renovar sesion al cambiar backend v2.6.55`.
+- GitHub Pages ya sirve `assets/js/config.js` con `VERSION: '2.6.55'` y el backend publico estable.
+- GitHub Pages ya sirve `sw.js` con cache `cialpa-app-v2.6.55`.
+- Nota operativa: al abrir la app, el usuario debe actualizar la app si el navegador conserva cache vieja e iniciar sesion nuevamente; con token nuevo el mapa debe volver a cargar escuelas.
+
 ### Validaciones ejecutadas
 - `node --check assets/js/auth.js`.
 - `node --check assets/js/api.js`.
@@ -24,6 +30,9 @@
 - `node --check assets/js/config.js`.
 - `node --check sw.js`.
 - `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+- `git push origin main`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.55`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.55`.
 
 ---
 
