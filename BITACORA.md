@@ -20,6 +20,7 @@
 - Se agrega `tools/database/env.example` y documentacion operativa en `tools/database/README.md`.
 - `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` incorpora la API relacional inicial y las variables de configuracion necesarias.
 - `package.json` suma scripts `db:api` y `db:check`, y se agrega la dependencia `pg`.
+- Version visible, etiqueta de edicion y cache del Service Worker alineados a `v2.6.63`.
 
 ### Pendiente operativo
 - Crear la base PostgreSQL administrada y ejecutar `tools/database/schema.sql`.
@@ -32,6 +33,9 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `node -e "import('pg')"`: OK.
 - API local `/health` sin `DATABASE_URL`: responde `database: not_configured`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check sw.js`.
 - `git diff --check`.
 
 ---
