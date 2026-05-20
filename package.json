@@ -8,7 +8,8 @@
     "metrics:web": "node tools/simulation/cialpa_web_metrics.mjs",
     "embed:schools": "node tools/simulation/embed_schools_csv.mjs",
     "db:api": "node tools/database/cialpa_db_api.mjs",
-    "db:check": "node --check tools/database/cialpa_db_api.mjs"
+    "db:check": "node --check tools/database/cialpa_db_api.mjs",
+    "db:schema": "node tools/database/apply_schema.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0"

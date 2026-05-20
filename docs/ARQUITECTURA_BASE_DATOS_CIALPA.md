@@ -97,7 +97,10 @@ Configuracion minima del servicio:
 | `DATABASE_URL` | Conexion PostgreSQL. |
 | `DATABASE_SYNC_TOKEN` | Token bearer esperado desde Apps Script. |
 | `PGSSLMODE=require` | TLS para Supabase/servicios administrados que lo requieran. |
+| `APPLY_SCHEMA_ON_START` | `true` solo durante el primer despliegue si Cloud Run debe ejecutar `schema.sql` al iniciar. |
 | `PORT` | Puerto HTTP, definido por Cloud Run o por ejecucion local. |
+
+Si no hay `psql` local, el esquema puede aplicarse con `npm run db:schema`. Para Cloud Run + Cloud SQL queda preparado `tools/database/deploy_cloudrun_cloudsql.ps1`, que crea la base, guarda secretos, construye la imagen y despliega el endpoint `/sync/mec-draft`.
 
 Configuracion minima en Apps Script:
 
@@ -109,6 +112,7 @@ Configuracion minima en Apps Script:
 | `DATABASE_SYNC_TIMEOUT_MS` | `8000` o `12000` |
 
 El token debe cargarse como Script Property `DATABASE_SYNC_TOKEN` para no dejarlo visible en la hoja.
+Como ayuda operativa, `tools/database/gas_database_sync_setup.gs.example` contiene una funcion manual para pegar y ejecutar desde la cuenta propietaria del Apps Script; la hoja `configuracion` queda con URL/modo habilitado y el token queda solo en `PropertiesService`.
 
 ## Decisiones pendientes
 

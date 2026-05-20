@@ -37,6 +37,22 @@ psql "$DATABASE_URL" -f tools/database/schema.sql
 
 Si el proveedor exige TLS, usar `PGSSLMODE=require`.
 
+Si `psql` no esta instalado, se puede aplicar el mismo esquema con Node:
+
+```bash
+set DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/DATABASE
+set PGSSLMODE=require
+npm run db:schema
+```
+
+La API tambien puede aplicar `schema.sql` al iniciar si se despliega con:
+
+```text
+APPLY_SCHEMA_ON_START=true
+```
+
+La operacion es idempotente porque el esquema usa `CREATE TABLE IF NOT EXISTS` y `CREATE INDEX IF NOT EXISTS`.
+
 ## Ejecutar local
 
 ```bash
@@ -72,13 +88,39 @@ DATABASE_SYNC_TOKEN=<mismo token de la API>
 
 Si la API falla, Apps Script conserva el error en `db_sync_queue` y no bloquea el guardado en Sheets.
 
-## Despliegue sugerido en Cloud Run
+## Despliegue sugerido en Cloud Run + Cloud SQL
 
-1. Crear base PostgreSQL y ejecutar `schema.sql`.
-2. Crear secreto para `DATABASE_URL`.
-3. Crear secreto para `DATABASE_SYNC_TOKEN`.
-4. Desplegar el servicio Node con `tools/database/Dockerfile` o con `npm run db:api` como comando de arranque.
-5. Configurar `DATABASE_SYNC_URL` en Apps Script con la URL HTTPS publica del servicio.
+La carpeta incluye un script operativo para Google Cloud. Requisitos:
+
+- Google Cloud SDK instalado y autenticado con un proyecto con billing activo.
+- Permisos para Cloud SQL, Cloud Run, Cloud Build, Secret Manager y Artifact Registry.
+- Ejecutar desde la raiz del repositorio.
+
+```powershell
+.\tools\database\deploy_cloudrun_cloudsql.ps1 `
+  -ProjectId "ID_DEL_PROYECTO_GCP" `
+  -Region "southamerica-east1"
+```
+
+El script:
+
+1. Habilita APIs necesarias.
+2. Crea una instancia Cloud SQL PostgreSQL, base y usuario si no existen.
+3. Guarda `DATABASE_URL` y `DATABASE_SYNC_TOKEN` en Secret Manager.
+4. Otorga a la cuenta de ejecucion de Cloud Run acceso a Cloud SQL y secretos.
+5. Construye la imagen con `tools/database/Dockerfile`.
+6. Despliega Cloud Run conectado a Cloud SQL.
+7. Arranca con `APPLY_SCHEMA_ON_START=true` para ejecutar `schema.sql`.
+
+Al finalizar imprime la URL que debe configurarse en Apps Script:
+
+```text
+DATABASE_SYNC_URL=https://<servicio>/sync/mec-draft
+```
+
+Para instancias ya existentes se pueden usar `-SkipSqlCreate`, `-SkipBuild`, `-SqlInstance`, `-DatabaseName`, `-DbUser`, `-DbPassword`, `-SyncToken` y `-RuntimeServiceAccount`.
+
+Luego de verificar `/health` con `schema: "ok"`, se puede redeplegar con `-NoApplySchemaOnStart` para evitar revisar el esquema en cada arranque.
 
 ## Consultas utiles
 

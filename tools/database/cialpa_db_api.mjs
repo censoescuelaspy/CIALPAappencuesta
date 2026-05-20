@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { readFile } from 'node:fs/promises';
 import process from 'node:process';
 import pg from 'pg';
 
@@ -8,6 +9,7 @@ const PORT = Number(process.env.PORT || 8787);
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const SYNC_TOKEN = process.env.DATABASE_SYNC_TOKEN || process.env.DB_SYNC_TOKEN || '';
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 12 * 1024 * 1024);
+const APPLY_SCHEMA_ON_START = isTruthy(process.env.APPLY_SCHEMA_ON_START || process.env.DATABASE_APPLY_SCHEMA);
 
 const pool = DATABASE_URL
   ? new Pool({
@@ -57,6 +59,13 @@ const server = createServer(async (req, res) => {
   }
 });
 
+try {
+  await applySchemaOnStart();
+} catch (err) {
+  console.error('[cialpa-db-api] No se pudo aplicar schema.sql al iniciar', err);
+  process.exit(1);
+}
+
 server.listen(PORT, () => {
   console.log(`CIALPA DB API escuchando en :${PORT}`);
   if (!DATABASE_URL) console.warn('DATABASE_URL no configurado: /sync devolvera 503.');
@@ -67,11 +76,27 @@ async function healthStatus() {
     return { status: 'ok', service: 'cialpa-db-api', database: 'not_configured' };
   }
   try {
-    await pool.query('SELECT 1');
-    return { status: 'ok', service: 'cialpa-db-api', database: 'ok' };
+    const result = await pool.query("SELECT to_regclass('public.mec_drafts') AS mec_drafts");
+    return {
+      status: 'ok',
+      service: 'cialpa-db-api',
+      database: 'ok',
+      schema: result.rows[0] && result.rows[0].mec_drafts ? 'ok' : 'missing',
+    };
   } catch (err) {
     return { status: 'degraded', service: 'cialpa-db-api', database: 'error', error: err.message };
   }
+}
+
+async function applySchemaOnStart() {
+  if (!APPLY_SCHEMA_ON_START) return;
+  if (!pool) {
+    console.warn('APPLY_SCHEMA_ON_START activo, pero DATABASE_URL no esta configurado.');
+    return;
+  }
+  const sql = await readFile(new URL('./schema.sql', import.meta.url), 'utf8');
+  await pool.query(sql);
+  console.log('schema.sql aplicado o verificado correctamente.');
 }
 
 function pgSslConfig() {
@@ -79,6 +104,10 @@ function pgSslConfig() {
   if (!value || ['disable', 'false', '0', 'off'].includes(value)) return undefined;
   if (['require', 'true', '1', 'on', 'no-verify'].includes(value)) return { rejectUnauthorized: false };
   return undefined;
+}
+
+function isTruthy(value) {
+  return ['true', '1', 'si', 'yes', 'on'].includes(String(value || '').trim().toLowerCase());
 }
 
 function setCorsHeaders(res) {

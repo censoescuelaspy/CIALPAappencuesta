@@ -1,0 +1,60 @@
+/**
+ * Helper manual para ejecutar desde el editor Apps Script con la cuenta
+ * propietaria del Web App.
+ *
+ * 1. Reemplazar DATABASE_SYNC_URL y DATABASE_SYNC_TOKEN.
+ * 2. Pegar temporalmente este bloque en Apps Script.
+ * 3. Ejecutar configurarDatabaseSyncProduccion().
+ * 4. Borrar el bloque o dejarlo sin token real antes de compartir codigo.
+ */
+function configurarDatabaseSyncProduccion() {
+  const DATABASE_SYNC_URL = 'https://<servicio>/sync/mec-draft';
+  const DATABASE_SYNC_TOKEN = '<token-largo-generado>';
+  const DATABASE_SYNC_TIMEOUT_MS = '12000';
+
+  if (!DATABASE_SYNC_URL || DATABASE_SYNC_URL.indexOf('https://') !== 0) {
+    throw new Error('DATABASE_SYNC_URL debe ser una URL HTTPS.');
+  }
+  if (!DATABASE_SYNC_TOKEN || DATABASE_SYNC_TOKEN.indexOf('<') !== -1) {
+    throw new Error('Reemplazar DATABASE_SYNC_TOKEN antes de ejecutar.');
+  }
+
+  PropertiesService.getScriptProperties().setProperty('DATABASE_SYNC_TOKEN', DATABASE_SYNC_TOKEN);
+  setDatabaseConfigValue_('DATABASE_SYNC_ENABLED', 'true');
+  setDatabaseConfigValue_('DATABASE_SYNC_MODE', 'rest');
+  setDatabaseConfigValue_('DATABASE_SYNC_URL', DATABASE_SYNC_URL);
+  setDatabaseConfigValue_('DATABASE_SYNC_TIMEOUT_MS', DATABASE_SYNC_TIMEOUT_MS);
+  setDatabaseConfigValue_('DATABASE_SYNC_TOKEN', '');
+
+  Logger.log('Database sync configurado: ' + DATABASE_SYNC_URL);
+}
+
+function setDatabaseConfigValue_(key, value) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAMES.CONFIG);
+  if (!sheet) throw new Error('Hoja configuracion no encontrada.');
+  const values = sheet.getDataRange().getValues();
+  if (values.length < 1) throw new Error('Hoja configuracion sin encabezados.');
+  const headers = values[0].map(h => String(h).trim());
+  const keyCol = headers.indexOf('clave');
+  const valueCol = headers.indexOf('valor');
+  if (keyCol < 0 || valueCol < 0) throw new Error('Encabezados clave/valor no encontrados.');
+
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][keyCol]) === key) {
+      sheet.getRange(i + 1, valueCol + 1).setValue(value);
+      return;
+    }
+  }
+
+  const row = new Array(headers.length).fill('');
+  row[keyCol] = key;
+  row[valueCol] = value;
+  const descCol = headers.indexOf('descripcion');
+  const groupCol = headers.indexOf('grupo');
+  const editableCol = headers.indexOf('editable');
+  if (descCol >= 0) row[descCol] = 'Configuracion de sincronizacion a PostgreSQL.';
+  if (groupCol >= 0) row[groupCol] = 'base_datos';
+  if (editableCol >= 0) row[editableCol] = 'true';
+  sheet.appendRow(row);
+}

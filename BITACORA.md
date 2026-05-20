@@ -4,6 +4,42 @@
 
 ---
 
+## Preparacion operativa Cloud SQL/Cloud Run para PostgreSQL - 2026-05-20 - v2.6.63
+
+### Objetivo
+- Continuar el paso operativo posterior a la API relacional.
+- Dejar ejecutable la creacion de PostgreSQL administrado, despliegue de API y configuracion GAS sin depender de comandos manuales dispersos.
+- Resolver el faltante local de `psql`, `gcloud` y Docker con scripts reproducibles.
+
+### Cambios implementados
+- Se agrega `tools/database/apply_schema.mjs` y script `npm run db:schema` para ejecutar `tools/database/schema.sql` usando Node/pg cuando no exista `psql`.
+- `tools/database/cialpa_db_api.mjs` puede aplicar `schema.sql` al iniciar con `APPLY_SCHEMA_ON_START=true`.
+- `/health` ahora informa `schema: ok` o `schema: missing` cuando hay base configurada.
+- Se agrega `tools/database/cloudbuild.yaml` para construir la imagen usando `tools/database/Dockerfile`.
+- Se agrega `tools/database/deploy_cloudrun_cloudsql.ps1`, que prepara APIs de Google Cloud, Cloud SQL PostgreSQL, secretos, Artifact Registry, Cloud Build y Cloud Run.
+- Se agrega `tools/database/gas_database_sync_setup.gs.example` para configurar `DATABASE_SYNC_ENABLED`, `DATABASE_SYNC_MODE`, `DATABASE_SYNC_URL`, `DATABASE_SYNC_TIMEOUT_MS` y guardar `DATABASE_SYNC_TOKEN` como Script Property desde la cuenta propietaria de Apps Script.
+- `tools/database/README.md`, `env.example` y `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` documentan el flujo operativo Cloud Run + Cloud SQL.
+
+### Estado operativo detectado
+- En esta maquina no estan disponibles `gcloud`, `psql` ni Docker en PATH.
+- `clasp.cmd show-authorized-user` confirma sesion local en `dmeza.py@gmail.com`; por historial de 403, la configuracion final/publish GAS debe ejecutarse desde la cuenta propietaria del Web App.
+
+### Pendiente operativo
+- Instalar/autenticar Google Cloud SDK o ejecutar `tools/database/deploy_cloudrun_cloudsql.ps1` desde una maquina que ya tenga `gcloud`.
+- Ejecutar el helper GAS desde la cuenta propietaria cuando exista la URL final de Cloud Run.
+- Hacer una escritura controlada y comparar `mec_borradores`, `db_sync_queue` y PostgreSQL.
+
+### Validaciones ejecutadas
+- Inventario local de herramientas: `gcloud`, `psql` y Docker no disponibles; `node` y `npm` disponibles.
+- `clasp.cmd show-authorized-user` con permisos: sesion `dmeza.py@gmail.com`.
+- `npm.cmd run db:check`.
+- `node --check tools/database/apply_schema.mjs`.
+- Parseo de `tools/database/deploy_cloudrun_cloudsql.ps1` con parser PowerShell.
+- Validacion sintactica de `tools/database/gas_database_sync_setup.gs.example`.
+- API local `/health` sin `DATABASE_URL`: responde `database: not_configured`.
+
+---
+
 ## API relacional PostgreSQL para borradores MEC - 2026-05-20 - v2.6.63
 
 ### Objetivo
