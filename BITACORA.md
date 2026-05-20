@@ -51,9 +51,11 @@
 - Prueba HTTP contra nuevo deployment propietario: `getEscuelas` responde `status: ok` con datos de escuelas.
 - Prueba HTTP sin escritura contra nuevo deployment propietario: `guardarBorradorMec` con token valido y sin escuela responde `Identificador de escuela requerido para guardar el borrador MEC`, confirmando que el endpoint nuevo esta publicado.
 - `APP_CONFIG.GAS_URL` actualizado al nuevo deployment propietario.
+- Commit publicado en `main`: `b7d3e4f` - `fix: apuntar backend publico v2.6.56`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.56` y URL GAS nueva.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.56`.
 
 ### Pendiente operativo
-- Publicar en GitHub Pages el frontend `v2.6.56` con la nueva URL GAS.
 - Despues de publicado, pedir a los usuarios `Actualizar app` o abrir con cache-buster para que el Service Worker tome `cialpa-app-v2.6.56`.
 - Verificar en campo que `Guardar ahora` cree o actualice una fila en `mec_borradores`.
 
