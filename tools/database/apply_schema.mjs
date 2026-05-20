@@ -26,6 +26,7 @@ try {
   const result = await pool.query(`
     SELECT
       to_regclass('public.schools') AS schools,
+      to_regclass('public.school_institutions') AS school_institutions,
       to_regclass('public.mec_drafts') AS mec_drafts,
       to_regclass('public.sync_mutations') AS sync_mutations
   `);

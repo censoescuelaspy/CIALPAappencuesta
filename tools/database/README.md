@@ -8,6 +8,27 @@ Esta carpeta contiene el primer receptor transaccional para guardar los borrador
 - `cialpa_db_api.mjs`: API HTTP compatible con Cloud Run. Recibe el JSON que Apps Script ya genera en `guardarBorradorMec`.
 - `Dockerfile`: imagen minima para desplegar el receptor en Cloud Run.
 - `env.example`: variables necesarias para ejecutar o desplegar.
+- `install_database_prereqs.ps1`: instalador auxiliar para Google Cloud SDK y PostgreSQL/psql en Windows.
+
+## Modelo e indexacion
+
+El modelo separa dos niveles que no deben mezclarse:
+
+- `schools`: local escolar, edificio o predio relevado. Esta clave fisica es `school_key` y normalmente corresponde a `codigo_local`.
+- `school_institutions`: instituciones que funcionan dentro del local. Se indexan por `institution_key` y dependen de `school_key`.
+- Elementos fisicos: bloques (`buildings`), pisos (`floors`), ambientes/aulas/espacios (`rooms`), objetos de ambiente (`room_objects`), sanitarios (`sanitary_groups` y `sanitary_objects`), exteriores (`site_elements`), evidencias y tiempos.
+
+La API siempre guarda el snapshot completo en `mec_drafts` y normaliza los hijos usando `school_key` e `institution_key` cuando existe. Si el payload no trae instituciones explicitas, crea una institucion principal a partir de `nombre_institucion`, `institucion` o el nombre de la escuela.
+
+Indices principales:
+
+- `schools(codigo_local)` para ubicar el edificio/local.
+- `school_institutions(school_key, codigo_institucion)` para multiples instituciones por edificio.
+- `mec_drafts(school_key, saved_at)` e `mec_drafts(institution_key, saved_at)` para historial por edificio o institucion.
+- `buildings(school_key, block_id)`, `floors(school_key, block_id, level_number)`, `rooms(school_key, block_id, floor_label, kind)`.
+- Indices equivalentes por `institution_key` para filtrar aulas, sanitarios y tiempos cuando una institucion comparte edificio.
+
+Esto permite que una escuela-edificio tenga mas de una institucion sin duplicar la geometria del predio. La estructura fisica se consulta por `school_key`; los reportes academicos u operativos por institucion pueden sumar por `institution_key`.
 
 ## Flujo
 
@@ -28,6 +49,18 @@ Content-Type: application/json
 Tambien acepta `POST /sync` para pruebas.
 
 ## Preparar PostgreSQL
+
+En Windows, si faltan herramientas locales:
+
+```powershell
+npm run db:install-tools
+```
+
+Eso instala Google Cloud SDK y PostgreSQL/psql usando `winget` o Chocolatey. Docker Desktop es opcional porque el despliegue recomendado usa Cloud Build; si se necesita Docker local:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/database/install_database_prereqs.ps1 -InstallDocker
+```
 
 En Supabase, Cloud SQL PostgreSQL, AlloyDB o una base local:
 
@@ -52,6 +85,14 @@ APPLY_SCHEMA_ON_START=true
 ```
 
 La operacion es idempotente porque el esquema usa `CREATE TABLE IF NOT EXISTS` y `CREATE INDEX IF NOT EXISTS`.
+
+Para levantar una base local reproducible en `.local/postgres_data`, iniciar PostgreSQL en el puerto `55432` y aplicar el esquema:
+
+```powershell
+npm run db:local
+```
+
+El comando imprime el `DATABASE_URL` local y el comando para detener el servidor cuando ya no se necesite.
 
 ## Ejecutar local
 
@@ -146,6 +187,23 @@ SELECT
 FROM mec_drafts d
 JOIN schools s ON s.school_key = d.school_key
 ORDER BY d.saved_at DESC;
+```
+
+Ambientes por institucion dentro del mismo edificio:
+
+```sql
+SELECT
+  s.codigo_local,
+  i.nombre AS institucion,
+  r.block_id,
+  r.floor_label,
+  r.kind,
+  count(*) AS ambientes
+FROM rooms r
+JOIN schools s ON s.school_key = r.school_key
+LEFT JOIN school_institutions i ON i.institution_key = r.institution_key
+GROUP BY s.codigo_local, i.nombre, r.block_id, r.floor_label, r.kind
+ORDER BY s.codigo_local, i.nombre, r.block_id, r.floor_label, r.kind;
 ```
 
 Promedio de carga por aula y sanitario:

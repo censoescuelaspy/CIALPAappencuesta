@@ -14,7 +14,7 @@ Pasar de un libro operativo en Google Sheets a una base de datos estructurada, a
 
 ## Principios de integridad
 
-- Cada escritura debe llevar `clientMutationId`, `device_id`, `user_id`, `school_id` y fecha del cliente/servidor.
+- Cada escritura debe llevar `clientMutationId`, `device_id`, `user_id`, `school_key`, `institution_key` cuando aplique y fecha del cliente/servidor.
 - Las mutaciones deben ser idempotentes: reintentar no debe duplicar filas.
 - Las entidades centrales deben tener claves foraneas y restricciones `NOT NULL`/`CHECK`.
 - Los borradores pueden guardarse como `JSONB`, pero los cierres finales deben normalizarse por bloque, piso, ambiente, sanitario, elemento y evidencia.
@@ -24,12 +24,13 @@ Pasar de un libro operativo en Google Sheets a una base de datos estructurada, a
 
 | Tabla | Uso |
 |---|---|
-| `schools` | Padron completo de escuelas, coordenadas, zona, departamento, distrito y estado operativo. |
+| `schools` | Local escolar, edificio o predio relevado. Puede alojar una o varias instituciones. |
+| `school_institutions` | Instituciones que funcionan dentro del local escolar, con clave propia por institucion. |
 | `school_samples` | Marca de muestra piloto, orden, estrato, factor de expansion y datos muestrales. |
 | `users` | Usuarios, roles, estado, identificador externo y datos de auditoria. |
 | `assignments` | Asignacion de escuelas por encuestador, supervisor, jornada y prioridad. |
 | `survey_sessions` | Apertura/cierre de trabajo por escuela, usuario y dispositivo. |
-| `mec_drafts` | Borrador vigente por escuela/usuario/dispositivo, con snapshot `JSONB`. |
+| `mec_drafts` | Borrador vigente por escuela, institucion, usuario y dispositivo, con snapshot `JSONB`. |
 | `school_submissions` | Cierre final versionado, estado de validacion, PDF y metadatos. |
 | `buildings` | Bloques o construcciones registradas. |
 | `floors` | Pisos por bloque. |
@@ -41,6 +42,34 @@ Pasar de un libro operativo en Google Sheets a una base de datos estructurada, a
 | `evidence_files` | Fotos, PDF, metadatos, hash, URL de almacenamiento y entidad vinculada. |
 | `sync_mutations` | Registro idempotente de cada mutacion offline recibida. |
 | `audit_log` | Auditoria inmutable de cambios, usuario, rol, IP/contexto y payload resumido. |
+
+## Indexacion jerarquica
+
+La clave `school_key` identifica el edificio/local escolar, no necesariamente una sola institucion. La clave `institution_key` identifica cada institucion dentro de ese edificio. Con eso una consulta puede responder tanto "que tiene este predio" como "que usa esta institucion".
+
+Jerarquia normalizada:
+
+```text
+schools (edificio/local)
+  -> school_institutions (una o varias instituciones)
+  -> mec_drafts / school_submissions
+  -> buildings (bloques)
+  -> floors (pisos)
+  -> rooms (aulas, espacios, ambientes)
+  -> room_objects (puertas, ventanas, luces, fallas, equipos)
+  -> sanitary_groups / sanitary_objects
+  -> site_elements (exteriores e infraestructura)
+  -> evidence_files / time_tracking_items
+```
+
+Indices operativos recomendados e implementados en el esquema inicial:
+
+- `schools(codigo_local)` para localizar el edificio.
+- `school_institutions(school_key, codigo_institucion)` para varias instituciones dentro del mismo local.
+- `mec_drafts(school_key, saved_at)` y `mec_drafts(institution_key, saved_at)` para historial por edificio o institucion.
+- `buildings(school_key, block_id)` y `floors(school_key, block_id, level_number)` para navegar bloque/piso.
+- `rooms(school_key, block_id, floor_label, kind)` para aulas, ambientes y otros espacios.
+- `sanitary_groups(school_key, block_ref, floor_label)` y `site_elements(school_key, type)` para sanitarios y exteriores.
 
 ## Flujo de sincronizacion
 
@@ -87,7 +116,8 @@ Se agrega una primera implementacion desplegable en `tools/database/`:
 - `tools/database/cialpa_db_api.mjs` recibe `POST /sync/mec-draft` con el payload que ya arma Apps Script.
 - La API guarda la mutacion idempotente en `sync_mutations`.
 - El snapshot completo queda en `mec_drafts.draft` como `JSONB`.
-- El contenido operativo queda normalizado en `buildings`, `floors`, `rooms`, `room_objects`, `sanitary_groups`, `sanitary_objects`, `site_elements`, `evidence_files` y `time_tracking_items`.
+- El contenido operativo queda normalizado en `school_institutions`, `buildings`, `floors`, `rooms`, `room_objects`, `sanitary_groups`, `sanitary_objects`, `site_elements`, `evidence_files` y `time_tracking_items`.
+- Todas las entidades fisicas guardan `school_key` y, cuando el payload lo permite, `institution_key`.
 - Los minutos de escuela, aulas, sanitarios y exteriores quedan tambien como columnas directas en `mec_drafts` para reportes logisticos.
 
 Configuracion minima del servicio:

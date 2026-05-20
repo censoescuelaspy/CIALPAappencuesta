@@ -4,6 +4,57 @@
 
 ---
 
+## Base PostgreSQL local e indexacion jerarquica escuela/institucion - 2026-05-20 - v2.6.65
+
+### Objetivo
+- Instalar/preparar las herramientas necesarias para crear la base de datos.
+- Asegurar que el modelo relacional distinga escuela/local edilicio de institucion educativa.
+- Indexar la jerarquia operativa: edificio, instituciones, bloques, pisos, aulas/ambientes/espacios, sanitarios, exteriores, evidencias y tiempos.
+
+### Cambios implementados
+- Se agrega `school_institutions` al esquema PostgreSQL para soportar varias instituciones dentro de una misma escuela-edificio/local.
+- `mec_drafts`, `buildings`, `floors`, `rooms`, `room_objects`, `sanitary_groups`, `sanitary_objects`, `site_elements`, `evidence_files` y `time_tracking_items` guardan `school_key` y, cuando aplica, `institution_key`.
+- Se agregan indices por `school_key`, `institution_key`, bloque, piso, tipo de ambiente, tipo sanitario y tipo exterior.
+- La API relacional normaliza instituciones desde el payload y asigna `institution_key` a bloques, pisos, aulas, sanitarios, exteriores, evidencias y tiempos.
+- El identificador de piso queda canonico por `block_id + floor_label`, evitando duplicados entre pisos declarados y pisos deducidos desde aulas/sanitarios.
+- `/health` exige ahora `schools`, `school_institutions` y `mec_drafts` para informar `schema: ok`.
+- Se agrega `tools/database/install_database_prereqs.ps1` y script `npm run db:install-tools` para preparar Google Cloud SDK y PostgreSQL/psql.
+- Se agrega `tools/database/setup_local_postgres.ps1` y script `npm run db:local` para levantar PostgreSQL local, crear la base `cialpa` y aplicar `schema.sql`.
+- `tools/database/deploy_cloudrun_cloudsql.ps1` usa `gcloud.cmd` para evitar el bloqueo de `gcloud.ps1` por politica de ejecucion de PowerShell.
+- `tools/database/README.md` y `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` documentan la indexacion escuela-edificio/institucion y consultas por jerarquia.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.65`.
+
+### Estado operativo detectado
+- Google Cloud SDK queda instalado y disponible como `gcloud.cmd` version `569.0.0`.
+- PostgreSQL/psql disponible en `C:\Program Files\PostgreSQL\16\bin`; se agrega al PATH de usuario.
+- Base local creada en `.local/postgres_data`, escuchando en `127.0.0.1:55432`, base `cialpa`.
+- `DATABASE_URL` local de prueba: `postgresql://postgres@127.0.0.1:55432/cialpa`.
+- `gcloud` no tiene cuenta autenticada ni proyecto configurado; Cloud SQL no puede crearse hasta ejecutar login y definir `ProjectId`.
+
+### Pendiente operativo
+- Ejecutar `gcloud auth login` y definir el proyecto GCP con billing activo.
+- Crear Cloud SQL/Cloud Run con `tools/database/deploy_cloudrun_cloudsql.ps1 -ProjectId "<ID_PROYECTO>" -Region "southamerica-east1"`.
+- Configurar `DATABASE_SYNC_URL` y `DATABASE_SYNC_TOKEN` en Apps Script desde la cuenta propietaria.
+
+### Validaciones ejecutadas
+- `npm.cmd run db:install-tools`.
+- `gcloud.cmd --version`: Google Cloud SDK `569.0.0`.
+- `psql --version`: PostgreSQL `16.2`.
+- `npm.cmd run db:local`: crea/verifica PostgreSQL local y aplica `schema.sql`.
+- `npm.cmd run db:schema` contra PostgreSQL local: `schools`, `school_institutions`, `mec_drafts` y `sync_mutations` OK.
+- API local `/health` con `DATABASE_URL`: responde `database: ok`, `schema: ok`.
+- Prueba `POST /sync/mec-draft` local con escuela-edificio, dos instituciones, bloque, piso, aula, sanitario y exterior: normaliza `institutions=2`, `floors=1`, `rooms=1`, `sanitaries=1`.
+- Verificacion SQL de indices: `idx_school_institutions_codigo`, `idx_mec_drafts_institution_saved`, `idx_rooms_school_block_floor_kind`, `idx_sanitary_groups_school_block_floor`, `idx_site_elements_school_type`.
+- `node --check tools/database/cialpa_db_api.mjs`.
+- `node --check tools/database/apply_schema.mjs`.
+- Parseo PowerShell de `install_database_prereqs.ps1`, `setup_local_postgres.ps1` y `deploy_cloudrun_cloudsql.ps1`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Correccion de estado finalizado en Sheets - 2026-05-20 - v2.6.64
 
 ### Objetivo

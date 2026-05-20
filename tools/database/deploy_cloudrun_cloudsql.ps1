@@ -30,6 +30,14 @@ function Require-Command {
   }
 }
 
+function Resolve-GcloudCommand {
+  $cmd = Get-Command "gcloud.cmd" -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  $cmd = Get-Command "gcloud" -ErrorAction SilentlyContinue
+  if ($cmd) { return $cmd.Source }
+  throw "No se encontro 'gcloud.cmd' en PATH. Instalar Google Cloud SDK antes de ejecutar este script."
+}
+
 function New-SecretValue {
   $bytes = New-Object byte[] 32
   [System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
@@ -38,7 +46,7 @@ function New-SecretValue {
 
 function Invoke-Gcloud {
   param([string[]]$CommandArgs)
-  & gcloud @CommandArgs
+  & $script:GcloudCommand @CommandArgs
   if ($LASTEXITCODE -ne 0) {
     throw "Fallo gcloud $($CommandArgs -join ' ')"
   }
@@ -46,7 +54,7 @@ function Invoke-Gcloud {
 
 function Gcloud-Value {
   param([string[]]$CommandArgs)
-  $output = & gcloud @CommandArgs 2>$null
+  $output = & $script:GcloudCommand @CommandArgs 2>$null
   if ($LASTEXITCODE -ne 0) {
     return ""
   }
@@ -68,7 +76,7 @@ function Ensure-Secret {
   }
 }
 
-Require-Command "gcloud"
+$script:GcloudCommand = Resolve-GcloudCommand
 
 if (-not $ImageTag) {
   $ImageTag = (Get-Date).ToUniversalTime().ToString("yyyyMMddHHmmss")

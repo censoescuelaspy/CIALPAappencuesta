@@ -76,12 +76,17 @@ async function healthStatus() {
     return { status: 'ok', service: 'cialpa-db-api', database: 'not_configured' };
   }
   try {
-    const result = await pool.query("SELECT to_regclass('public.mec_drafts') AS mec_drafts");
+    const result = await pool.query(`
+      SELECT
+        to_regclass('public.schools') AS schools,
+        to_regclass('public.school_institutions') AS school_institutions,
+        to_regclass('public.mec_drafts') AS mec_drafts
+    `);
     return {
       status: 'ok',
       service: 'cialpa-db-api',
       database: 'ok',
-      schema: result.rows[0] && result.rows[0].mec_drafts ? 'ok' : 'missing',
+      schema: result.rows[0] && result.rows[0].schools && result.rows[0].school_institutions && result.rows[0].mec_drafts ? 'ok' : 'missing',
     };
   } catch (err) {
     return { status: 'degraded', service: 'cialpa-db-api', database: 'error', error: err.message };
@@ -170,6 +175,7 @@ async function persistMecDraft(payload, context = {}) {
     await client.query('BEGIN');
     await upsertSyncMutation(client, normalized, context, 'recibida');
     await upsertSchool(client, normalized);
+    await upsertInstitutions(client, normalized);
     await upsertDraft(client, normalized);
     await replaceDraftChildren(client, normalized);
     await client.query(
@@ -188,6 +194,7 @@ async function persistMecDraft(payload, context = {}) {
       mutation_id: normalized.mutationId,
       draft_id: normalized.draftId,
       school_key: normalized.schoolKey,
+      institution_key: normalized.institutionKey,
       upserted: normalized.counts,
     };
   } catch (err) {
@@ -223,6 +230,21 @@ function normalizePayload(payload) {
   );
   const idEscuela = text(school.id_escuela, selected.id_escuela, selected.id, general.id_escuela);
   const schoolKey = text(codigoLocal, idEscuela, mutationId);
+  const schoolRecord = {
+    schoolKey,
+    idEscuela,
+    codigoLocal,
+    nombre: text(school.nombre_escuela, school.nombre, selected.nombre, selected.nombre_escuela, general.nombre_escuela, general.nombre_institucion),
+    departamento: text(school.departamento, selected.departamento, general.departamento),
+    distrito: text(school.distrito, selected.distrito, general.distrito),
+    localidad: text(school.localidad, selected.localidad, general.localidad),
+    zona: text(school.zona, selected.zona, general.zona),
+    latitud: numberOrNull(school.latitud, school.lat, selected.latitud, selected.lat, general.latitud),
+    longitud: numberOrNull(school.longitud, school.lng, school.lon, selected.longitud, selected.lng, selected.lon, general.longitud),
+    raw: { ...school, selectedSchool: selected, general },
+  };
+  const institutions = institutionRecords(payload, draft, selected, general, school, schoolRecord);
+  const primaryInstitution = institutions[0] || null;
   const timeTracking = plainObject(payload.time_tracking || payload.timeTracking || {});
   const timeFields = timeTrackingFields(timeTracking);
   const blocks = asArray(draft.__blocks);
@@ -251,19 +273,9 @@ function normalizePayload(payload) {
     timeFields,
     draft,
     selected,
-    school: {
-      schoolKey,
-      idEscuela,
-      codigoLocal,
-      nombre: text(school.nombre_escuela, school.nombre, selected.nombre, selected.nombre_escuela, general.nombre_escuela),
-      departamento: text(school.departamento, selected.departamento, general.departamento),
-      distrito: text(school.distrito, selected.distrito, general.distrito),
-      localidad: text(school.localidad, selected.localidad, general.localidad),
-      zona: text(school.zona, selected.zona, general.zona),
-      latitud: numberOrNull(school.latitud, school.lat, selected.latitud, selected.lat, general.latitud),
-      longitud: numberOrNull(school.longitud, school.lng, school.lon, selected.longitud, selected.lng, selected.lon, general.longitud),
-      raw: { ...school, selectedSchool: selected, general },
-    },
+    school: schoolRecord,
+    institutions,
+    institutionKey: primaryInstitution?.institutionKey || null,
     schoolKey,
     idEscuela,
     codigoLocal,
@@ -276,6 +288,7 @@ function normalizePayload(payload) {
     timeRecords: records,
     counts: {
       blocks: blocks.length,
+      institutions: institutions.length,
       floors: floors.length,
       rooms: rooms.length,
       roomObjects: rooms.reduce((sum, room) => sum + asArray(room.objects).length, 0),
@@ -286,6 +299,83 @@ function normalizePayload(payload) {
       timeRecords: records.length,
     },
   };
+}
+
+function institutionRecords(payload, draft, selected, general, schoolPayload, schoolRecord) {
+  const records = [];
+  const addRecord = (source = {}, fallbackName = '') => {
+    const raw = plainObject(source);
+    const idInstitucion = text(raw.id_institucion, raw.idInstitucion, raw.institucion_id, raw.id);
+    const codigoInstitucion = text(raw.codigo_institucion, raw.codigoInstitucion, raw.institucion_codigo, raw.codigo);
+    const nombre = text(raw.nombre_institucion, raw.nombreInstitucion, raw.institucion, raw.nombre, raw.name, fallbackName);
+    if (!nombre && !codigoInstitucion && !idInstitucion) return;
+    if (isNoneText(nombre)) return;
+    const keySeed = text(codigoInstitucion, idInstitucion, nombre, 'institucion_principal');
+    const institution = {
+      institutionKey: `${schoolRecord.schoolKey}::${slug(keySeed)}`,
+      schoolKey: schoolRecord.schoolKey,
+      idInstitucion,
+      codigoInstitucion,
+      nombre: nombre || schoolRecord.nombre || 'Institucion sin nombre',
+      turno: text(raw.turno, raw.jornada, raw.turno_programado, general.turno, general.jornada),
+      nivel: text(raw.nivel, raw.nivel_educativo, raw.oferta, general.nivel, general.nivel_educativo),
+      sector: text(raw.sector, raw.gestion, raw.dependencia, general.sector, general.gestion),
+      modalidad: text(raw.modalidad, raw.tipo_ensenanza, raw.tipo_enseñanza, general.modalidad),
+      raw,
+    };
+    if (!records.some(item => item.institutionKey === institution.institutionKey)) {
+      records.push(institution);
+    }
+  };
+
+  addRecord({
+    ...schoolPayload,
+    ...selected,
+    ...general,
+    nombre_institucion: text(
+      schoolPayload.nombre_institucion,
+      selected.nombre_institucion,
+      selected.institucion,
+      general.nombre_institucion,
+      general.nombre_establecimiento,
+      schoolRecord.nombre,
+    ),
+  }, schoolRecord.nombre);
+
+  const arrays = [
+    payload.institutions,
+    payload.instituciones,
+    schoolPayload.institutions,
+    schoolPayload.instituciones,
+    draft.__institutions,
+    draft.__instituciones,
+    draft.institutions,
+    draft.instituciones,
+  ];
+  arrays.flatMap(asArray).forEach(item => addRecord(item));
+
+  splitInstitutionText(text(general.instituciones_asociadas, selected.instituciones_asociadas, schoolPayload.instituciones_asociadas))
+    .forEach(name => addRecord({ nombre_institucion: name }, name));
+
+  if (!records.length) {
+    addRecord({ nombre_institucion: schoolRecord.nombre || schoolRecord.codigoLocal || 'Institucion principal' }, schoolRecord.nombre);
+  }
+  return records;
+}
+
+function splitInstitutionText(value) {
+  const raw = text(value);
+  if (!raw || isNoneText(raw)) return [];
+  return raw
+    .split(/\r?\n|;|\|/g)
+    .flatMap(part => (part.includes(',') ? part.split(',') : [part]))
+    .map(part => part.trim())
+    .filter(part => part && !isNoneText(part));
+}
+
+function isNoneText(value) {
+  const normalized = slug(value);
+  return ['ninguna', 'ninguno', 'no', 'sin_instituciones', 'no_aplica', 'na', 'n_a'].includes(normalized);
 }
 
 async function upsertSyncMutation(client, data, context, status) {
@@ -345,20 +435,54 @@ async function upsertSchool(client, data) {
   );
 }
 
+async function upsertInstitutions(client, data) {
+  for (const institution of data.institutions) {
+    await client.query(
+      `INSERT INTO school_institutions
+        (institution_key, school_key, id_institucion, codigo_institucion, nombre,
+         turno, nivel, sector, modalidad, raw, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,now())
+       ON CONFLICT (institution_key) DO UPDATE
+         SET id_institucion = COALESCE(NULLIF(EXCLUDED.id_institucion, ''), school_institutions.id_institucion),
+             codigo_institucion = COALESCE(NULLIF(EXCLUDED.codigo_institucion, ''), school_institutions.codigo_institucion),
+             nombre = COALESCE(NULLIF(EXCLUDED.nombre, ''), school_institutions.nombre),
+             turno = COALESCE(NULLIF(EXCLUDED.turno, ''), school_institutions.turno),
+             nivel = COALESCE(NULLIF(EXCLUDED.nivel, ''), school_institutions.nivel),
+             sector = COALESCE(NULLIF(EXCLUDED.sector, ''), school_institutions.sector),
+             modalidad = COALESCE(NULLIF(EXCLUDED.modalidad, ''), school_institutions.modalidad),
+             raw = EXCLUDED.raw,
+             updated_at = now()`,
+      [
+        institution.institutionKey,
+        institution.schoolKey,
+        institution.idInstitucion,
+        institution.codigoInstitucion,
+        institution.nombre,
+        institution.turno,
+        institution.nivel,
+        institution.sector,
+        institution.modalidad,
+        JSON.stringify(institution.raw || {}),
+      ],
+    );
+  }
+}
+
 async function upsertDraft(client, data) {
   const t = data.timeFields;
   await client.query(
     `INSERT INTO mec_drafts
-      (draft_id, mutation_id, school_key, id_escuela, codigo_local, usuario, estado_borrador,
+      (draft_id, mutation_id, school_key, institution_key, id_escuela, codigo_local, usuario, estado_borrador,
        motivo, app_version, schema_version, saved_at, counts, summary, time_tracking, draft,
        evidence_index, tiempo_escuela_min, tiempo_aulas_min, tiempo_aulas_promedio_min,
        tiempo_sanitarios_min, tiempo_sanitarios_promedio_min, tiempo_exteriores_min, updated_at)
      VALUES
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb,
-       $16::jsonb,$17,$18,$19,$20,$21,$22,now())
+      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb,$16::jsonb,
+       $17::jsonb,$18,$19,$20,$21,$22,$23,now())
      ON CONFLICT (draft_id) DO UPDATE
        SET mutation_id = EXCLUDED.mutation_id,
            school_key = EXCLUDED.school_key,
+           institution_key = EXCLUDED.institution_key,
            id_escuela = EXCLUDED.id_escuela,
            codigo_local = EXCLUDED.codigo_local,
            usuario = EXCLUDED.usuario,
@@ -383,6 +507,7 @@ async function upsertDraft(client, data) {
       data.draftId,
       data.mutationId,
       data.schoolKey,
+      data.institutionKey,
       data.idEscuela,
       data.codigoLocal,
       data.user,
@@ -439,14 +564,16 @@ async function deleteDraftChildren(client, draftId) {
 async function insertBuildings(client, data) {
   for (const [index, block] of data.blocks.entries()) {
     const blockId = stableId(block, `bloque_${index + 1}`);
+    const institutionKey = institutionKeyForEntity(block, data);
     await client.query(
       `INSERT INTO buildings
-        (draft_id, block_id, school_key, codigo, nombre, floor_count, largo_m, ancho_m, estado, geometry, ficha, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb)`,
+        (draft_id, block_id, school_key, institution_key, codigo, nombre, floor_count, largo_m, ancho_m, estado, geometry, ficha, raw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb)`,
       [
         data.draftId,
         blockId,
         data.schoolKey,
+        institutionKey,
         text(block.bloque_codigo, block.codigo, block.code),
         text(block.nombre, block.name, block.bloque_nombre, blockId),
         integerOrNull(block.floorCount, block.pisos, asArray(block.floors).length || null),
@@ -463,15 +590,17 @@ async function insertBuildings(client, data) {
 
 async function insertFloors(client, data) {
   for (const floor of data.floors) {
+    const institutionKey = institutionKeyForEntity(floor.raw, data);
     await client.query(
       `INSERT INTO floors
-        (draft_id, floor_id, block_id, school_key, label, level_number, largo_m, ancho_m, estado, geometry, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb)`,
+        (draft_id, floor_id, block_id, school_key, institution_key, label, level_number, largo_m, ancho_m, estado, geometry, raw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb)`,
       [
         data.draftId,
         floor.floorId,
         floor.blockId,
         data.schoolKey,
+        institutionKey,
         floor.label,
         floor.levelNumber,
         numberOrNull(floor.raw.largo_m, floor.raw.largo, floor.raw.lengthM),
@@ -487,15 +616,22 @@ async function insertFloors(client, data) {
 async function insertRooms(client, data) {
   for (const [index, room] of data.rooms.entries()) {
     const roomId = stableId(room, `ambiente_${index + 1}`);
+    const institutionKey = institutionKeyForEntity(room, data);
+    const blockId = text(room.blockId, room.bloque_id, room.bloque);
+    const floorLabel = text(room.floor, room.planta, room.piso, 'Piso 1');
     await client.query(
       `INSERT INTO rooms
-        (draft_id, room_id, block_id, floor_label, kind, name, code, estado, largo_m, ancho_m, area_m2, geometry, ficha, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb)`,
+        (draft_id, room_id, school_key, institution_key, block_id, floor_id, floor_label,
+         kind, name, code, estado, largo_m, ancho_m, area_m2, geometry, ficha, raw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16::jsonb,$17::jsonb)`,
       [
         data.draftId,
         roomId,
-        text(room.blockId, room.bloque_id, room.bloque),
-        text(room.floor, room.planta, room.piso, 'Piso 1'),
+        data.schoolKey,
+        institutionKey,
+        blockId,
+        floorIdFor(blockId, floorLabel),
+        floorLabel,
         text(room.spaceType, room.tipo_espacio, room.tipo, 'classroom'),
         text(room.name, room.nombre, room.aula_nombre, room.codigo, roomId),
         text(room.codigo, room.code, room.aula_codigo),
@@ -514,16 +650,24 @@ async function insertRooms(client, data) {
 async function insertRoomObjects(client, data) {
   for (const [roomIndex, room] of data.rooms.entries()) {
     const roomId = stableId(room, `ambiente_${roomIndex + 1}`);
+    const institutionKey = institutionKeyForEntity(room, data);
+    const blockId = text(room.blockId, room.bloque_id, room.bloque);
+    const floorLabel = text(room.floor, room.planta, room.piso, 'Piso 1');
     for (const [objectIndex, object] of asArray(room.objects).entries()) {
       const objectId = `${roomId}:${stableId(object, `obj_${objectIndex + 1}`)}`;
       await client.query(
         `INSERT INTO room_objects
-          (draft_id, room_id, object_id, type, code, estado, geometry, ficha, raw)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`,
+          (draft_id, room_id, object_id, school_key, institution_key, block_id, floor_label,
+           type, code, estado, geometry, ficha, raw)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb)`,
         [
           data.draftId,
           roomId,
           objectId,
+          data.schoolKey,
+          institutionKeyForEntity(object, data, institutionKey),
+          blockId,
+          floorLabel,
           text(object.type, object.tipo),
           text(object.ficha?.codigo, object.codigo, object.code),
           text(object.ficha?.estado, object.estado, object.state),
@@ -539,13 +683,17 @@ async function insertRoomObjects(client, data) {
 async function insertSanitaries(client, data) {
   for (const [index, item] of data.sanitaries.entries()) {
     const sanitaryId = stableId(item, `sanitario_${index + 1}`);
+    const institutionKey = institutionKeyForEntity(item, data);
     await client.query(
       `INSERT INTO sanitary_groups
-        (draft_id, sanitary_id, block_ref, floor_label, code, name, estado, largo_m, ancho_m, area_m2, geometry, ficha, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb)`,
+        (draft_id, sanitary_id, school_key, institution_key, block_ref, floor_label, code, name,
+         estado, largo_m, ancho_m, area_m2, geometry, ficha, raw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,$14::jsonb,$15::jsonb)`,
       [
         data.draftId,
         sanitaryId,
+        data.schoolKey,
+        institutionKey,
         text(item.bloque, item.blockId, item.bloque_id),
         text(item.planta, item.floor, item.piso, 'Piso 1'),
         text(item.codigo, item.code),
@@ -565,16 +713,24 @@ async function insertSanitaries(client, data) {
 async function insertSanitaryObjects(client, data) {
   for (const [sanitaryIndex, sanitary] of data.sanitaries.entries()) {
     const sanitaryId = stableId(sanitary, `sanitario_${sanitaryIndex + 1}`);
+    const institutionKey = institutionKeyForEntity(sanitary, data);
+    const blockRef = text(sanitary.bloque, sanitary.blockId, sanitary.bloque_id);
+    const floorLabel = text(sanitary.planta, sanitary.floor, sanitary.piso, 'Piso 1');
     for (const [objectIndex, object] of asArray(sanitary.objects).entries()) {
       const objectId = `${sanitaryId}:${stableId(object, `obj_${objectIndex + 1}`)}`;
       await client.query(
         `INSERT INTO sanitary_objects
-          (draft_id, sanitary_id, object_id, type, code, estado, geometry, ficha, raw)
-         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`,
+          (draft_id, sanitary_id, object_id, school_key, institution_key, block_ref, floor_label,
+           type, code, estado, geometry, ficha, raw)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb)`,
         [
           data.draftId,
           sanitaryId,
           objectId,
+          data.schoolKey,
+          institutionKeyForEntity(object, data, institutionKey),
+          blockRef,
+          floorLabel,
           text(object.type, object.tipo),
           text(object.ficha?.codigo, object.codigo, object.code),
           text(object.ficha?.estado, object.estado, object.state),
@@ -590,13 +746,16 @@ async function insertSanitaryObjects(client, data) {
 async function insertSiteElements(client, data) {
   for (const [index, element] of data.siteElements.entries()) {
     const elementId = stableId(element, `exterior_${index + 1}`);
+    const institutionKey = institutionKeyForEntity(element, data);
     await client.query(
       `INSERT INTO site_elements
-        (draft_id, element_id, type, code, estado, block_id, geometry, ficha, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9::jsonb)`,
+        (draft_id, element_id, school_key, institution_key, type, code, estado, block_id, geometry, ficha, raw)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11::jsonb)`,
       [
         data.draftId,
         elementId,
+        data.schoolKey,
+        institutionKey,
         text(element.type, element.tipo),
         text(element.ficha?.codigo, element.codigo, element.code),
         text(element.ficha?.estado, element.estado, element.state),
@@ -614,12 +773,14 @@ async function insertEvidence(client, data) {
     const evidenceId = text(item.evidenceId, item.driveFileId, item.indexedName, `${item.fieldPath || 'evidencia'}:${item.index || index + 1}`);
     await client.query(
       `INSERT INTO evidence_files
-        (draft_id, evidence_id, entity_kind, entity_id, field_path, file_name, drive_file_id,
+        (draft_id, evidence_id, school_key, institution_key, entity_kind, entity_id, field_path, file_name, drive_file_id,
          drive_url, captured_at, metadata)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`,
       [
         data.draftId,
         evidenceId,
+        data.schoolKey,
+        institutionKeyForEntity(item.context || item, data),
         text(item.context?.kind, item.context?.entityKind, evidenceKindFromFieldPath(item.fieldPath)),
         text(item.context?.elementId, item.context?.roomId, item.context?.sanitaryId, item.context?.id),
         text(item.fieldPath),
@@ -638,12 +799,14 @@ async function insertTimeRecords(client, data) {
     const recordId = `${text(record.kind, 'registro')}:${text(record.id, index + 1)}:${dateOrNull(record.startedAt) || 'sin_inicio'}:${index + 1}`;
     await client.query(
       `INSERT INTO time_tracking_items
-        (draft_id, record_id, kind, entity_id, label, started_at, finished_at,
+        (draft_id, record_id, school_key, institution_key, kind, entity_id, label, started_at, finished_at,
          duration_seconds, active, raw)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)`,
       [
         data.draftId,
         recordId,
+        data.schoolKey,
+        institutionKeyForEntity(record, data),
         text(record.kind, 'registro'),
         text(record.id),
         text(record.label),
@@ -681,7 +844,7 @@ function floorRecords(blocks, rooms, sanitaries) {
     const blockId = stableId(block, `bloque_${blockIndex + 1}`);
     for (const [floorIndex, floor] of asArray(block.floors).entries()) {
       const label = text(floor.label, floor.nombre, floor.name, floor.piso, floor.planta, `Piso ${floorIndex + 1}`);
-      const floorId = stableId(floor, `${blockId}:${slug(label)}`);
+      const floorId = floorIdFor(blockId, label);
       byId.set(floorId, {
         floorId,
         blockId,
@@ -762,6 +925,35 @@ function evidenceKindFromFieldPath(fieldPath = '') {
 
 function stableId(item, fallback) {
   return text(item?.id, item?.uuid, item?.codigo, item?.code, fallback);
+}
+
+function floorIdFor(blockId, floorLabel) {
+  return `${text(blockId, 'sin_bloque')}:${slug(floorLabel || 'Piso 1')}`;
+}
+
+function institutionKeyForEntity(item, data, fallback = data.institutionKey) {
+  const explicit = text(item?.institution_key, item?.institutionKey, item?.institucion_key);
+  if (explicit && data.institutions.some(institution => institution.institutionKey === explicit)) return explicit;
+  const codeOrName = text(
+    item?.codigo_institucion,
+    item?.codigoInstitucion,
+    item?.institucion_codigo,
+    item?.id_institucion,
+    item?.idInstitucion,
+    item?.institucion,
+    item?.nombre_institucion,
+  );
+  if (codeOrName) {
+    const normalized = slug(codeOrName);
+    const match = data.institutions.find(institution => [
+      institution.codigoInstitucion,
+      institution.idInstitucion,
+      institution.nombre,
+      institution.institutionKey,
+    ].some(value => slug(value) === normalized || String(value || '') === codeOrName));
+    if (match) return match.institutionKey;
+  }
+  return fallback || null;
 }
 
 function asArray(value) {

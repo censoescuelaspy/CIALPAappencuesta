@@ -12,6 +12,7 @@ npm-debug.log*
 
 # Servidores locales de prueba
 server-*.log
+.local/
 
 # Reportes de Playwright
 test-results/
