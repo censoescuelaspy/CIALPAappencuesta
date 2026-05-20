@@ -287,10 +287,11 @@ const MecFormModule = (() => {
     }
   }
 
-  function _saveDraft(showToast = false) {
+  function _saveDraft(showToast = false, options = {}) {
     _data.__activeModuleId = _activeModuleId;
     _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _data.__activeSanitaryId = _activeSanitaryId || '';
+    if (options.ensureSchoolTimer !== false) _ensureSchoolTimeLog();
     _normalizeNumberedNames();
     if (_data.__classroomSketch && _data.__classrooms && (_activeClassroomId || _data.__classroomSketch.id)) _syncActiveClassroomFromSketch();
     _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
@@ -354,6 +355,7 @@ const MecFormModule = (() => {
     const id = school.id_escuela || school.codigo_local || school.code || '';
     const counts = _finalDeliveryCounts();
     const evidenceIndex = _buildEvidenceIndex();
+    const timeTracking = _timeLogSummary();
     const savedAtText = document.getElementById('mec-save-state')?.textContent || '';
     return {
       clientMutationId: _draftSyncMutationId(id),
@@ -366,10 +368,12 @@ const MecFormModule = (() => {
       motivo: reason,
       estado_borrador: reason === 'cierre' ? 'cierre' : 'en_curso',
       counts,
+      timeTracking,
       resumen: {
         school,
         counts,
         evidenceCount: evidenceIndex.length,
+        timeTracking,
         savedAtText,
         activeModule: _activeModuleId,
         baseMapConfirmed: Boolean(_data.__planBaseMap?.confirmed),
@@ -929,6 +933,7 @@ const MecFormModule = (() => {
       if (force || changedSchool || !_data.general[field]) _data.general[field] = String(value);
     });
     _data.__selectedSchool = _schoolSnapshot(school);
+    _ensureSchoolTimeLog();
   }
 
   function _numberInRange(value, fallback = 0, min = -Infinity, max = Infinity) {
@@ -1057,6 +1062,130 @@ const MecFormModule = (() => {
 
   function _activeTimeLog(kind, id) {
     return _ensureTimeLog().active[_timeLogKey(kind, id)] || null;
+  }
+
+  function _finishTimeLogIfActive(kind, id, label = '') {
+    if (!id || !_activeTimeLog(kind, id)) return null;
+    return _finishTimeLog(kind, id, label);
+  }
+
+  function _schoolTimeLogIdentity() {
+    const selected = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    const printable = _planPrintSchoolInfo ? _planPrintSchoolInfo() : {};
+    const id = selected.id_escuela || selected.codigo_local || selected.codigo || selected.id || printable.code || '';
+    const label = selected.nombre || selected.nombre_escuela || selected.nombre_establecimiento || printable.name || id || 'Escuela';
+    return { id, label };
+  }
+
+  function _ensureSchoolTimeLog() {
+    const school = _schoolTimeLogIdentity();
+    if (!school.id) return null;
+    return _startTimeLog('escuela', school.id, school.label);
+  }
+
+  function _finishSchoolTimeLogIfActive() {
+    const school = _schoolTimeLogIdentity();
+    if (!school.id) return null;
+    return _finishTimeLogIfActive('escuela', school.id, school.label);
+  }
+
+  function _timeLogDuration(record, nowMs = Date.now()) {
+    const stored = Number(record?.durationSeconds);
+    if (Number.isFinite(stored) && stored > 0) return Math.round(stored);
+    const startedAt = new Date(record?.startedAt || record?.inicio || '').getTime();
+    const finishedAt = record?.finishedAt || record?.fin || record?.endedAt;
+    const endMs = finishedAt ? new Date(finishedAt).getTime() : nowMs;
+    if (!Number.isFinite(startedAt) || !Number.isFinite(endMs)) return 0;
+    return Math.max(0, Math.round((endMs - startedAt) / 1000));
+  }
+
+  function _timeLogRecords({ includeActive = true } = {}) {
+    const log = _ensureTimeLog();
+    const nowMs = Date.now();
+    const finished = (log.items || []).map(item => ({
+      kind: item.kind || 'registro',
+      id: item.id || '',
+      label: item.label || '',
+      startedAt: item.startedAt || '',
+      finishedAt: item.finishedAt || '',
+      durationSeconds: _timeLogDuration(item, nowMs),
+      active: false,
+    }));
+    if (!includeActive) return finished;
+    const active = Object.values(log.active || {}).map(item => ({
+      kind: item.kind || 'registro',
+      id: item.id || '',
+      label: item.label || '',
+      startedAt: item.startedAt || '',
+      finishedAt: '',
+      durationSeconds: _timeLogDuration(item, nowMs),
+      active: true,
+    }));
+    return [...finished, ...active].filter(item => item.kind && item.id);
+  }
+
+  function _minutesFromSeconds(seconds = 0) {
+    const value = Math.max(0, Number(seconds) || 0);
+    return Math.round((value / 60) * 10) / 10;
+  }
+
+  function _timeLogSummary() {
+    const records = _timeLogRecords({ includeActive: true });
+    const byKind = {};
+    let firstMs = Infinity;
+    let lastMs = 0;
+    records.forEach(record => {
+      const kind = record.kind || 'registro';
+      if (!byKind[kind]) {
+        byKind[kind] = {
+          kind,
+          count: 0,
+          finishedCount: 0,
+          activeCount: 0,
+          totalSeconds: 0,
+          totalMinutes: 0,
+          averageSeconds: 0,
+          averageMinutes: 0,
+          items: [],
+          _ids: new Set(),
+        };
+      }
+      const group = byKind[kind];
+      group._ids.add(record.id);
+      group.totalSeconds += record.durationSeconds || 0;
+      if (record.active) group.activeCount += 1;
+      else group.finishedCount += 1;
+      group.items.push(record);
+      const startMs = new Date(record.startedAt || '').getTime();
+      const endMs = record.finishedAt ? new Date(record.finishedAt).getTime() : Date.now();
+      if (Number.isFinite(startMs)) firstMs = Math.min(firstMs, startMs);
+      if (Number.isFinite(endMs)) lastMs = Math.max(lastMs, endMs);
+    });
+    Object.values(byKind).forEach(group => {
+      group.count = group._ids.size || group.items.length;
+      group.totalSeconds = Math.round(group.totalSeconds);
+      group.totalMinutes = _minutesFromSeconds(group.totalSeconds);
+      group.averageSeconds = group.count ? Math.round(group.totalSeconds / group.count) : 0;
+      group.averageMinutes = _minutesFromSeconds(group.averageSeconds);
+      delete group._ids;
+    });
+    const productiveSeconds = records
+      .filter(record => record.kind !== 'escuela')
+      .reduce((sum, record) => sum + (record.durationSeconds || 0), 0);
+    const windowSeconds = Number.isFinite(firstMs) && lastMs > firstMs ? Math.round((lastMs - firstMs) / 1000) : 0;
+    const schoolSeconds = byKind.escuela?.totalSeconds || windowSeconds;
+    return {
+      generatedAt: new Date().toISOString(),
+      schoolSeconds,
+      schoolMinutes: _minutesFromSeconds(schoolSeconds),
+      productiveSeconds: Math.round(productiveSeconds),
+      productiveMinutes: _minutesFromSeconds(productiveSeconds),
+      workWindowSeconds: windowSeconds,
+      workWindowMinutes: _minutesFromSeconds(windowSeconds),
+      byKind,
+      activeItems: records.filter(record => record.active),
+      records,
+    };
   }
 
   function _formatDuration(seconds = 0) {
@@ -3332,6 +3461,15 @@ const MecFormModule = (() => {
     _saveDraft(true);
     renderSchoolPlan();
     if (record) UI.showToast(`${_roomSpaceLabel(room)} guardado. Tiempo de registro: ${_formatDuration(record.durationSeconds)}.`, 'success', 5600);
+  }
+
+  function finishClassroomTimer(id = _activeClassroomId || _data.__classroomSketch?.id) {
+    if ((_activeClassroomId || _data.__classroomSketch?.id) === id) _syncActiveClassroomFromSketch();
+    const room = (_data.__classrooms || []).find(item => item.id === id);
+    if (!room) return null;
+    const record = _finishTimeLogIfActive('ambiente', room.id, _classroomHierarchyLabel(room) || room.name || _roomSpaceLabel(room));
+    if (record) _saveDraft(false);
+    return record;
   }
 
   async function setActiveClassroomLocked(locked) {
@@ -5649,6 +5787,14 @@ const MecFormModule = (() => {
     _render();
     renderSchoolPlan();
     UI.showToast(`Sanitario guardado. Tiempo de registro: ${_formatDuration(record.durationSeconds)}.`, 'success', 5600);
+  }
+
+  function finishSanitaryTimer(id = _activeSanitaryId) {
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
+    if (!item) return null;
+    const record = _finishTimeLogIfActive('sanitario', item.id, item.codigo || 'Sanitario');
+    if (record) _saveDraft(false);
+    return record;
   }
 
   function addSanitaryOpening(id, type) {
@@ -16388,6 +16534,14 @@ const MecFormModule = (() => {
     closeSiteElementFicha();
   }
 
+  function finishSiteElementTimer(id) {
+    const element = _ensureSiteElements().find(item => item.id === id);
+    if (!element) return null;
+    const record = _finishTimeLogIfActive('exterior', element.id, element.ficha?.codigo || _siteElementLabel(element.type));
+    if (record) _saveDraft(false);
+    return record;
+  }
+
   async function deleteSiteElement(id) {
     const element = _ensureSiteElements().find(item => item.id === id);
     if (!element) return;
@@ -20109,6 +20263,7 @@ const MecFormModule = (() => {
       schemaVersion: MEC_SCHEMA.version,
       school,
       counts: _finalDeliveryCounts(),
+      timeTracking: _timeLogSummary(),
       completion: completionStatus || {},
       storage: {
         spreadsheetUrl: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.SPREADSHEET_URL : '',
@@ -20132,7 +20287,12 @@ const MecFormModule = (() => {
     _syncActiveBlock();
     _ensureClassrooms();
     _ensureSanitaries();
-    _saveDraft(false);
+    const activeRoom = (_data.__classrooms || []).find(room => room.id === (_activeClassroomId || _data.__classroomSketch?.id));
+    if (activeRoom) _finishTimeLogIfActive('ambiente', activeRoom.id, _classroomHierarchyLabel(activeRoom) || activeRoom.name || _roomSpaceLabel(activeRoom));
+    const activeSanitary = (_data.__sanitaries || []).find(item => item.id === _activeSanitaryId);
+    if (activeSanitary) _finishTimeLogIfActive('sanitario', activeSanitary.id, activeSanitary.codigo || 'Sanitario');
+    _finishSchoolTimeLogIfActive();
+    _saveDraft(false, { ensureSchoolTimer: false });
     const metadata = _buildFinalDeliveryMetadata(completionStatus);
     return {
       metadata,
@@ -20148,6 +20308,7 @@ const MecFormModule = (() => {
       exportedAt: new Date().toISOString(),
       schemaVersion: MEC_SCHEMA.version,
       values: _data,
+      timeTracking: _timeLogSummary(),
       evidenceIndex: _buildEvidenceIndex(),
     };
     const json = JSON.stringify(payload, null, 2);
@@ -20311,6 +20472,7 @@ const MecFormModule = (() => {
     closeSiteElementTypePicker,
     chooseSiteElementType,
     saveCurrentClassroom,
+    finishClassroomTimer,
     setActiveClassroomLocked,
     setPlanClassroomLocked,
     openClassroomFicha,
@@ -20322,6 +20484,7 @@ const MecFormModule = (() => {
     addSanitary,
     selectSanitary,
     saveCurrentSanitary,
+    finishSanitaryTimer,
     addSanitaryFixture,
     addSanitaryOpening,
     addSanitaryElement,
@@ -20384,6 +20547,7 @@ const MecFormModule = (() => {
     openSiteElementFicha,
     closeSiteElementFicha,
     saveSiteElementFicha,
+    finishSiteElementTimer,
     deleteSiteElement,
     setSiteElementLocked,
     setSiteElementEvidence,
@@ -20423,6 +20587,7 @@ const MecFormModule = (() => {
     exportPlanPng,
     printPlanPdf,
     buildFinalDeliveryPackage,
+    getTimeSummary: _timeLogSummary,
     syncDraftToSheets,
     setSketchZoom,
     setSanitaryZoom,

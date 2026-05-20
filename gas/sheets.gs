@@ -13,7 +13,9 @@ const SheetsService = (() => {
     'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado',
     'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado',
     'prioridad_operativa', 'en_muestra_piloto', 'orden_muestra_piloto',
-    'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo',
+    'tiempo_estimado_min', 'tiempo_real_min', 'tiempo_aulas_min', 'tiempo_aulas_promedio_min',
+    'tiempo_sanitarios_min', 'tiempo_sanitarios_promedio_min', 'tiempo_exteriores_min',
+    'ultima_sesion_id', 'folio_externo',
     'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url',
     'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id',
     'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'
@@ -552,6 +554,8 @@ const SheetsService = (() => {
     const escuela = escuelaResult.status === 'ok' ? escuelaResult.data : {};
     const counts = params.counts || {};
     const evidenceIndex = Array.isArray(params.evidenceIndex) ? params.evidenceIndex : [];
+    const timeTracking = _timeTrackingFromDraftParams(params);
+    const timeFields = _draftTimeFields_(timeTracking);
     const createdAt = existingIdx !== -1 ? (_getByHeader(sheet, existingIdx, headers, 'creado_en') || now) : now;
     const row = {
       id_borrador: draftId,
@@ -572,6 +576,13 @@ const SheetsService = (() => {
       exteriores: counts.siteElements || 0,
       evidencias: counts.evidence || evidenceIndex.length || 0,
       base_mapa_confirmada: params.resumen && params.resumen.baseMapConfirmed ? 'true' : 'false',
+      tiempo_escuela_min: timeFields.tiempo_escuela_min,
+      tiempo_aulas_min: timeFields.tiempo_aulas_min,
+      tiempo_aulas_promedio_min: timeFields.tiempo_aulas_promedio_min,
+      tiempo_sanitarios_min: timeFields.tiempo_sanitarios_min,
+      tiempo_sanitarios_promedio_min: timeFields.tiempo_sanitarios_promedio_min,
+      tiempo_exteriores_min: timeFields.tiempo_exteriores_min,
+      tiempo_registro_json: _jsonForSheet(timeTracking || {}, 16000),
       resumen_json: _jsonForSheet(params.resumen || {}, 22000),
       draft_json: _jsonForSheet(params.values || {}, 45000),
       evidence_index_json: _jsonForSheet(evidenceIndex, 30000),
@@ -593,6 +604,12 @@ const SheetsService = (() => {
         ultimo_borrador_mec_id: draftId,
         ultimo_borrador_mec_at: now,
         ultimo_borrador_mec_usuario: row.usuario,
+        tiempo_real_min: timeFields.tiempo_escuela_min,
+        tiempo_aulas_min: timeFields.tiempo_aulas_min,
+        tiempo_aulas_promedio_min: timeFields.tiempo_aulas_promedio_min,
+        tiempo_sanitarios_min: timeFields.tiempo_sanitarios_min,
+        tiempo_sanitarios_promedio_min: timeFields.tiempo_sanitarios_promedio_min,
+        tiempo_exteriores_min: timeFields.tiempo_exteriores_min,
       });
     }
     let databaseSync = { status: 'pendiente_config' };
@@ -642,6 +659,7 @@ const SheetsService = (() => {
     const baseName = _safeEvidenceFilename(`cialpa_cierre_${codigoLocal || idEscuela || deliveryId}_${Utilities.formatDate(new Date(), TZ, 'yyyyMMdd_HHmmss')}`).replace(/\.[^.]+$/, '');
 
     const metadata = params.metadata || {};
+    const closeTimeFields = _draftTimeFields_(metadata.timeTracking || params.timeTracking || (params.resumen && params.resumen.timeTracking) || {});
     const metadataJson = JSON.stringify({
       id_entrega: deliveryId,
       generado_en: now,
@@ -715,6 +733,12 @@ const SheetsService = (() => {
         ultimo_metadata_url: row.metadata_url,
         email_cierre_estado: emailStatus,
         email_cierre_destino: recipient,
+        tiempo_real_min: closeTimeFields.tiempo_escuela_min,
+        tiempo_aulas_min: closeTimeFields.tiempo_aulas_min,
+        tiempo_aulas_promedio_min: closeTimeFields.tiempo_aulas_promedio_min,
+        tiempo_sanitarios_min: closeTimeFields.tiempo_sanitarios_min,
+        tiempo_sanitarios_promedio_min: closeTimeFields.tiempo_sanitarios_promedio_min,
+        tiempo_exteriores_min: closeTimeFields.tiempo_exteriores_min,
       });
     }
     AuditService.log('CIERRE_COMPLETO', session.usuario, `id_entrega: ${deliveryId}, escuela: ${codigoLocal || idEscuela}, email: ${emailStatus}`);
@@ -1089,7 +1113,112 @@ const SheetsService = (() => {
   }
 
   function _mecDraftHeaders() {
-    return ['id_borrador','id_escuela','codigo_local','nombre_escuela','usuario','fecha_guardado','estado_borrador','motivo','app_version','schema_version','bloques','pisos','aulas','otros_espacios','sanitarios','exteriores','evidencias','base_mapa_confirmada','resumen_json','draft_json','evidence_index_json','creado_en','actualizado_en'];
+    return ['id_borrador','id_escuela','codigo_local','nombre_escuela','usuario','fecha_guardado','estado_borrador','motivo','app_version','schema_version','bloques','pisos','aulas','otros_espacios','sanitarios','exteriores','evidencias','base_mapa_confirmada','tiempo_escuela_min','tiempo_aulas_min','tiempo_aulas_promedio_min','tiempo_sanitarios_min','tiempo_sanitarios_promedio_min','tiempo_exteriores_min','tiempo_registro_json','resumen_json','draft_json','evidence_index_json','creado_en','actualizado_en'];
+  }
+
+  function _durationSecondsFromTimeRecord_(record, nowMs) {
+    const stored = Number(record && (record.durationSeconds || record.duracion_segundos));
+    if (isFinite(stored) && stored > 0) return Math.round(stored);
+    const startedAt = new Date(record && (record.startedAt || record.inicio_iso || record.inicio || '')).getTime();
+    const finishedRaw = record && (record.finishedAt || record.fin_iso || record.fin || record.endedAt || '');
+    const finishedAt = finishedRaw ? new Date(finishedRaw).getTime() : nowMs;
+    if (!isFinite(startedAt) || !isFinite(finishedAt)) return 0;
+    return Math.max(0, Math.round((finishedAt - startedAt) / 1000));
+  }
+
+  function _minutesFromSeconds_(seconds) {
+    const value = Math.max(0, Number(seconds) || 0);
+    return Math.round((value / 60) * 10) / 10;
+  }
+
+  function _timeTrackingFromLog_(log) {
+    log = log || {};
+    const nowMs = new Date().getTime();
+    const items = Array.isArray(log.items) ? log.items : [];
+    const active = log.active && typeof log.active === 'object' ? Object.values(log.active) : [];
+    const records = [];
+    items.forEach(item => records.push({
+      kind: item.kind || 'registro',
+      id: item.id || '',
+      label: item.label || '',
+      startedAt: item.startedAt || '',
+      finishedAt: item.finishedAt || '',
+      durationSeconds: _durationSecondsFromTimeRecord_(item, nowMs),
+      active: false,
+    }));
+    active.forEach(item => records.push({
+      kind: item.kind || 'registro',
+      id: item.id || '',
+      label: item.label || '',
+      startedAt: item.startedAt || '',
+      finishedAt: '',
+      durationSeconds: _durationSecondsFromTimeRecord_(item, nowMs),
+      active: true,
+    }));
+    const byKind = {};
+    let firstMs = Infinity;
+    let lastMs = 0;
+    records.filter(record => record.kind && record.id).forEach(record => {
+      const kind = record.kind || 'registro';
+      if (!byKind[kind]) byKind[kind] = { kind, count: 0, finishedCount: 0, activeCount: 0, totalSeconds: 0, totalMinutes: 0, averageSeconds: 0, averageMinutes: 0, items: [], ids: {} };
+      const group = byKind[kind];
+      group.ids[record.id] = true;
+      group.totalSeconds += record.durationSeconds || 0;
+      if (record.active) group.activeCount += 1;
+      else group.finishedCount += 1;
+      group.items.push(record);
+      const startedAt = new Date(record.startedAt || '').getTime();
+      const finishedAt = record.finishedAt ? new Date(record.finishedAt).getTime() : nowMs;
+      if (isFinite(startedAt)) firstMs = Math.min(firstMs, startedAt);
+      if (isFinite(finishedAt)) lastMs = Math.max(lastMs, finishedAt);
+    });
+    Object.keys(byKind).forEach(kind => {
+      const group = byKind[kind];
+      group.count = Object.keys(group.ids).length || group.items.length;
+      group.totalSeconds = Math.round(group.totalSeconds);
+      group.totalMinutes = _minutesFromSeconds_(group.totalSeconds);
+      group.averageSeconds = group.count ? Math.round(group.totalSeconds / group.count) : 0;
+      group.averageMinutes = _minutesFromSeconds_(group.averageSeconds);
+      delete group.ids;
+    });
+    const productiveSeconds = records
+      .filter(record => record.kind !== 'escuela')
+      .reduce((sum, record) => sum + (Number(record.durationSeconds) || 0), 0);
+    const windowSeconds = isFinite(firstMs) && lastMs > firstMs ? Math.round((lastMs - firstMs) / 1000) : 0;
+    const schoolSeconds = (byKind.escuela && byKind.escuela.totalSeconds) || windowSeconds;
+    return {
+      generatedAt: new Date().toISOString(),
+      schoolSeconds,
+      schoolMinutes: _minutesFromSeconds_(schoolSeconds),
+      productiveSeconds: Math.round(productiveSeconds),
+      productiveMinutes: _minutesFromSeconds_(productiveSeconds),
+      workWindowSeconds: windowSeconds,
+      workWindowMinutes: _minutesFromSeconds_(windowSeconds),
+      byKind,
+      activeItems: records.filter(record => record.active),
+      records,
+    };
+  }
+
+  function _timeTrackingFromDraftParams(params) {
+    const direct = params.timeTracking || params.time_tracking || (params.resumen && params.resumen.timeTracking) || null;
+    if (direct && (direct.byKind || direct.schoolSeconds || direct.records)) return direct;
+    return _timeTrackingFromLog_((params.values || {}).__registroTiempos || {});
+  }
+
+  function _draftTimeFields_(summary) {
+    summary = summary || {};
+    const byKind = summary.byKind || {};
+    const kind = name => byKind[name] || {};
+    const schoolSeconds = Number(summary.schoolSeconds || (kind('escuela').totalSeconds) || summary.workWindowSeconds || 0);
+    return {
+      tiempo_escuela_min: _minutesFromSeconds_(schoolSeconds),
+      tiempo_aulas_min: _minutesFromSeconds_(kind('ambiente').totalSeconds || 0),
+      tiempo_aulas_promedio_min: _minutesFromSeconds_(kind('ambiente').averageSeconds || 0),
+      tiempo_sanitarios_min: _minutesFromSeconds_(kind('sanitario').totalSeconds || 0),
+      tiempo_sanitarios_promedio_min: _minutesFromSeconds_(kind('sanitario').averageSeconds || 0),
+      tiempo_exteriores_min: _minutesFromSeconds_(kind('exterior').totalSeconds || 0),
+    };
   }
 
   function _dbSyncQueueHeaders() {
@@ -1113,6 +1242,7 @@ const SheetsService = (() => {
       status: row.estado_borrador || 'en_curso',
       reason: row.motivo || '',
       counts: params.counts || {},
+      time_tracking: params.timeTracking || (params.resumen && params.resumen.timeTracking) || {},
       summary: params.resumen || {},
       draft: params.values || {},
       evidence_index: Array.isArray(params.evidenceIndex) ? params.evidenceIndex : [],

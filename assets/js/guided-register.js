@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.21
+ * Version: 2.6.62
  */
 
 const GuidedRegisterModule = (() => {
@@ -14,6 +14,7 @@ const GuidedRegisterModule = (() => {
   let _touchStartX = 0;
   let _touchStartY = 0;
   let _guidedState = { targets: {}, flags: {} };
+  let _timeRefreshTimer = null;
 
   function _schoolIdentityValues(school) {
     const values = [
@@ -190,6 +191,9 @@ const GuidedRegisterModule = (() => {
       _updateSlide();
       _updateSnapshot();
     });
+    if (!_timeRefreshTimer) {
+      _timeRefreshTimer = setInterval(() => _refreshTimeTracking(), 15000);
+    }
   }
 
   function _render(root) {
@@ -225,6 +229,7 @@ const GuidedRegisterModule = (() => {
                 <button class="btn btn-sm guided-plan-panel__school-action" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
               </div>
             </div>
+            <div class="guided-time-strip" data-guided-time-strip></div>
             <div id="guided-school-plan-root" class="guided-plan-surface" data-school-plan-root></div>
           </aside>
         </section>
@@ -577,6 +582,7 @@ const GuidedRegisterModule = (() => {
     if (schoolName) schoolName.textContent = snap.school.name || 'Sin escuela seleccionada';
     const schoolMeta = root.querySelector('[data-guided-school-meta]');
     if (schoolMeta) schoolMeta.textContent = snap.school.meta || 'Seleccione una escuela desde el mapa antes de iniciar la carga.';
+    _refreshTimeTracking(root, snap);
     root.querySelectorAll('[data-guided-step-state]').forEach(label => {
       const step = STEPS.find(item => item.id === label.dataset.guidedStepState);
       const done = _stepDone(step?.id, snap);
@@ -587,6 +593,14 @@ const GuidedRegisterModule = (() => {
       panel.innerHTML = _guidedNextHtml(panel.dataset.guidedNext || '', snap);
     });
     requestAnimationFrame(() => _syncDeckHeight(root));
+  }
+
+  function _refreshTimeTracking(root = document.getElementById('guided-register-root'), snap = null) {
+    if (!root) return;
+    const panel = root.querySelector('[data-guided-time-strip]');
+    if (!panel) return;
+    const current = snap || _snapshot();
+    panel.innerHTML = _timeStripHtml(current.timeTracking);
   }
 
   function _syncDeckHeight(root = document.getElementById('guided-register-root')) {
@@ -628,6 +642,169 @@ const GuidedRegisterModule = (() => {
       if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
     }
     return '';
+  }
+
+  function _durationSecondsFromLog(item = {}, nowMs = Date.now()) {
+    const stored = Number(item.durationSeconds || item.duracion_segundos);
+    if (Number.isFinite(stored) && stored > 0) return Math.round(stored);
+    const startMs = new Date(item.startedAt || item.inicio_iso || item.inicio || '').getTime();
+    const endRaw = item.finishedAt || item.fin_iso || item.fin || item.endedAt || '';
+    const endMs = endRaw ? new Date(endRaw).getTime() : nowMs;
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return 0;
+    return Math.max(0, Math.round((endMs - startMs) / 1000));
+  }
+
+  function _minutesFromSeconds(seconds = 0) {
+    const value = Math.max(0, Number(seconds) || 0);
+    return Math.round((value / 60) * 10) / 10;
+  }
+
+  function _timeTrackingSummary(values = {}) {
+    if (typeof MecFormModule !== 'undefined' && typeof MecFormModule.getTimeSummary === 'function') {
+      try {
+        return MecFormModule.getTimeSummary();
+      } catch (err) {
+        console.warn('[Registro guiado] No se pudo leer resumen de tiempos activo:', err);
+      }
+    }
+    const log = values.__registroTiempos || {};
+    const nowMs = Date.now();
+    const finished = Array.isArray(log.items) ? log.items : [];
+    const active = log.active && typeof log.active === 'object' ? Object.values(log.active) : [];
+    const records = [
+      ...finished.map(item => ({
+        kind: item.kind || 'registro',
+        id: item.id || '',
+        label: item.label || '',
+        startedAt: item.startedAt || '',
+        finishedAt: item.finishedAt || '',
+        durationSeconds: _durationSecondsFromLog(item, nowMs),
+        active: false,
+      })),
+      ...active.map(item => ({
+        kind: item.kind || 'registro',
+        id: item.id || '',
+        label: item.label || '',
+        startedAt: item.startedAt || '',
+        finishedAt: '',
+        durationSeconds: _durationSecondsFromLog(item, nowMs),
+        active: true,
+      })),
+    ].filter(item => item.kind && item.id);
+    const byKind = {};
+    let firstMs = Infinity;
+    let lastMs = 0;
+    records.forEach(record => {
+      const kind = record.kind || 'registro';
+      byKind[kind] = byKind[kind] || { kind, count: 0, finishedCount: 0, activeCount: 0, totalSeconds: 0, totalMinutes: 0, averageSeconds: 0, averageMinutes: 0, items: [], _ids: new Set() };
+      const group = byKind[kind];
+      group._ids.add(record.id);
+      group.totalSeconds += record.durationSeconds || 0;
+      if (record.active) group.activeCount += 1;
+      else group.finishedCount += 1;
+      group.items.push(record);
+      const startMs = new Date(record.startedAt || '').getTime();
+      const endMs = record.finishedAt ? new Date(record.finishedAt).getTime() : nowMs;
+      if (Number.isFinite(startMs)) firstMs = Math.min(firstMs, startMs);
+      if (Number.isFinite(endMs)) lastMs = Math.max(lastMs, endMs);
+    });
+    Object.values(byKind).forEach(group => {
+      group.count = group._ids.size || group.items.length;
+      group.totalSeconds = Math.round(group.totalSeconds);
+      group.totalMinutes = _minutesFromSeconds(group.totalSeconds);
+      group.averageSeconds = group.count ? Math.round(group.totalSeconds / group.count) : 0;
+      group.averageMinutes = _minutesFromSeconds(group.averageSeconds);
+      delete group._ids;
+    });
+    const productiveSeconds = records
+      .filter(record => record.kind !== 'escuela')
+      .reduce((sum, record) => sum + (record.durationSeconds || 0), 0);
+    const workWindowSeconds = Number.isFinite(firstMs) && lastMs > firstMs ? Math.round((lastMs - firstMs) / 1000) : 0;
+    const schoolSeconds = byKind.escuela?.totalSeconds || workWindowSeconds;
+    return {
+      generatedAt: new Date().toISOString(),
+      schoolSeconds,
+      schoolMinutes: _minutesFromSeconds(schoolSeconds),
+      productiveSeconds: Math.round(productiveSeconds),
+      productiveMinutes: _minutesFromSeconds(productiveSeconds),
+      workWindowSeconds,
+      workWindowMinutes: _minutesFromSeconds(workWindowSeconds),
+      byKind,
+      activeItems: records.filter(record => record.active),
+      records,
+    };
+  }
+
+  function _timeDurationText(seconds = 0) {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const sec = total % 60;
+    if (hours) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+    if (minutes) return `${minutes}m ${String(sec).padStart(2, '0')}s`;
+    return `${sec}s`;
+  }
+
+  function _timeKind(summary = {}, kind = '') {
+    return summary?.byKind?.[kind] || { count: 0, activeCount: 0, totalSeconds: 0, averageSeconds: 0 };
+  }
+
+  function _timeStripHtml(summary = {}) {
+    const hasRecords = Array.isArray(summary.records) && summary.records.length;
+    const school = Number(summary.schoolSeconds || 0);
+    const ambientes = _timeKind(summary, 'ambiente');
+    const sanitarios = _timeKind(summary, 'sanitario');
+    const active = Array.isArray(summary.activeItems) ? summary.activeItems : [];
+    if (!hasRecords) {
+      return `
+        <div class="guided-time-strip__empty">
+          <strong>Tiempo logistico</strong>
+          <span>Sin medicion registrada todavia</span>
+        </div>`;
+    }
+    return `
+      <div class="guided-time-chip guided-time-chip--main">
+        <span>Escuela</span>
+        <strong>${_escape(_timeDurationText(school))}</strong>
+        <small>${active.length ? `${active.length} contador(es) activo(s)` : 'sin contador activo'}</small>
+      </div>
+      <div class="guided-time-chip">
+        <span>Aulas / ambientes</span>
+        <strong>${_escape(_timeDurationText(ambientes.totalSeconds))}</strong>
+        <small>${ambientes.count || 0} registro(s) - prom. ${_escape(_timeDurationText(ambientes.averageSeconds))}</small>
+      </div>
+      <div class="guided-time-chip">
+        <span>Sanitarios</span>
+        <strong>${_escape(_timeDurationText(sanitarios.totalSeconds))}</strong>
+        <small>${sanitarios.count || 0} registro(s) - prom. ${_escape(_timeDurationText(sanitarios.averageSeconds))}</small>
+      </div>`;
+  }
+
+  function _timePanelHtml(summary = {}) {
+    const hasRecords = Array.isArray(summary.records) && summary.records.length;
+    if (!hasRecords) {
+      return `
+        <div class="guided-time-panel" aria-label="Tiempos logisticos">
+          <strong>Tiempos logisticos</strong>
+          <span>Sin medicion registrada todavia.</span>
+        </div>`;
+    }
+    const rows = [
+      ['Escuela completa', summary.schoolSeconds || 0, _timeKind(summary, 'escuela').count || 1, _timeKind(summary, 'escuela').averageSeconds || summary.schoolSeconds || 0],
+      ['Aulas / ambientes', _timeKind(summary, 'ambiente').totalSeconds, _timeKind(summary, 'ambiente').count, _timeKind(summary, 'ambiente').averageSeconds],
+      ['Sanitarios', _timeKind(summary, 'sanitario').totalSeconds, _timeKind(summary, 'sanitario').count, _timeKind(summary, 'sanitario').averageSeconds],
+      ['Exteriores / tecnicos', _timeKind(summary, 'exterior').totalSeconds, _timeKind(summary, 'exterior').count, _timeKind(summary, 'exterior').averageSeconds],
+    ];
+    return `
+      <div class="guided-time-panel" aria-label="Tiempos logisticos">
+        <strong>Tiempos logisticos</strong>
+        ${rows.map(row => `
+          <span>
+            <b>${_escape(row[0])}</b>
+            <em>${_escape(_timeDurationText(row[1]))}</em>
+            <small>${Number(row[2] || 0)} item(s) - prom. ${_escape(_timeDurationText(row[3]))}</small>
+          </span>`).join('')}
+      </div>`;
   }
 
   function _snapshot() {
@@ -678,9 +855,11 @@ const GuidedRegisterModule = (() => {
     const blockReadyForRooms = Boolean(activeBlock && blockHasMeasures && blockPositioned && activeFloors.length && activeFloorsReady);
     const classroomTargetKey = _targetKeyParts(blockId, activeFloorLabel, 'classrooms');
     const savedAtText = _formatDate(saved.savedAt);
+    const timeTracking = _timeTrackingSummary(values);
     const completion = _completionStatus(values, savedAtText, school);
     return {
       values,
+      timeTracking,
       blocks: blocks.length,
       classrooms,
       otherSpaces,
@@ -1219,7 +1398,7 @@ const GuidedRegisterModule = (() => {
 
   function _closureQuestion(snap) {
     const status = snap.completion || { complete: false, pending: [] };
-    const control = _closureControlHtml(status);
+    const control = _closureControlHtml(status, snap.timeTracking);
     if (!status.complete) {
       return _question(
         'Revision final',
@@ -1264,7 +1443,7 @@ const GuidedRegisterModule = (() => {
     };
   }
 
-  function _closureControlHtml(status) {
+  function _closureControlHtml(status, timeTracking = {}) {
     const pending = (status.pending || []).slice(0, 8);
     const pendingHtml = pending.length
       ? `<ul class="guided-requirements guided-closure-list" aria-label="Pendientes finales">
@@ -1285,6 +1464,7 @@ const GuidedRegisterModule = (() => {
         </ul>`;
     return `
       ${pendingHtml}
+      ${_timePanelHtml(timeTracking)}
       <div class="guided-storage-map" aria-label="Mapa de guardado">
         <strong>Donde quedan guardados los datos</strong>
         <span><b>Dispositivo</b> borrador local por escuela para continuar sin perder carga.</span>
@@ -1612,6 +1792,9 @@ const GuidedRegisterModule = (() => {
       return;
     }
     _setFlag(_flagKeyParts(room.blockId || snap.activeBlock?.id, _normalizeFloorLabel(room.floor || snap.activeFloorLabel), `classroomConfigured:${room.id}`), true);
+    if (typeof MecFormModule !== 'undefined' && MecFormModule.finishClassroomTimer) {
+      MecFormModule.finishClassroomTimer(room.id);
+    }
     _saveState();
     _updateSnapshot();
     UI.showToast(`${room.name || 'Aula'} confirmada.`, 'success');
@@ -1630,6 +1813,9 @@ const GuidedRegisterModule = (() => {
       return;
     }
     _setFlag(_flagKeyParts(item.bloque || snap.activeBlock?.id, _normalizeFloorLabel(item.planta || snap.activeFloorLabel), `sanitaryConfigured:${item.id}`), true);
+    if (typeof MecFormModule !== 'undefined' && MecFormModule.finishSanitaryTimer) {
+      MecFormModule.finishSanitaryTimer(item.id);
+    }
     _saveState();
     _updateSnapshot();
     UI.showToast(`${item.codigo || 'Sanitario'} confirmado.`, 'success');
@@ -1648,6 +1834,9 @@ const GuidedRegisterModule = (() => {
       return;
     }
     _setFlag(_flagKeyParts('predio', 'exteriores', `siteConfigured:${item.id}`), true);
+    if (typeof MecFormModule !== 'undefined' && MecFormModule.finishSiteElementTimer) {
+      MecFormModule.finishSiteElementTimer(item.id);
+    }
     _saveState();
     _updateSnapshot();
     UI.showToast(`${item.ficha?.codigo || 'Elemento exterior'} confirmado.`, 'success');
@@ -1727,6 +1916,7 @@ const GuidedRegisterModule = (() => {
       resumen: {
         escuela: snap.school,
         conteos: snap.completion?.counts || {},
+        timeTracking: packageData?.metadata?.timeTracking || snap.timeTracking || {},
         guardado_local: snap.savedAtText || '',
         version: typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.VERSION : '',
       },

@@ -304,7 +304,7 @@ function _setupSheetsConfigV21_() {
 }
 
 function _escuelasHeadersV21_() {
-  return ['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado', 'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado', 'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo', 'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url', 'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id', 'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'];
+  return ['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado', 'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado', 'prioridad_operativa', 'en_muestra_piloto', 'orden_muestra_piloto', 'tiempo_estimado_min', 'tiempo_real_min', 'tiempo_aulas_min', 'tiempo_aulas_promedio_min', 'tiempo_sanitarios_min', 'tiempo_sanitarios_promedio_min', 'tiempo_exteriores_min', 'ultima_sesion_id', 'folio_externo', 'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url', 'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id', 'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'];
 }
 
 function _dbSyncQueueHeadersV21_() {
@@ -320,7 +320,7 @@ function _modulosHeadersV21_() {
 }
 
 function _mecDraftHeadersV21_() {
-  return ['id_borrador','id_escuela','codigo_local','nombre_escuela','usuario','fecha_guardado','estado_borrador','motivo','app_version','schema_version','bloques','pisos','aulas','otros_espacios','sanitarios','exteriores','evidencias','base_mapa_confirmada','resumen_json','draft_json','evidence_index_json','creado_en','actualizado_en'];
+  return ['id_borrador','id_escuela','codigo_local','nombre_escuela','usuario','fecha_guardado','estado_borrador','motivo','app_version','schema_version','bloques','pisos','aulas','otros_espacios','sanitarios','exteriores','evidencias','base_mapa_confirmada','tiempo_escuela_min','tiempo_aulas_min','tiempo_aulas_promedio_min','tiempo_sanitarios_min','tiempo_sanitarios_promedio_min','tiempo_exteriores_min','tiempo_registro_json','resumen_json','draft_json','evidence_index_json','creado_en','actualizado_en'];
 }
 
 function _appendMissingHeaders_(sheet, requiredHeaders) {

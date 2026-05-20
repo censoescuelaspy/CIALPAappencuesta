@@ -441,7 +441,11 @@ const PlanningModule = (() => {
   }
 
   function _actualMinutes(school) {
-    return _firstNumber(school.duracion_minutos, school.tiempo_real_min, school.tiempo_carga_minutos, school.duracion_total_minutos, school.minutos_reales);
+    const actual = _firstNumber(school.duracion_minutos, school.tiempo_real_min, school.tiempo_carga_minutos, school.duracion_total_minutos, school.minutos_reales);
+    if (!actual) return 0;
+    const status = _norm(school.estado_relevamiento || school.estado_cierre || school.estado || '');
+    if (status && !/(final|complet|cerr|entreg)/.test(status)) return 0;
+    return actual;
   }
 
   function _refreshMapAssignments() {

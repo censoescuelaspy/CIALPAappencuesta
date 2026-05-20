@@ -4,6 +4,41 @@
 
 ---
 
+## Tiempos logisticos visibles por escuela, aula y sanitario - 2026-05-20 - v2.6.62
+
+### Objetivo
+- Hacer visible durante la carga cuanto demora registrar la escuela completa.
+- Medir y mostrar tiempos acumulados y promedio para aulas/ambientes y sanitarios.
+- Dejar esos tiempos disponibles para planificacion/logistica desde Google Sheets.
+
+### Cambios implementados
+- El borrador MEC inicia un contador de escuela cuando hay escuela activa y se guarda actividad.
+- `Registro guiado` muestra una franja permanente de `Tiempo logistico` con escuela, aulas/ambientes y sanitarios.
+- La etapa `Revision y salida` agrega un panel de tiempos con total, cantidad de items y promedio por tipo.
+- Confirmar configuracion de aula, sanitario o exterior cierra el contador del item aunque el usuario no pulse el boton tecnico `Guardar`.
+- Al cerrar el relevamiento completo, se cierran los contadores activos de aula, sanitario y escuela antes de armar el paquete final.
+- El JSON exportado y los metadatos de cierre incluyen `timeTracking`.
+- `guardarBorradorMec` guarda tiempos en `mec_borradores` y actualiza `escuelas_seleccionadas` con `tiempo_real_min`, tiempos de aulas, sanitarios y exteriores.
+- La cola `db_sync_queue` incluye `time_tracking` dentro del paquete de sincronizacion a base de datos.
+- Version y cache actualizados a `v2.6.62`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages.
+- Subir/publicar GAS desde la cuenta propietaria para que las nuevas columnas de tiempos se creen en produccion.
+- Revisar en `Planificacion` que `tiempo_real_min` empiece a reemplazar el estimado cuando existan cargas reales.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/planning.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
 ## Correccion de filtro piloto y aviso de padron incompleto - 2026-05-20 - v2.6.61
 
 ### Objetivo
