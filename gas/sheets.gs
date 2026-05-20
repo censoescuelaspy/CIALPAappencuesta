@@ -594,6 +594,12 @@ const SheetsService = (() => {
         ultimo_borrador_mec_usuario: row.usuario,
       });
     }
+    let databaseSync = { status: 'pendiente_config' };
+    try {
+      databaseSync = _syncDraftToDatabase(params, row);
+    } catch (err) {
+      databaseSync = { status: 'error', error: err.message || String(err) };
+    }
     AuditService.log('GUARDAR_BORRADOR_MEC', row.usuario || 'sistema', `id_borrador: ${draftId}, escuela: ${row.codigo_local || row.id_escuela}`);
     return {
       status: 'ok',
@@ -603,6 +609,7 @@ const SheetsService = (() => {
         sheet: SHEET_NAMES.MEC_DRAFTS,
         updatedAt: now,
         codigo_local: row.codigo_local,
+        database_sync: databaseSync,
       },
     };
   }
@@ -1061,6 +1068,7 @@ const SheetsService = (() => {
     _ensureColumns(SHEET_NAMES.MODULOS, _modulosHeaders());
     _ensureColumns(SHEET_NAMES.MEC_DRAFTS, _mecDraftHeaders());
     _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
+    _ensureColumns(SHEET_NAMES.DB_SYNC_QUEUE, _dbSyncQueueHeaders());
   }
 
   function _sesionesHeaders() {
@@ -1077,6 +1085,136 @@ const SheetsService = (() => {
 
   function _mecDraftHeaders() {
     return ['id_borrador','id_escuela','codigo_local','nombre_escuela','usuario','fecha_guardado','estado_borrador','motivo','app_version','schema_version','bloques','pisos','aulas','otros_espacios','sanitarios','exteriores','evidencias','base_mapa_confirmada','resumen_json','draft_json','evidence_index_json','creado_en','actualizado_en'];
+  }
+
+  function _dbSyncQueueHeaders() {
+    return ['id_mutacion','tipo_entidad','estado','intentos','ultimo_error','database_url','codigo_local','id_escuela','usuario','fecha_evento','app_version','payload_json','payload_file_id','payload_file_url','payload_file_error','creado_en','actualizado_en'];
+  }
+
+  function _databaseSyncPayloadForDraft(params, row) {
+    return {
+      mutation_id: row.id_borrador,
+      entity: 'mec_draft',
+      source: 'cialpa_gas',
+      app_version: row.app_version || params.app_version || '',
+      schema_version: row.schema_version || params.schema_version || '',
+      saved_at: row.fecha_guardado,
+      school: {
+        id_escuela: row.id_escuela || '',
+        codigo_local: row.codigo_local || '',
+        nombre_escuela: row.nombre_escuela || '',
+      },
+      user: row.usuario || '',
+      status: row.estado_borrador || 'en_curso',
+      reason: row.motivo || '',
+      counts: params.counts || {},
+      summary: params.resumen || {},
+      draft: params.values || {},
+      evidence_index: Array.isArray(params.evidenceIndex) ? params.evidenceIndex : [],
+    };
+  }
+
+  function _upsertDatabaseSyncQueue(payload, row, status, errorMessage, databaseUrl, attemptsIncrement) {
+    _ensureColumns(SHEET_NAMES.DB_SYNC_QUEUE, _dbSyncQueueHeaders());
+    const sheet = _getSheet(SHEET_NAMES.DB_SYNC_QUEUE);
+    const headers = _headers(sheet);
+    const id = payload.mutation_id || row.id_borrador || _genId('DBQ');
+    const existingIdx = _findRowIndex(SHEET_NAMES.DB_SYNC_QUEUE, 'id_mutacion', id);
+    const now = _timestamp();
+    const previousAttempts = existingIdx !== -1 ? Number(_getByHeader(sheet, existingIdx, headers, 'intentos') || 0) : 0;
+    const existingPayloadFileId = existingIdx !== -1 ? _getByHeader(sheet, existingIdx, headers, 'payload_file_id') : '';
+    const payloadFile = _storeDatabaseSyncPayloadFile(payload, row, existingPayloadFileId);
+    const queueRow = {
+      id_mutacion: id,
+      tipo_entidad: payload.entity || 'mec_draft',
+      estado: status,
+      intentos: previousAttempts + (attemptsIncrement ? 1 : 0),
+      ultimo_error: errorMessage || '',
+      database_url: databaseUrl || '',
+      codigo_local: row.codigo_local || '',
+      id_escuela: row.id_escuela || '',
+      usuario: row.usuario || '',
+      fecha_evento: row.fecha_guardado || now,
+      app_version: row.app_version || '',
+      payload_json: _jsonForSheet(payload, 18000),
+      payload_file_id: payloadFile.id || '',
+      payload_file_url: payloadFile.url || '',
+      payload_file_error: payloadFile.error || '',
+      creado_en: existingIdx !== -1 ? (_getByHeader(sheet, existingIdx, headers, 'creado_en') || now) : now,
+      actualizado_en: now,
+    };
+    if (existingIdx !== -1) {
+      Object.entries(queueRow).forEach(([key, value]) => _setByHeader(sheet, existingIdx, headers, key, value));
+    } else {
+      _appendObject(SHEET_NAMES.DB_SYNC_QUEUE, _dbSyncQueueHeaders(), queueRow);
+    }
+    return {
+      status,
+      queue_sheet: SHEET_NAMES.DB_SYNC_QUEUE,
+      id_mutacion: id,
+      attempts: queueRow.intentos,
+      error: errorMessage || '',
+      payload_file_url: payloadFile.url || '',
+    };
+  }
+
+  function _storeDatabaseSyncPayloadFile(payload, row, existingFileId) {
+    try {
+      const body = JSON.stringify(payload);
+      const filename = `db_sync_${_safeKey(row.codigo_local || row.id_escuela || 'escuela')}_${_safeKey(payload.mutation_id || 'mutacion')}.json`;
+      if (existingFileId) {
+        const existing = DriveApp.getFileById(existingFileId);
+        existing.setContent(body);
+        return { id: existing.getId(), url: existing.getUrl() };
+      }
+      const folder = DriveApp.getFolderById(EVIDENCE_FOLDER_ID);
+      const file = folder.createFile(filename, body, 'application/json');
+      return { id: file.getId(), url: file.getUrl() };
+    } catch (err) {
+      return { id: existingFileId || '', url: '', error: err.message || String(err) };
+    }
+  }
+
+  function _syncDraftToDatabase(params, row) {
+    const payload = _databaseSyncPayloadForDraft(params, row);
+    const mode = String(_config('DATABASE_SYNC_MODE', 'queue')).toLowerCase();
+    const enabled = _configBool('DATABASE_SYNC_ENABLED', false);
+    const url = String(_config('DATABASE_SYNC_URL', '') || '').trim();
+    if (!enabled || !url || mode === 'queue') {
+      const status = enabled && url ? 'pendiente' : 'pendiente_config';
+      return _upsertDatabaseSyncQueue(payload, row, status, '', url, false);
+    }
+    try {
+      _upsertDatabaseSyncQueue(payload, row, 'enviando', '', url, true);
+      const token = _databaseSyncToken();
+      const options = {
+        method: 'post',
+        contentType: 'application/json',
+        muteHttpExceptions: true,
+        payload: JSON.stringify(payload),
+        followRedirects: true,
+      };
+      if (token) options.headers = { Authorization: `Bearer ${token}` };
+      const response = UrlFetchApp.fetch(url, options);
+      const code = response.getResponseCode();
+      if (code < 200 || code >= 300) {
+        const body = String(response.getContentText() || '').slice(0, 400);
+        throw new Error(`HTTP ${code}: ${body}`);
+      }
+      return _upsertDatabaseSyncQueue(payload, row, 'sincronizado', '', url, false);
+    } catch (err) {
+      return _upsertDatabaseSyncQueue(payload, row, 'error', err.message || String(err), url, false);
+    }
+  }
+
+  function _databaseSyncToken() {
+    try {
+      const propsToken = PropertiesService.getScriptProperties().getProperty('DATABASE_SYNC_TOKEN');
+      if (propsToken) return String(propsToken).trim();
+    } catch (err) {
+      // Fallback to configuracion sheet below.
+    }
+    return String(_config('DATABASE_SYNC_TOKEN', '') || '').trim();
   }
 
   function _resolveLaunchConfig(params) {

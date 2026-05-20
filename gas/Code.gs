@@ -28,6 +28,7 @@ const SHEET_NAMES = {
   EVIDENCIAS:   'evidencias',
   MEC_DRAFTS:   'mec_borradores',
   ENTREGAS:     'entregas_cierre',
+  DB_SYNC_QUEUE: 'db_sync_queue',
 };
 
 const ADMIN_USERS = ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'];

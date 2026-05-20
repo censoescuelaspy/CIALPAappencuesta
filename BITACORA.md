@@ -4,6 +4,44 @@
 
 ---
 
+## Filtros inmediatos, guardado verificable y cola de base de datos - 2026-05-20 - v2.6.60
+
+### Objetivo
+- Evitar que los filtros del mapa dependan del boton `Filtrar`.
+- Hacer mas claro el resultado del boton de guardado remoto del borrador MEC.
+- Avanzar la migracion hacia base de datos sin cortar el respaldo actual en Google Sheets.
+
+### Cambios implementados
+- Los filtros del mapa aplican automaticamente al tocar departamento, distrito, zona, estado, encuestador o muestra.
+- La busqueda del mapa filtra mientras se escribe, con una espera breve para no recalcular en cada tecla.
+- El boton `Filtrar` queda como indicador/fallback `Filtrado automatico`; `Limpiar` sigue reseteando todo.
+- El guardado manual informa si el borrador llego a `mec_borradores` y muestra el estado de sincronizacion hacia base de datos.
+- Si hay una sincronizacion remota en curso, el boton avisa en vez de fallar silenciosamente.
+- Apps Script agrega la hoja `db_sync_queue` como cola idempotente para guardar el mismo paquete del borrador MEC.
+- `guardarBorradorMec` sigue escribiendo en `mec_borradores` y, ademas, registra la mutacion en `db_sync_queue`.
+- La cola de base de datos guarda un resumen en Sheets y el paquete completo como JSON en Drive, enlazado desde `payload_file_url`.
+- Se agregan claves de configuracion `DATABASE_SYNC_ENABLED`, `DATABASE_SYNC_MODE`, `DATABASE_SYNC_URL`, `DATABASE_SYNC_TOKEN` y `DATABASE_SYNC_TIMEOUT_MS`.
+- Si `DATABASE_SYNC_MODE=rest` y hay URL configurada, GAS intenta enviar el borrador a una API externa; si falla, conserva el error en `db_sync_queue` sin bloquear Sheets.
+- `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` documenta el puente operativo y recomienda cargar el token como Script Property.
+- Version y cache actualizados a `v2.6.60`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages.
+- Subir GAS desde la cuenta propietaria para que `mec_borradores` y `db_sync_queue` queden activos en produccion.
+- Ejecutar `migrarBackendV21()` o `setupSheets()` en Apps Script para crear/migrar la hoja `db_sync_queue` y semillas de configuracion.
+- Definir la API transaccional PostgreSQL/Supabase/Cloud Run que recibira `DATABASE_SYNC_URL`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
 ## Administracion de encuestadores, mapa mas visible e insercion clara - 2026-05-20 - v2.6.59
 
 ### Objetivo

@@ -928,28 +928,58 @@ const AppController = (() => {
     }
   }
 
+  function _readMapFilters() {
+    return {
+      departamento: document.getElementById('filter-departamento')?.value || '',
+      distrito: document.getElementById('filter-distrito')?.value || '',
+      zona: document.getElementById('filter-zona')?.value || '',
+      encuestador: document.getElementById('filter-encuestador')?.value || '',
+      estado: document.getElementById('filter-estado')?.value || '',
+      piloto: document.getElementById('filter-piloto')?.value || '',
+      q: document.getElementById('filter-search')?.value || '',
+    };
+  }
+
+  function _applyMapFiltersNow() {
+    if (typeof MapModule !== 'undefined' && typeof MapModule.applyFilters === 'function') {
+      MapModule.applyFilters(_readMapFilters());
+    }
+  }
+
   function _bindMapFilters() {
+    const form = document.getElementById('map-filter-form');
+    if (form && form.dataset.bound !== 'true') {
+      form.dataset.bound = 'true';
+      form.addEventListener('submit', event => {
+        event.preventDefault();
+        _applyMapFiltersNow();
+      });
+      form.addEventListener('click', event => {
+        const choice = event.target.closest('[data-choice-target]');
+        if (!choice || !form.contains(choice)) return;
+        window.setTimeout(() => {
+          if (choice.dataset.choiceTarget === 'filter-departamento' && typeof MapModule.populateDistrictButtons === 'function') {
+            MapModule.populateDistrictButtons(document.getElementById('filter-departamento')?.value || '');
+          }
+          _applyMapFiltersNow();
+        }, 0);
+      });
+    }
+
     const applyBtn = document.getElementById('map-filter-apply');
     if (applyBtn && applyBtn.dataset.bound !== 'true') {
       applyBtn.dataset.bound = 'true';
-      applyBtn.addEventListener('click', () => {
-        const filters = {
-          departamento: document.getElementById('filter-departamento')?.value || '',
-          distrito: document.getElementById('filter-distrito')?.value || '',
-          zona: document.getElementById('filter-zona')?.value || '',
-          encuestador: document.getElementById('filter-encuestador')?.value || '',
-          estado: document.getElementById('filter-estado')?.value || '',
-          piloto: document.getElementById('filter-piloto')?.value || '',
-          q: document.getElementById('filter-search')?.value || '',
-        };
-        MapModule.applyFilters(filters);
+      applyBtn.addEventListener('click', event => {
+        event.preventDefault();
+        _applyMapFiltersNow();
       });
     }
 
     const clearBtn = document.getElementById('map-filter-clear');
     if (clearBtn && clearBtn.dataset.bound !== 'true') {
       clearBtn.dataset.bound = 'true';
-      clearBtn.addEventListener('click', () => {
+      clearBtn.addEventListener('click', event => {
+        event.preventDefault();
         document.getElementById('map-filter-form')?.reset();
         if (typeof MapModule.populateDistrictButtons === 'function') MapModule.populateDistrictButtons('');
         UI.refreshButtonChoices(document.getElementById('map-filter-form'));
@@ -960,8 +990,10 @@ const AppController = (() => {
     const searchInput = document.getElementById('filter-search');
     if (searchInput && searchInput.dataset.bound !== 'true') {
       searchInput.dataset.bound = 'true';
+      let searchTimer = null;
       searchInput.addEventListener('input', () => {
-        document.getElementById('map-filter-apply')?.click();
+        window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(_applyMapFiltersNow, 120);
       });
     }
     ['filter-departamento', 'filter-distrito', 'filter-zona', 'filter-encuestador', 'filter-estado', 'filter-piloto'].forEach(id => {
@@ -972,7 +1004,7 @@ const AppController = (() => {
           if (id === 'filter-departamento' && typeof MapModule.populateDistrictButtons === 'function') {
             MapModule.populateDistrictButtons(input.value || '');
           }
-          document.getElementById('map-filter-apply')?.click();
+          _applyMapFiltersNow();
         });
       }
     });

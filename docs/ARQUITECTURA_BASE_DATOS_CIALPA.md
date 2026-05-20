@@ -68,6 +68,17 @@ Pasar de un libro operativo en Google Sheets a una base de datos estructurada, a
 4. Dejar Sheets como exportacion/reporting.
 5. Congelar esquema `v1` antes de escalar a todas las escuelas.
 
+## Puente operativo implementado
+
+- `guardarBorradorMec` mantiene la escritura visible en `mec_borradores`.
+- El mismo guardado deja una mutacion idempotente en `db_sync_queue`, usando `id_borrador/clientMutationId`.
+- La cola guarda una vista resumida en Sheets y el paquete completo como JSON en Drive, referenciado por `payload_file_id` y `payload_file_url`.
+- Configuracion en `configuracion`: `DATABASE_SYNC_ENABLED`, `DATABASE_SYNC_MODE`, `DATABASE_SYNC_URL`, `DATABASE_SYNC_TOKEN`.
+- Para produccion, el token debe cargarse preferentemente como Script Property `DATABASE_SYNC_TOKEN`; la hoja `configuracion` queda como respaldo operativo temporal.
+- Con `DATABASE_SYNC_MODE=queue`, la cola queda preparada para migrar o reprocesar sin depender todavia de una API externa.
+- Con `DATABASE_SYNC_MODE=rest`, `DATABASE_SYNC_ENABLED=true` y `DATABASE_SYNC_URL` configurada, Apps Script intenta enviar el JSON del borrador a la API transaccional; si falla, conserva el error en `db_sync_queue` sin bloquear Sheets.
+- Este puente es temporal: la API definitiva debe validar permisos, normalizar entidades y escribir en PostgreSQL dentro de una transaccion.
+
 ## Decisiones pendientes
 
 - Proveedor: Cloud SQL PostgreSQL, Supabase o AlloyDB.

@@ -383,6 +383,16 @@ const MecFormModule = (() => {
     };
   }
 
+  function _databaseSyncStatusText(databaseSync) {
+    if (!databaseSync) return '';
+    const status = String(databaseSync.status || '').toLowerCase();
+    if (status === 'sincronizado') return ' Base de datos: sincronizada.';
+    if (status === 'pendiente' || status === 'pendiente_config') return ' Base de datos: en cola.';
+    if (status === 'deshabilitado') return ' Base de datos: pendiente de configurar.';
+    if (status === 'error') return ' Base de datos: error en cola, revisar configuracion.';
+    return ` Base de datos: ${databaseSync.status}.`;
+  }
+
   async function syncDraftToSheets(reason = 'manual', options = {}) {
     const silent = options.silent === true;
     const manual = !silent || reason === 'manual';
@@ -396,7 +406,10 @@ const MecFormModule = (() => {
     }
     const nowMs = Date.now();
     if (!manual && nowMs - _lastDraftSyncAt < DRAFT_SYNC_MIN_INTERVAL_MS) return null;
-    if (_draftSyncRunning) return null;
+    if (_draftSyncRunning) {
+      if (manual) UI.showToast('Ya hay un guardado remoto en curso. Espere unos segundos y revise el aviso de confirmacion.', 'info', 5200);
+      return null;
+    }
     const payload = _buildDraftSyncPayload(reason);
     if (!payload.id_escuela && !payload.codigo_local) {
       if (manual) UI.showToast('Seleccione una escuela antes de guardar el borrador en Sheets.', 'warning', 6200);
@@ -412,13 +425,14 @@ const MecFormModule = (() => {
         status: result?.status || 'ok',
         queued: Boolean(result?.queued),
         sheet: result?.data?.sheet || 'mec_borradores',
+        database_sync: result?.data?.database_sync || null,
         id_borrador: result?.data?.id_borrador || payload.clientMutationId,
       };
       if (manual) {
         if (result?.queued || result?.data?.offline) {
           UI.showToast('Sin conexion: el borrador MEC quedo en cola local para subir a Sheets.', 'warning', 7600);
         } else {
-          UI.showToast('Borrador MEC guardado en Google Sheets: hoja mec_borradores.', 'success', 6800);
+          UI.showToast(`Borrador MEC guardado en Google Sheets: hoja mec_borradores.${_databaseSyncStatusText(result?.data?.database_sync)}`, 'success', 8200);
         }
       }
       return result;

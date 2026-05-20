@@ -115,7 +115,12 @@ function seedConfig() {
     ['FINAL_REPORT_EMAIL', 'censoescuelaspy@gmial.com', 'Destinatario automatico del PDF y metadatos del cierre completo.', 'cierre', 'true', ''],
     ['CONTACTO_TELEFONO', '(021) 000-000', 'Teléfono de soporte operativo.', 'contacto', 'true', ''],
     ['ALLOW_MULTIPLE_SESSIONS', 'false', 'Permitir más de una sesión abierta sobre la misma escuela.', 'seguridad', 'true', ''],
-    ['DEFAULT_ESTIMATED_MINUTES', '180', 'Tiempo inicial esperado de relevamiento por escuela, ajustable luego con evidencia empírica.', 'planificacion', 'true', '']
+    ['DEFAULT_ESTIMATED_MINUTES', '180', 'Tiempo inicial esperado de relevamiento por escuela, ajustable luego con evidencia empírica.', 'planificacion', 'true', ''],
+    ['DATABASE_SYNC_ENABLED', 'false', 'Activa el envio del guardado MEC a una API de base de datos externa.', 'base_datos', 'true', ''],
+    ['DATABASE_SYNC_MODE', 'queue', 'Modo de sincronizacion de base: queue o rest.', 'base_datos', 'true', ''],
+    ['DATABASE_SYNC_URL', '', 'URL HTTPS del endpoint que recibira borradores MEC en formato JSON.', 'base_datos', 'true', ''],
+    ['DATABASE_SYNC_TOKEN', '', 'Token bearer opcional para autenticar el endpoint de base de datos.', 'base_datos', 'true', ''],
+    ['DATABASE_SYNC_TIMEOUT_MS', '8000', 'Tiempo maximo de espera para enviar a la base de datos externa.', 'base_datos', 'true', '']
   ];
 
   defaults.forEach(row => {
@@ -291,6 +296,7 @@ function _setupSheetsConfigV21_() {
     { name: SHEET_NAMES.EVIDENCIAS, headers: ['id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes','drive_file_id','drive_url','folder_id','label','school_code','school_name','scope','block_label','floor_label','space_label','element_type','element_label','element_id','field_path'] },
     { name: SHEET_NAMES.MEC_DRAFTS, headers: _mecDraftHeadersV21_() },
     { name: SHEET_NAMES.ENTREGAS, headers: ['id_entrega','id_escuela','codigo_local','nombre_escuela','usuario','fecha_cierre','destinatario_email','estado_cierre','pendientes','email_status','email_error','pdf_file_id','pdf_url','metadata_file_id','metadata_url','resumen_json','metadata_json','plan_model_json','evidence_count','creado_en','actualizado_en'] },
+    { name: SHEET_NAMES.DB_SYNC_QUEUE, headers: _dbSyncQueueHeadersV21_() },
     { name: SHEET_NAMES.CONFIG, headers: ['clave', 'valor', 'descripcion', 'categoria', 'editable', 'fecha_actualizacion'] },
     { name: SHEET_NAMES.AUDITORIA, headers: ['id_registro', 'usuario', 'accion', 'fecha_hora', 'detalle', 'ip_aproximada'] },
     { name: SHEET_NAMES.CATALOGOS, headers: ['tipo', 'codigo', 'descripcion', 'orden', 'activo'] }
@@ -299,6 +305,10 @@ function _setupSheetsConfigV21_() {
 
 function _escuelasHeadersV21_() {
   return ['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud', 'estado_relevamiento', 'encuestador_asignado', 'supervisor_asignado', 'fecha_ultimo_evento', 'observaciones', 'orden_visita', 'fecha_programada', 'turno_programado', 'prioridad_operativa', 'tiempo_estimado_min', 'ultima_sesion_id', 'folio_externo', 'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url', 'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id', 'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'];
+}
+
+function _dbSyncQueueHeadersV21_() {
+  return ['id_mutacion', 'tipo_entidad', 'estado', 'intentos', 'ultimo_error', 'database_url', 'codigo_local', 'id_escuela', 'usuario', 'fecha_evento', 'app_version', 'payload_json', 'payload_file_id', 'payload_file_url', 'payload_file_error', 'creado_en', 'actualizado_en'];
 }
 
 function _sesionesHeadersV21_() {
