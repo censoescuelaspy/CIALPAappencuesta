@@ -4,6 +4,38 @@
 
 ---
 
+## API relacional PostgreSQL para borradores MEC - 2026-05-20 - v2.6.63
+
+### Objetivo
+- Avanzar del puente `db_sync_queue` hacia guardado real en una base de datos relacional.
+- Mantener Google Sheets como respaldo operativo mientras se prueba la escritura transaccional.
+- Dejar preparada una API desplegable para Cloud Run, Supabase, Cloud SQL PostgreSQL o AlloyDB.
+
+### Cambios implementados
+- Se agrega `tools/database/schema.sql` con el esquema PostgreSQL inicial para escuelas, mutaciones, borradores, bloques, pisos, ambientes, objetos, sanitarios, exteriores, evidencias y tiempos.
+- Se agrega `tools/database/cialpa_db_api.mjs`, un receptor HTTP `POST /sync/mec-draft` compatible con el payload que Apps Script ya genera desde `guardarBorradorMec`.
+- La API valida token bearer opcional, registra la mutacion en `sync_mutations`, guarda el snapshot completo en `mec_drafts` y normaliza el modelo en tablas relacionales dentro de una transaccion.
+- Los tiempos logisticos quedan persistidos como columnas directas en `mec_drafts` y como registros detallados en `time_tracking_items`.
+- Se agrega `tools/database/Dockerfile` para despliegue del receptor Node en Cloud Run.
+- Se agrega `tools/database/env.example` y documentacion operativa en `tools/database/README.md`.
+- `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` incorpora la API relacional inicial y las variables de configuracion necesarias.
+- `package.json` suma scripts `db:api` y `db:check`, y se agrega la dependencia `pg`.
+
+### Pendiente operativo
+- Crear la base PostgreSQL administrada y ejecutar `tools/database/schema.sql`.
+- Desplegar la API con `DATABASE_URL` y `DATABASE_SYNC_TOKEN`.
+- Configurar en Apps Script `DATABASE_SYNC_ENABLED=true`, `DATABASE_SYNC_MODE=rest` y `DATABASE_SYNC_URL=https://<servicio>/sync/mec-draft`.
+- Ejecutar una escritura controlada y comparar conteos entre `mec_borradores`, `db_sync_queue` y PostgreSQL.
+
+### Validaciones ejecutadas
+- `npm.cmd run db:check`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `node -e "import('pg')"`: OK.
+- API local `/health` sin `DATABASE_URL`: responde `database: not_configured`.
+- `git diff --check`.
+
+---
+
 ## Tiempos logisticos visibles por escuela, aula y sanitario - 2026-05-20 - v2.6.62
 
 ### Objetivo

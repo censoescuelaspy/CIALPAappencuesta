@@ -79,6 +79,37 @@ Pasar de un libro operativo en Google Sheets a una base de datos estructurada, a
 - Con `DATABASE_SYNC_MODE=rest`, `DATABASE_SYNC_ENABLED=true` y `DATABASE_SYNC_URL` configurada, Apps Script intenta enviar el JSON del borrador a la API transaccional; si falla, conserva el error en `db_sync_queue` sin bloquear Sheets.
 - Este puente es temporal: la API definitiva debe validar permisos, normalizar entidades y escribir en PostgreSQL dentro de una transaccion.
 
+## API relacional inicial
+
+Se agrega una primera implementacion desplegable en `tools/database/`:
+
+- `tools/database/schema.sql` crea el esquema PostgreSQL inicial.
+- `tools/database/cialpa_db_api.mjs` recibe `POST /sync/mec-draft` con el payload que ya arma Apps Script.
+- La API guarda la mutacion idempotente en `sync_mutations`.
+- El snapshot completo queda en `mec_drafts.draft` como `JSONB`.
+- El contenido operativo queda normalizado en `buildings`, `floors`, `rooms`, `room_objects`, `sanitary_groups`, `sanitary_objects`, `site_elements`, `evidence_files` y `time_tracking_items`.
+- Los minutos de escuela, aulas, sanitarios y exteriores quedan tambien como columnas directas en `mec_drafts` para reportes logisticos.
+
+Configuracion minima del servicio:
+
+| Variable | Uso |
+|---|---|
+| `DATABASE_URL` | Conexion PostgreSQL. |
+| `DATABASE_SYNC_TOKEN` | Token bearer esperado desde Apps Script. |
+| `PGSSLMODE=require` | TLS para Supabase/servicios administrados que lo requieran. |
+| `PORT` | Puerto HTTP, definido por Cloud Run o por ejecucion local. |
+
+Configuracion minima en Apps Script:
+
+| Clave | Valor |
+|---|---|
+| `DATABASE_SYNC_ENABLED` | `true` |
+| `DATABASE_SYNC_MODE` | `rest` |
+| `DATABASE_SYNC_URL` | `https://<servicio>/sync/mec-draft` |
+| `DATABASE_SYNC_TIMEOUT_MS` | `8000` o `12000` |
+
+El token debe cargarse como Script Property `DATABASE_SYNC_TOKEN` para no dejarlo visible en la hoja.
+
 ## Decisiones pendientes
 
 - Proveedor: Cloud SQL PostgreSQL, Supabase o AlloyDB.
