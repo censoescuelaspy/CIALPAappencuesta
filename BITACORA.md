@@ -4,6 +4,27 @@
 
 ---
 
+## Recuperacion urgente del mapa con backend publico - 2026-05-19 - v2.6.54
+
+### Objetivo
+- Recuperar la carga de escuelas en el mapa despues de detectar que los deployments GAS nuevos respondian HTTP 403.
+- Evitar que la app publicada apunte a un Web App privado o no autorizado.
+
+### Cambios implementados
+- `APP_CONFIG.GAS_URL` se cambio al deployment publico estable `AKfycbwKls1jXCwh-Np9UMoir2VD3LtQlxxdJ0e3cetBeQDzJCnSNWAIHYnapTaPD1fgC75M`.
+- Se verifico que ese deployment responde JSON publico en `login` y `getEscuelas` sin devolver la pantalla de Google Drive `Necesitas acceso`.
+- Version y cache actualizados a `v2.6.54` para forzar actualizacion del Service Worker.
+- Se deja documentado que los deployments nuevos `@12/@13` del GAS quedaron con HTTP 403 aunque la metadata informe `ANYONE_ANONYMOUS`; requieren correccion desde consola Apps Script/Google Cloud antes de volver a usarlos.
+
+### Validaciones ejecutadas
+- Prueba HTTP de deployment publico estable: `login` responde JSON `Usuario y contraseña son requeridos`.
+- Prueba HTTP de deployment publico estable: `getEscuelas` responde JSON `Token invalido o expirado`, no HTTP 403.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+---
+
 ## Guardado visible en Sheets del borrador MEC - 2026-05-19 - v2.6.53
 
 ### Objetivo
