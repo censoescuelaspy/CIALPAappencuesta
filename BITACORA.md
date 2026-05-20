@@ -20,11 +20,11 @@
 - El JSON exportado y los metadatos de cierre incluyen `timeTracking`.
 - `guardarBorradorMec` guarda tiempos en `mec_borradores` y actualiza `escuelas_seleccionadas` con `tiempo_real_min`, tiempos de aulas, sanitarios y exteriores.
 - La cola `db_sync_queue` incluye `time_tracking` dentro del paquete de sincronizacion a base de datos.
+- Se preparo un paquete temporal privado `C:\tmp\cialpa_gas_deploy_v262_883f86e` conservando el padron embebido completo y se subio a Apps Script HEAD con `clasp push -f`.
 - Version y cache actualizados a `v2.6.62`.
 
 ### Pendiente operativo
-- Publicar frontend en GitHub Pages.
-- Subir/publicar GAS desde la cuenta propietaria para que las nuevas columnas de tiempos se creen en produccion.
+- Publicar el deployment GAS desde la cuenta propietaria para que las nuevas columnas de tiempos se creen en produccion.
 - Revisar en `Planificacion` que `tiempo_real_min` empiece a reemplazar el estimado cuando existan cargas reales.
 
 ### Validaciones ejecutadas
@@ -35,6 +35,10 @@
 - `node --check sw.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - Validacion sintactica de `gas/*.gs` mediante Node.
+- `clasp push -f` desde paquete temporal privado: sube 8 archivos a Apps Script HEAD preservando el padron completo.
+- `git push origin main`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.62`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.62`.
 - `git diff --check`.
 
 ---
