@@ -4,6 +4,37 @@
 
 ---
 
+## Correccion de filtro piloto y aviso de padron incompleto - 2026-05-20 - v2.6.61
+
+### Objetivo
+- Corregir que el filtro `Piloto sorteada` quedara en cero aunque existieran escuelas de muestra.
+- Evitar que `Todo el padron` parezca correcto cuando el backend solo esta entregando la hoja operativa reducida.
+
+### Cambios implementados
+- El mapa ahora reconoce escuelas piloto por `en_muestra_piloto`, `muestra_piloto`, `prioridad_operativa: piloto` u `orden_muestra_piloto`.
+- Los filtros del mapa comparan valores normalizados, tolerando mayusculas, acentos y diferencias menores de texto.
+- La busqueda del mapa tambien normaliza acentos para encontrar nombres, distritos y localidades con mayor tolerancia.
+- Apps Script normaliza una escuela como piloto si trae bandera, orden de muestra o prioridad operativa piloto.
+- `getEscuelas` usa la misma regla robusta para el filtro `piloto`/`muestra_piloto`.
+- Mientras el backend siga en fallback de hoja operativa corta sin marcas de piloto, esas filas se tratan como muestra piloto provisional para que `Piloto sorteada` no quede en cero.
+- Si el backend no esta usando `embedded_csv` y devuelve una nomina corta, la app avisa a supervisores/admins que deben regenerar `gas/escuelas_embebidas.gs` y publicar GAS desde la cuenta propietaria para ver el padron completo.
+- Version y cache actualizados a `v2.6.61`.
+
+### Pendiente operativo
+- Regenerar `gas/escuelas_embebidas.gs` localmente con `npm run embed:schools` y publicar GAS desde la cuenta propietaria para que `Todo el padron` muestre las 5462 escuelas y no solo la hoja operativa.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- Prueba local del filtro: `Piloto sorteada` reconoce `Si/Sí`, `prioridad_operativa: piloto` y `orden_muestra_piloto`; `Todo el padron` restaura todos los casos cargados.
+- `git diff --check`.
+
+---
+
 ## Filtros inmediatos, guardado verificable y cola de base de datos - 2026-05-20 - v2.6.60
 
 ### Objetivo

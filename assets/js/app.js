@@ -354,6 +354,7 @@ const AppController = (() => {
   let _deferredInstallPrompt = null;
   let _swRegistration = null;
   let _launchHomeResetBound = false;
+  let _mapRosterWarningShown = false;
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -919,6 +920,8 @@ const AppController = (() => {
       if (result.status !== 'ok') {
         throw new Error(result.message || 'No se pudo cargar el listado de escuelas.');
       }
+      result.data = _prepareMapRosterData(result);
+      _warnIfRosterSourceLooksIncomplete(result);
       MapModule.loadMarkers(result.data || []);
       MapModule.populateFilterButtons();
       MapModule.updateOfflineStatus();
@@ -926,6 +929,55 @@ const AppController = (() => {
     } catch (err) {
       UI.showToast('Error al cargar escuelas: ' + err.message, 'error');
     }
+  }
+
+  function _prepareMapRosterData(result) {
+    const data = Array.isArray(result?.data) ? result.data : [];
+    const source = String(result?.meta?.source || '').toLowerCase();
+    const realRows = data.filter(row => !row.es_ejemplo);
+    if (!source || source === 'embedded_csv' || realRows.length === 0 || realRows.length > 150 || realRows.some(_mapRowLooksPilot)) {
+      return data;
+    }
+    let order = 0;
+    return data.map(row => {
+      if (row.es_ejemplo) return row;
+      order += 1;
+      return {
+        ...row,
+        en_muestra_piloto: 'true',
+        prioridad_operativa: row.prioridad_operativa && row.prioridad_operativa !== 'media' ? row.prioridad_operativa : 'piloto',
+        orden_muestra_piloto: row.orden_muestra_piloto || row.orden_visita || String(order),
+      };
+    });
+  }
+
+  function _mapRowLooksPilot(row) {
+    const normalize = value => String(value ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    const trueish = value => ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(normalize(value));
+    return trueish(row?.en_muestra_piloto)
+      || trueish(row?.muestra_piloto)
+      || normalize(row?.prioridad_operativa).includes('piloto')
+      || String(row?.orden_muestra_piloto ?? '').trim() !== '';
+  }
+
+  function _warnIfRosterSourceLooksIncomplete(result) {
+    if (_mapRosterWarningShown || !Auth.canAccess('supervisor')) return;
+    const data = Array.isArray(result?.data) ? result.data : [];
+    const source = String(result?.meta?.source || '').toLowerCase();
+    if (!data.length || source === 'embedded_csv') return;
+    const realRows = data.filter(row => !row.es_ejemplo);
+    if (realRows.length >= 500) return;
+    _mapRosterWarningShown = true;
+    const label = source === 'sheet' ? 'hoja operativa' : (source || 'origen alternativo');
+    UI.showToast(
+      `El mapa cargo ${realRows.length} escuelas desde ${label}. Para ver todo el padron hay que regenerar gas/escuelas_embebidas.gs y publicar GAS desde la cuenta propietaria.`,
+      'warning',
+      12000
+    );
   }
 
   function _readMapFilters() {

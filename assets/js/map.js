@@ -47,6 +47,33 @@ const MapModule = (() => {
     return String(value || 'pendiente').replace(/[^a-z0-9_-]/gi, '') || 'pendiente';
   }
 
+  function _normalizeFilterValue(value) {
+    return String(value ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function _sameFilterValue(a, b) {
+    return _normalizeFilterValue(a) === _normalizeFilterValue(b);
+  }
+
+  function _isTrueish(value) {
+    if (value === true || value === 1) return true;
+    const text = _normalizeFilterValue(value);
+    return ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(text);
+  }
+
+  function _isPilotSchool(escuela) {
+    if (!escuela) return false;
+    const priority = _normalizeFilterValue(escuela.prioridad_operativa);
+    return _isTrueish(escuela.en_muestra_piloto)
+      || _isTrueish(escuela.muestra_piloto)
+      || priority.includes('piloto')
+      || String(escuela.orden_muestra_piloto ?? '').trim() !== '';
+  }
+
   function _isClosed(e) {
     return ['finalizada', 'cerrada', 'completada'].includes(String(e.estado_relevamiento || '').toLowerCase());
   }
@@ -261,15 +288,15 @@ const MapModule = (() => {
   function applyFilters(filters) {
     _activeFilters = { ...filters };
     _filteredEscuelas = _escuelas.filter(e => {
-      if (filters.departamento && e.departamento !== filters.departamento) return false;
-      if (filters.distrito && e.distrito !== filters.distrito) return false;
-      if (filters.zona && e.zona !== filters.zona) return false;
-      if (filters.encuestador && e.encuestador_asignado !== filters.encuestador) return false;
-      if (filters.estado && e.estado_relevamiento !== filters.estado) return false;
-      if (String(filters.piloto || '').toLowerCase() === 'true' && String(e.en_muestra_piloto || '').toLowerCase() !== 'true') return false;
+      if (filters.departamento && !_sameFilterValue(e.departamento, filters.departamento)) return false;
+      if (filters.distrito && !_sameFilterValue(e.distrito, filters.distrito)) return false;
+      if (filters.zona && !_sameFilterValue(e.zona, filters.zona)) return false;
+      if (filters.encuestador && !_sameFilterValue(e.encuestador_asignado, filters.encuestador)) return false;
+      if (filters.estado && !_sameFilterValue(e.estado_relevamiento, filters.estado)) return false;
+      if (_isTrueish(filters.piloto) && !_isPilotSchool(e)) return false;
       if (filters.q) {
-        const q = filters.q.toLowerCase();
-        const haystack = `${e.nombre} ${e.codigo_local} ${e.departamento} ${e.distrito} ${e.localidad}`.toLowerCase();
+        const q = _normalizeFilterValue(filters.q);
+        const haystack = _normalizeFilterValue(`${e.nombre} ${e.codigo_local} ${e.departamento} ${e.distrito} ${e.localidad}`);
         if (!haystack.includes(q)) return false;
       }
       return true;

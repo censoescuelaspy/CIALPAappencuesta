@@ -50,6 +50,7 @@ const SheetsService = (() => {
         return aliases.some(alias => assigned === alias || assigned.includes(alias));
       });
     }
+    rows = _markSheetFallbackPilotRows_(rows, source.source);
     if (filters.departamento) rows = rows.filter(r => _same(r.departamento, filters.departamento));
     if (filters.estado) rows = rows.filter(r => _same(r.estado_relevamiento, filters.estado));
     if (filters.encuestador) rows = rows.filter(r => _same(r.encuestador_asignado, filters.encuestador));
@@ -57,7 +58,7 @@ const SheetsService = (() => {
     if (filters.zona) rows = rows.filter(r => _same(r.zona, filters.zona));
     if (filters.distrito) rows = rows.filter(r => _same(r.distrito, filters.distrito));
     if (_isTrueish(filters.muestra_piloto) || _isTrueish(filters.piloto)) {
-      rows = rows.filter(r => _isTrueish(r.en_muestra_piloto) || _isTrueish(r.muestra_piloto));
+      rows = rows.filter(_isPilotSchool_);
     }
     if (filters.q) {
       const q = _txt(filters.q).toLowerCase();
@@ -987,12 +988,16 @@ const SheetsService = (() => {
     const matricula = _first(r, ['MATRICULA', 'matricula', 'Matrícula', 'Matrícula del local escolar', 'cantidad matricula']);
     const aulas = _first(r, ['AULAS_EST', 'aulas_est', 'aulas']);
     const obsBase = _first(r, ['observaciones', 'OBSERVACIONES']) || '';
-    const muestraPiloto = _first(r, ['en_muestra_piloto', 'muestra_piloto', 'EN_MUESTRA_PILOTO', 'MUESTRA_PILOTO']);
-    const ordenMuestraPiloto = _first(r, ['orden_muestra_piloto', 'ORDEN_MUESTRA_PILOTO']);
+    const muestraPiloto = _first(r, ['en_muestra_piloto', 'muestra_piloto', 'EN_MUESTRA_PILOTO', 'MUESTRA_PILOTO', 'piloto', 'PILOTO']);
+    const ordenMuestraPiloto = _first(r, ['orden_muestra_piloto', 'ORDEN_MUESTRA_PILOTO', 'orden_piloto', 'ORDEN_PILOTO']);
+    const prioridadOperativa = _first(r, ['prioridad_operativa', 'PRIORIDAD_OPERATIVA']);
+    const esPiloto = _isTrueish(muestraPiloto)
+      || _txt(ordenMuestraPiloto) !== ''
+      || _txt(prioridadOperativa).toLowerCase().indexOf('piloto') !== -1;
     const extraObs = [];
     if (matricula !== '') extraObs.push(`Matrícula: ${matricula}`);
     if (aulas !== '') extraObs.push(`Aulas estimadas: ${aulas}`);
-    if (_isTrueish(muestraPiloto)) extraObs.push(`Muestra piloto${ordenMuestraPiloto ? ` #${ordenMuestraPiloto}` : ''}`);
+    if (esPiloto) extraObs.push(`Muestra piloto${ordenMuestraPiloto ? ` #${ordenMuestraPiloto}` : ''}`);
 
     return {
       id_escuela: _txt(id),
@@ -1012,8 +1017,8 @@ const SheetsService = (() => {
       orden_visita: _txt(_first(r, ['orden_visita', 'ORDEN_VISITA', 'ENUMERA'])),
       fecha_programada: _txt(_first(r, ['fecha_programada', 'FECHA_PROGRAMADA'])),
       turno_programado: _txt(_first(r, ['turno_programado', 'TURNO_PROGRAMADO'])),
-      prioridad_operativa: _txt(_first(r, ['prioridad_operativa', 'PRIORIDAD_OPERATIVA'])) || 'media',
-      en_muestra_piloto: _isTrueish(muestraPiloto) ? 'true' : 'false',
+      prioridad_operativa: _txt(prioridadOperativa) || (esPiloto ? 'piloto' : 'media'),
+      en_muestra_piloto: esPiloto ? 'true' : 'false',
       orden_muestra_piloto: _txt(ordenMuestraPiloto),
       tiempo_estimado_min: _txt(_first(r, ['tiempo_estimado_min', 'TIEMPO_ESTIMADO_MIN'])),
       ultima_sesion_id: _txt(_first(r, ['ultima_sesion_id', 'ULTIMA_SESION_ID'])),
@@ -1480,8 +1485,29 @@ const SheetsService = (() => {
   }
 
   function _isTrueish(v) {
-    const t = _txt(v).toLowerCase();
-    return ['true', '1', 'si', 'sí', 's', 'piloto', 'muestra'].includes(t);
+    const t = _txt(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(t);
+  }
+
+  function _isPilotSchool_(row) {
+    if (!row) return false;
+    return _isTrueish(row.en_muestra_piloto)
+      || _isTrueish(row.muestra_piloto)
+      || _txt(row.orden_muestra_piloto) !== ''
+      || _txt(row.prioridad_operativa).toLowerCase().indexOf('piloto') !== -1;
+  }
+
+  function _markSheetFallbackPilotRows_(rows, sourceName) {
+    if (sourceName !== 'sheet' || !Array.isArray(rows) || rows.length === 0 || rows.length > 150 || rows.some(_isPilotSchool_)) {
+      return rows;
+    }
+    return rows.map(function(row, index) {
+      return Object.assign({}, row, {
+        en_muestra_piloto: 'true',
+        orden_muestra_piloto: row.orden_muestra_piloto || row.orden_visita || String(index + 1),
+        prioridad_operativa: _txt(row.prioridad_operativa) && !_same(row.prioridad_operativa, 'media') ? row.prioridad_operativa : 'piloto'
+      });
+    });
   }
 
   function _isNumeric(v) {
