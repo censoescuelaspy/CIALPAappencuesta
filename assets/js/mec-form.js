@@ -311,7 +311,7 @@ const MecFormModule = (() => {
       if (showToast) UI.showToast('Borrador MEC guardado en este dispositivo.', 'success');
       const state = document.getElementById('mec-save-state');
       if (state) state.textContent = _formatSavedAt(savedAt);
-      _scheduleDraftSync(showToast ? 'manual-local' : 'auto');
+      if (options.skipRemoteSync !== true) _scheduleDraftSync(showToast ? 'manual-local' : 'auto');
     } catch (err) {
       console.warn('[MEC] No se pudo guardar el borrador local:', err);
       UI.showToast('No se pudo guardar el borrador local. Revise espacio del dispositivo o sincronice evidencias.', 'warning', 7000);
@@ -399,6 +399,26 @@ const MecFormModule = (() => {
     return ` Base de datos: ${databaseSync.status}.`;
   }
 
+  function _remoteDraftSyncText() {
+    const state = _data.__lastRemoteDraftSync || {};
+    if (!state.at) return 'Sin confirmar';
+    if (state.queued || state.offline) return 'En cola local';
+    if (state.status === 'ok') return `Confirmado ${_formatSavedAt(state.at)}`;
+    if (state.status === 'running') return 'Guardando...';
+    if (state.status === 'error') return 'Error';
+    return _formatSavedAt(state.at);
+  }
+
+  function _setRemoteDraftSyncState(state) {
+    _data.__lastRemoteDraftSync = {
+      ...(_data.__lastRemoteDraftSync || {}),
+      ...state,
+      at: state.at || new Date().toISOString(),
+    };
+    const el = document.getElementById('mec-remote-save-state');
+    if (el) el.textContent = _remoteDraftSyncText();
+  }
+
   async function syncDraftToSheets(reason = 'manual', options = {}) {
     const silent = options.silent === true;
     const manual = !silent || reason === 'manual';
@@ -422,28 +442,33 @@ const MecFormModule = (() => {
       return null;
     }
     _draftSyncRunning = true;
+    if (manual) _setRemoteDraftSyncState({ status: 'running' });
     try {
       const result = await API.guardarBorradorMec(payload);
       if (result?.status && result.status !== 'ok') throw new Error(result.message || 'El servidor rechazo el borrador MEC.');
       _lastDraftSyncAt = Date.now();
-      _data.__lastRemoteDraftSync = {
-        at: new Date().toISOString(),
+      _setRemoteDraftSyncState({
         status: result?.status || 'ok',
         queued: Boolean(result?.queued),
+        offline: Boolean(result?.data?.offline),
         sheet: result?.data?.sheet || 'mec_borradores',
         database_sync: result?.data?.database_sync || null,
         id_borrador: result?.data?.id_borrador || payload.clientMutationId,
-      };
+      });
+      _saveDraft(false, { skipRemoteSync: true });
       if (manual) {
         if (result?.queued || result?.data?.offline) {
           UI.showToast('Sin conexion: el borrador MEC quedo en cola local para subir a Sheets.', 'warning', 7600);
         } else {
-          UI.showToast(`Borrador MEC guardado en Google Sheets: hoja mec_borradores.${_databaseSyncStatusText(result?.data?.database_sync)}`, 'success', 8200);
+          const message = `Borrador MEC guardado en Google Sheets: hoja mec_borradores.${_databaseSyncStatusText(result?.data?.database_sync)}`;
+          UI.showToast(message, 'success', 9000);
+          if (typeof UI.showAlert === 'function') UI.showAlert('Guardado confirmado', message, 'success');
         }
       }
       return result;
     } catch (err) {
       console.error('[MEC] Error al guardar borrador MEC en Sheets:', err);
+      if (manual) _setRemoteDraftSyncState({ status: 'error', error: err.message });
       if (manual) UI.showToast(`No se pudo guardar en Sheets: ${err.message}`, 'warning', 7600);
       throw err;
     } finally {
@@ -1801,6 +1826,10 @@ const MecFormModule = (() => {
           <div>
             <span>Borrador</span>
             <strong id="mec-save-state">${saved ? _formatSavedAt(saved.savedAt) : 'Sin guardar'}</strong>
+          </div>
+          <div>
+            <span>Sheets</span>
+            <strong id="mec-remote-save-state">${_remoteDraftSyncText()}</strong>
           </div>
         </div>
       </div>
@@ -11156,6 +11185,8 @@ const MecFormModule = (() => {
     const saveState = document.getElementById('mec-save-state');
     const saved = _readSavedMeta();
     if (saveState && saved) saveState.textContent = _formatSavedAt(saved.savedAt);
+    const remoteState = document.getElementById('mec-remote-save-state');
+    if (remoteState) remoteState.textContent = _remoteDraftSyncText();
   }
 
   function _moduleProgressText(module) {

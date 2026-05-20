@@ -41,9 +41,10 @@ const UI = (() => {
     existingToasts
       .slice(0, Math.max(0, existingToasts.length - (maxVisible - 1)))
       .forEach(item => item.remove());
-    const timeout = normalizedType === 'success'
-      ? Math.min(Number(duration) || 1600, 1600)
-      : Number(duration);
+    const requestedDuration = Number(duration);
+    const timeout = Number.isFinite(requestedDuration)
+      ? requestedDuration
+      : (normalizedType === 'success' ? 4200 : 4000);
     const toast = document.createElement('div');
     toast.className = `toast toast--${normalizedType}`;
     const icon = document.createElement('span');

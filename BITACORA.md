@@ -4,6 +4,42 @@
 
 ---
 
+## Confirmacion visible de guardado y padron oficial completo - 2026-05-20 - v2.6.66
+
+### Objetivo
+- Hacer visible la confirmacion del guardado remoto en Google Sheets.
+- Corregir que el mapa siga mostrando solo la muestra piloto cuando el padron embebido publico esta vacio.
+- Usar como fuente completa el Spreadsheet oficial `lista_oficial_escuelas_2025` sin publicar las filas sensibles en GitHub.
+
+### Cambios implementados
+- Los mensajes emergentes de exito ya no se limitan a 1,6 segundos y el contenedor queda por encima de modales/fichas flotantes.
+- El guardado manual del borrador MEC muestra estado `Sheets` en la cabecera del registro.
+- Cuando el guardado remoto confirma escritura en `mec_borradores`, se muestra toast largo y alerta modal `Guardado confirmado`.
+- El estado de sincronizacion remota se conserva en el borrador local sin disparar una nueva sincronizacion en bucle.
+- Apps Script intenta leer el padron oficial desde el Spreadsheet `1Auz5pIrUzAdc2uN0UkiBNwlV3stjq0bPcnCcsEraWmU`, hoja `listado_ini`, cuando no existe padron embebido.
+- La hoja `muestra_piloto_def` del mismo Spreadsheet se usa solo para marcar piloto/orden, sin reducir el listado completo.
+- Los datos operativos de `escuelas_seleccionadas` se superponen sobre el padron completo para conservar estados, asignaciones, tiempos, cierres y enlaces.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.66`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el deployment desde la cuenta propietaria del Web App.
+- Verificar que el propietario del Apps Script tenga acceso al Spreadsheet oficial `lista_oficial_escuelas_2025`.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.66`.
+
+### Validaciones ejecutadas
+- Google Drive metadata: `listado_ini` tiene 5463 filas y 32 columnas; `muestra_piloto_def` queda como hoja separada de muestra.
+- Lectura de encabezados oficiales de `listado_ini` y `muestra_piloto_def` mediante conector Google Drive.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+
+---
+
 ## Base PostgreSQL local e indexacion jerarquica escuela/institucion - 2026-05-20 - v2.6.65
 
 ### Objetivo

@@ -7,6 +7,9 @@
 const SheetsService = (() => {
 
   const TZ = 'America/Asuncion';
+  const OFFICIAL_SCHOOLS_SPREADSHEET_ID = '1Auz5pIrUzAdc2uN0UkiBNwlV3stjq0bPcnCcsEraWmU';
+  const OFFICIAL_SCHOOLS_FULL_SHEET = 'listado_ini';
+  const OFFICIAL_SCHOOLS_PILOT_SHEET = 'muestra_piloto_def';
 
   const OP_COLS_ESCUELAS = [
     'id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona',
@@ -989,9 +992,18 @@ const SheetsService = (() => {
 
     if (embeddedRows.length) {
       return {
-        rows: embeddedRows,
+        rows: _mergeOperationalSchoolRows_(embeddedRows),
         source: 'embedded_csv',
         embeddedUpdatedAt: typeof getEmbeddedEscuelasUpdatedAt_ === 'function' ? getEmbeddedEscuelasUpdatedAt_() : '',
+      };
+    }
+
+    const officialRows = _officialSchoolRows_();
+    if (officialRows.length) {
+      return {
+        rows: _mergeOperationalSchoolRows_(officialRows),
+        source: 'official_sheet',
+        embeddedUpdatedAt: '',
       };
     }
 
@@ -1000,6 +1012,94 @@ const SheetsService = (() => {
       source: 'sheet',
       embeddedUpdatedAt: '',
     };
+  }
+
+  function _officialSchoolRows_() {
+    try {
+      const ss = SpreadsheetApp.openById(OFFICIAL_SCHOOLS_SPREADSHEET_ID);
+      const fullSheet = ss.getSheetByName(OFFICIAL_SCHOOLS_FULL_SHEET);
+      if (!fullSheet) return [];
+      const rows = _objectsFromSheet_(fullSheet).map(function(row, idx) {
+        return Object.assign({}, row, { __official_sheet_row: idx + 2 });
+      });
+      const pilotSheet = ss.getSheetByName(OFFICIAL_SCHOOLS_PILOT_SHEET);
+      const pilotRows = pilotSheet ? _objectsFromSheet_(pilotSheet) : [];
+      _markOfficialPilotRows_(rows, pilotRows);
+      return rows;
+    } catch (err) {
+      Logger.log('No se pudo leer el padron oficial lista_oficial_escuelas_2025: ' + err);
+      return [];
+    }
+  }
+
+  function _objectsFromSheet_(sheet) {
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+    const headers = data[0].map(function(h) { return String(h).trim(); });
+    return data.slice(1).map(function(row) {
+      const obj = {};
+      headers.forEach(function(h, i) { obj[h] = row[i]; });
+      return obj;
+    });
+  }
+
+  function _markOfficialPilotRows_(rows, pilotRows) {
+    if (!Array.isArray(rows) || !Array.isArray(pilotRows) || !pilotRows.length) return;
+    const byCode = {};
+    rows.forEach(function(row) {
+      const normalized = _normalizarEscuela(row, row.__official_sheet_row || 0);
+      const key = _txt(normalized.codigo_local || normalized.id_escuela);
+      if (key) byCode[key] = row;
+    });
+    pilotRows.forEach(function(pilot, index) {
+      const code = _txt(_first(pilot, ['CODIGO', 'codigo', 'codigo_local', 'Código del local escolar', 'Código Local Escolar']));
+      if (!code || !byCode[code]) return;
+      const target = byCode[code];
+      target.en_muestra_piloto = 'true';
+      target.muestra_piloto = 'piloto';
+      target.orden_muestra_piloto = _txt(_first(pilot, ['ENUMERA', 'orden_muestra_piloto', 'orden_piloto'])) || String(index + 1);
+      target.orden_visita = target.orden_visita || target.orden_muestra_piloto;
+      target.prioridad_operativa = target.prioridad_operativa || 'piloto';
+      target.__pilot_sheet_row = index + 2;
+    });
+  }
+
+  function _mergeOperationalSchoolRows_(sourceRows) {
+    if (!Array.isArray(sourceRows) || !sourceRows.length) return sourceRows || [];
+    let operationalRows = [];
+    try {
+      operationalRows = _sheetToObjects(SHEET_NAMES.ESCUELAS);
+    } catch (err) {
+      return sourceRows;
+    }
+    if (!operationalRows.length) return sourceRows;
+
+    const operationalByKey = {};
+    operationalRows.forEach(function(row, idx) {
+      const normalized = _normalizarEscuela(row, row.__row_number || idx + 2);
+      [normalized.codigo_local, normalized.id_escuela].forEach(function(key) {
+        key = _txt(key);
+        if (key) operationalByKey[key] = row;
+      });
+    });
+
+    return sourceRows.map(function(row, idx) {
+      const normalized = _normalizarEscuela(row, row.__official_sheet_row || row.__embedded_csv_row || idx + 2);
+      const operational = operationalByKey[_txt(normalized.codigo_local)] || operationalByKey[_txt(normalized.id_escuela)];
+      if (!operational) return row;
+      return _overlayOperationalSchoolRow_(row, operational);
+    });
+  }
+
+  function _overlayOperationalSchoolRow_(base, operational) {
+    const merged = Object.assign({}, base);
+    OP_COLS_ESCUELAS.forEach(function(key) {
+      const value = operational[key];
+      if (value === undefined || value === null || String(value).trim() === '') return;
+      if (['id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona', 'latitud', 'longitud'].indexOf(key) !== -1 && merged[key]) return;
+      merged[key] = value;
+    });
+    return merged;
   }
 
   function _appendEmbeddedEscuelaOperationalRow_(id) {

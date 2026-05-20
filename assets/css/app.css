@@ -1697,7 +1697,7 @@ td {
   position: fixed;
   bottom: .85rem;
   right: .85rem;
-  z-index: 2000;
+  z-index: 9000;
   display: flex;
   flex-direction: column-reverse;
   gap: .35rem;
