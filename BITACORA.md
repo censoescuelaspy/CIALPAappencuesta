@@ -18,10 +18,12 @@
 - `getEscuelas` usa la misma regla robusta para el filtro `piloto`/`muestra_piloto`.
 - Mientras el backend siga en fallback de hoja operativa corta sin marcas de piloto, esas filas se tratan como muestra piloto provisional para que `Piloto sorteada` no quede en cero.
 - Si el backend no esta usando `embedded_csv` y devuelve una nomina corta, la app avisa a supervisores/admins que deben regenerar `gas/escuelas_embebidas.gs` y publicar GAS desde la cuenta propietaria para ver el padron completo.
+- Se genero un paquete temporal privado de GAS con el padron embebido completo y se subio a Apps Script HEAD mediante `clasp push -f`.
+- El repositorio publico conserva `gas/escuelas_embebidas.gs` como stub sin filas sensibles.
 - Version y cache actualizados a `v2.6.61`.
 
 ### Pendiente operativo
-- Regenerar `gas/escuelas_embebidas.gs` localmente con `npm run embed:schools` y publicar GAS desde la cuenta propietaria para que `Todo el padron` muestre las 5462 escuelas y no solo la hoja operativa.
+- Publicar el deployment GAS desde la cuenta propietaria `censoescuelaspy@gmail.com` para que `Todo el padron` muestre las 5462 escuelas y no solo la hoja operativa.
 
 ### Validaciones ejecutadas
 - `node --check assets/js/map.js`.
@@ -31,6 +33,9 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - Validacion sintactica de `gas/*.gs` mediante Node.
 - Prueba local del filtro: `Piloto sorteada` reconoce `Si/Sí`, `prioridad_operativa: piloto` y `orden_muestra_piloto`; `Todo el padron` restaura todos los casos cargados.
+- Generacion temporal privada de `escuelas_embebidas.gs`: 5462 escuelas de padron completo y 86 escuelas piloto.
+- `clasp push -f` desde paquete temporal privado: sube 8 archivos a Apps Script HEAD.
+- `clasp show-authorized-user`: sesion local en `dmeza.py@gmail.com`; por historial de 403, queda pendiente publicar el deployment desde la cuenta propietaria.
 - `git diff --check`.
 
 ---
