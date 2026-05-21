@@ -4,6 +4,38 @@
 
 ---
 
+## Apunte a Web App MailApp autorizado - 2026-05-21 - v2.6.83
+
+### Objetivo
+- Apuntar la PWA al nuevo Web App publicado luego de agregar el scope explicito de `MailApp`.
+- Confirmar que el deployment nuevo conserva endpoints publicos, padron oficial completo y proteccion por token.
+- Forzar cache nuevo para que usuarios tomen el backend correcto.
+
+### Resultado
+- `APP_CONFIG.GAS_URL` apunta a `https://script.google.com/macros/s/AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ/exec`.
+- El Web App responde `login` sin credenciales con validacion publica, sin HTTP 403.
+- `registrarUsuario` y `recuperarPassword` siguen como endpoints publicos y responden validaciones de campos requeridos.
+- `diagnosticoPadron` responde `source: official_sheet`, `total: 5462`, `muestra_piloto: 86`, `filas_operativas: 92`.
+- `getEscuelas` sin token responde `Token invalido o expirado`, confirmando proteccion de endpoints privados.
+- Version visible y cache del Service Worker actualizados a `v2.6.83`.
+
+### Pendiente operativo
+- Ejecutar `probarNotificacionAdmin()` desde Apps Script o hacer una solicitud real de relevamiento para confirmar que el permiso de `MailApp` quedo aceptado y llega el correo.
+- Pedir a administradores y usuarios `Actualizar app` para tomar `cialpa-app-v2.6.83` e iniciar sesion contra el backend nuevo.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App nuevo para `login` sin datos: responde `Usuario y contraseña son requeridos`.
+- Prueba HTTP del Web App nuevo para `diagnosticoPadron`: `official_sheet`, `total: 5462`, `muestra_piloto: 86`, `filas_operativas: 92`.
+- Prueba HTTP del Web App nuevo para `registrarUsuario` sin datos: responde `Usuario, nombres, apellidos y contraseña son requeridos`.
+- Prueba HTTP del Web App nuevo para `recuperarPassword` sin datos: responde `Usuario y nueva contraseña son requeridos`.
+- Prueba HTTP del Web App nuevo para `getEscuelas` sin token: responde `Token invalido o expirado`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Autorizacion explicita de MailApp para correo operativo - 2026-05-21 - v2.6.82
 
 ### Objetivo
