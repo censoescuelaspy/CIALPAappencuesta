@@ -21,6 +21,7 @@
 - Version visible y cache del Service Worker actualizados a `v2.6.87`.
 
 ### Pendiente operativo
+- Publicar/actualizar el Web App desde la cuenta propietaria/aceptada para que la URL `/exec` pase de `@23` a una version nueva con `uploadEvidence` reforzado.
 - Pedir a encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.87`.
 - Hacer una carga real de foto desde una escuela y confirmar en Drive la subcarpeta `{codigo_local} - {nombre_escuela}` dentro de `1MtFgyyCaAF4MyfRmpvFAvwjgzSn75V_-`.
 
@@ -34,6 +35,15 @@
 - `node -e "JSON.parse(...package.json...); JSON.parse(...gas/appsscript.json...)"`: OK.
 - `git diff --check`.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `clasp.cmd show-authorized-user`: sesion local `dmeza.py@gmail.com`.
+- `clasp.cmd deployments`: Web App publico `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` sigue en `@23`; no se redeploya desde la cuenta editora para evitar repetir el riesgo historico de HTTP 403.
+- Prueba HTTP del Web App para `diagnosticoPadron`: `official_sheet`, `total: 5462`, `muestra_piloto: 86`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.87`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `driveSubFolderId` y contexto escolar con `codigo_local` / `id_escuela`.
+- Verificacion HTTP de GitHub Pages para `assets/js/map.js`: contiene `addLayers(toAdd)` y `addLayers(filteredMarkers)`.
+- Verificacion HTTP de GitHub Pages para `assets/js/stats.js`: contiene `_statsCache` y `STATS_CACHE_TTL`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.87`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.87`.
 
 ---
 
