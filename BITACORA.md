@@ -4,6 +4,28 @@
 
 ---
 
+## Apunte a nuevo Web App propietario validado - 2026-05-20 - v2.6.69
+
+### Objetivo
+- Apuntar la PWA al nuevo deployment publico publicado desde la cuenta propietaria/aceptada.
+- Confirmar que el backend publicado ya incluye `diagnosticoPadron` y lee el padron oficial completo.
+- Forzar cache nuevo para que los navegadores de campo dejen de usar el Web App anterior con HTTP 403.
+
+### Cambios implementados
+- `APP_CONFIG.GAS_URL` apunta a `https://script.google.com/macros/s/AKfycbytu9TcFhKl1PoRO8G0OPAti19ey5KfMG83IFMCInwPOgw5jYElSTcIr-gXMPiSQFM89w/exec`.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.69`.
+
+### Pendiente operativo
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.69` y renovar sesion contra el nuevo backend.
+- Ejecutar `repararSesionesDuplicadasEnCurso()` una vez desde Apps Script para limpiar duplicados actuales.
+
+### Validaciones ejecutadas
+- Web App nuevo `login`: responde JSON publico `Usuario y contraseña son requeridos`, sin HTTP 403.
+- Web App nuevo `diagnosticoPadron`: `source: official_sheet`, `total: 5462`, `con_coordenadas: 5004`, `muestra_piloto: 86`, `filas_operativas: 91`.
+- Web App nuevo `getEscuelas` sin token: responde `Token invalido o expirado`, confirmando backend publico protegido por sesion.
+
+---
+
 ## Bloqueo de sesiones duplicadas por escuela y usuario - 2026-05-20 - v2.6.68
 
 ### Objetivo

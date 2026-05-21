@@ -1,12 +1,12 @@
 /**
  * CIALPA — Relevamiento Escolar
  * config.js — Central application configuration
- * Version: 2.6.68
+ * Version: 2.6.69
  */
 
 const APP_CONFIG = {
   // Google Apps Script Web App URL — fill after deploying GAS
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbwwFYlYkar_mnYy4hW7ne_qt85xHQnUk2VeALniVDPtu5MUP5B7pEZHEnFIlo5zxuY/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbytu9TcFhKl1PoRO8G0OPAti19ey5KfMG83IFMCInwPOgw5jYElSTcIr-gXMPiSQFM89w/exec',
 
   // External survey application defaults. These values can be overridden from Google Sheets CONFIG.
   FORM_URL: 'https://demo.mec.gov.py/demo_rue/login',
@@ -17,8 +17,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA — Relevamiento Escolar',
-  VERSION: '2.6.68',
-  EDITION_LABEL: 'Edición vigente v2.6.68',
+  VERSION: '2.6.69',
+  EDITION_LABEL: 'Edición vigente v2.6.69',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
