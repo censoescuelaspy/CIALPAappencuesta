@@ -14,6 +14,7 @@
 
 ### Cambios implementados
 - `API.getEscuelas` puede usar cache local reciente y forzar red solo cuando se necesita refrescar.
+- La carga de `getEscuelas` en red usa un intento unico mas largo, evitando sumar casi dos minutos por reintentos consecutivos.
 - `Mapa` carga primero desde cache local si existe y refresca el padron en segundo plano.
 - La lista lateral del mapa y la tabla de asignaciones renderizan un lote inicial, evitando crear miles de filas de una sola vez.
 - `Planificacion > Distribucion de escuelas` reutiliza la lista ya cargada por el mapa cuando esta disponible.

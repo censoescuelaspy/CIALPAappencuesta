@@ -613,7 +613,7 @@ const API = (() => {
   }
 
   async function call(endpoint, method = 'GET', data = {}, options = {}) {
-    const { skipAuth = false, skipLoading = false, skipQueue = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS } = options;
+    const { skipAuth = false, skipLoading = false, skipQueue = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS, timeoutMs = APP_CONFIG.API_TIMEOUT_MS } = options;
     if (!skipLoading) _incrementLoading();
 
     if (_IS_DEMO) {
@@ -646,7 +646,7 @@ const API = (() => {
           fetchOptions.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
           fetchOptions.body = JSON.stringify(payload);
         }
-        const response = await _fetchWithTimeout(url, fetchOptions, APP_CONFIG.API_TIMEOUT_MS);
+        const response = await _fetchWithTimeout(url, fetchOptions, timeoutMs);
         if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         const text = await response.text();
         let json;
@@ -706,7 +706,7 @@ const API = (() => {
         return response;
       }
     }
-    const result = await call('getEscuelas', 'GET', request, { skipLoading: true });
+    const result = await call('getEscuelas', 'GET', request, { skipLoading: true, retries: 1, timeoutMs: 75000 });
     if (result.status === 'ok' && request?.includeExample) result.data = _withExampleSchool(result.data || []);
     return result;
   }
