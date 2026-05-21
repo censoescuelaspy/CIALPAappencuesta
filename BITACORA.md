@@ -4,6 +4,38 @@
 
 ---
 
+## Filtro de muestra y guardado firme de distribucion - 2026-05-21 - v2.6.85
+
+### Objetivo
+- Permitir en `Planificacion operativa > Distribucion de escuelas` trabajar solo con escuelas de la muestra piloto.
+- Hacer que `Balancear pendientes` y `Rebalancear todo` respeten los filtros actuales, especialmente `Solo muestra piloto`.
+- Evitar que una asignacion parezca guardada si no llego realmente a Sheets.
+
+### Cambios implementados
+- La distribucion agrega filtro `Todas las escuelas` / `Solo muestra piloto`.
+- El balanceo automatico ahora opera sobre las escuelas filtradas visibles, no sobre todo el padron completo por defecto.
+- Despues de balancear, el mensaje indica que hay que pulsar `Guardar cambios` para publicar la distribucion.
+- El boton principal de guardado queda destacado como `Guardar cambios (N)` cuando hay cambios pendientes.
+- `saveAssignments()` valida la respuesta de `asignarEscuela`; si el backend devuelve error o la operacion no se confirma, la fila no se marca como guardada.
+- `API.asignarEscuela()` ya no entra a cola offline: las asignaciones deben confirmarse online para impactar en Sheets y ser visibles para otros usuarios.
+- Las filas de escuelas de muestra quedan marcadas como `Muestra piloto`.
+- Version visible y cache del Service Worker actualizados a `v2.6.85`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages.
+- Pedir a administradores `Actualizar app` para tomar `cialpa-app-v2.6.85`.
+- Probar con admin: filtrar `Solo muestra piloto`, tocar `Balancear pendientes`, guardar cambios y verificar desde otro usuario/recarga que la asignacion nueva aparece.
+
+### Validaciones ejecutadas
+- `node --check assets/js/planning.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Alertas internas para solicitudes de relevamiento - 2026-05-21 - v2.6.84
 
 ### Objetivo

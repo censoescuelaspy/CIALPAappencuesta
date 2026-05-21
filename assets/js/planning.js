@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * planning.js — Estimacion de tiempos y distribucion operativa
- * Version: 2.6.76
+ * Version: 2.6.85
  */
 
 const PlanningModule = (() => {
@@ -20,7 +20,7 @@ const PlanningModule = (() => {
   let _draftAssignments = {};
   let _originalAssignments = {};
   let _activeTab = 'tiempos';
-  let _filters = { estado: '', encuestador: '', search: '' };
+  let _filters = { estado: '', encuestador: '', muestra: '', search: '' };
   let _settings = _loadSettings();
   let _savingAssignments = false;
   let _assignmentLimit = ASSIGNMENT_BATCH_SIZE;
@@ -95,14 +95,19 @@ const PlanningModule = (() => {
       UI.showToast('No hay encuestadores activos para balancear.', 'warning');
       return;
     }
+    const targetSchools = _filteredSchools()
+      .filter(school => scope === 'all' || _normalState(school) !== 'finalizada');
+    if (!targetSchools.length) {
+      UI.showToast('No hay escuelas en los filtros actuales para balancear.', 'info');
+      return;
+    }
 
     const buckets = activeSurveyors.map(surveyor => ({
       label: _surveyorLabel(surveyor),
       minutes: 0,
     }));
 
-    _schools
-      .filter(school => scope === 'all' || _normalState(school) !== 'finalizada')
+    targetSchools
       .sort((a, b) => _schoolMinutes(b) - _schoolMinutes(a))
       .forEach(school => {
         const bucket = buckets.sort((a, b) => a.minutes - b.minutes)[0];
@@ -110,7 +115,7 @@ const PlanningModule = (() => {
         bucket.minutes += _schoolMinutes(school);
       });
 
-    UI.showToast('Distribucion balanceada por minutos estimados.', 'success');
+    UI.showToast(`Distribucion balanceada en ${targetSchools.length} escuela(s) filtrada(s). Pulse Guardar cambios para publicar.`, 'success');
     _activeTab = 'asignaciones';
     _render();
   }
@@ -145,18 +150,21 @@ const PlanningModule = (() => {
         const id = _schoolId(school);
         const assigned = _draftAssignments[id] || '';
         const surveyor = _surveyors.find(item => _surveyorLabel(item) === assigned) || {};
-        await API.asignarEscuela({
+        const result = await API.asignarEscuela({
           id_escuela: id,
           codigo_local: school.codigo_local || '',
           encuestador_asignado: assigned,
           usuario_encuestador: surveyor.usuario || '',
           id_encuestador: surveyor.id_encuestador || '',
         });
+        if (!result || result.status !== 'ok' || result.queued) {
+          throw new Error(result?.message || `No se pudo guardar la asignacion de ${school.codigo_local || id}.`);
+        }
         school.encuestador_asignado = assigned;
         _originalAssignments[id] = assigned;
       }
       _refreshMapAssignments();
-      UI.showToast('Asignaciones guardadas.', 'success');
+      UI.showToast(`Asignaciones guardadas en Sheets (${changes.length}). Los usuarios las veran al actualizar o volver a abrir la app.`, 'success');
     } catch (err) {
       UI.showToast('Error al guardar asignaciones: ' + err.message, 'error');
     } finally {
@@ -273,6 +281,7 @@ const PlanningModule = (() => {
     const filtered = _filteredSchools();
     const visibleSchools = filtered.slice(0, _assignmentLimit);
     const remaining = Math.max(0, filtered.length - visibleSchools.length);
+    const visibleUnassigned = filtered.filter(school => !_draftAssignments[_schoolId(school)] && _normalState(school) !== 'finalizada');
     const saveLabel = _savingAssignments ? 'Guardando...' : `Guardar cambios${summary.dirty ? ` (${summary.dirty})` : ''}`;
     const saveDisabled = !summary.dirty || _savingAssignments ? 'disabled' : '';
     return `
@@ -281,7 +290,7 @@ const PlanningModule = (() => {
           <strong>${summary.dirty ? `${summary.dirty} cambio(s) de asignacion pendiente(s)` : 'Sin cambios de asignacion pendientes'}</strong>
           <span>${summary.dirty ? 'Las escuelas marcadas en amarillo todavia no estan guardadas en Sheets.' : 'Cuando cambie un responsable, el boton de guardado quedara habilitado aqui.'}</span>
         </div>
-        <button class="btn btn-primary" type="button" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
+        <button class="btn btn-success" type="button" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
       </div>
 
       <div class="planning-toolbar card">
@@ -293,19 +302,27 @@ const PlanningModule = (() => {
             <button class="choice-button ${_filters.estado === value ? 'choice-button--active' : ''}" type="button"
               onclick='PlanningModule.setFilter("estado", ${_js(value)})'>${_escape(value ? _stateLabel(value) : 'Todos los estados')}</button>`).join('')}
         </div>
+        <div class="choice-button-strip planning-choice-strip--compact">
+          ${[
+            ['', 'Todas las escuelas'],
+            ['piloto', 'Solo muestra piloto'],
+          ].map(([value, label]) => `
+            <button class="choice-button ${_filters.muestra === value ? 'choice-button--active' : ''}" type="button"
+              onclick='PlanningModule.setFilter("muestra", ${_js(value)})'>${_escape(label)}</button>`).join('')}
+        </div>
         <div class="planning-toolbar__actions">
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.autoBalance('pending')">Balancear pendientes</button>
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.autoBalance('all')">Rebalancear todo</button>
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.resetDraft()">Deshacer</button>
-          <button class="btn btn-sm btn-primary" type="button" data-min-role="admin" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
+          <button class="btn btn-sm btn-success" type="button" data-min-role="admin" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
         </div>
       </div>
 
       <div class="planning-assignment-summary">
         ${_kpi('Escuelas visibles', filtered.length, 'Segun filtros actuales')}
-        ${_kpi('Sin asignar', summary.unassigned, 'Requieren responsable')}
+        ${_kpi('Sin asignar visibles', visibleUnassigned.length, 'Requieren responsable')}
         ${_kpi('Cambios pendientes', summary.dirty, 'Aun no guardados')}
-        ${_kpi('Minutos sin asignar', _formatDuration(summary.unassignedMinutes), 'Carga por distribuir')}
+        ${_kpi('Minutos sin asignar', _formatDuration(visibleUnassigned.reduce((sum, school) => sum + _schoolMinutes(school), 0)), 'Carga visible por distribuir')}
       </div>
 
       <div class="card">
@@ -364,6 +381,7 @@ const PlanningModule = (() => {
           <strong>${_escape(school.codigo_local || id)}</strong>
           <span>${_escape(school.nombre || school.nombre_escuela || 'Escuela sin nombre')}</span>
           <small>${_escape([school.departamento, school.distrito, school.localidad].filter(Boolean).join(' · '))}</small>
+          ${_isPilotSchool(school) ? '<small class="planning-row-tag">Muestra piloto</small>' : ''}
         </td>
         <td><span class="badge ${_stateBadgeClass(_normalState(school))}">${_escape(_stateLabel(_normalState(school)))}</span></td>
         <td>${_schoolMinutes(school)}</td>
@@ -443,6 +461,7 @@ const PlanningModule = (() => {
     return _schools.filter(school => {
       if (_filters.estado && _normalState(school) !== _filters.estado) return false;
       if (_filters.encuestador && _draftAssignments[_schoolId(school)] !== _filters.encuestador) return false;
+      if (_filters.muestra === 'piloto' && !_isPilotSchool(school)) return false;
       if (search) {
         const haystack = _norm([school.codigo_local, school.nombre, school.nombre_escuela, school.departamento, school.distrito, school.localidad].join(' '));
         if (!haystack.includes(search)) return false;
@@ -571,6 +590,20 @@ const PlanningModule = (() => {
       finalizada: 'badge--finalizada',
       incidencia: 'badge--incidencia',
     }[state] || 'badge--pendiente';
+  }
+
+  function _isTrueish(value) {
+    if (value === true || value === 1) return true;
+    const text = _norm(value);
+    return ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(text);
+  }
+
+  function _isPilotSchool(school) {
+    if (!school) return false;
+    return _isTrueish(school.en_muestra_piloto)
+      || _isTrueish(school.muestra_piloto)
+      || _norm(school.prioridad_operativa).includes('piloto')
+      || String(school.orden_muestra_piloto ?? '').trim() !== '';
   }
 
   function _formatDuration(minutes) {

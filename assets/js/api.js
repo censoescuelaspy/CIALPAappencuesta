@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.80
+ * Version: 2.6.85
  */
 
 const API = (() => {
@@ -734,7 +734,7 @@ const API = (() => {
     return call('getEscuela', 'GET', { id_escuela: id });
   }
   async function updateEscuelaEstado(id, estado, observacion = '') { return call('updateEscuelaEstado', 'POST', { id_escuela: id, estado, observacion }); }
-  async function asignarEscuela(datos) { return call('asignarEscuela', 'POST', datos); }
+  async function asignarEscuela(datos) { return call('asignarEscuela', 'POST', datos, { skipQueue: true }); }
 
   async function iniciarSesion(id_escuela, datos = {}) { return call('iniciarSesion', 'POST', { id_escuela, ...datos }); }
   async function cerrarSesion(id_sesion, datos) { return call('cerrarSesion', 'POST', { id_sesion, ...datos }); }

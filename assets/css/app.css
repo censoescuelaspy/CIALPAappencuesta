@@ -3170,7 +3170,11 @@ td {
 }
 
 .planning-toolbar {
-  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1.2fr) minmax(160px, .7fr) auto;
+}
+
+.planning-choice-strip--compact .choice-button {
+  flex: 1 1 120px;
 }
 
 .planning-toolbar__actions,
@@ -3194,6 +3198,11 @@ td {
 
 .planning-table td:first-child small {
   color: var(--color-text-muted);
+}
+
+.planning-row-tag {
+  color: #1d6f34 !important;
+  font-weight: 850;
 }
 
 .planning-row--dirty {
