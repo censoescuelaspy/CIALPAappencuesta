@@ -10,6 +10,8 @@ const StatsModule = (() => {
   let _charts = {};
   let _statsData = null;
   let _localAnalytics = null;
+  let _statsCache = {};
+  const STATS_CACHE_TTL = 5 * 60 * 1000;
 
   async function init() {
     if (!Auth.canAccess('supervisor')) {
@@ -42,6 +44,20 @@ const StatsModule = (() => {
 
   async function loadStats() {
     const filters = _getFilters();
+    const cacheKey = JSON.stringify(filters);
+    const cached = _statsCache[cacheKey];
+    if (cached && (Date.now() - cached.time < STATS_CACHE_TTL)) {
+      _statsData = cached.stats;
+      _localAnalytics = cached.local;
+      _renderOfflineDashboard(_localAnalytics);
+      _renderInfrastructureDashboard(_localAnalytics);
+      _renderKPIs(_statsData);
+      _renderCharts(_statsData);
+      _renderEncuestadoresTable(_statsData.por_encuestador || []);
+      _renderRecentActivity(_statsData.actividad_reciente || []);
+      return;
+    }
+
     let remoteStats = null;
     let remoteResult = null;
     let remoteError = null;
@@ -73,6 +89,7 @@ const StatsModule = (() => {
     }
 
     _statsData = _normalizeStats(remoteStats);
+    if (!remoteError) _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
     _renderOfflineDashboard(_localAnalytics);
     _renderInfrastructureDashboard(_localAnalytics);
     _renderKPIs(_statsData);

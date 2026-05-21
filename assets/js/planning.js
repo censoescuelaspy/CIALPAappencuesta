@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * planning.js — Estimacion de tiempos y distribucion operativa
- * Version: 2.6.85
+ * Version: 2.6.86
  */
 
 const PlanningModule = (() => {

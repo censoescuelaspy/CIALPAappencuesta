@@ -728,12 +728,27 @@ const SheetsService = (() => {
     const filename = _safeEvidenceFilename(params.filename || params.name || `evidencia_${Date.now()}.jpg`);
     const bytes = Utilities.base64Decode(base64);
     const blob = Utilities.newBlob(bytes, mimeType, filename);
-    const folder = DriveApp.getFolderById(folderId);
-    const file = folder.createFile(blob);
+    const context = typeof params.context === 'object' ? params.context : {};
+    const rootFolder = DriveApp.getFolderById(folderId);
+
+    // Get or create per-school subfolder: "{schoolCode} - {schoolName}"
+    const schoolCode = String(context.schoolCode || '').trim();
+    const schoolName = String(context.schoolName || '').trim();
+    const schoolFolderName = schoolCode
+      ? (schoolName ? `${schoolCode} - ${schoolName}` : schoolCode)
+      : (schoolName || 'sin_escuela');
+    let targetFolder = rootFolder;
+    let subFolderId = folderId;
+    try {
+      const existing = rootFolder.getFoldersByName(schoolFolderName);
+      targetFolder = existing.hasNext() ? existing.next() : rootFolder.createFolder(schoolFolderName);
+      subFolderId = targetFolder.getId();
+    } catch (folderErr) {
+      Logger.log('uploadEvidence: no se pudo crear subcarpeta escuela: ' + folderErr);
+    }
+
+    const file = targetFolder.createFile(blob);
     const now = _timestamp();
-    const context = typeof params.context === 'object'
-      ? params.context
-      : {};
     file.setDescription(JSON.stringify({
       app: 'CIALPA',
       label: params.label || '',
@@ -744,14 +759,14 @@ const SheetsService = (() => {
 
     _ensureColumns(SHEET_NAMES.EVIDENCIAS, [
       'id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes',
-      'drive_file_id','drive_url','folder_id','label','school_code','school_name',
+      'drive_file_id','drive_url','folder_id','subfolder_id','label','school_code','school_name',
       'scope','block_label','floor_label','space_label','element_type','element_label',
       'element_id','field_path'
     ]);
     const evidenceId = _genId('EVI');
     _appendObject(SHEET_NAMES.EVIDENCIAS, [
       'id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes',
-      'drive_file_id','drive_url','folder_id','label','school_code','school_name',
+      'drive_file_id','drive_url','folder_id','subfolder_id','label','school_code','school_name',
       'scope','block_label','floor_label','space_label','element_type','element_label',
       'element_id','field_path'
     ], {
@@ -764,6 +779,7 @@ const SheetsService = (() => {
       drive_file_id: file.getId(),
       drive_url: file.getUrl(),
       folder_id: folderId,
+      subfolder_id: subFolderId,
       label: params.label || '',
       school_code: context.schoolCode || '',
       school_name: context.schoolName || '',
@@ -785,6 +801,7 @@ const SheetsService = (() => {
         url: file.getUrl(),
         name: filename,
         folderId,
+        subFolderId,
         uploadedAt: now,
         evidenceId,
       }

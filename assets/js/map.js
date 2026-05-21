@@ -249,8 +249,9 @@ const MapModule = (() => {
 
     if (_markerCluster) _markerCluster.clearLayers();
 
+    const toAdd = [];
     _escuelas.forEach(e => {
-      if (!_map || !window.L || !_markerCluster) return;
+      if (!_map || !window.L) return;
       const lat = parseFloat(e.latitud);
       const lng = parseFloat(e.longitud);
       if (isNaN(lat) || isNaN(lng)) return;
@@ -266,8 +267,9 @@ const MapModule = (() => {
       });
 
       _markers[e.id_escuela] = marker;
-      _markerCluster.addLayer(marker);
+      toAdd.push(marker);
     });
+    if (_markerCluster && toAdd.length) _markerCluster.addLayers(toAdd);
 
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
@@ -298,12 +300,13 @@ const MapModule = (() => {
       return true;
     });
 
-    // Toggle marker visibility via cluster
+    // Toggle marker visibility via cluster — bulk addLayers is much faster than per-marker addLayer
     if (_markerCluster) _markerCluster.clearLayers();
     const filteredIds = new Set(_filteredEscuelas.map(e => e.id_escuela));
-    Object.entries(_markers).forEach(([id, marker]) => {
-      if (filteredIds.has(id) && _markerCluster) _markerCluster.addLayer(marker);
-    });
+    const filteredMarkers = Object.entries(_markers)
+      .filter(([id]) => filteredIds.has(id))
+      .map(([, marker]) => marker);
+    if (_markerCluster && filteredMarkers.length) _markerCluster.addLayers(filteredMarkers);
 
     _renderList(_filteredEscuelas);
     _updateSummaryBadges(_filteredEscuelas);

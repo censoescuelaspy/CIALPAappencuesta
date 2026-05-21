@@ -4,6 +4,42 @@
 
 ---
 
+## Fotos indexadas por escuela, mapa mas rapido, cache de estadisticas - 2026-05-21 - v2.6.86
+
+### Objetivo
+- Las fotos de evidencia quedan organizadas en subcarpetas por escuela dentro de la carpeta raiz de Drive.
+- Reducir el tiempo de carga del mapa en tablet al agregar 5462 puntos.
+- Evitar que el panel de estadisticas consulte GAS en cada apertura.
+
+### Cambios implementados
+
+**GAS — `gas/sheets.gs` (`uploadEvidence`)**
+- Antes de crear el archivo en Drive, se busca o crea una subcarpeta `{codigo_local} - {nombre_escuela}` dentro de `EVIDENCE_FOLDER_ID`.
+- El archivo de la foto se guarda en esa subcarpeta en vez de la raiz.
+- Se agrega la columna `subfolder_id` a la hoja `evidencias` y al objeto de retorno de la funcion.
+- Fallback a la carpeta raiz si la creacion de subcarpeta falla.
+
+**Map — `assets/js/map.js` (`loadMarkers`, `applyFilters`)**
+- Reemplazado `_markerCluster.addLayer(marker)` llamado 5462 veces por `_markerCluster.addLayers(toAdd)` (llamada unica al batch API de leaflet.markercluster).
+- El mismo patron aplicado en `applyFilters`: se construye array `filteredMarkers` y se llama `addLayers` una sola vez.
+- Esto elimina el procesamiento interno de cluster que se disparaba 5462 veces y bloqueaba el hilo principal en tablet.
+
+**Stats — `assets/js/stats.js` (`loadStats`)**
+- Se agrega cache en memoria (`_statsCache`) con TTL de 5 minutos por combinacion de filtros.
+- Si hay resultado cacheado vigente, se renderiza directamente sin consultar GAS.
+- El cache se invalida al cambiar los filtros o al pasar 5 minutos; no se guarda en caso de error remoto.
+
+### Pendiente operativo
+- Subir GAS con `clasp.cmd push -f` desde `gas/` para que los nuevos uploads vayan a subcarpetas.
+- Pedir a encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.86`.
+- Verificar en Drive que las fotos nuevas aparecen en subcarpetas por escuela.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`: OK.
+- `node --check assets/js/stats.js`: OK.
+
+---
+
 ## Filtro de muestra y guardado firme de distribucion - 2026-05-21 - v2.6.85
 
 ### Objetivo
