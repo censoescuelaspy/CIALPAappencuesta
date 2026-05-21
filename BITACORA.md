@@ -39,6 +39,13 @@
 - Validacion sintactica de `gas/*.gs` mediante Node.
 - `git diff --check`.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git push origin main`: publica commit `0c5acdc`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.76`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.76`.
+- Verificacion HTTP de GitHub Pages para `assets/js/map.js`: contiene `Solicitar relevar` y `MAP_LIST_LIMIT`.
+- Verificacion HTTP de GitHub Pages para `assets/js/planning.js`: contiene `showMoreAssignments` y `preferCache`.
+- Verificacion HTTP de GitHub Pages para `assets/js/api.js`: contiene `solicitarRelevamiento` y `preferCache`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.76` y `forceNetwork`.
 
 ---
 
