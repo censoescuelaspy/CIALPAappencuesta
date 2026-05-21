@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.js — Authentication module
- * Version: 2.6.71
+ * Version: 2.6.74
  */
 
 const Auth = (() => {
@@ -143,6 +143,55 @@ const Auth = (() => {
     _clearSession();
   }
 
+  async function registerUser(datos) {
+    const payload = {
+      usuario: String(datos.usuario || '').trim().toLowerCase(),
+      nombres: String(datos.nombres || '').trim(),
+      apellidos: String(datos.apellidos || '').trim(),
+      documento: String(datos.documento || '').trim(),
+      telefono: String(datos.telefono || '').trim(),
+      correo: String(datos.correo || '').trim(),
+      password: String(datos.password || ''),
+    };
+    if (!payload.usuario || !payload.nombres || !payload.apellidos || !payload.password) {
+      throw new Error('Usuario, nombres, apellidos y contraseña son requeridos.');
+    }
+    if (!payload.correo && !payload.documento) {
+      throw new Error('Cargue correo o documento para poder recuperar la contraseña.');
+    }
+    UI.setLoading(true, 'Creando usuario...');
+    try {
+      const result = await API.registrarUsuario(payload);
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo crear el usuario.');
+      return result.data || {};
+    } finally {
+      UI.setLoading(false);
+    }
+  }
+
+  async function recoverPassword(datos) {
+    const payload = {
+      usuario: String(datos.usuario || '').trim().toLowerCase(),
+      documento: String(datos.documento || '').trim(),
+      correo: String(datos.correo || '').trim(),
+      password: String(datos.password || ''),
+    };
+    if (!payload.usuario || !payload.password) {
+      throw new Error('Usuario y nueva contraseña son requeridos.');
+    }
+    if (!payload.correo && !payload.documento) {
+      throw new Error('Ingrese el correo o documento registrado.');
+    }
+    UI.setLoading(true, 'Actualizando contraseña...');
+    try {
+      const result = await API.recuperarPassword(payload);
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo recuperar la contraseña.');
+      return result.data || {};
+    } finally {
+      UI.setLoading(false);
+    }
+  }
+
   function expireSession(message = 'Sesion vencida. Inicie sesion nuevamente.') {
     _clearSession();
     try {
@@ -274,6 +323,8 @@ const Auth = (() => {
 
   return {
     login,
+    registerUser,
+    recoverPassword,
     logout,
     getSession,
     clearSession: _clearSession,

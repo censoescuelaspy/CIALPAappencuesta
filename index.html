@@ -58,7 +58,13 @@
       &nbsp;• Primer acceso: <code>nombre.apellido</code> / clave numérica de 6 dígitos
     </div>
 
-    <form id="login-form" autocomplete="on" novalidate>
+    <div class="auth-tabs" role="tablist" aria-label="Acceso">
+      <button type="button" class="auth-tab auth-tab--active" data-auth-panel="login" aria-pressed="true">Ingresar</button>
+      <button type="button" class="auth-tab" data-auth-panel="register" aria-pressed="false">Crear usuario</button>
+      <button type="button" class="auth-tab" data-auth-panel="recover" aria-pressed="false">Recuperar clave</button>
+    </div>
+
+    <form id="login-form" data-auth-form="login" autocomplete="on" novalidate>
       <div class="form-group">
         <label for="login-usuario">Usuario</label>
         <input
@@ -79,8 +85,7 @@
           type="password"
           class="form-control"
           name="password"
-          placeholder="6 dígitos en el primer acceso"
-          inputmode="numeric"
+          placeholder="Contraseña"
           minlength="6"
           autocomplete="current-password"
           required
@@ -91,8 +96,83 @@
       </button>
     </form>
 
+    <form id="register-form" data-auth-form="register" autocomplete="on" novalidate hidden>
+      <div class="form-group">
+        <label for="register-usuario">Usuario *</label>
+        <input id="register-usuario" type="text" class="form-control" name="usuario" placeholder="nombre.apellido" autocomplete="username" required />
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="register-nombres">Nombres *</label>
+          <input id="register-nombres" type="text" class="form-control" name="nombres" autocomplete="given-name" required />
+        </div>
+        <div class="form-group">
+          <label for="register-apellidos">Apellidos *</label>
+          <input id="register-apellidos" type="text" class="form-control" name="apellidos" autocomplete="family-name" required />
+        </div>
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="register-documento">Documento</label>
+          <input id="register-documento" type="text" class="form-control" name="documento" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="register-telefono">Telefono</label>
+          <input id="register-telefono" type="tel" class="form-control" name="telefono" autocomplete="tel" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="register-correo">Correo</label>
+        <input id="register-correo" type="email" class="form-control" name="correo" autocomplete="email" />
+        <small class="auth-help">Cargue correo o documento para recuperar la contrasena mas adelante.</small>
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="register-password">Contrasena *</label>
+          <input id="register-password" type="password" class="form-control" name="password" minlength="6" autocomplete="new-password" required />
+        </div>
+        <div class="form-group">
+          <label for="register-password-confirm">Repetir *</label>
+          <input id="register-password-confirm" type="password" class="form-control" name="password_confirm" minlength="6" autocomplete="new-password" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem;">
+        Crear usuario e ingresar
+      </button>
+    </form>
+
+    <form id="recover-form" data-auth-form="recover" autocomplete="on" novalidate hidden>
+      <div class="form-group">
+        <label for="recover-usuario">Usuario *</label>
+        <input id="recover-usuario" type="text" class="form-control" name="usuario" autocomplete="username" required />
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="recover-documento">Documento registrado</label>
+          <input id="recover-documento" type="text" class="form-control" name="documento" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="recover-correo">Correo registrado</label>
+          <input id="recover-correo" type="email" class="form-control" name="correo" autocomplete="email" />
+        </div>
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="recover-password">Nueva contrasena *</label>
+          <input id="recover-password" type="password" class="form-control" name="password" minlength="6" autocomplete="new-password" required />
+        </div>
+        <div class="form-group">
+          <label for="recover-password-confirm">Repetir *</label>
+          <input id="recover-password-confirm" type="password" class="form-control" name="password_confirm" minlength="6" autocomplete="new-password" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem;">
+        Actualizar contrasena
+      </button>
+    </form>
+
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.72</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.74</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -119,7 +199,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.72</strong>
+      Edición vigente<br><strong class="app-version">v2.6.74</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -210,7 +290,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.72</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.74</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -923,7 +1003,7 @@
             <div data-admin-content="encuestadores" class="active">
               <div class="card" style="margin-bottom:1rem;">
                 <strong>Registro de nuevo encuestador</strong>
-                <p class="text-muted" style="margin:.35rem 0 0;">Use <b>+ Nuevo Encuestador</b>, cargue usuario, nombre, rol, estado activo y una contrasena temporal o deje que el primer acceso configure una clave numerica de 6 digitos.</p>
+                <p class="text-muted" style="margin:.35rem 0 0;">Los usuarios pueden registrarse desde el acceso inicial. El admin puede editar datos, estado, rol y luego asignar escuelas.</p>
               </div>
               <div style="margin-bottom:1rem;display:flex;justify-content:flex-end;">
                 <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo Encuestador</button>

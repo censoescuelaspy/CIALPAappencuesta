@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.5.18
+ * Version: 2.6.74
  */
 
 const API = (() => {
@@ -286,6 +286,59 @@ const API = (() => {
         }
         return { status: 'error', message: 'Credenciales inválidas. Primer acceso: usuario nombre.apellido y clave numérica de 6 dígitos.' };
       }
+      case 'registrarUsuario': {
+        const usuario = String(data.usuario || '').trim().toLowerCase();
+        if (!usuario || !data.password || !data.nombres || !data.apellidos) {
+          return { status: 'error', message: 'Usuario, nombres, apellidos y contrasena son requeridos.' };
+        }
+        if (!data.correo && !data.documento) {
+          return { status: 'error', message: 'Cargue correo o documento para recuperar la contrasena.' };
+        }
+        if (String(data.password || '').length < 6) {
+          return { status: 'error', message: 'La contrasena debe tener al menos 6 caracteres.' };
+        }
+        if (_DEMO_USERS.some(x => x.usuario.toLowerCase() === usuario)) {
+          return { status: 'error', message: 'Ya existe un usuario con ese nombre.' };
+        }
+        const user = {
+          usuario,
+          password: String(data.password || ''),
+          nombres: String(data.nombres || '').trim(),
+          apellidos: String(data.apellidos || '').trim(),
+          rol: 'encuestador',
+          id_usuario: 'u_demo_' + Date.now(),
+        };
+        _DEMO_USERS.push(user);
+        _DEMO_ENCUESTADORES.push({
+          id_encuestador: 'enc_demo_' + Date.now(),
+          usuario,
+          nombres: user.nombres,
+          apellidos: user.apellidos,
+          documento: data.documento || '',
+          telefono: data.telefono || '',
+          correo: data.correo || '',
+          zona_asignada: '',
+          rol: 'encuestador',
+          activo: true,
+          fecha_alta: new Date().toISOString().slice(0, 10),
+        });
+        return { status: 'ok', message: 'Usuario demo creado.', data: { usuario, rol: 'encuestador' } };
+      }
+      case 'recuperarPassword': {
+        const usuario = String(data.usuario || '').trim().toLowerCase();
+        const user = _DEMO_USERS.find(x => x.usuario.toLowerCase() === usuario);
+        const enc = _DEMO_ENCUESTADORES.find(x => String(x.usuario || '').toLowerCase() === usuario);
+        if (!user || !enc) return { status: 'error', message: 'No pudimos validar esos datos.' };
+        if (String(data.password || data.new_password || '').length < 6) {
+          return { status: 'error', message: 'La contrasena debe tener al menos 6 caracteres.' };
+        }
+        const correoOk = data.correo && String(enc.correo || '').toLowerCase() === String(data.correo || '').toLowerCase();
+        const docOk = data.documento && String(enc.documento || '').replace(/\D+/g, '') === String(data.documento || '').replace(/\D+/g, '');
+        if (!correoOk && !docOk) return { status: 'error', message: 'No pudimos validar esos datos.' };
+        user.password = String(data.password || data.new_password || '');
+        user.firstAccess = false;
+        return { status: 'ok', message: 'Contrasena demo actualizada.' };
+      }
       case 'logout': return { status: 'ok' };
       case 'getEscuelas': return { status: 'ok', data: _DEMO_ESCUELAS };
       case 'getEscuela': return { status: 'ok', data: _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || null };
@@ -368,18 +421,24 @@ const API = (() => {
           demo: true,
         },
       };
-      case 'guardarCierreCompleto': return {
-        status: 'ok',
-        message: 'Cierre completo demo registrado.',
-        data: {
-          id_entrega: 'ENT_DEMO_' + Date.now(),
-          pdf_url: '',
-          metadata_url: '',
-          email_status: 'demo',
-          destinatario_email: data.destinatario_email || APP_CONFIG.FINAL_REPORT_EMAIL || '',
-          demo: true,
-        },
-      };
+      case 'guardarCierreCompleto': {
+        const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.codigo_local);
+        if (esc) esc.estado_relevamiento = 'finalizada';
+        return {
+          status: 'ok',
+          message: 'Cierre completo demo registrado.',
+          data: {
+            id_entrega: 'ENT_DEMO_' + Date.now(),
+            id_escuela: data.id_escuela || '',
+            codigo_local: data.codigo_local || '',
+            pdf_url: '',
+            metadata_url: '',
+            email_status: 'demo',
+            destinatario_email: data.destinatario_email || APP_CONFIG.FINAL_REPORT_EMAIL || '',
+            demo: true,
+          },
+        };
+      }
       case 'getIncidencias': return { status: 'ok', data: [] };
       case 'resolverIncidencia': return { status: 'ok' };
       case 'getConfig': return { status: 'ok', data: Object.entries(_DEMO_CONFIG).map(([clave, valor]) => ({ clave, valor, descripcion: 'Parametro demo', editable: 'true' })) };
@@ -650,6 +709,8 @@ const API = (() => {
   async function getModulosSesion(id_sesion) { return call('getModulosSesion', 'GET', { id_sesion }, { skipLoading: true }); }
 
   async function getEncuestadores(filters = {}) { return call('getEncuestadores', 'GET', filters, { skipLoading: true }); }
+  async function registrarUsuario(datos) { return call('registrarUsuario', 'POST', datos, { skipAuth: true }); }
+  async function recuperarPassword(datos) { return call('recuperarPassword', 'POST', datos, { skipAuth: true }); }
   async function saveEncuestador(datos) { return call('saveEncuestador', 'POST', datos); }
   async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 
@@ -683,6 +744,8 @@ const API = (() => {
     cerrarModulo,
     getModulosSesion,
     getEncuestadores,
+    registrarUsuario,
+    recuperarPassword,
     saveEncuestador,
     deleteEncuestador,
     saveIncidencia,

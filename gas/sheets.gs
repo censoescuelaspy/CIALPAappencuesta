@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.1.0
+ * Version 2.6.74
  */
 
 const SheetsService = (() => {
@@ -451,7 +451,7 @@ const SheetsService = (() => {
     if (!usuario || !nombres) return { status: 'error', message: 'Usuario y nombres son requeridos.' };
     const activeValue = activo === false || String(activo).toLowerCase() === 'false' ? 'false' : 'true';
     _ensureColumns(SHEET_NAMES.ENCUESTADORES, ['id_encuestador','usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol','foto_url','activo','fecha_alta','fecha_actualizacion']);
-    _ensureColumns(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual']);
+    _ensureColumns(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual','token_expiry','documento','telefono','correo']);
 
     if (!id_encuestador) {
       const existing = _sheetToObjects(SHEET_NAMES.ENCUESTADORES);
@@ -460,8 +460,8 @@ const SheetsService = (() => {
       _appendObject(SHEET_NAMES.ENCUESTADORES, ['id_encuestador','usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol','foto_url','activo','fecha_alta','fecha_actualizacion'], {
         id_encuestador: newId, usuario, nombres, apellidos: apellidos || '', documento: documento || '', telefono: telefono || '', correo: correo || '', zona_asignada: zona_asignada || '', rol: rol || 'encuestador', foto_url: '', activo: activeValue, fecha_alta: _today(), fecha_actualizacion: _today()
       });
-      _appendObject(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual'], {
-        id_usuario: _genId('USR'), usuario, password_hash: password ? AuthService._hashPassword(password) : '', nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activeValue, fecha_alta: _today(), ultimo_acceso: '', token_actual: ''
+      _appendObject(SHEET_NAMES.USUARIOS, ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual','token_expiry','documento','telefono','correo'], {
+        id_usuario: _genId('USR'), usuario, password_hash: password ? AuthService._hashPassword(password) : '', nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activeValue, fecha_alta: _today(), ultimo_acceso: '', token_actual: '', token_expiry: '', documento: documento || '', telefono: telefono || '', correo: correo || ''
       });
       AuditService.log('CREATE_ENCUESTADOR', session.usuario, `usuario: ${usuario}`);
       return { status: 'ok', message: 'Encuestador creado.', data: { id_encuestador: newId } };
@@ -479,7 +479,7 @@ const SheetsService = (() => {
     ['usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol'].forEach(k => _setByHeader(sheet, rowIdx, headers, k, params[k] || ''));
     _setByHeader(sheet, rowIdx, headers, 'activo', activeValue);
     _setByHeader(sheet, rowIdx, headers, 'fecha_actualizacion', _today());
-    _updateUsuarioMirror(previousUsuario, { usuario, nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activeValue, password });
+    _updateUsuarioMirror(previousUsuario, { usuario, nombres, apellidos: apellidos || '', rol: rol || 'encuestador', activo: activeValue, password, documento, telefono, correo });
     AuditService.log('UPDATE_ENCUESTADOR', session.usuario, `id: ${id_encuestador}, usuario: ${usuario}`);
     return { status: 'ok', message: 'Encuestador actualizado.' };
   }
@@ -705,7 +705,7 @@ const SheetsService = (() => {
   }
 
   function guardarCierreCompleto(params) {
-    const session = params._session;
+    const session = params._session || {};
     const deliveryId = _clientMutationId(params) || _genId('ENT');
     const now = _timestamp();
     _ensureColumns(SHEET_NAMES.ENTREGAS, _entregasHeaders());
@@ -732,50 +732,8 @@ const SheetsService = (() => {
     const nombreEscuela = params.nombre_escuela || escuela.nombre || '';
     const recipient = params.destinatario_email || _config('FINAL_REPORT_EMAIL', 'censoescuelaspy@gmial.com');
     const subject = params.asunto_email || `CIALPA cierre completo - ${codigoLocal || idEscuela || 'sin codigo'}`;
-    const folder = DriveApp.getFolderById(EVIDENCE_FOLDER_ID);
-    const baseName = _safeEvidenceFilename(`cialpa_cierre_${codigoLocal || idEscuela || deliveryId}_${Utilities.formatDate(new Date(), TZ, 'yyyyMMdd_HHmmss')}`).replace(/\.[^.]+$/, '');
-
     const metadata = params.metadata || {};
     const closeTimeFields = _draftTimeFields_(metadata.timeTracking || params.timeTracking || (params.resumen && params.resumen.timeTracking) || {});
-    const metadataJson = JSON.stringify({
-      id_entrega: deliveryId,
-      generado_en: now,
-      usuario: session.usuario,
-      resumen: params.resumen || {},
-      completion: params.completion || {},
-      metadata,
-      evidenceIndex: params.evidenceIndex || [],
-    }, null, 2);
-    const metadataBlob = Utilities.newBlob(metadataJson, 'application/json', `${baseName}_metadata.json`);
-    const metadataFile = folder.createFile(metadataBlob);
-
-    const pdfResult = _createFinalPdfFile_(folder, params.pdfHtml || '', baseName);
-    const attachments = [metadataBlob];
-    if (pdfResult.blob) attachments.unshift(pdfResult.blob);
-
-    let emailStatus = 'no_enviado';
-    let emailError = pdfResult.error || '';
-    try {
-      MailApp.sendEmail({
-        to: recipient,
-        subject,
-        htmlBody: _finalDeliveryEmailHtml(params, {
-          deliveryId,
-          codigoLocal,
-          nombreEscuela,
-          pdfUrl: pdfResult.url,
-          metadataUrl: metadataFile.getUrl(),
-          usuario: session.usuario,
-          now,
-        }),
-        attachments,
-      });
-      emailStatus = 'enviado';
-    } catch (err) {
-      emailStatus = 'error';
-      emailError = [emailError, err.message].filter(Boolean).join(' | ');
-    }
-
     const pendingCount = Array.isArray(params.completion?.pending) ? params.completion.pending.length : 0;
     const row = {
       id_entrega: deliveryId,
@@ -787,12 +745,12 @@ const SheetsService = (() => {
       destinatario_email: recipient,
       estado_cierre: pendingCount ? 'con_pendientes' : 'completo',
       pendientes: pendingCount,
-      email_status: emailStatus,
-      email_error: emailError,
-      pdf_file_id: pdfResult.id || '',
-      pdf_url: pdfResult.url || '',
-      metadata_file_id: metadataFile.getId(),
-      metadata_url: metadataFile.getUrl(),
+      email_status: 'pendiente',
+      email_error: '',
+      pdf_file_id: '',
+      pdf_url: '',
+      metadata_file_id: '',
+      metadata_url: '',
       resumen_json: _jsonForSheet(params.resumen || {}, 45000),
       metadata_json: _jsonForSheet(metadata, 45000),
       plan_model_json: _jsonForSheet(params.planModel || {}, 45000),
@@ -801,11 +759,69 @@ const SheetsService = (() => {
       actualizado_en: now,
     };
     _appendObject(SHEET_NAMES.ENTREGAS, _entregasHeaders(), row);
+    let rowIdx = _findRowIndex(SHEET_NAMES.ENTREGAS, 'id_entrega', deliveryId);
     _markSchoolFinalizedFromDelivery_(row, params, now, closeTimeFields);
-    AuditService.log('CIERRE_COMPLETO', session.usuario, `id_entrega: ${deliveryId}, escuela: ${codigoLocal || idEscuela}, email: ${emailStatus}`);
+
+    try {
+      const folder = DriveApp.getFolderById(EVIDENCE_FOLDER_ID);
+      const baseName = _safeEvidenceFilename(`cialpa_cierre_${codigoLocal || idEscuela || deliveryId}_${Utilities.formatDate(new Date(), TZ, 'yyyyMMdd_HHmmss')}`).replace(/\.[^.]+$/, '');
+      const metadataJson = JSON.stringify({
+        id_entrega: deliveryId,
+        generado_en: now,
+        usuario: session.usuario,
+        resumen: params.resumen || {},
+        completion: params.completion || {},
+        metadata,
+        evidenceIndex: params.evidenceIndex || [],
+      }, null, 2);
+      const metadataBlob = Utilities.newBlob(metadataJson, 'application/json', `${baseName}_metadata.json`);
+      const metadataFile = folder.createFile(metadataBlob);
+      const pdfResult = _createFinalPdfFile_(folder, params.pdfHtml || '', baseName);
+      const attachments = [metadataBlob];
+      if (pdfResult.blob) attachments.unshift(pdfResult.blob);
+
+      row.pdf_file_id = pdfResult.id || '';
+      row.pdf_url = pdfResult.url || '';
+      row.metadata_file_id = metadataFile.getId();
+      row.metadata_url = metadataFile.getUrl();
+      row.email_error = pdfResult.error || '';
+      try {
+        MailApp.sendEmail({
+          to: recipient,
+          subject,
+          htmlBody: _finalDeliveryEmailHtml(params, {
+            deliveryId,
+            codigoLocal,
+            nombreEscuela,
+            pdfUrl: row.pdf_url,
+            metadataUrl: row.metadata_url,
+            usuario: session.usuario,
+            now,
+          }),
+          attachments,
+        });
+        row.email_status = 'enviado';
+      } catch (err) {
+        row.email_status = 'error';
+        row.email_error = [row.email_error, err.message].filter(Boolean).join(' | ');
+      }
+    } catch (err) {
+      row.email_status = 'error';
+      row.email_error = [row.email_error, err.message || String(err)].filter(Boolean).join(' | ');
+    }
+
+    row.actualizado_en = _timestamp();
+    if (rowIdx === -1) rowIdx = _findRowIndex(SHEET_NAMES.ENTREGAS, 'id_entrega', deliveryId);
+    if (rowIdx !== -1) {
+      const sheet = _getSheet(SHEET_NAMES.ENTREGAS);
+      const headers = _headers(sheet);
+      Object.entries(row).forEach(([key, value]) => _setByHeader(sheet, rowIdx, headers, key, value));
+    }
+    _markSchoolFinalizedFromDelivery_(row, params, now, closeTimeFields);
+    AuditService.log('CIERRE_COMPLETO', session.usuario, `id_entrega: ${deliveryId}, escuela: ${codigoLocal || idEscuela}, email: ${row.email_status}`);
     return {
       status: 'ok',
-      message: emailStatus === 'enviado' ? 'Cierre completo guardado y enviado por correo.' : 'Cierre completo guardado; correo pendiente de revision.',
+      message: row.email_status === 'enviado' ? 'Cierre completo guardado y enviado por correo.' : 'Cierre completo guardado; correo/PDF pendiente de revision.',
       data: row,
     };
   }
@@ -1713,6 +1729,9 @@ const SheetsService = (() => {
     if (fields.apellidos !== undefined) _setByHeader(sheet, rowIdx, headers, 'apellidos', fields.apellidos);
     if (fields.rol !== undefined) _setByHeader(sheet, rowIdx, headers, 'rol', fields.rol);
     if (fields.activo !== undefined) _setByHeader(sheet, rowIdx, headers, 'activo', fields.activo);
+    if (fields.documento !== undefined) _setByHeader(sheet, rowIdx, headers, 'documento', fields.documento);
+    if (fields.telefono !== undefined) _setByHeader(sheet, rowIdx, headers, 'telefono', fields.telefono);
+    if (fields.correo !== undefined) _setByHeader(sheet, rowIdx, headers, 'correo', fields.correo);
     if (fields.password) _setByHeader(sheet, rowIdx, headers, 'password_hash', AuthService._hashPassword(fields.password));
   }
 

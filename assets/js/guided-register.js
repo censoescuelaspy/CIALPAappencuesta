@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.70
+ * Version: 2.6.74
  */
 
 const GuidedRegisterModule = (() => {
@@ -1879,7 +1879,7 @@ const GuidedRegisterModule = (() => {
     }
     const packageData = mec.buildFinalDeliveryPackage(snap.completion);
     if (mec.syncDraftToSheets) {
-      await mec.syncDraftToSheets('cierre', { silent: true }).catch(err => {
+      await mec.syncDraftToSheets('cierre_final', { silent: true, force: true }).catch(err => {
         console.warn('[Registro guiado] No se pudo sincronizar borrador MEC antes del cierre:', err);
       });
     }

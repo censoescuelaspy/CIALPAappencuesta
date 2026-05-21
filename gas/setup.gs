@@ -99,7 +99,7 @@ function createDefaultAdmin() {
     SpreadsheetApp.getUi().alert('El usuario admin ya existe.');
     return;
   }
-  sheet.appendRow(['USR_ADMIN_001', 'admin', passwordHash, 'Administrador', 'Sistema', 'admin', 'true', _today(), '', '', '']);
+  sheet.appendRow(['USR_ADMIN_001', 'admin', passwordHash, 'Administrador', 'Sistema', 'admin', 'true', _today(), '', '', '', '', '', '']);
   SpreadsheetApp.getUi().alert('Usuario admin creado. Usuario: admin, contraseña temporal: ' + password + '. Cambiar la contraseña inmediatamente.');
 }
 
@@ -293,7 +293,7 @@ function hashPassword() {
 function _setupSheetsConfigV21_() {
   return [
     { name: SHEET_NAMES.ESCUELAS, headers: _escuelasHeadersV21_() },
-    { name: SHEET_NAMES.USUARIOS, headers: ['id_usuario', 'usuario', 'password_hash', 'nombres', 'apellidos', 'rol', 'activo', 'fecha_alta', 'ultimo_acceso', 'token_actual', 'token_expiry'] },
+    { name: SHEET_NAMES.USUARIOS, headers: ['id_usuario', 'usuario', 'password_hash', 'nombres', 'apellidos', 'rol', 'activo', 'fecha_alta', 'ultimo_acceso', 'token_actual', 'token_expiry', 'documento', 'telefono', 'correo'] },
     { name: SHEET_NAMES.ENCUESTADORES, headers: ['id_encuestador', 'usuario', 'nombres', 'apellidos', 'documento', 'telefono', 'correo', 'zona_asignada', 'rol', 'foto_url', 'activo', 'fecha_alta', 'fecha_actualizacion'] },
     { name: SHEET_NAMES.SESIONES, headers: _sesionesHeadersV21_() },
     { name: SHEET_NAMES.MODULOS, headers: _modulosHeadersV21_() },

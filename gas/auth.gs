@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.gs — Authentication service
- * Version: 2.1.0
+ * Version: 2.6.74
  */
 
 const AuthService = (() => {
@@ -96,8 +96,185 @@ const AuthService = (() => {
     };
   }
 
+  function registrarUsuario(params) {
+    const usuario = _normalizeUsuario(params.usuario);
+    const password = String(params.password || '').trim();
+    const nombres = _cleanText(params.nombres);
+    const apellidos = _cleanText(params.apellidos);
+    const documento = _cleanText(params.documento);
+    const telefono = _cleanText(params.telefono);
+    const correo = _normalizeCorreo(params.correo);
+
+    if (!usuario || !password || !nombres || !apellidos) {
+      return { status: 'error', message: 'Usuario, nombres, apellidos y contraseña son requeridos.' };
+    }
+    if (!_isValidUsername(usuario)) {
+      return { status: 'error', message: 'El usuario debe tener 3 a 60 caracteres y usar solo letras, números, punto, guion o guion bajo.' };
+    }
+    if (!_isAcceptablePassword(password)) {
+      return { status: 'error', message: 'La contraseña debe tener al menos 6 caracteres.' };
+    }
+    if (!correo && !documento) {
+      return { status: 'error', message: 'Cargue correo o documento para poder recuperar la contraseña si hace falta.' };
+    }
+
+    _ensureUserColumns();
+    _ensureEncuestadorColumns();
+
+    const usuarios = _sheetToObjects(SHEET_NAMES.USUARIOS);
+    if (usuarios.some(u => _normalizeUsuario(u.usuario) === usuario)) {
+      return { status: 'error', message: 'Ya existe un usuario con ese nombre.' };
+    }
+    const encuestadores = _sheetToObjects(SHEET_NAMES.ENCUESTADORES);
+    if (encuestadores.some(e => _normalizeUsuario(e.usuario || _usuarioFromName(e.nombres, e.apellidos)) === usuario)) {
+      return { status: 'error', message: 'Ya existe un encuestador con ese usuario.' };
+    }
+    if (correo && encuestadores.some(e => _normalizeCorreo(e.correo) === correo)) {
+      return { status: 'error', message: 'Ya existe un encuestador registrado con ese correo.' };
+    }
+    if (_digits(documento) && encuestadores.some(e => _digits(e.documento) === _digits(documento))) {
+      return { status: 'error', message: 'Ya existe un encuestador registrado con ese documento.' };
+    }
+
+    const userId = _genId('USR');
+    const encId = _genId('ENC');
+    const base = {
+      usuario,
+      nombres,
+      apellidos,
+      documento,
+      telefono,
+      correo,
+      rol: 'encuestador',
+      activo: 'true',
+    };
+
+    _appendObject(SHEET_NAMES.USUARIOS, _userHeaders(), {
+      id_usuario: userId,
+      ...base,
+      password_hash: _hashPassword(password),
+      fecha_alta: _today(),
+      ultimo_acceso: '',
+      token_actual: '',
+      token_expiry: '',
+    });
+    _appendObject(SHEET_NAMES.ENCUESTADORES, _encuestadorHeaders(), {
+      id_encuestador: encId,
+      ...base,
+      zona_asignada: '',
+      foto_url: '',
+      fecha_alta: _today(),
+      fecha_actualizacion: _today(),
+    });
+
+    AuditService.log('USUARIO_REGISTRADO', usuario, 'Alta publica de usuario encuestador sin escuelas asignadas.');
+    return {
+      status: 'ok',
+      message: 'Usuario creado. El administrador podrá asignarle escuelas desde Configuración.',
+      data: { id_usuario: userId, id_encuestador: encId, usuario, rol: 'encuestador' },
+    };
+  }
+
+  function recuperarPassword(params) {
+    const usuario = _normalizeUsuario(params.usuario);
+    const password = String(params.password || params.new_password || '').trim();
+    const documento = _cleanText(params.documento);
+    const correo = _normalizeCorreo(params.correo);
+
+    if (!usuario || !password) {
+      return { status: 'error', message: 'Usuario y nueva contraseña son requeridos.' };
+    }
+    if (!_isAcceptablePassword(password)) {
+      return { status: 'error', message: 'La contraseña debe tener al menos 6 caracteres.' };
+    }
+    if (!correo && !documento) {
+      return { status: 'error', message: 'Ingrese el correo o documento registrado para validar la recuperación.' };
+    }
+
+    _ensureUserColumns();
+    _ensureEncuestadorColumns();
+
+    const usuarios = _sheetToObjects(SHEET_NAMES.USUARIOS);
+    const encuestadores = _sheetToObjects(SHEET_NAMES.ENCUESTADORES);
+    const user = usuarios.find(u => _normalizeUsuario(u.usuario) === usuario);
+    const enc = encuestadores.find(e => _normalizeUsuario(e.usuario || _usuarioFromName(e.nombres, e.apellidos)) === usuario);
+
+    if (!user && !enc) {
+      AuditService.log('PASSWORD_RECOVERY_FAIL', usuario, 'Usuario no encontrado.');
+      return { status: 'error', message: 'No pudimos validar esos datos. Revise usuario, correo o documento.' };
+    }
+    if (_isInactive(user) || _isInactive(enc)) {
+      return { status: 'error', message: 'La cuenta está inactiva. Contacte al administrador.' };
+    }
+
+    if (!_matchesRecoveryContact({ user, enc, correo, documento })) {
+      AuditService.log('PASSWORD_RECOVERY_FAIL', usuario, 'Datos de recuperacion no coinciden.');
+      return { status: 'error', message: 'No pudimos validar esos datos. Revise usuario, correo o documento.' };
+    }
+
+    if (user) {
+      _setUserPassword(user.id_usuario, _hashPassword(password));
+    } else {
+      _appendObject(SHEET_NAMES.USUARIOS, _userHeaders(), {
+        id_usuario: _genId('USR'),
+        usuario,
+        password_hash: _hashPassword(password),
+        nombres: enc.nombres || '',
+        apellidos: enc.apellidos || '',
+        rol: enc.rol || 'encuestador',
+        activo: 'true',
+        fecha_alta: _today(),
+        ultimo_acceso: '',
+        token_actual: '',
+        token_expiry: '',
+        documento: enc.documento || '',
+        telefono: enc.telefono || '',
+        correo: enc.correo || '',
+      });
+    }
+
+    AuditService.log('PASSWORD_RECOVERY', usuario, 'Contraseña actualizada por recuperación validada.');
+    return { status: 'ok', message: 'Contraseña actualizada. Ya puede iniciar sesión.' };
+  }
+
   function _normalizeUsuario(usuario) {
     return String(usuario || '').trim().toLowerCase();
+  }
+
+  function _cleanText(value) {
+    return String(value || '').trim();
+  }
+
+  function _normalizeCorreo(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
+  function _digits(value) {
+    return String(value || '').replace(/\D+/g, '');
+  }
+
+  function _isValidUsername(usuario) {
+    return /^[a-z0-9._-]{3,60}$/.test(String(usuario || ''));
+  }
+
+  function _isAcceptablePassword(password) {
+    const value = String(password || '');
+    return value.length >= 6 && value.length <= 128;
+  }
+
+  function _isInactive(row) {
+    if (!row) return false;
+    const value = String(row.activo ?? '').toLowerCase();
+    return ['false', '0', 'no', 'inactivo'].includes(value);
+  }
+
+  function _matchesRecoveryContact({ user, enc, correo, documento }) {
+    const emails = [user && user.correo, enc && enc.correo].map(_normalizeCorreo).filter(Boolean);
+    const docs = [user && user.documento, enc && enc.documento].map(_digits).filter(Boolean);
+    const emailOk = correo && emails.includes(correo);
+    const doc = _digits(documento);
+    const docOk = doc && docs.includes(doc);
+    return Boolean(emailOk || docOk);
   }
 
   function _isSixDigitPassword(password) {
@@ -162,19 +339,64 @@ const AuthService = (() => {
   }
 
   function _ensureUserColumns() {
-    const sheet = _getSheet(SHEET_NAMES.USUARIOS);
-    const expected = ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual','token_expiry'];
+    _ensureColumns(SHEET_NAMES.USUARIOS, _userHeaders());
+  }
+
+  function _ensureEncuestadorColumns() {
+    _ensureColumns(SHEET_NAMES.ENCUESTADORES, _encuestadorHeaders());
+  }
+
+  function _userHeaders() {
+    return ['id_usuario','usuario','password_hash','nombres','apellidos','rol','activo','fecha_alta','ultimo_acceso','token_actual','token_expiry','documento','telefono','correo'];
+  }
+
+  function _encuestadorHeaders() {
+    return ['id_encuestador','usuario','nombres','apellidos','documento','telefono','correo','zona_asignada','rol','foto_url','activo','fecha_alta','fecha_actualizacion'];
+  }
+
+  function _ensureColumns(sheetName, expected) {
+    const ss = _getSpreadsheet();
+    let sheet = ss.getSheetByName(sheetName);
+    if (!sheet) sheet = ss.insertSheet(sheetName);
     const lastCol = Math.max(sheet.getLastColumn(), 1);
-    const headers = sheet.getLastRow() ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim()) : [];
+    const headers = sheet.getLastRow()
+      ? sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim())
+      : [];
     if (!headers.length || headers.every(h => !h)) {
       sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+      sheet.setFrozenRows(1);
       return;
     }
     expected.forEach(header => {
-      if (!headers.includes(header)) {
-        sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
-      }
+      if (!headers.includes(header)) sheet.getRange(1, sheet.getLastColumn() + 1).setValue(header);
     });
+  }
+
+  function _headers(sheet) {
+    const lastCol = Math.max(sheet.getLastColumn(), 1);
+    return sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
+  }
+
+  function _appendObject(sheetName, headers, obj) {
+    _ensureColumns(sheetName, headers);
+    const sheet = _getSpreadsheet().getSheetByName(sheetName);
+    const currentHeaders = _headers(sheet);
+    sheet.appendRow(currentHeaders.map(h => obj[h] !== undefined ? obj[h] : ''));
+  }
+
+  function _setByHeader(sheet, rowIdx, headers, col, value) {
+    const idx = headers.indexOf(col);
+    if (idx !== -1) sheet.getRange(rowIdx, idx + 1).setValue(value);
+  }
+
+  function _setUserPassword(idUsuario, passwordHash) {
+    const rowIdx = _findRowIndex(SHEET_NAMES.USUARIOS, 'id_usuario', idUsuario);
+    if (rowIdx === -1) return;
+    const sheet = _getSpreadsheet().getSheetByName(SHEET_NAMES.USUARIOS);
+    const headers = _headers(sheet);
+    _setByHeader(sheet, rowIdx, headers, 'password_hash', passwordHash);
+    _setByHeader(sheet, rowIdx, headers, 'token_actual', '');
+    _setByHeader(sheet, rowIdx, headers, 'token_expiry', '');
   }
 
   function _updateUserToken(id_usuario, token, expiry) {
@@ -246,5 +468,5 @@ const AuthService = (() => {
     return { status: 'ok', hash: _hashPassword(password) };
   }
 
-  return { login, validateToken, logout, hashPasswordPublic, _hashPassword };
+  return { login, registrarUsuario, recuperarPassword, validateToken, logout, hashPasswordPublic, _hashPassword };
 })();

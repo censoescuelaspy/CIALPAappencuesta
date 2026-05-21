@@ -422,6 +422,7 @@ const MecFormModule = (() => {
   async function syncDraftToSheets(reason = 'manual', options = {}) {
     const silent = options.silent === true;
     const manual = !silent || reason === 'manual';
+    const force = options.force === true || /cierre|final|termin|complet|entrega/.test(String(reason || '').toLowerCase());
     if (typeof API === 'undefined' || !API.guardarBorradorMec) {
       if (manual) UI.showToast('El guardado en Sheets no esta disponible en esta version del backend.', 'warning', 7200);
       return null;
@@ -431,7 +432,7 @@ const MecFormModule = (() => {
       return null;
     }
     const nowMs = Date.now();
-    if (!manual && nowMs - _lastDraftSyncAt < DRAFT_SYNC_MIN_INTERVAL_MS) return null;
+    if (!manual && !force && nowMs - _lastDraftSyncAt < DRAFT_SYNC_MIN_INTERVAL_MS) return null;
     if (_draftSyncRunning) {
       if (manual) UI.showToast('Ya hay un guardado remoto en curso. Espere unos segundos y revise el aviso de confirmacion.', 'info', 5200);
       return null;

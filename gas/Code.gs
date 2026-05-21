@@ -76,7 +76,7 @@ function _handleRequest(e) {
     const action = params.action || '';
 
     // Public endpoints (no auth required)
-    const publicActions = ['login', 'diagnosticoPadron'];
+    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron'];
     const token = params.token || '';
 
     if (!publicActions.includes(action)) {
@@ -93,6 +93,8 @@ function _handleRequest(e) {
 
     const writeActions = [
       'logout',
+      'registrarUsuario',
+      'recuperarPassword',
       'updateEscuelaEstado',
       'asignarEscuela',
       'iniciarSesion',
@@ -118,6 +120,8 @@ function _handleRequest(e) {
     switch (action) {
       // Auth
       case 'login':           return _respond(AuthService.login(params));
+      case 'registrarUsuario': return _respond(AuthService.registrarUsuario(params));
+      case 'recuperarPassword': return _respond(AuthService.recuperarPassword(params));
       case 'logout':          return _respond(AuthService.logout(params.token));
 
       // Escuelas

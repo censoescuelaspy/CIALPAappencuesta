@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.72
+ * Version: 2.6.74
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -388,26 +388,95 @@ const AppController = (() => {
       demoNotice.style.display = isDemo ? 'block' : 'none';
     }
 
-    const form = document.getElementById('login-form');
-    if (form) {
-      form.addEventListener('submit', async e => {
-        e.preventDefault();
-        const usuario = document.getElementById('login-usuario').value.trim();
-        const password = document.getElementById('login-password').value;
-        const errEl = document.getElementById('login-error');
-        if (errEl) errEl.textContent = '';
-
-        try {
-          await Auth.login(usuario, password);
-          showApp();
-        } catch (err) {
-          if (errEl) errEl.textContent = err.message;
-        }
-      });
-    }
+    _bindAuthForms();
+    _showAuthPanel('login');
   }
 
   // ── Main app shell ─────────────────────────────────────────────────────────
+
+  function _bindAuthForms() {
+    const screen = document.getElementById('login-screen');
+    if (!screen || screen.dataset.authBound === 'true') return;
+    screen.dataset.authBound = 'true';
+
+    screen.querySelectorAll('[data-auth-panel]').forEach(button => {
+      button.addEventListener('click', () => _showAuthPanel(button.dataset.authPanel || 'login'));
+    });
+
+    document.getElementById('login-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      _setAuthMessage('');
+      const usuario = document.getElementById('login-usuario')?.value.trim() || '';
+      const password = document.getElementById('login-password')?.value || '';
+      try {
+        await Auth.login(usuario, password);
+        showApp();
+      } catch (err) {
+        _setAuthMessage(err.message);
+      }
+    });
+
+    document.getElementById('register-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      _setAuthMessage('');
+      const datos = _formObject(e.currentTarget);
+      if (datos.password !== datos.password_confirm) {
+        _setAuthMessage('Las contrasenas no coinciden.');
+        return;
+      }
+      try {
+        await Auth.registerUser(datos);
+        await Auth.login(datos.usuario, datos.password);
+        UI.showToast('Usuario creado. El administrador podra asignarle escuelas.', 'success', 6500);
+        showApp();
+      } catch (err) {
+        _setAuthMessage(err.message);
+      }
+    });
+
+    document.getElementById('recover-form')?.addEventListener('submit', async e => {
+      e.preventDefault();
+      _setAuthMessage('');
+      const datos = _formObject(e.currentTarget);
+      if (datos.password !== datos.password_confirm) {
+        _setAuthMessage('Las contrasenas no coinciden.');
+        return;
+      }
+      try {
+        await Auth.recoverPassword(datos);
+        _showAuthPanel('login');
+        const userInput = document.getElementById('login-usuario');
+        if (userInput) userInput.value = datos.usuario || '';
+        _setAuthMessage('Contrasena actualizada. Ya puede iniciar sesion.', 'success');
+      } catch (err) {
+        _setAuthMessage(err.message);
+      }
+    });
+  }
+
+  function _showAuthPanel(panel = 'login') {
+    const target = ['login', 'register', 'recover'].includes(panel) ? panel : 'login';
+    document.querySelectorAll('[data-auth-panel]').forEach(button => {
+      const active = button.dataset.authPanel === target;
+      button.classList.toggle('auth-tab--active', active);
+      button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    });
+    document.querySelectorAll('[data-auth-form]').forEach(form => {
+      form.hidden = form.dataset.authForm !== target;
+    });
+    _setAuthMessage('');
+  }
+
+  function _setAuthMessage(message, type = 'error') {
+    const el = document.getElementById('login-error');
+    if (!el) return;
+    el.textContent = message || '';
+    el.classList.toggle('login-error--success', type === 'success');
+  }
+
+  function _formObject(form) {
+    return Object.fromEntries([...new FormData(form).entries()].map(([key, value]) => [key, String(value || '').trim()]));
+  }
 
   function showApp() {
     const loginScreen = document.getElementById('login-screen');

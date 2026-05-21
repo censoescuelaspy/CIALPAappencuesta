@@ -4,6 +4,78 @@
 
 ---
 
+## Cierre final no bloqueado por PDF/correo - 2026-05-21 - v2.6.74
+
+### Objetivo
+- Corregir que `Finalizar escuela` dejara la escuela como `en_curso` o `en proceso`.
+- Asegurar que el estado operativo pase a `finalizada` aunque falle la generacion de PDF, Drive o envio por correo.
+- Forzar el guardado final del borrador MEC sin que lo salte el antirrebote del autoguardado.
+
+### Cambios implementados
+- `syncDraftToSheets('cierre_final')` ahora se ejecuta con `force`, ignorando la ventana minima de autoguardado.
+- `guardarCierreCompleto` registra primero la entrega en `entregas_cierre` y marca `escuelas_seleccionadas.estado_relevamiento = finalizada` antes de preparar PDF, metadatos o correo.
+- Si Drive/PDF/correo falla, el cierre queda guardado con `email_status: error` y `email_error`, sin revertir el estado finalizado.
+- El cierre vuelve a actualizar enlaces PDF/metadatos si se generan correctamente despues del cambio de estado.
+- El modo demo tambien marca la escuela como `finalizada` al ejecutar `guardarCierreCompleto`.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.74`.
+
+### Pendiente operativo
+- Publicar el Web App desde la cuenta propietaria/aceptada para que `guardarCierreCompleto` tome la correccion de estado.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.74`.
+- Ejecutar `repararEstadosFinalizadosDesdeCierres()` una vez si ya hay cierres en `entregas_cierre` que siguen apareciendo como `en_curso`.
+- Probar con una escuela real: tocar `Finalizar escuela`, confirmar cierre y verificar `entregas_cierre`, `escuelas_seleccionadas.estado_relevamiento` y `sesiones_relevamiento.estado`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- Revision estatica: `cierre_final` con `force`, estado `finalizada` antes de PDF/correo y cache `cialpa-app-v2.6.74`.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
+## Registro publico de usuarios y recuperacion de contrasena - 2026-05-21 - v2.6.73
+
+### Objetivo
+- Permitir que cualquier persona cree usuario y contrasena desde la pantalla de acceso.
+- Permitir recuperar contrasena validando usuario mas correo o documento registrado.
+- Hacer que las cuentas nuevas aparezcan en `Encuestadores`, sin escuelas asignadas hasta que un admin las distribuya.
+
+### Cambios implementados
+- El login incorpora pestanas `Ingresar`, `Crear usuario` y `Recuperar clave`.
+- El alta publica crea filas espejo en `usuarios` y `encuestadores`, con rol `encuestador`, activo y sin `zona_asignada`.
+- La recuperacion de contrasena exige usuario y correo o documento coincidente antes de actualizar el hash y limpiar tokens activos.
+- `saveEncuestador` mantiene sincronizados documento, telefono y correo en la cuenta espejo de `usuarios`.
+- Se agregan los endpoints publicos GAS `registrarUsuario` y `recuperarPassword`, protegidos por validaciones y lock de escritura.
+- El modo demo tambien permite probar alta y recuperacion sin backend.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.73`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria/aceptada para activar los nuevos endpoints publicos.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.73`.
+- Probar con un usuario nuevo: crear cuenta, confirmar que entra en `Inicio`, verificar que aparece en `Encuestadores`, asignarle escuelas desde admin y validar recuperacion de contrasena.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- Revision estatica: `registrarUsuario`, `recuperarPassword`, formularios `register-form`/`recover-form` y cache `cialpa-app-v2.6.73`.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Inicio limpio sin escuela preseleccionada - 2026-05-21 - v2.6.72
 
 ### Objetivo
