@@ -4,6 +4,36 @@
 
 ---
 
+## Refuerzo de cache y rol admin para guardado de planificacion - 2026-05-21 - v2.6.90
+
+### Objetivo
+- Corregir el caso reportado donde un usuario que ingresa como admin seguia viendo el mensaje viejo `Solo administradores autorizados pueden guardar asignaciones`.
+- Evitar que tablets/celulares sigan ejecutando `planning.js` anterior por cache del navegador o Service Worker.
+- Tratar el rol `admin` del backend como administrador operativo sin depender de la lista local `ADMIN_USERS`.
+
+### Cambios implementados
+- `Auth.isAdminUser()` ahora reconoce como administrador a toda sesion cuyo rol normalizado sea `admin`.
+- Se normalizan variantes de rol como `administrador`, `administradora`, `supervisora`, `encuestadora` y `cargadora`.
+- `index.html` carga CSS, manifest y scripts locales con `?v=2.6.90`, incluyendo `planning.js?v=2.6.90` y `auth.js?v=2.6.90`.
+- Version visible y cache del Service Worker actualizados a `v2.6.90`.
+
+### Pendiente operativo
+- En el celular/tablet con el error, tocar `Actualizar app` una vez y volver a iniciar sesion si lo pide.
+- Confirmar que la pantalla muestre `v2.6.90`, cambiar una asignacion y guardar.
+
+### Validaciones ejecutadas
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/planning.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Revision estatica: no queda el mensaje viejo `Solo administradores autorizados pueden guardar asignaciones` en `planning.js`.
+- Revision estatica: `index.html` carga `auth.js?v=2.6.90` y `planning.js?v=2.6.90`.
+- Revision estatica: `Auth.isAdminUser()` reconoce sesiones con rol normalizado `admin`.
+
+---
+
 ## Guardado visible de distribucion para roles operativos - 2026-05-21 - v2.6.89
 
 ### Objetivo

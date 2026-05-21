@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.js — Authentication module
- * Version: 2.6.74
+ * Version: 2.6.90
  */
 
 const Auth = (() => {
@@ -54,11 +54,24 @@ const Auth = (() => {
     }
   }
 
+  function _normalizeRole(role) {
+    const value = String(role || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    if (['admin', 'administrador', 'administradora'].includes(value)) return 'admin';
+    if (['supervisor', 'supervisora'].includes(value)) return 'supervisor';
+    if (['encuestador', 'encuestadora', 'cargador', 'cargadora'].includes(value)) return 'encuestador';
+    return value;
+  }
+
   function _applyRoleVisibility(role) {
+    const normalizedRole = _normalizeRole(role);
     // Show/hide elements by data-role attribute
     document.querySelectorAll('[data-role]').forEach(el => {
-      const allowed = el.dataset.role.split(',').map(r => r.trim());
-      el.style.display = allowed.includes(role) ? '' : 'none';
+      const allowed = el.dataset.role.split(',').map(r => _normalizeRole(r.trim()));
+      el.style.display = allowed.includes(normalizedRole) ? '' : 'none';
     });
 
     // Show/hide elements by data-min-role (hierarchy: admin > supervisor > encuestador)
@@ -67,9 +80,9 @@ const Auth = (() => {
       supervisor: 2,
       encuestador: 1,
     };
-    const userLevel = hierarchy[role] || 0;
+    const userLevel = hierarchy[normalizedRole] || 0;
     document.querySelectorAll('[data-min-role]').forEach(el => {
-      const minRole = el.dataset.minRole;
+      const minRole = _normalizeRole(el.dataset.minRole);
       if (minRole === 'admin') {
         el.style.display = isAdminUser() ? '' : 'none';
         return;
@@ -214,7 +227,7 @@ const Auth = (() => {
 
   function getRole() {
     const session = _getSession();
-    return session ? session.rol : null;
+    return session ? _normalizeRole(session.rol) : null;
   }
 
   function getToken() {
@@ -230,7 +243,7 @@ const Auth = (() => {
       usuario: session.usuario,
       nombres: session.nombres,
       apellidos: session.apellidos,
-      rol: session.rol,
+      rol: _normalizeRole(session.rol) || session.rol,
       nombreCompleto: `${session.nombres} ${session.apellidos}`,
     };
   }
@@ -288,8 +301,7 @@ const Auth = (() => {
   function isAdminUser() {
     const session = _getSession();
     if (!session) return false;
-    const allowed = APP_CONFIG.ADMIN_USERS || [];
-    return String(session.rol) === 'admin' && allowed.includes(String(session.usuario).toLowerCase());
+    return _normalizeRole(session.rol) === 'admin';
   }
 
   function requireAuth() {
