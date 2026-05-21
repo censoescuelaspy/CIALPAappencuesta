@@ -4,6 +4,39 @@
 
 ---
 
+## Apunte a nuevo Web App propietario - 2026-05-21 - v2.6.80
+
+### Objetivo
+- Apuntar la PWA al nuevo Web App publicado por el propietario.
+- Confirmar que el nuevo deployment mantiene activos los endpoints publicos de cuenta y el padron oficial.
+- Forzar cache nuevo para que administradores y usuarios tomen la URL backend correcta.
+
+### Resultado
+- `APP_CONFIG.GAS_URL` apunta a `https://script.google.com/macros/s/AKfycbxgphQDS0tQ9Kdi5Z0V7wfLZIW1oPA8ukxS1FAw4ysdMUS8wJGOVuIqdxo_c0jaG7MALQ/exec`.
+- El Web App nuevo responde `login` sin credenciales con validacion publica, sin HTTP 403.
+- `registrarUsuario` ya no exige token: sin datos responde validacion de campos requeridos.
+- `recuperarPassword` ya no exige token: sin datos responde validacion de usuario/nueva contrasena.
+- `diagnosticoPadron` responde `source: official_sheet`, `total: 5462`, `con_coordenadas: 5004`, `muestra_piloto: 86`, `filas_operativas: 91`.
+- Version visible y cache del Service Worker actualizados a `v2.6.80`.
+
+### Pendiente operativo
+- Publicar el commit local en GitHub Pages; el push a `origin/main` requiere aprobacion explicita por la politica de seguridad del entorno.
+- Pedir a administradores y usuarios `Actualizar app` para tomar `cialpa-app-v2.6.80`.
+- Probar con usuario nuevo real: registrarse, verificar correo de alta, solicitar relevar una escuela sin asignacion, aprobar desde `Encuestadores` y confirmar que la escuela queda asignada.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App nuevo para `login` sin datos: responde `Usuario y contraseña son requeridos`.
+- Prueba HTTP del Web App nuevo para `diagnosticoPadron`: `official_sheet`, `total: 5462`, `muestra_piloto: 86`.
+- Prueba HTTP del Web App nuevo para `registrarUsuario` sin datos: responde `Usuario, nombres, apellidos y contraseña son requeridos`.
+- Prueba HTTP del Web App nuevo para `recuperarPassword` sin datos: responde `Usuario y nueva contraseña son requeridos`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/api.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Consola admin de encuestadores, solicitudes y correos - 2026-05-21 - v2.6.79
 
 ### Objetivo
