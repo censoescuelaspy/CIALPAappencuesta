@@ -34,6 +34,10 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - Revision estatica: `PUBLIC_ACCOUNT_ENDPOINTS`, `backendNeedsPublish` y cache `cialpa-app-v2.6.78`.
 - `git diff --check`.
+- `git push origin main`: publica commit `8892067`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.78`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.78`.
+- Verificacion HTTP de GitHub Pages para `assets/js/api.js`: contiene `backendNeedsPublish` y mensaje de registro publico.
 
 ---
 
