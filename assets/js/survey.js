@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.6.71
+ * Version: 2.6.72
  */
 
 const SurveyModule = (() => {
@@ -599,14 +599,19 @@ const SurveyModule = (() => {
     _updateTimerDisplay();
   }
 
-  function clearSelection() {
+  function clearSelection(options = {}) {
     _stopTimer();
     _currentEscuela = null;
     _currentSession = null;
     _moduleLogs = [];
     _state = STATE.IDLE;
     _elapsedSeconds = 0;
-    _renderSurveyPanel();
+    if (options.clearMecContext !== false
+      && typeof MecFormModule !== 'undefined'
+      && typeof MecFormModule.clearActiveSchoolContext === 'function') {
+      MecFormModule.clearActiveSchoolContext({ render: Boolean(options.renderMec) });
+    }
+    if (options.render !== false) _renderSurveyPanel();
   }
 
   function getState() { return _state; }

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.71
+ * Version: 2.6.72
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ const AppController = (() => {
     auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
   };
 
-  const START_MODULE = 'registro';
+  const START_MODULE = 'inicio';
   let _currentModule = null;
   let _mapInitialized = false;
   let _sidebarHideTimer = null;
@@ -431,9 +431,9 @@ const AppController = (() => {
       _bindGlobalEvents();
     } catch (err) {
       console.error('Error inicializando la vista principal:', err);
-      UI.showToast?.('Se restauro la vista Registro guiado despues de actualizar la app.', 'warning', 6000);
+      UI.showToast?.('Se restauro la vista Inicio despues de actualizar la app.', 'warning', 6000);
     } finally {
-      resetToHome();
+      resetToHome({ clearSelection: true });
     }
   }
 
@@ -444,15 +444,32 @@ const AppController = (() => {
       if (!event.persisted || !Auth.isLoggedIn()) return;
       const shell = document.getElementById('app-shell');
       if (!shell || shell.style.display === 'none') return;
-      resetToHome();
+      resetToHome({ clearSelection: true });
     });
   }
 
-  function resetToHome() {
+  function _clearActiveSchoolContext() {
+    try {
+      if (typeof SurveyModule !== 'undefined' && typeof SurveyModule.clearSelection === 'function') {
+        SurveyModule.clearSelection({ render: false, clearMecContext: false });
+      }
+      if (typeof MapModule !== 'undefined' && typeof MapModule.clearSelection === 'function') {
+        MapModule.clearSelection({ render: false });
+      }
+      if (typeof MecFormModule !== 'undefined' && typeof MecFormModule.clearActiveSchoolContext === 'function') {
+        MecFormModule.clearActiveSchoolContext({ render: false });
+      }
+    } catch (err) {
+      console.warn('No se pudo limpiar la escuela activa al iniciar:', err);
+    }
+  }
+
+  function resetToHome(options = {}) {
+    if (options.clearSelection) _clearActiveSchoolContext();
     try {
       showModule(START_MODULE);
     } catch (err) {
-      console.error('No se pudo abrir Registro guiado por el ruteador:', err);
+      console.error('No se pudo abrir Inicio por el ruteador:', err);
       _ensureVisibleModule(START_MODULE, true);
     }
     requestAnimationFrame(() => {
@@ -466,7 +483,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['registro', 'mapa', 'jornada', 'planificacion', 'configuracion', 'estadisticas'];
+    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'planificacion', 'configuracion', 'estadisticas'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])

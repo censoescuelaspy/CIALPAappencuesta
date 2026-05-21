@@ -4,6 +4,38 @@
 
 ---
 
+## Inicio limpio sin escuela preseleccionada - 2026-05-21 - v2.6.72
+
+### Objetivo
+- Al ingresar, llevar siempre al usuario a `Inicio` y no abrir el plano o `Registro guiado` automaticamente.
+- Evitar que una escuela anterior quede seleccionada por defecto desde el borrador local del navegador.
+- Conservar los borradores por escuela para recuperarlos solo cuando el usuario seleccione explicitamente una escuela.
+
+### Cambios implementados
+- El modulo inicial de la app vuelve a ser `Inicio`.
+- El menu lateral muestra `Inicio` como primer acceso, antes de `Mapa` y `Registro guiado`.
+- Al abrir o restaurar la app, se limpia la seleccion activa de `SurveyModule` y `MapModule`.
+- El motor MEC agrega `clearActiveSchoolContext()`, que borra solo el borrador activo global `cialpa_mec_form_draft_v1` y deja intactos los borradores por escuela.
+- `SurveyModule.clearSelection()` tambien puede limpiar el contexto activo del MEC sin forzar renderizados innecesarios.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.72`.
+
+### Pendiente operativo
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.72`.
+- Probar con un usuario que ya tenia una escuela abierta: iniciar sesion, confirmar que entra en `Inicio` sin escuela activa, ir al mapa y seleccionar manualmente una escuela asignada.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Revision estatica: `START_MODULE = 'inicio'`, `clearActiveSchoolContext`, `MapModule.clearSelection` y cache `cialpa-app-v2.6.72`.
+
+---
+
 ## Mapa completo con seleccion por asignacion y configuracion de usuarios - 2026-05-20 - v2.6.71
 
 ### Objetivo

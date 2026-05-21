@@ -11330,6 +11330,18 @@ const MecFormModule = (() => {
     return true;
   }
 
+  function clearActiveSchoolContext(options = {}) {
+    clearTimeout(_draftSyncTimer);
+    _draftSyncTimer = null;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* storage can be unavailable in restricted browser modes */
+    }
+    _applyDraftValues({});
+    if (options.render && _initialized) _render();
+  }
+
   async function resetDraft() {
     const confirmed = await UI.showConfirm('Limpiar borrador MEC', '¿Desea borrar las respuestas guardadas localmente para esta prueba?');
     if (!confirmed) return;
@@ -20475,6 +20487,7 @@ const MecFormModule = (() => {
     saveNow,
     saveSketchAndNext,
     setSelectedSchool,
+    clearActiveSchoolContext,
     resetDraft,
     exportJson,
     toggleModule,

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.71
+ * Version: 2.6.72
  */
 
 const MapModule = (() => {
@@ -686,6 +686,16 @@ const MapModule = (() => {
     return _selectedEscuela;
   }
 
+  function clearSelection(options = {}) {
+    _selectedEscuela = null;
+    document.querySelectorAll('.map-list-item--active').forEach(el => el.classList.remove('map-list-item--active'));
+    const panel = document.getElementById('map-info-panel');
+    if (panel && options.render !== false) {
+      panel.classList.remove('map-info-panel--visible');
+      panel.innerHTML = '';
+    }
+  }
+
   function getFiltered() {
     return _filteredEscuelas;
   }
@@ -736,6 +746,7 @@ const MapModule = (() => {
     getMap,
     getEscuelas,
     getSelectedEscuela,
+    clearSelection,
     getFiltered,
     populateFilterButtons,
     populateDistrictButtons,
