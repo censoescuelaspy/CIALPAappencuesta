@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "simulate:api": "node tools/simulation/cialpa_api_simulator.mjs",
+    "simulate:demo": "node tools/simulation/cialpa_bulk_demo_responses.mjs",
     "simulate:ui": "playwright test --config=tools/simulation/playwright.config.mjs",
     "metrics:web": "node tools/simulation/cialpa_web_metrics.mjs",
     "embed:schools": "node tools/simulation/embed_schools_csv.mjs",

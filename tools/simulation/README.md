@@ -38,6 +38,34 @@ node tools/simulation/cialpa_api_simulator.mjs --help
 - `--delay-ms=N`: pausa entre escrituras por worker.
 - `--gas-url=URL`: permite probar otro deployment sin tocar `assets/js/config.js`.
 
+## Demo masivo prorrateado por territorio
+
+Para mostrar tableros y bondades del instrumento sin tocar produccion, generar al menos 1000 respuestas sinteticas desde el padron oficial local:
+
+```powershell
+npm.cmd run simulate:demo -- --count=1000
+```
+
+El generador reparte respuestas por `Departamento + Distrito`: si la cantidad alcanza, asigna al menos una respuesta por distrito y distribuye el resto proporcionalmente al peso del distrito en el padron.
+
+Archivos generados en `tools/simulation/demo-output/`:
+
+- `demo-responses-<runId>.jsonl`: payloads listos para `guardarBorradorMec`.
+- `demo-mec_borradores-<runId>.csv`: CSV con las columnas de la hoja `mec_borradores`.
+- `demo-allocation-<runId>.csv`: prorrateo por departamento y distrito.
+- `demo-infraestructura_mec-<runId>.json`: snapshot agregado para el panel `Infraestructura MEC`.
+- `demo-summary-<runId>.md`: resumen ejecutivo de la simulacion.
+
+La escritura real al backend queda bloqueada por confirmacion explicita:
+
+```powershell
+$env:CIALPA_USER='admin'
+$env:CIALPA_PASSWORD='password'
+npm.cmd run simulate:demo -- --count=1000 --write --confirm-write=SIMULAR_1000 --concurrency=1 --delay-ms=900
+```
+
+Use `--write` solo en una base de prueba o con autorizacion operativa, porque cada payload se guarda como borrador MEC y puede actualizar estado/tiempos de la escuela.
+
 ## Smoke test con Playwright
 
 Instalar dependencias:

@@ -4,6 +4,43 @@
 
 ---
 
+## Simulacion masiva de respuestas demo por territorio - 2026-05-21
+
+### Objetivo
+- Generar al menos 1000 respuestas sinteticas para mostrar las bondades del instrumento CIALPA.
+- Prorratear la muestra por departamento y distrito usando el padron oficial local.
+- Evitar escrituras accidentales en produccion dejando la carga al backend bloqueada por confirmacion explicita.
+
+### Cambios implementados
+- Se agrega `tools/simulation/cialpa_bulk_demo_responses.mjs`.
+- Se agrega el script `npm run simulate:demo`.
+- El generador usa el CSV local `lista_oficial_escuelas_2025_listado_ini.csv`.
+- La asignacion se hace por `Departamento + Distrito`: si la cantidad alcanza, asigna al menos una respuesta por distrito y reparte el resto proporcionalmente al peso del distrito en el padron.
+- Cada respuesta sintetica incluye borrador MEC con bloques, aulas, sanitarios, exteriores, electricidad, accesibilidad, danos, evidencias sinteticas y tiempos logisticos.
+- La salida incluye JSONL de payloads API, CSV compatible con `mec_borradores`, CSV de prorrateo, snapshot `infraestructura_mec` y resumen Markdown.
+- `--write` queda protegido por `--confirm-write=SIMULAR_1000`.
+- `tools/simulation/demo-output/` queda ignorado por Git para no publicar datasets demo grandes.
+
+### Resultado local generado
+- Run ID: `demo1000_20260521`.
+- Respuestas sinteticas: `1000`.
+- Departamentos cubiertos: `18`.
+- Distritos cubiertos: `263`.
+- CSV `mec_borradores`: `tools/simulation/demo-output/demo-mec_borradores-demo1000_20260521.csv`.
+- Payloads API: `tools/simulation/demo-output/demo-responses-demo1000_20260521.jsonl`.
+- Prorrateo territorial: `tools/simulation/demo-output/demo-allocation-demo1000_20260521.csv`.
+- Snapshot infraestructura: `tools/simulation/demo-output/demo-infraestructura_mec-demo1000_20260521.json`.
+- Resumen: `tools/simulation/demo-output/demo-summary-demo1000_20260521.md`.
+
+### Validaciones ejecutadas
+- `node --check tools/simulation/cialpa_bulk_demo_responses.mjs`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `npm.cmd run simulate:demo -- --count=1000 --run-id=demo1000_20260521 --seed=demo-mec-1000`.
+- Verificacion de salida: `1000` filas en `demo-mec_borradores`, `263` distritos en `demo-allocation`.
+- Resumen por departamento revisado: 18 departamentos con respuestas prorrateadas.
+
+---
+
 ## Super panel de infraestructura MEC - 2026-05-21 - v2.6.93
 
 ### Objetivo
