@@ -154,6 +154,7 @@ function seedCatalogos() {
     ['tipo_incidencia', 'TEC', 'Problema técnico', '5', 'true'],
     ['tipo_incidencia', 'SEG', 'Seguridad o riesgo', '6', 'true'],
     ['tipo_incidencia', 'OTR', 'Otra', '7', 'true'],
+    ['tipo_incidencia', 'SOL', 'Solicitud de relevamiento', '8', 'true'],
     ['prioridad', 'ALT', 'Alta', '1', 'true'],
     ['prioridad', 'MED', 'Media', '2', 'true'],
     ['prioridad', 'BAJ', 'Baja', '3', 'true'],

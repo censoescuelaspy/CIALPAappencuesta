@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * planning.js — Estimacion de tiempos y distribucion operativa
- * Version: 2.6.75
+ * Version: 2.6.76
  */
 
 const PlanningModule = (() => {
@@ -13,6 +13,7 @@ const PlanningModule = (() => {
     hoursPerDay: Number(APP_CONFIG.DEFAULT_WORKDAY_HOURS || 6),
     targetDays: 10,
   };
+  const ASSIGNMENT_BATCH_SIZE = 90;
 
   let _schools = [];
   let _surveyors = [];
@@ -22,6 +23,7 @@ const PlanningModule = (() => {
   let _filters = { estado: '', encuestador: '', search: '' };
   let _settings = _loadSettings();
   let _savingAssignments = false;
+  let _assignmentLimit = ASSIGNMENT_BATCH_SIZE;
 
   async function init() {
     const root = document.getElementById('planning-root');
@@ -33,12 +35,18 @@ const PlanningModule = (() => {
     await load();
   }
 
-  async function load() {
+  async function load(options = {}) {
     const root = document.getElementById('planning-root');
     if (root) root.innerHTML = '<div class="card"><p class="text-muted text-center">Cargando planificacion operativa...</p></div>';
     try {
+      const mapSchools = !options.forceNetwork && typeof MapModule !== 'undefined' && typeof MapModule.getEscuelas === 'function'
+        ? (MapModule.getEscuelas() || [])
+        : [];
+      const schoolsPromise = mapSchools.length
+        ? Promise.resolve({ status: 'ok', data: mapSchools, cached: true, meta: { source: 'map_module' } })
+        : API.getEscuelas({}, { preferCache: !options.forceNetwork, forceNetwork: Boolean(options.forceNetwork), cacheMaxAgeMs: 24 * 60 * 60 * 1000 });
       const [schoolsResult, surveyorResult] = await Promise.all([
-        API.getEscuelas(),
+        schoolsPromise,
         API.getEncuestadores().catch(() => ({ status: 'error', data: [] })),
       ]);
       if (schoolsResult.status !== 'ok') throw new Error(schoolsResult.message || 'No se pudieron cargar escuelas.');
@@ -46,6 +54,7 @@ const PlanningModule = (() => {
       _surveyors = _normalizeSurveyors(surveyorResult.data || [], _schools);
       _originalAssignments = Object.fromEntries(_schools.map(school => [_schoolId(school), _assignedName(school)]));
       _draftAssignments = { ..._originalAssignments };
+      _assignmentLimit = ASSIGNMENT_BATCH_SIZE;
       _render();
     } catch (err) {
       if (root) root.innerHTML = `<div class="card"><p class="access-denied">Error al cargar planificacion: ${_escape(err.message)}</p></div>`;
@@ -66,6 +75,12 @@ const PlanningModule = (() => {
 
   function setFilter(key, value) {
     _filters[key] = value || '';
+    _assignmentLimit = ASSIGNMENT_BATCH_SIZE;
+    _render();
+  }
+
+  function showMoreAssignments() {
+    _assignmentLimit += ASSIGNMENT_BATCH_SIZE;
     _render();
   }
 
@@ -256,6 +271,8 @@ const PlanningModule = (() => {
 
   function _renderAssignmentPanel(summary) {
     const filtered = _filteredSchools();
+    const visibleSchools = filtered.slice(0, _assignmentLimit);
+    const remaining = Math.max(0, filtered.length - visibleSchools.length);
     const saveLabel = _savingAssignments ? 'Guardando...' : `Guardar cambios${summary.dirty ? ` (${summary.dirty})` : ''}`;
     const saveDisabled = !summary.dirty || _savingAssignments ? 'disabled' : '';
     return `
@@ -292,6 +309,10 @@ const PlanningModule = (() => {
       </div>
 
       <div class="card">
+        <div class="planning-list-status">
+          <span>Mostrando ${visibleSchools.length} de ${filtered.length} escuela(s) filtrada(s).</span>
+          ${remaining ? `<button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.showMoreAssignments()">Mostrar ${Math.min(ASSIGNMENT_BATCH_SIZE, remaining)} mas</button>` : ''}
+        </div>
         <div class="table-wrapper planning-table-wrapper">
           <table class="planning-table">
             <thead>
@@ -303,7 +324,7 @@ const PlanningModule = (() => {
               </tr>
             </thead>
             <tbody>
-              ${filtered.length ? filtered.map(school => _assignmentRow(school)).join('') : '<tr><td colspan="4" class="text-center text-muted">No hay escuelas para los filtros actuales.</td></tr>'}
+              ${visibleSchools.length ? visibleSchools.map(school => _assignmentRow(school)).join('') : '<tr><td colspan="4" class="text-center text-muted">No hay escuelas para los filtros actuales.</td></tr>'}
             </tbody>
           </table>
         </div>
@@ -599,6 +620,7 @@ const PlanningModule = (() => {
     setSetting,
     setFilter,
     assignSchool,
+    showMoreAssignments,
     autoBalance,
     resetDraft,
     saveAssignments,

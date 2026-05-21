@@ -172,7 +172,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.75</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.76</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -199,7 +199,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.75</strong>
+      Edición vigente<br><strong class="app-version">v2.6.76</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -290,7 +290,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.75</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.76</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -969,7 +969,7 @@
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="PlanningModule.exportCSV()">Exportar CSV</button>
             <button class="btn btn-sm btn-primary" data-min-role="admin" onclick="PlanningModule.saveAssignments()">Guardar asignaciones</button>
-            <button class="btn btn-sm btn-primary" onclick="PlanningModule.load()">↺ Actualizar</button>
+            <button class="btn btn-sm btn-primary" onclick="PlanningModule.load({ forceNetwork: true })">↺ Actualizar</button>
           </div>
         </div>
         <div class="page-content">

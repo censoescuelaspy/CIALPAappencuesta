@@ -1003,7 +1003,7 @@ const AppController = (() => {
     setTimeout(() => MapModule.invalidateSize(), 100);
 
     try {
-      const result = await API.getEscuelas();
+      const result = await API.getEscuelas({}, { preferCache: true, cacheMaxAgeMs: 24 * 60 * 60 * 1000 });
       if (result.status !== 'ok') {
         throw new Error(result.message || 'No se pudo cargar el listado de escuelas.');
       }
@@ -1013,8 +1013,25 @@ const AppController = (() => {
       MapModule.populateFilterButtons();
       MapModule.updateOfflineStatus();
       _bindMapFilters();
+      if (result.cached && navigator.onLine) {
+        _refreshMapRosterFromNetwork();
+      }
     } catch (err) {
       UI.showToast('Error al cargar escuelas: ' + err.message, 'error');
+    }
+  }
+
+  async function _refreshMapRosterFromNetwork() {
+    try {
+      const fresh = await API.getEscuelas({}, { forceNetwork: true });
+      if (fresh.status !== 'ok') return;
+      fresh.data = _prepareMapRosterData(fresh);
+      _warnIfRosterSourceLooksIncomplete(fresh);
+      MapModule.loadMarkers(fresh.data || []);
+      MapModule.populateFilterButtons();
+      MapModule.updateOfflineStatus();
+    } catch (err) {
+      console.warn('[CIALPA] No se pudo refrescar el padron en segundo plano:', err);
     }
   }
 

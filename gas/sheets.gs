@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.74
+ * Version 2.6.76
  */
 
 const SheetsService = (() => {
@@ -525,6 +525,61 @@ const SheetsService = (() => {
     if (params.id_escuela) _updateEscuelaOperational(params.id_escuela, { estado_relevamiento: 'incidencia', fecha_ultimo_evento: _timestamp() });
     AuditService.log('SAVE_INCIDENCIA', session.usuario, `id: ${id}, escuela: ${params.id_escuela || ''}`);
     return { status: 'ok', message: 'Incidencia registrada.', data: { id_incidencia: id } };
+  }
+
+  function solicitarRelevamiento(params) {
+    const session = params._session;
+    const id = params.id_escuela || params.codigo_local;
+    if (!id) return { status: 'error', message: 'Identificador de escuela requerido.' };
+
+    const escuelaResult = getEscuela(id);
+    if (escuelaResult.status !== 'ok') return escuelaResult;
+    const escuela = escuelaResult.data || {};
+    if (_estado(escuela.estado_relevamiento) === 'finalizada') {
+      return { status: 'error', message: 'La escuela ya figura finalizada.' };
+    }
+    if (_txt(_schoolAssignmentText_(escuela))) {
+      return { status: 'error', message: 'La escuela ya esta asignada a un responsable.' };
+    }
+
+    const headers = ['id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion','prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','latitud','longitud'];
+    _ensureColumns(SHEET_NAMES.INCIDENCIAS, headers);
+    const requestedId = _clientMutationId(params);
+    if (requestedId) {
+      const existingIdx = _findRowIndex(SHEET_NAMES.INCIDENCIAS, 'id_incidencia', requestedId);
+      if (existingIdx !== -1) return { status: 'ok', message: 'Solicitud offline ya sincronizada.', data: { id_incidencia: requestedId } };
+    }
+
+    const existing = _sheetToObjects(SHEET_NAMES.INCIDENCIAS).find(function(row) {
+      const sameSchool = _same(row.id_escuela, escuela.id_escuela) || _same(row.codigo_local, escuela.codigo_local);
+      return sameSchool
+        && _same(row.usuario, session.usuario)
+        && _same(row.estado_resolucion, 'pendiente')
+        && _same(row.tipo_incidencia, 'Solicitud de relevamiento');
+    });
+    if (existing) {
+      return { status: 'ok', message: 'Ya existe una solicitud pendiente para esta escuela.', data: { id_incidencia: existing.id_incidencia } };
+    }
+
+    const solicitante = `${session.nombres || ''} ${session.apellidos || ''}`.trim() || session.usuario;
+    const idSolicitud = requestedId || _genId('SOL');
+    _appendObject(SHEET_NAMES.INCIDENCIAS, headers, {
+      id_incidencia: idSolicitud,
+      id_escuela: escuela.id_escuela || id,
+      usuario: session.usuario,
+      fecha_hora: _timestamp(),
+      tipo_incidencia: 'Solicitud de relevamiento',
+      descripcion: params.descripcion || `Solicitud de ${solicitante} para relevar escuela sin asignacion: ${escuela.nombre || params.nombre_escuela || escuela.codigo_local || id}.`,
+      prioridad: 'media',
+      estado_resolucion: 'pendiente',
+      evidencia_url: '',
+      id_sesion: '',
+      codigo_local: escuela.codigo_local || params.codigo_local || '',
+      latitud: escuela.latitud || params.latitud || '',
+      longitud: escuela.longitud || params.longitud || ''
+    });
+    AuditService.log('SOLICITAR_RELEVAMIENTO', session.usuario, `id: ${idSolicitud}, escuela: ${escuela.codigo_local || escuela.id_escuela || id}`);
+    return { status: 'ok', message: 'Solicitud enviada al administrador.', data: { id_incidencia: idSolicitud } };
   }
 
   function uploadEvidence(params) {
@@ -2045,7 +2100,7 @@ const SheetsService = (() => {
   function _estado(v) {
     const t = _txt(v).toLowerCase();
     if (['finalizada','en_curso','incidencia','pendiente','parcial','suspendida','revisar'].includes(t)) return t;
-    if (t.includes('final')) return 'finalizada';
+    if (t.includes('final') || t.includes('complet') || t.includes('cerr') || t.includes('entreg')) return 'finalizada';
     if (t.includes('curso')) return 'en_curso';
     if (t.includes('inci')) return 'incidencia';
     if (t.includes('parc')) return 'parcial';
@@ -2072,7 +2127,7 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, repararSesionesDuplicadasEnCurso, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    saveIncidencia, solicitarRelevamiento, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };

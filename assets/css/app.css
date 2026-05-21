@@ -609,19 +609,21 @@ textarea.form-control { resize: vertical; min-height: 80px; }
 .map-sidebar__filters .choice-button-strip {
   display: flex;
   grid-template-columns: none;
+  flex-wrap: wrap;
   gap: .35rem;
-  overflow-x: auto;
+  overflow-x: visible;
   padding-bottom: .15rem;
   scrollbar-width: thin;
 }
 
 .map-sidebar__filters .choice-button {
-  flex: 0 0 auto;
+  flex: 1 1 88px;
   min-width: 78px;
-  max-width: 168px;
+  max-width: none;
   min-height: 32px;
   padding: .35rem .5rem;
   text-align: left;
+  white-space: normal;
 }
 
 .map-filter-form {
@@ -854,6 +856,15 @@ td {
   font-size: .875rem;
 }
 
+.map-list__limit {
+  padding: .65rem .75rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: .76rem;
+  line-height: 1.35;
+}
+
 .map-list-item {
   display: flex;
   align-items: center;
@@ -965,11 +976,12 @@ td {
 .map-info-card p  { font-size: .85rem; margin-bottom: .3rem; }
 
 /* Leaflet popup custom */
-.map-popup { min-width: 220px; }
+.map-popup { min-width: 190px; max-width: 235px; }
 .map-popup__header { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .5rem; }
 .map-popup__header strong { font-size: .9rem; }
 .map-popup__body p { font-size: .82rem; margin-bottom: .2rem; color: #444; }
-.map-popup__actions { margin-top: .75rem; display: flex; gap: .5rem; flex-wrap: wrap; }
+.map-popup__actions { margin-top: .65rem; display: flex; gap: .4rem; flex-wrap: wrap; }
+.map-popup__actions .btn { flex: 1 1 92px; white-space: normal; }
 .map-readonly-note {
   width: 100%;
   margin: .25rem 0 0;
@@ -3037,6 +3049,16 @@ td {
   margin-top: .15rem;
 }
 
+.planning-list-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .65rem;
+  color: var(--color-text-muted);
+  font-size: .82rem;
+}
+
 .planning-two-col {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
@@ -3136,6 +3158,7 @@ td {
 }
 
 .planning-assignee {
+  flex: 1 1 82px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -3145,6 +3168,7 @@ td {
   font-weight: 800;
   min-height: 44px;
   padding: .35rem .55rem;
+  white-space: normal;
 }
 
 .planning-assignee--active {
@@ -3154,6 +3178,18 @@ td {
 }
 
 @media (max-width: 900px) {
+  .choice-button-strip.choice-button-strip--scroll {
+    display: flex;
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+
+  .choice-button-strip.choice-button-strip--scroll .choice-button {
+    flex: 1 1 96px;
+    max-width: none;
+    white-space: normal;
+  }
+
   .planning-settings,
   .planning-toolbar,
   .planning-kpis,
@@ -3169,6 +3205,11 @@ td {
   }
 
   .planning-save-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .planning-list-status {
     align-items: stretch;
     flex-direction: column;
   }

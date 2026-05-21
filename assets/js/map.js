@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.72
+ * Version: 2.6.76
  */
 
 const MapModule = (() => {
@@ -19,6 +19,7 @@ const MapModule = (() => {
 
   const _PALETTE = ['#2b6cb0', '#2f855a', '#b7791f', '#805ad5', '#c05621', '#0f766e', '#b83280', '#4a5568', '#2563eb', '#16a34a'];
   const _OSM_SUBDOMAINS = ['a', 'b', 'c'];
+  const MAP_LIST_LIMIT = 240;
 
   // ── Icon factory ──────────────────────────────────────────────────────────
 
@@ -75,7 +76,25 @@ const MapModule = (() => {
   }
 
   function _isClosed(e) {
-    return ['finalizada', 'cerrada', 'completada'].includes(String(e.estado_relevamiento || '').toLowerCase());
+    const state = String(e.estado_relevamiento || '').toLowerCase();
+    return ['finalizada', 'cerrada', 'completada', 'entregada'].includes(state)
+      || state.includes('final')
+      || state.includes('complet')
+      || state.includes('cerr')
+      || state.includes('entreg');
+  }
+
+  function _assignmentLabel(e) {
+    return String(Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || '')).trim();
+  }
+
+  function _isUnassigned(e) {
+    const label = _assignmentLabel(e);
+    return !label || label === 'No asignada';
+  }
+
+  function _canRequestSurvey(e) {
+    return Boolean(e) && Auth.isLoggedIn() && !_isClosed(e) && _isUnassigned(e);
   }
 
   function _getIcon(e) {
@@ -104,7 +123,9 @@ const MapModule = (() => {
     const estadoColor = APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d';
     const canSurvey = Auth.canAccess('encuestador');
     const canOperate = canSurvey && Auth.canOperateSchool(e);
+    const canRequest = _canRequestSurvey(e) && !canOperate;
     const idArg = _jsString(e.id_escuela);
+    const location = [e.distrito, e.localidad].filter(Boolean).join(' - ');
 
     return `
       <div class="map-popup">
@@ -113,18 +134,14 @@ const MapModule = (() => {
           <span class="badge" style="background:${_escape(estadoColor)}">${_escape(estadoLabel)}</span>
         </div>
         <div class="map-popup__body">
-          <p><b>Código:</b> ${_escape(e.codigo_local || '—')}</p>
-          <p><b>Departamento:</b> ${_escape(e.departamento || '—')}</p>
-          <p><b>Distrito:</b> ${_escape(e.distrito || '—')}</p>
-          <p><b>Localidad:</b> ${_escape(e.localidad || '—')}</p>
-          <p><b>Zona:</b> ${_escape(e.zona || '—')}</p>
+          <p><b>Codigo:</b> ${_escape(e.codigo_local || '-')}</p>
+          <p><b>Lugar:</b> ${_escape(location || e.departamento || '-')}</p>
           <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
-          ${e.fecha_ultimo_evento ? `<p><b>Último evento:</b> ${_escape(e.fecha_ultimo_evento)}</p>` : ''}
-          ${e.observaciones ? `<p><b>Observaciones:</b> ${_escape(e.observaciones)}</p>` : ''}
         </div>
         <div class="map-popup__actions">
           ${canOperate ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>` : ''}
           ${canOperate ? `<button class="btn btn-primary btn-sm" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
+          ${canRequest ? `<button class="btn btn-warning btn-sm" onclick='MapModule.solicitarRelevamiento(${idArg})'>Solicitar relevar</button>` : ''}
           ${canSurvey && !canOperate ? _readonlyNotice(e) : ''}
           <button class="btn btn-outline btn-sm" onclick='MapModule.focusListItem(${idArg})'>Ver en lista</button>
         </div>
@@ -239,13 +256,13 @@ const MapModule = (() => {
       if (isNaN(lat) || isNaN(lng)) return;
 
       const marker = L.marker([lat, lng], { icon: _getIcon(e) });
-      marker.bindPopup(_buildPopup(e), { maxWidth: 300 });
+      marker.bindPopup(_buildPopup(e), { maxWidth: 245 });
       marker.escuelaId = e.id_escuela;
 
       marker.on('click', () => {
         _selectedEscuela = e;
         _highlightListItem(e.id_escuela);
-        _updateInfoPanel(e);
+        _hideInfoPanel();
       });
 
       _markers[e.id_escuela] = marker;
@@ -309,7 +326,8 @@ const MapModule = (() => {
       return;
     }
 
-    container.innerHTML = escuelas.map(e => {
+    const visible = escuelas.slice(0, MAP_LIST_LIMIT);
+    container.innerHTML = visible.map(e => {
       const estadoColor = _surveyorColor(_surveyorName(e));
       const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
       const strength = _isClosed(e) ? 'cerrada' : 'pendiente';
@@ -323,7 +341,10 @@ const MapModule = (() => {
           </div>
           <span class="map-list-item__badge" style="background:${_escape(APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d')}">${_escape(estadoLabel)}</span>
         </div>`;
-    }).join('');
+    }).join('') + (escuelas.length > visible.length ? `
+      <div class="map-list__limit">
+        Mostrando ${visible.length} de ${escuelas.length} escuelas. Use filtros o busqueda para afinar la lista.
+      </div>` : '');
   }
 
   function _highlightListItem(id) {
@@ -360,8 +381,16 @@ const MapModule = (() => {
     panel.classList.add('map-info-panel--visible');
   }
 
+  function _hideInfoPanel() {
+    const panel = document.getElementById('map-info-panel');
+    if (!panel) return;
+    panel.classList.remove('map-info-panel--visible');
+    panel.innerHTML = '';
+  }
+
   function _readonlyNotice(e, block = false) {
     const assigned = Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || 'No asignada');
+    if (_canRequestSurvey(e)) return '';
     const cls = block ? 'map-readonly-note map-readonly-note--block' : 'map-readonly-note';
     return `<p class="${cls}"><b>Solo lectura.</b> Asignada a: ${_escape(assigned)}. Use el mapa para consultar; solo puede iniciar o migrar escuelas asignadas a su usuario.</p>`;
   }
@@ -514,7 +543,7 @@ const MapModule = (() => {
     const escuela = _escuelas.find(e => e.id_escuela === id);
     if (escuela) {
       _selectedEscuela = escuela;
-      _updateInfoPanel(escuela);
+      _hideInfoPanel();
     }
   }
 
@@ -536,7 +565,7 @@ const MapModule = (() => {
     }
     _selectedEscuela = escuela;
     _highlightListItem(escuela.id_escuela);
-    _updateInfoPanel(escuela);
+    _hideInfoPanel();
     const ready = typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function'
       ? SurveyModule.setCurrentEscuela(escuela)
       : true;
@@ -548,6 +577,39 @@ const MapModule = (() => {
       } catch { /* non-fatal */ }
     }, 160);
     UI.showToast(`Escuela activa: ${escuela.nombre || escuela.codigo_local || escuela.id_escuela}.`, 'success', 4200);
+  }
+
+  async function solicitarRelevamiento(id) {
+    if (!Auth.requireAuth()) return;
+    const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
+    if (!escuela) {
+      UI.showToast('No se encontro la escuela seleccionada.', 'warning');
+      return;
+    }
+    if (!_canRequestSurvey(escuela)) {
+      UI.showToast('Solo se puede solicitar una escuela pendiente y sin asignacion.', 'warning', 6000);
+      return;
+    }
+    const ok = await UI.showConfirm(
+      'Solicitar relevamiento',
+      `Se enviara al administrador una solicitud para relevar ${escuela.nombre || escuela.codigo_local || escuela.id_escuela}.`
+    );
+    if (!ok) return;
+    try {
+      const result = await API.solicitarRelevamiento({
+        id_escuela: escuela.id_escuela,
+        codigo_local: escuela.codigo_local || '',
+        nombre_escuela: escuela.nombre || '',
+        departamento: escuela.departamento || '',
+        distrito: escuela.distrito || '',
+        localidad: escuela.localidad || '',
+      });
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo enviar la solicitud.');
+      UI.showToast(result.message || 'Solicitud enviada al administrador.', 'success', 6500);
+      if (_markers[escuela.id_escuela]) _markers[escuela.id_escuela].closePopup();
+    } catch (err) {
+      UI.showToast('Error al enviar solicitud: ' + err.message, 'error', 7000);
+    }
   }
 
   function invalidateSize() {
@@ -742,6 +804,7 @@ const MapModule = (() => {
     flyTo,
     focusListItem,
     startGuidedRegister,
+    solicitarRelevamiento,
     invalidateSize,
     getMap,
     getEscuelas,

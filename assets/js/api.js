@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.74
+ * Version: 2.6.76
  */
 
 const API = (() => {
@@ -400,6 +400,7 @@ const API = (() => {
       case 'saveEncuestador': return { status: 'ok' };
       case 'deleteEncuestador': return { status: 'ok' };
       case 'saveIncidencia': return { status: 'ok', data: { id_incidencia: 'INC_DEMO_' + Date.now() } };
+      case 'solicitarRelevamiento': return { status: 'ok', message: 'Solicitud demo enviada al administrador.', data: { id_incidencia: 'SOL_DEMO_' + Date.now(), demo: true } };
       case 'uploadEvidence': return {
         status: 'ok',
         data: {
@@ -512,6 +513,7 @@ const API = (() => {
       'iniciarModulo',
       'cerrarModulo',
       'saveIncidencia',
+      'solicitarRelevamiento',
       'guardarBorradorMec',
       'guardarCierreCompleto',
       'resolverIncidencia',
@@ -571,7 +573,7 @@ const API = (() => {
     if (endpoint === 'cerrarSesion') {
       return { duracion_minutos: data.duracion_minutos || 0, offline: true };
     }
-    if (endpoint === 'saveIncidencia') return { id_incidencia: data.clientMutationId || queued.id, offline: true };
+    if (endpoint === 'saveIncidencia' || endpoint === 'solicitarRelevamiento') return { id_incidencia: data.clientMutationId || queued.id, offline: true };
     if (endpoint === 'guardarCierreCompleto') {
       return {
         id_entrega: data.clientMutationId || queued.id,
@@ -686,9 +688,26 @@ const API = (() => {
     throw new Error(msg);
   }
 
-  async function getEscuelas(filters = {}) {
-    const result = await call('getEscuelas', 'GET', filters, { skipLoading: true });
-    if (result.status === 'ok' && filters?.includeExample) result.data = _withExampleSchool(result.data || []);
+  async function getEscuelas(filters = {}, options = {}) {
+    const request = { ...(filters || {}) };
+    const { preferCache = false, forceNetwork = false, cacheMaxAgeMs = 15 * 60 * 1000 } = options || {};
+    if (preferCache && !forceNetwork && typeof CialpaLocalStore !== 'undefined') {
+      const cached = await CialpaLocalStore.getApi('getEscuelas', request).catch(() => null);
+      const savedAt = cached?.savedAt ? Date.parse(cached.savedAt) : 0;
+      const age = savedAt ? Date.now() - savedAt : 0;
+      if (cached?.response?.status === 'ok' && (!savedAt || age <= cacheMaxAgeMs)) {
+        const response = {
+          ...cached.response,
+          cached: true,
+          cachedAt: cached.savedAt || '',
+          message: cached.response.message || 'Listado cargado desde cache local.',
+        };
+        if (response.status === 'ok' && request.includeExample) response.data = _withExampleSchool(response.data || []);
+        return response;
+      }
+    }
+    const result = await call('getEscuelas', 'GET', request, { skipLoading: true });
+    if (result.status === 'ok' && request?.includeExample) result.data = _withExampleSchool(result.data || []);
     return result;
   }
   async function getEscuela(id) {
@@ -715,6 +734,7 @@ const API = (() => {
   async function deleteEncuestador(id) { return call('deleteEncuestador', 'POST', { id_encuestador: id }); }
 
   async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
+  async function solicitarRelevamiento(datos) { return call('solicitarRelevamiento', 'POST', datos); }
   async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
@@ -749,6 +769,7 @@ const API = (() => {
     saveEncuestador,
     deleteEncuestador,
     saveIncidencia,
+    solicitarRelevamiento,
     guardarBorradorMec,
     guardarCierreCompleto,
     uploadEvidence,

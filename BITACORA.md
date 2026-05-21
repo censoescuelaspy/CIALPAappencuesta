@@ -4,6 +4,44 @@
 
 ---
 
+## Mapa liviano, botones responsivos y solicitud de relevamiento - 2026-05-21 - v2.6.76
+
+### Objetivo
+- Reducir la espera percibida al cargar listas grandes de escuelas en mapa y planificacion.
+- Hacer que las filas de botones bajen a nuevas lineas en moviles/tablets en vez de formar tiras horizontales largas.
+- Evitar ficha duplicada al seleccionar un punto del mapa.
+- Permitir que cualquier usuario solicite al administrador relevar una escuela no finalizada y sin asignacion.
+
+### Cambios implementados
+- `API.getEscuelas` puede usar cache local reciente y forzar red solo cuando se necesita refrescar.
+- `Mapa` carga primero desde cache local si existe y refresca el padron en segundo plano.
+- La lista lateral del mapa y la tabla de asignaciones renderizan un lote inicial, evitando crear miles de filas de una sola vez.
+- `Planificacion > Distribucion de escuelas` reutiliza la lista ya cargada por el mapa cuando esta disponible.
+- Las tiras de filtros/botones envuelven en varias lineas en tablet y movil.
+- El popup del marcador queda compacto y se elimina la ficha lateral duplicada cuando hay mapa grafico.
+- Se agrega la accion `Solicitar relevar` para escuelas pendientes/sin asignacion.
+- Apps Script agrega `solicitarRelevamiento`, que registra una solicitud en `incidencias` sin cambiar el estado operativo de la escuela.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.76`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria/aceptada para activar `solicitarRelevamiento`.
+- Pedir a usuarios y administradores `Actualizar app` para tomar `cialpa-app-v2.6.76`.
+- Probar con usuario no admin: abrir una escuela sin asignacion, tocar `Solicitar relevar` y verificar que el admin vea la solicitud en `incidencias`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/planning.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Guardado visible de asignaciones de escuelas - 2026-05-21 - v2.6.75
 
 ### Objetivo

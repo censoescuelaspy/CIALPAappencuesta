@@ -106,6 +106,7 @@ function _handleRequest(e) {
       'saveEncuestador',
       'deleteEncuestador',
       'saveIncidencia',
+      'solicitarRelevamiento',
       'uploadEvidence',
       'guardarBorradorMec',
       'guardarCierreCompleto',
@@ -151,6 +152,7 @@ function _handleRequest(e) {
 
       // Incidencias
       case 'saveIncidencia':  return _respond(SheetsService.saveIncidencia(params));
+      case 'solicitarRelevamiento': return _respond(SheetsService.solicitarRelevamiento(params));
       case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));
       case 'guardarBorradorMec': return _respond(SheetsService.guardarBorradorMec(params));
       case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));
