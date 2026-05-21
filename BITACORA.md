@@ -32,6 +32,11 @@
 - Validacion sintactica de `gas/*.gs` mediante Node.
 - `git diff --check`.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git push origin main`: publica commit `53ff12a`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.82`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.82`.
+- Verificacion HTTP de GitHub Pages para `assets/js/map.js`: contiene mensaje operativo `falta autorizar MailApp`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.82`.
 
 ---
 
