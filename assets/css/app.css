@@ -826,6 +826,11 @@ td {
   background: var(--color-surface-alt);
 }
 
+.map-sidebar__filters [data-choice-list] {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 .map-sidebar__filters .form-control {
   margin-bottom: .5rem;
 }
@@ -846,6 +851,7 @@ td {
 
 #map-school-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -2535,18 +2541,37 @@ td {
     display: flex;
     width: 100%;
     min-width: 0;
+    min-height: 0;
     max-height: 34dvh;
     border-top: 1px solid var(--color-border);
     border-right: 0;
   }
 
   .map-sidebar__filters {
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: min(22dvh, 260px);
     padding: .5rem;
     overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .map-sidebar__filters .form-control {
     margin-bottom: 0;
+  }
+
+  .map-filter-group[open] .map-filter-group__body {
+    max-height: 13rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .map-sidebar__filters [data-choice-list] {
+    max-height: 8.5rem;
+    overflow-y: auto;
+    padding-right: .15rem;
   }
 
   .map-sidebar__filter-btns {
@@ -2838,7 +2863,16 @@ td {
   }
 
   .map-sidebar__filters {
+    max-height: min(22dvh, 220px);
     padding: .45rem;
+  }
+
+  .map-filter-group[open] .map-filter-group__body {
+    max-height: 10rem;
+  }
+
+  .map-sidebar__filters [data-choice-list] {
+    max-height: 6.8rem;
   }
 
   .map-sidebar__filter-btns {
@@ -2911,6 +2945,10 @@ td {
 
   .map-sidebar {
     max-height: 36dvh;
+  }
+
+  .map-sidebar__filters {
+    max-height: min(24dvh, 190px);
   }
 
   .chart-card canvas {

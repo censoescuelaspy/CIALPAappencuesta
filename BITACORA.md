@@ -4,6 +4,32 @@
 
 ---
 
+## Scroll tactil de filtros del mapa - 2026-05-21 - v2.6.77
+
+### Objetivo
+- Corregir que, en moviles/tablets, las listas de botones de filtros del mapa quedaran fijas y taparan el acceso a otros grupos de opciones.
+- Mantener botones responsivos en varias lineas sin bloquear el desplazamiento del panel.
+
+### Cambios implementados
+- `Mapa` limita la altura de la franja de filtros en pantallas angostas y le da scroll vertical propio.
+- Las listas largas de botones dinamicos, como departamento, distrito y encuestador, tienen altura maxima y desplazamiento tactil independiente.
+- Los grupos abiertos de filtros tambien pueden desplazarse cuando el contenido supera el alto disponible.
+- La lista de escuelas conserva alto util debajo de los filtros gracias a `min-height: 0`.
+- Version visible y cache del Service Worker actualizados a `v2.6.77`.
+
+### Pendiente operativo
+- Pedir a usuarios y administradores `Actualizar app` para tomar `cialpa-app-v2.6.77`.
+- Probar en tablet/celular: abrir `Mapa`, desplegar filtros largos y confirmar que se puede bajar hasta `Operacion` y los botones finales.
+
+### Validaciones ejecutadas
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Revision estatica: `map-sidebar__filters`, `data-choice-list`, `map-filter-group__body` y cache `cialpa-app-v2.6.77`.
+- `git diff --check`.
+
+---
+
 ## Mapa liviano, botones responsivos y solicitud de relevamiento - 2026-05-21 - v2.6.76
 
 ### Objetivo
