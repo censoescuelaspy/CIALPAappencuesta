@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.js — Authentication module
- * Version: 2.0.0
+ * Version: 2.6.71
  */
 
 const Auth = (() => {
@@ -186,6 +186,56 @@ const Auth = (() => {
     };
   }
 
+  function _normalizeIdentity(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+  }
+
+  function _identityAliases(session) {
+    if (!session) return [];
+    const fullName = `${session.nombres || ''} ${session.apellidos || ''}`.trim();
+    const firstName = String(session.nombres || '').trim().split(/\s+/)[0] || '';
+    const firstLast = String(session.apellidos || '').trim().split(/\s+/)[0] || '';
+    return [
+      session.usuario,
+      session.id_usuario,
+      fullName,
+      firstName && firstLast ? `${firstName}.${firstLast}` : '',
+      firstName && firstLast ? `${firstName} ${firstLast}` : '',
+    ].filter(Boolean);
+  }
+
+  function canOperateSchool(escuela) {
+    const session = _getSession();
+    if (!session || !escuela) return false;
+    if (String(escuela.id_escuela || '') === 'ESC_DEMO_CIALPA') return true;
+    if (isAdminUser()) return true;
+
+    const assignedText = [
+      escuela.encuestador_asignado,
+      escuela.usuario_asignado,
+      escuela.encuestador,
+      escuela.responsable,
+      escuela.id_encuestador,
+      escuela.id_usuario_asignado,
+    ].filter(Boolean).join(' ');
+    const assigned = _normalizeIdentity(assignedText);
+    if (!assigned) return false;
+
+    return _identityAliases(session)
+      .map(_normalizeIdentity)
+      .filter(Boolean)
+      .some(alias => assigned === alias || assigned.includes(alias) || (assigned.length >= 6 && alias.includes(assigned)));
+  }
+
+  function schoolAssignmentLabel(escuela) {
+    return String(escuela?.encuestador_asignado || escuela?.usuario_asignado || escuela?.encuestador || 'No asignada');
+  }
+
   function isAdminUser() {
     const session = _getSession();
     if (!session) return false;
@@ -233,6 +283,8 @@ const Auth = (() => {
     getToken,
     getUserInfo,
     isAdminUser,
+    canOperateSchool,
+    schoolAssignmentLabel,
     requireAuth,
     applyRoleVisibility,
     canAccess,

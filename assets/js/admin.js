@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.6.59
+ * Version: 2.6.71
  */
 
 const AdminModule = (() => {
@@ -22,7 +22,7 @@ const AdminModule = (() => {
       return;
     }
     _bindTabEvents();
-    loadConfig();
+    _switchTab('encuestadores');
   }
 
   function _bindTabEvents() {

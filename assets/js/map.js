@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.5.18
+ * Version: 2.6.71
  */
 
 const MapModule = (() => {
@@ -103,6 +103,7 @@ const MapModule = (() => {
     const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
     const estadoColor = APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d';
     const canSurvey = Auth.canAccess('encuestador');
+    const canOperate = canSurvey && Auth.canOperateSchool(e);
     const idArg = _jsString(e.id_escuela);
 
     return `
@@ -122,8 +123,9 @@ const MapModule = (() => {
           ${e.observaciones ? `<p><b>Observaciones:</b> ${_escape(e.observaciones)}</p>` : ''}
         </div>
         <div class="map-popup__actions">
-          ${canSurvey ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>` : ''}
-          ${canSurvey ? `<button class="btn btn-primary btn-sm" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
+          ${canOperate ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>` : ''}
+          ${canOperate ? `<button class="btn btn-primary btn-sm" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
+          ${canSurvey && !canOperate ? _readonlyNotice(e) : ''}
           <button class="btn btn-outline btn-sm" onclick='MapModule.focusListItem(${idArg})'>Ver en lista</button>
         </div>
       </div>`;
@@ -224,7 +226,7 @@ const MapModule = (() => {
   // ── Markers ───────────────────────────────────────────────────────────────
 
   function loadMarkers(escuelas) {
-    _escuelas = (escuelas || []).filter(_visibleForCurrentUser);
+    _escuelas = escuelas || [];
     _filteredEscuelas = [..._escuelas];
     _markers = {};
 
@@ -257,15 +259,7 @@ const MapModule = (() => {
   }
 
   function _visibleForCurrentUser(e) {
-    if (Auth.canAccess('supervisor')) return true;
-    const user = Auth.getUserInfo?.();
-    if (!user) return false;
-    const assigned = String(e.encuestador_asignado || '').toLowerCase().trim();
-    if (!assigned) return false;
-    const aliases = [user.usuario, user.nombreCompleto, `${user.nombres} ${user.apellidos}`, user.id]
-      .filter(Boolean)
-      .map(v => String(v).toLowerCase().trim());
-    return aliases.some(alias => assigned === alias || assigned.includes(alias));
+    return Boolean(e) && Auth.isLoggedIn();
   }
 
   // ── Filtering ─────────────────────────────────────────────────────────────
@@ -345,6 +339,8 @@ const MapModule = (() => {
     if (!panel) return;
     const state = _safeState(e.estado_relevamiento);
     const idArg = _jsString(e.id_escuela);
+    const canSurvey = Auth.canAccess('encuestador');
+    const canOperate = canSurvey && Auth.canOperateSchool(e);
     panel.innerHTML = `
       <div class="map-info-card">
         <h4>${_escape(e.nombre)}</h4>
@@ -355,12 +351,28 @@ const MapModule = (() => {
         <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
         <p><b>Tiempo estimado:</b> ${_estimateMinutes(e)} min</p>
         <p><b>Estado:</b> <span class="badge badge--${state}">${_escape(APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento)}</span></p>
-        ${Auth.canAccess('encuestador') ? `
+        ${canOperate ? `
           <button class="btn btn-success btn-block mt-2" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>
           <button class="btn btn-primary btn-block mt-2" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>
         ` : ''}
+        ${canSurvey && !canOperate ? _readonlyNotice(e, true) : ''}
       </div>`;
     panel.classList.add('map-info-panel--visible');
+  }
+
+  function _readonlyNotice(e, block = false) {
+    const assigned = Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || 'No asignada');
+    const cls = block ? 'map-readonly-note map-readonly-note--block' : 'map-readonly-note';
+    return `<p class="${cls}"><b>Solo lectura.</b> Asignada a: ${_escape(assigned)}. Use el mapa para consultar; solo puede iniciar o migrar escuelas asignadas a su usuario.</p>`;
+  }
+
+  function _showSelectionBlocked(e) {
+    const assigned = Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || 'No asignada');
+    UI.showAlert(
+      'Escuela no asignada',
+      `Puede ver esta escuela en el mapa, pero no puede seleccionarla para carga. Asignada a: ${assigned}.`,
+      'warning'
+    );
   }
 
   function _estimateMinutes(e) {
@@ -516,6 +528,10 @@ const MapModule = (() => {
     const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
     if (!escuela) {
       UI.showToast('No se encontro la escuela seleccionada en el mapa.', 'warning');
+      return;
+    }
+    if (!Auth.canOperateSchool(escuela)) {
+      _showSelectionBlocked(escuela);
       return;
     }
     _selectedEscuela = escuela;

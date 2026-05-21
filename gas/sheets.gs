@@ -43,18 +43,6 @@ const SheetsService = (() => {
       .filter(r => r.codigo_local || r.id_escuela || r.nombre);
 
     filters = filters || {};
-    const session = filters._session;
-    if (session && String(session.rol) === 'encuestador') {
-      const aliases = [
-        session.usuario,
-        `${session.nombres || ''} ${session.apellidos || ''}`.trim(),
-        session.id_usuario
-      ].filter(Boolean).map(v => String(v).toLowerCase());
-      rows = rows.filter(r => {
-        const assigned = String(r.encuestador_asignado || '').toLowerCase();
-        return aliases.some(alias => assigned === alias || assigned.includes(alias));
-      });
-    }
     rows = _markSheetFallbackPilotRows_(rows, source.source);
     if (filters.departamento) rows = rows.filter(r => _same(r.departamento, filters.departamento));
     if (filters.estado) rows = rows.filter(r => _same(r.estado_relevamiento, filters.estado));
@@ -138,6 +126,7 @@ const SheetsService = (() => {
 
     const raw = _objectFromRow(sheet, rowIdx, headers);
     const normalized = _normalizarEscuela(raw, rowIdx);
+    if (!_canOperateSchool_(session, normalized)) return _schoolAccessError_(normalized);
     set('id_escuela', normalized.id_escuela);
     set('codigo_local', normalized.codigo_local);
     set('nombre', normalized.nombre);
@@ -183,6 +172,7 @@ const SheetsService = (() => {
     const escuelaResult = getEscuela(idEscuela);
     if (escuelaResult.status !== 'ok') return escuelaResult;
     const escuela = escuelaResult.data;
+    if (!_canOperateSchool_(session, escuela)) return _schoolAccessError_(escuela);
 
     const requestedSessionId = _clientMutationId(params);
     const allowMultiple = _configBool('ALLOW_MULTIPLE_SESSIONS', false);
@@ -629,6 +619,9 @@ const SheetsService = (() => {
     const now = _timestamp();
     const escuelaResult = idEscuela ? getEscuela(idEscuela) : { status: 'error' };
     const escuela = escuelaResult.status === 'ok' ? escuelaResult.data : {};
+    if (!_canOperateSchool_(session, escuelaResult.status === 'ok' ? escuela : { id_escuela: idEscuela, codigo_local: codigoLocalParam })) {
+      return _schoolAccessError_(escuelaResult.status === 'ok' ? escuela : { encuestador_asignado: '' });
+    }
     const counts = params.counts || {};
     const evidenceIndex = Array.isArray(params.evidenceIndex) ? params.evidenceIndex : [];
     const timeTracking = _timeTrackingFromDraftParams(params);
@@ -732,6 +725,9 @@ const SheetsService = (() => {
     const idEscuela = params.id_escuela || params.codigo_local || '';
     const escuelaResult = idEscuela ? getEscuela(idEscuela) : { status: 'error' };
     const escuela = escuelaResult.status === 'ok' ? escuelaResult.data : {};
+    if (!_canOperateSchool_(session, escuelaResult.status === 'ok' ? escuela : { id_escuela: idEscuela, codigo_local: params.codigo_local || '' })) {
+      return _schoolAccessError_(escuelaResult.status === 'ok' ? escuela : { encuestador_asignado: '' });
+    }
     const codigoLocal = params.codigo_local || escuela.codigo_local || '';
     const nombreEscuela = params.nombre_escuela || escuela.nombre || '';
     const recipient = params.destinatario_email || _config('FINAL_REPORT_EMAIL', 'censoescuelaspy@gmial.com');
@@ -1804,6 +1800,60 @@ const SheetsService = (() => {
 
   function _same(a, b) {
     return _txt(a).toLowerCase() === _txt(b).toLowerCase();
+  }
+
+  function _identityKey_(value) {
+    return _txt(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+  }
+
+  function _sessionIdentityAliases_(session) {
+    session = session || {};
+    const fullName = `${session.nombres || ''} ${session.apellidos || ''}`.trim();
+    const firstName = _txt(session.nombres).split(/\s+/)[0] || '';
+    const firstLast = _txt(session.apellidos).split(/\s+/)[0] || '';
+    return [
+      session.usuario,
+      session.id_usuario,
+      fullName,
+      firstName && firstLast ? `${firstName}.${firstLast}` : '',
+      firstName && firstLast ? `${firstName} ${firstLast}` : '',
+    ].filter(Boolean);
+  }
+
+  function _schoolAssignmentText_(escuela) {
+    return [
+      escuela && escuela.encuestador_asignado,
+      escuela && escuela.usuario_asignado,
+      escuela && escuela.encuestador,
+      escuela && escuela.responsable,
+      escuela && escuela.id_encuestador,
+      escuela && escuela.id_usuario_asignado,
+    ].filter(Boolean).join(' ');
+  }
+
+  function _canOperateSchool_(session, escuela) {
+    if (!session || !escuela) return false;
+    if (_same(escuela.id_escuela, 'ESC_DEMO_CIALPA')) return true;
+    if (_isAuthorizedAdmin(session)) return true;
+    const assigned = _identityKey_(_schoolAssignmentText_(escuela));
+    if (!assigned) return false;
+    return _sessionIdentityAliases_(session)
+      .map(_identityKey_)
+      .filter(Boolean)
+      .some(alias => assigned === alias || assigned.indexOf(alias) !== -1 || (assigned.length >= 6 && alias.indexOf(assigned) !== -1));
+  }
+
+  function _schoolAccessError_(escuela) {
+    const assigned = _txt(escuela && (escuela.encuestador_asignado || escuela.usuario_asignado || escuela.encuestador)) || 'No asignada';
+    return {
+      status: 'error',
+      code: 'SCHOOL_NOT_ASSIGNED',
+      message: `Escuela no asignada a su usuario. Asignada a: ${assigned}.`,
+    };
   }
 
   function _sessionState_(row) {

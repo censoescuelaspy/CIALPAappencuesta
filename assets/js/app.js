@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.21
+ * Version: 2.6.71
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -466,7 +466,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['registro', 'mapa', 'jornada', 'planificacion', 'encuestadores', 'estadisticas'];
+    const primaryModules = ['registro', 'mapa', 'jornada', 'planificacion', 'configuracion', 'estadisticas'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])

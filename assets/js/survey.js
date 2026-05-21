@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.6.70
+ * Version: 2.6.71
  */
 
 const SurveyModule = (() => {
@@ -187,6 +187,11 @@ const SurveyModule = (() => {
   function setCurrentEscuela(escuela, options = {}) {
     if (!Auth.requireAuth()) return false;
     if (!escuela) return false;
+    if (!options.skipAssignmentCheck && typeof Auth.canOperateSchool === 'function' && !Auth.canOperateSchool(escuela)) {
+      const assigned = Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(escuela) : (escuela.encuestador_asignado || 'No asignada');
+      UI.showAlert('Escuela no asignada', `Puede verla en el mapa, pero solo puede cargar escuelas asignadas a su usuario. Asignada a: ${assigned}.`, 'warning');
+      return false;
+    }
     const incomingId = String(escuela.id_escuela || escuela.codigo_local || '');
     const currentId = String(_currentEscuela?.id_escuela || _currentEscuela?.codigo_local || '');
     if (_state === STATE.IN_PROGRESS && currentId && incomingId && currentId !== incomingId) {

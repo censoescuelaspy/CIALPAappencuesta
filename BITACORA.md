@@ -4,6 +4,43 @@
 
 ---
 
+## Mapa completo con seleccion por asignacion y configuracion de usuarios - 2026-05-20 - v2.6.71
+
+### Objetivo
+- Permitir que todos los usuarios vean el padron completo en el mapa, incluyendo escuelas sorteadas para la muestra.
+- Bloquear la seleccion, inicio, migracion, guardado y cierre de escuelas no asignadas al usuario.
+- Dejar la gestion de encuestadores dentro de una vista clara de configuracion para administradores.
+
+### Cambios implementados
+- `getEscuelas` ya no reduce el padron por usuario encuestador; el mapa conserva visibilidad completa.
+- Se agrega `Auth.canOperateSchool()`, que permite operar una escuela solo al admin autorizado o al usuario que coincide con `encuestador_asignado`.
+- Los popups y la ficha lateral del mapa muestran botones `Iniciar/continuar registro` y `Migrar datos al RUE-MEC` solo para escuelas operables.
+- Las escuelas ajenas quedan como `Solo lectura`, indicando el encuestador asignado.
+- `MapModule.startGuidedRegister()` y `SurveyModule.setCurrentEscuela()` bloquean seleccion manual de escuelas no asignadas.
+- Apps Script refuerza la misma regla en `updateEscuelaEstado`, `iniciarSesion`, `guardarBorradorMec` y `guardarCierreCompleto`.
+- El menu lateral de admin abre `Configuracion`, con la pestaña `Encuestadores` como entrada principal para agregar, editar, quitar o reactivar usuarios.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.71`.
+
+### Pendiente operativo
+- Publicar el Web App desde la cuenta propietaria/aceptada para que el deployment publico tome el backend con bloqueo por asignacion.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.71`.
+- Probar con un encuestador real: ver todo el mapa, intentar una escuela ajena y confirmar que solo aparece lectura; luego iniciar una escuela asignada.
+
+### Validaciones ejecutadas
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/admin.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Boton visible para finalizar escuela y cierre con pendientes - 2026-05-20 - v2.6.70
 
 ### Objetivo
