@@ -22,7 +22,6 @@
 - Version visible y cache del Service Worker actualizados a `v2.6.85`.
 
 ### Pendiente operativo
-- Publicar frontend en GitHub Pages.
 - Pedir a administradores `Actualizar app` para tomar `cialpa-app-v2.6.85`.
 - Probar con admin: filtrar `Solo muestra piloto`, tocar `Balancear pendientes`, guardar cambios y verificar desde otro usuario/recarga que la asignacion nueva aparece.
 
@@ -33,6 +32,12 @@
 - `node --check sw.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
+- `git push origin main`: publica commit `6c8374f`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.85`.
+- Verificacion HTTP de GitHub Pages para `assets/js/planning.js`: contiene `Solo muestra piloto` y balance sobre escuelas filtradas.
+- Verificacion HTTP de GitHub Pages para `assets/js/api.js`: `asignarEscuela` usa `skipQueue: true`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.85`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.85`.
 
 ---
 
