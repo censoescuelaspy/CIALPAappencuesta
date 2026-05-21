@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * planning.js — Estimacion de tiempos y distribucion operativa
- * Version: 2.6.86
+ * Version: 2.6.89
  */
 
 const PlanningModule = (() => {
@@ -126,8 +126,8 @@ const PlanningModule = (() => {
   }
 
   async function saveAssignments() {
-    if (!Auth.canAccess('admin')) {
-      UI.showToast('Solo administradores autorizados pueden guardar asignaciones.', 'warning');
+    if (!Auth.canAccess('supervisor')) {
+      UI.showToast('Solo supervisores o administradores pueden guardar asignaciones.', 'warning');
       return;
     }
     if (_savingAssignments) {
@@ -164,7 +164,8 @@ const PlanningModule = (() => {
         _originalAssignments[id] = assigned;
       }
       _refreshMapAssignments();
-      UI.showToast(`Asignaciones guardadas en Sheets (${changes.length}). Los usuarios las veran al actualizar o volver a abrir la app.`, 'success');
+      _rememberAssignmentsCache();
+      UI.showToast(`Asignaciones guardadas en Sheets (${changes.length}) y publicadas para todos los usuarios.`, 'success', 6500);
     } catch (err) {
       UI.showToast('Error al guardar asignaciones: ' + err.message, 'error');
     } finally {
@@ -285,7 +286,7 @@ const PlanningModule = (() => {
     const saveLabel = _savingAssignments ? 'Guardando...' : `Guardar cambios${summary.dirty ? ` (${summary.dirty})` : ''}`;
     const saveDisabled = !summary.dirty || _savingAssignments ? 'disabled' : '';
     return `
-      <div class="planning-save-banner ${summary.dirty ? 'planning-save-banner--dirty' : ''}" data-min-role="admin">
+      <div class="planning-save-banner ${summary.dirty ? 'planning-save-banner--dirty' : ''}" data-min-role="supervisor">
         <div>
           <strong>${summary.dirty ? `${summary.dirty} cambio(s) de asignacion pendiente(s)` : 'Sin cambios de asignacion pendientes'}</strong>
           <span>${summary.dirty ? 'Las escuelas marcadas en amarillo todavia no estan guardadas en Sheets.' : 'Cuando cambie un responsable, el boton de guardado quedara habilitado aqui.'}</span>
@@ -314,7 +315,7 @@ const PlanningModule = (() => {
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.autoBalance('pending')">Balancear pendientes</button>
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.autoBalance('all')">Rebalancear todo</button>
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.resetDraft()">Deshacer</button>
-          <button class="btn btn-sm btn-success" type="button" data-min-role="admin" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
+          <button class="btn btn-sm btn-success" type="button" data-min-role="supervisor" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
         </div>
       </div>
 
@@ -516,6 +517,16 @@ const PlanningModule = (() => {
     });
     if (MapModule.loadMarkers) MapModule.loadMarkers(mapSchools);
     if (MapModule.populateFilterButtons) MapModule.populateFilterButtons();
+  }
+
+  function _rememberAssignmentsCache() {
+    if (typeof CialpaLocalStore === 'undefined' || !CialpaLocalStore.rememberApi) return;
+    CialpaLocalStore.rememberApi('getEscuelas', 'GET', {}, {
+      status: 'ok',
+      data: _schools,
+      meta: { source: 'planning_assignments' },
+      message: 'Listado actualizado desde distribucion operativa.',
+    }).catch(err => console.warn('[Planning] No se pudo actualizar cache local de escuelas:', err));
   }
 
   function _loadSettings() {

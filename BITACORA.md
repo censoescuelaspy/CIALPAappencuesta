@@ -4,6 +4,35 @@
 
 ---
 
+## Guardado visible de distribucion para roles operativos - 2026-05-21 - v2.6.89
+
+### Objetivo
+- Corregir que usuarios con rol operativo de planificacion vean la distribucion pero no vean el boton para guardar asignaciones.
+- Alinear el frontend con el backend: `asignarEscuela` ya permite guardar a roles `admin` y `supervisor`.
+- Asegurar que despues de guardar, el cache local de escuelas quede actualizado en la app actual.
+
+### Cambios implementados
+- El boton superior `Guardar cambios` de `Planificacion operativa` pasa de `data-min-role="admin"` a `data-min-role="supervisor"`.
+- La franja interna `Guardar cambios (N)` de `Distribucion de escuelas` tambien queda visible para supervisores y administradores.
+- `saveAssignments()` valida `Auth.canAccess('supervisor')` en vez de la lista blanca estricta `ADMIN_USERS`.
+- Al guardar correctamente, se actualiza el cache local `getEscuelas` con las asignaciones confirmadas.
+- El mensaje de exito ahora confirma que las asignaciones fueron guardadas en Sheets y publicadas para todos los usuarios.
+- Version visible y cache del Service Worker actualizados a `v2.6.89`.
+
+### Pendiente operativo
+- Pedir a administradores/supervisores `Actualizar app` para tomar `cialpa-app-v2.6.89`.
+- Probar con el usuario que reporto el problema: abrir `Planificacion > Distribucion de escuelas`, cambiar una asignacion, verificar `Guardar cambios (1)`, guardar y recargar desde otro usuario.
+
+### Validaciones ejecutadas
+- `node --check assets/js/planning.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Revision estatica: `Planificacion` mantiene acceso `supervisor`, `Guardar cambios` queda visible para `supervisor`, `saveAssignments()` valida `Auth.canAccess('supervisor')`, y cache `cialpa-app-v2.6.89`.
+
+---
+
 ## Apunte a Web App con evidencias indexadas - 2026-05-21 - v2.6.88
 
 ### Objetivo
