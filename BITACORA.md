@@ -38,6 +38,11 @@
 - Validacion sintactica de `gas/*.gs` mediante Node.
 - `git diff --check`.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git push origin main`: publica commit `e9827fa`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.71`.
+- Verificacion HTTP de GitHub Pages para `assets/js/map.js`: contiene `canOperateSchool` y aviso `Solo lectura`.
+- Verificacion HTTP de GitHub Pages para `assets/js/auth.js`: contiene `canOperateSchool`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.71`.
 
 ---
 
