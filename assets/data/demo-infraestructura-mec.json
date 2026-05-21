@@ -1,0 +1,62 @@
+{
+  "source": "Demo 1000 respuestas sinteticas",
+  "demo": true,
+  "generated_at": "2026-05-21T21:05:30.065Z",
+  "escuelas_con_borrador": 1000,
+  "borradores_total": 1000,
+  "bloques": 1409,
+  "pisos": 1473,
+  "aulas": 4923,
+  "otros_espacios": 1481,
+  "sanitarios": 1979,
+  "exteriores": 4673,
+  "evidencias": 9944,
+  "area_aulas_m2": 197460.3,
+  "area_sanitarios_m2": 22939.8,
+  "area_exteriores_m2": 235300.5,
+  "area_total_m2": 455700.6,
+  "puertas": 4923,
+  "ventanas": 14408,
+  "tomas": 23283,
+  "luces": 11002,
+  "ventiladores": 1956,
+  "aires": 1420,
+  "tableros": 1502,
+  "danos": 1429,
+  "escaleras": 802,
+  "rampas": 679,
+  "sanitarios_accesibles": 623,
+  "sanitarios_fuera_servicio": 423,
+  "puesta_tierra_si": 936,
+  "diferencial_si": 784,
+  "circuitos_identificados": 704,
+  "calidad": {
+    "Bueno": 43959,
+    "Regular": 18300,
+    "Malo": 10160,
+    "Sin estado": 4923
+  },
+  "tiempos": {
+    "escuela_promedio_min": 154.5,
+    "aulas_promedio_min": 11.9,
+    "sanitarios_promedio_min": 10,
+    "exteriores_promedio_min": 30.5
+  },
+  "alertas": [
+    {
+      "tone": "danger",
+      "label": "Danos simulados",
+      "note": "1429 elementos con deterioro para priorizar mantenimiento."
+    },
+    {
+      "tone": "warning",
+      "label": "Brecha electrica simulada",
+      "note": "473 bloques sin puesta a tierra confirmada."
+    },
+    {
+      "tone": "info",
+      "label": "Cobertura fotografica demo",
+      "note": "9944 evidencias sinteticas indexadas."
+    }
+  ]
+}

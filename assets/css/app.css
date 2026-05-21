@@ -1993,6 +1993,12 @@ td {
   font-weight: 800;
 }
 
+.mec-infra-chips .mec-demo-chip {
+  background: #fff4d8;
+  color: #8a5a00;
+  border: 1px solid #e8c56a;
+}
+
 .mec-infra-topline {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

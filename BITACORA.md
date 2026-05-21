@@ -4,6 +4,33 @@
 
 ---
 
+## Demo visible para panel Infraestructura MEC - 2026-05-21 - v2.6.94
+
+### Objetivo
+- Evitar que `Infraestructura MEC` quede vacio cuando todavia no hay borradores reales publicados en el backend o en el navegador.
+- Permitir mostrar las bondades del tablero con una demo clara de 1000 respuestas sinteticas, sin confundirla con datos reales.
+
+### Cambios implementados
+- Se agrega `assets/data/demo-infraestructura-mec.json` con el agregado liviano de la simulacion `demo1000_20260521`.
+- Si el backend no devuelve `infraestructura_mec` y no hay borrador MEC local, el panel carga automaticamente la demo.
+- El panel muestra chip `Modo demo` y fuente `Demo 1000 respuestas sinteticas`.
+- Se agrega boton `Demo 1000` en la cabecera y `Cargar demo 1000 respuestas` en el estado vacio.
+- El Service Worker precachea el JSON demo.
+- Version visible y cache actualizados a `v2.6.94`.
+
+### Pendiente operativo
+- Publicar Web App propietario para que el panel muestre datos reales desde `mec_borradores`.
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.94`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Parseo JSON de `assets/data/demo-infraestructura-mec.json`: OK.
+- Playwright con servidor HTTP local: sin datos reales, `Infraestructura MEC` carga demo, muestra `Modo demo`, `1000 escuelas con ficha MEC`, 4 tarjetas tecnicas y sin overflow horizontal.
+
+---
+
 ## Simulacion masiva de respuestas demo por territorio - 2026-05-21
 
 ### Objetivo

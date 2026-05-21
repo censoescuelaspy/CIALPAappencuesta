@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.6.93
+ * Version: 2.6.94
  */
 
 const StatsModule = (() => {
@@ -16,6 +16,7 @@ const StatsModule = (() => {
   let _chartLoader = null;
   const STATS_CACHE_TTL = 5 * 60 * 1000;
   const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  const DEMO_INFRA_URL = 'assets/data/demo-infraestructura-mec.json';
 
   async function init() {
     if (!Auth.canAccess('supervisor')) {
@@ -148,9 +149,37 @@ const StatsModule = (() => {
 
     const localMec = _localAnalytics?.mec || (typeof CialpaLocalStore !== 'undefined' ? CialpaLocalStore.mecMetrics() : null);
     _infraData = _normalizeMecInfrastructure(remoteStats?.infraestructura_mec || remoteStats?.infraestructura || null, localMec);
+    if (!_hasInfrastructureData(_infraData)) {
+      const demo = await _loadMecInfrastructureDemo();
+      if (demo) _infraData = demo;
+    }
     _infraCache = { data: _infraData, time: Date.now() };
     _renderMecInfrastructurePanel(_infraData);
     if (remoteError) UI.showToast('Infraestructura MEC calculada con datos locales. Falta publicar/consultar el agregado del servidor.', 'warning', 6500);
+  }
+
+  async function loadMecInfrastructureDemo() {
+    const demo = await _loadMecInfrastructureDemo({ force: true });
+    if (!demo) {
+      UI.showToast('No se pudo cargar la demo de infraestructura MEC.', 'warning');
+      return;
+    }
+    _infraData = demo;
+    _infraCache = { data: _infraData, time: Date.now() };
+    _renderMecInfrastructurePanel(_infraData);
+    UI.showToast('Demo de 1000 respuestas sinteticas cargada.', 'info', 5000);
+  }
+
+  async function _loadMecInfrastructureDemo() {
+    try {
+      const response = await fetch(`${DEMO_INFRA_URL}?v=${APP_CONFIG.VERSION}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const raw = await response.json();
+      return _normalizeMecInfrastructure(raw, null);
+    } catch (err) {
+      console.warn('No se pudo cargar demo infraestructura MEC:', err);
+      return null;
+    }
   }
 
   async function _renderStatsView() {
@@ -477,6 +506,7 @@ const StatsModule = (() => {
     const evidencePending = _pickNumber(raw, ['evidencias_pendientes', 'evidence_pending'], localMec.evidencePending || Math.max(0, evidenceFields - evidenceCovered));
     const infra = {
       source: raw.source || (Object.keys(raw).length ? 'Servidor MEC' : 'Borrador local del dispositivo'),
+      demo: Boolean(raw.demo),
       generatedAt: raw.generated_at || localMec.savedAt || new Date().toISOString(),
       schools: _pickNumber(raw, ['escuelas_con_borrador', 'schools_with_mec', 'schools'], localMec.blocks || localMec.classrooms || localMec.sanitaries ? 1 : 0),
       drafts: _pickNumber(raw, ['borradores_total', 'drafts_total', 'drafts'], 0),
@@ -533,6 +563,7 @@ const StatsModule = (() => {
           <span class="eyebrow">Infraestructura MEC</span>
           <h3>Todavia no hay borradores MEC para consolidar.</h3>
           <p>Cuando las escuelas empiecen a guardar el Registro guiado, este panel va a mostrar ambientes, sanitarios, electricidad, accesibilidad, daños y evidencias.</p>
+          <button class="btn btn-sm btn-primary" type="button" onclick="StatsModule.loadMecInfrastructureDemo()">Cargar demo 1000 respuestas</button>
         </section>`;
       return;
     }
@@ -554,6 +585,7 @@ const StatsModule = (() => {
             <span class="eyebrow">Infraestructura escolar MEC</span>
             <h3>Radiografia tecnica para priorizar inversion, mantenimiento y seguridad edilicia.</h3>
             <div class="mec-infra-chips">
+              ${infra.demo ? '<span class="mec-demo-chip">Modo demo</span>' : ''}
               <span>${infra.schools} escuelas con ficha MEC</span>
               <span>${_formatArea(infra.areaTotal)} relevados</span>
               <span>${infra.source}</span>
@@ -1119,6 +1151,7 @@ const StatsModule = (() => {
     loadStats,
     initMecInfrastructure,
     loadMecInfrastructure,
+    loadMecInfrastructureDemo,
     exportCSV,
     exportLocalJson,
     exportMecInfrastructureJson,
