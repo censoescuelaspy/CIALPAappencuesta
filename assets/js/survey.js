@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.5.18
+ * Version: 2.6.68
  */
 
 const SurveyModule = (() => {
@@ -14,6 +14,7 @@ const SurveyModule = (() => {
   let _elapsedSeconds = 0;
   let _moduleLogs = [];
   let _launchConfig = null;
+  let _startingSurvey = false;
 
   const STATE = {
     IDLE: 'idle',
@@ -78,6 +79,21 @@ const SurveyModule = (() => {
     return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
   }
 
+  function _digits(value) {
+    return String(value ?? '').replace(/\D+/g, '');
+  }
+
+  function _sameSchoolSession(session, school) {
+    if (!session || !school) return false;
+    const sessionKeys = [session.id_escuela, session.codigo_local, _digits(session.id_escuela), _digits(session.codigo_local)]
+      .map(v => String(v || '').trim())
+      .filter(Boolean);
+    const schoolKeys = [school.id_escuela, school.codigo_local, _digits(school.id_escuela), _digits(school.codigo_local)]
+      .map(v => String(v || '').trim())
+      .filter(Boolean);
+    return sessionKeys.some(key => schoolKeys.includes(key));
+  }
+
   async function _getLaunchConfig() {
     if (_launchConfig) return _launchConfig;
     try {
@@ -140,6 +156,10 @@ const SurveyModule = (() => {
   function selectEscuela(id) {
     if (!Auth.requireAuth()) return;
 
+    if (_startingSurvey) {
+      UI.showToast('Ya se esta iniciando la sesion. Espere la confirmacion.', 'warning');
+      return;
+    }
     if (_state === STATE.IN_PROGRESS) {
       UI.showAlert('Sesión activa', `Ya existe una sesión activa en "${_currentEscuela?.nombre}". Debe cerrarse antes de iniciar otra.`, 'warning');
       AppController.showModule('encuesta');
@@ -195,24 +215,33 @@ const SurveyModule = (() => {
       UI.showToast('Seleccione una escuela antes de iniciar el relevamiento.', 'warning');
       return;
     }
+    if (_startingSurvey) {
+      UI.showToast('Ya se esta iniciando la sesion. Espere la confirmacion.', 'warning');
+      return;
+    }
     if (_state === STATE.IN_PROGRESS) {
       UI.showToast('Ya hay una sesión activa.', 'warning');
       return;
     }
 
+    _startingSurvey = true;
     try {
       const openResult = await API.getSesionesAbiertas();
       if (openResult.status === 'ok') {
-        const open = (openResult.data || []).find(s => s.id_escuela === _currentEscuela.id_escuela);
+        const open = (openResult.data || []).find(s => _sameSchoolSession(s, _currentEscuela));
         if (open) {
           const confirmed = await UI.showConfirm('Sesión preexistente', `Existe una sesión abierta para esta escuela iniciada por ${open.usuario}. ¿Desea recuperarla?`);
-          if (!confirmed) return;
+          if (!confirmed) {
+            _startingSurvey = false;
+            return;
+          }
           _currentSession = open;
           _moduleLogs = [];
           _setState(STATE.IN_PROGRESS);
           _startTimer(_calculateElapsedFromSession(open));
           await refreshModuleLogs();
           await openExternalSurveyApp();
+          _startingSurvey = false;
           return;
         }
       }
@@ -239,11 +268,13 @@ const SurveyModule = (() => {
       _moduleLogs = [];
       _currentEscuela.estado_relevamiento = 'en_curso';
       _setState(STATE.IN_PROGRESS);
-      _startTimer(0);
+      _startTimer(_calculateElapsedFromSession(result.data));
       await openExternalSurveyApp();
       UI.showToast(`Sesión iniciada para "${_currentEscuela.nombre}".`, 'success');
     } catch (err) {
       UI.showToast(`Error al iniciar sesión: ${err.message}`, 'error');
+    } finally {
+      _startingSurvey = false;
     }
   }
 

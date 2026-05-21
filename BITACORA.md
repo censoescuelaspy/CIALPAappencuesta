@@ -4,6 +4,38 @@
 
 ---
 
+## Bloqueo de sesiones duplicadas por escuela y usuario - 2026-05-20 - v2.6.68
+
+### Objetivo
+- Evitar que un usuario quede con dos sesiones `en_curso` para la misma escuela.
+- Corregir la visualizacion de fecha/hora de `Mi Jornada`, donde las horas de Sheets podian verse como `1899-12-30T...`.
+- Dejar una reparacion manual para duplicados ya existentes en `sesiones_relevamiento`.
+
+### Cambios implementados
+- `iniciarSesion` ahora reutiliza una sesion abierta existente del mismo usuario y escuela, en lugar de crear otra fila.
+- La deteccion de sesiones abiertas normaliza estados como `En Curso`, `en curso` o `en_curso`.
+- La comparacion de escuela tolera `id_escuela`, `codigo_local` y sus digitos normalizados.
+- El frontend bloquea doble toque/reintento mientras se esta iniciando una sesion.
+- `getMisSesiones` y `getSesionesAbiertas` devuelven fecha y hora normalizadas como texto `yyyy-MM-dd` y `HH:mm:ss`, evitando la fecha base de Sheets.
+- Se agrega la funcion GAS `repararSesionesDuplicadasEnCurso()` para cerrar duplicados del mismo usuario/escuela como `suspendida`.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.68`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria/aceptada por Google.
+- Ejecutar `repararSesionesDuplicadasEnCurso()` una vez desde Apps Script para limpiar duplicados actuales.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.68`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Correccion de demo fijo y diagnostico de padron publicado - 2026-05-20 - v2.6.67
 
 ### Objetivo

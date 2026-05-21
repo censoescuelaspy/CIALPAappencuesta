@@ -190,10 +190,15 @@ const SheetsService = (() => {
     _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
     const sesiones = _sheetToObjects(SHEET_NAMES.SESIONES);
     const existente = requestedSessionId ? sesiones.find(s => String(s.id_sesion) === String(requestedSessionId)) : null;
-    if (existente) return { status: 'ok', data: existente, message: 'La sesion offline ya estaba sincronizada.' };
-    const abierta = sesiones.find(s => String(s.id_escuela) === String(escuela.id_escuela) && String(s.estado) === 'en_curso');
+    if (existente) return { status: 'ok', data: _normalizeSessionRow_(existente), message: 'La sesion offline ya estaba sincronizada.' };
+    const abiertaMismoUsuario = sesiones.find(s => _isOpenSession_(s) && _sameSessionSchool_(s, escuela, idEscuela) && _same(s.usuario, session.usuario));
+    if (abiertaMismoUsuario) {
+      return { status: 'ok', data: _normalizeSessionRow_(abiertaMismoUsuario), message: 'Ya tenias una sesion abierta para esta escuela; se reutiliza la existente.' };
+    }
+
+    const abierta = sesiones.find(s => _isOpenSession_(s) && _sameSessionSchool_(s, escuela, idEscuela));
     if (abierta && !allowMultiple) {
-      return { status: 'error', message: 'Ya existe una sesión activa para esta escuela.', data: abierta, code: 'SESSION_OPEN' };
+      return { status: 'error', message: 'Ya existe una sesión activa para esta escuela.', data: _normalizeSessionRow_(abierta), code: 'SESSION_OPEN' };
     }
 
     const launch = _resolveLaunchConfig(params);
@@ -240,7 +245,7 @@ const SheetsService = (() => {
     });
     _logEvento(id_sesion, escuela.id_escuela, session.usuario, 'INICIO_SESION', `Inicio ${row.fecha_inicio} ${row.hora_inicio}`);
     AuditService.log('INICIO_SESION', session.usuario, `id_sesion: ${id_sesion}, escuela: ${escuela.codigo_local}`);
-    return { status: 'ok', data: row };
+    return { status: 'ok', data: _normalizeSessionRow_(row) };
   }
 
   function cerrarSesion(params) {
@@ -306,7 +311,7 @@ const SheetsService = (() => {
     const modulos = _sheetToObjects(SHEET_NAMES.MODULOS);
     const existente = requestedModuleId ? modulos.find(r => String(r.id_modulo) === String(requestedModuleId)) : null;
     if (existente) return { status: 'ok', data: existente, message: 'El modulo offline ya estaba sincronizado.' };
-    const abiertos = modulos.find(r => String(r.id_sesion) === String(params.id_sesion) && String(r.modulo) === String(params.modulo) && String(r.estado) === 'en_curso');
+    const abiertos = modulos.find(r => String(r.id_sesion) === String(params.id_sesion) && String(r.modulo) === String(params.modulo) && _estado(r.estado) === 'en_curso');
     if (abiertos) return { status: 'ok', data: abiertos, message: 'El módulo ya estaba en curso.' };
     const id_modulo = requestedModuleId || _genId('MOD');
     const now = new Date();
@@ -346,7 +351,7 @@ const SheetsService = (() => {
       const idxModulo = headers.indexOf('modulo');
       const idxEstado = headers.indexOf('estado');
       for (let i = 1; i < data.length; i++) {
-        if (String(data[i][idxSesion]) === String(params.id_sesion) && String(data[i][idxModulo]) === String(params.modulo) && String(data[i][idxEstado]) === 'en_curso') {
+        if (String(data[i][idxSesion]) === String(params.id_sesion) && String(data[i][idxModulo]) === String(params.modulo) && _estado(data[i][idxEstado]) === 'en_curso') {
           rowIdx = i + 1;
           break;
         }
@@ -375,7 +380,7 @@ const SheetsService = (() => {
   }
 
   function getSesionesAbiertas() {
-    const sesiones = _sheetToObjects(SHEET_NAMES.SESIONES).filter(s => String(s.estado) === 'en_curso');
+    const sesiones = _sheetToObjects(SHEET_NAMES.SESIONES).filter(_isOpenSession_).map(_normalizeSessionRow_);
     const escuelas = _escuelasMap();
     sesiones.forEach(s => {
       const e = escuelas[s.id_escuela] || escuelas[s.codigo_local] || {};
@@ -387,7 +392,7 @@ const SheetsService = (() => {
 
   function getMisSesiones(params) {
     const session = params._session;
-    let rows = _sheetToObjects(SHEET_NAMES.SESIONES).filter(s => String(s.usuario) === String(session.usuario));
+    let rows = _sheetToObjects(SHEET_NAMES.SESIONES).filter(s => _same(s.usuario, session.usuario)).map(_normalizeSessionRow_);
     const escuelas = _escuelasMap();
     rows.forEach(s => {
       const e = escuelas[s.id_escuela] || escuelas[s.codigo_local] || {};
@@ -396,6 +401,49 @@ const SheetsService = (() => {
     });
     rows.sort((a, b) => String(b.inicio_iso || `${b.fecha_inicio}${b.hora_inicio}`).localeCompare(String(a.inicio_iso || `${a.fecha_inicio}${a.hora_inicio}`)));
     return { status: 'ok', data: rows };
+  }
+
+  function repararSesionesDuplicadasEnCurso(params) {
+    const session = params && params._session;
+    if (!['admin', 'supervisor'].includes(String(session && session.rol))) return { status: 'error', message: 'Acceso restringido.' };
+    _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
+    const sheet = _getSheet(SHEET_NAMES.SESIONES);
+    const headers = _headers(sheet);
+    const rows = _sheetToObjects(SHEET_NAMES.SESIONES).map((row, index) => Object.assign({ __row_index: index + 2 }, row));
+    const groups = {};
+
+    rows.filter(_isOpenSession_).forEach(row => {
+      const userKey = _txt(row.usuario).toLowerCase();
+      const schoolKey = _sessionSchoolKey_(row);
+      if (!userKey || !schoolKey) return;
+      const key = `${userKey}|${schoolKey}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(row);
+    });
+
+    const now = new Date();
+    let cerradas = 0;
+    Object.keys(groups).forEach(key => {
+      const group = groups[key];
+      if (group.length < 2) return;
+      group.sort((a, b) => _sessionStartMs_(b) - _sessionStartMs_(a));
+      group.slice(1).forEach(row => {
+        const startIso = _formatIsoCell_(row.inicio_iso) || _asIso(_formatDateCell_(row.fecha_inicio), _formatTimeCell_(row.hora_inicio));
+        const startMs = startIso ? new Date(startIso).getTime() : NaN;
+        const durSeg = isFinite(startMs) ? Math.max(0, Math.round((now.getTime() - startMs) / 1000)) : '';
+        _setByHeader(sheet, row.__row_index, headers, 'fecha_fin', _date(now));
+        _setByHeader(sheet, row.__row_index, headers, 'hora_fin', _time(now));
+        _setByHeader(sheet, row.__row_index, headers, 'fin_iso', now.toISOString());
+        _setByHeader(sheet, row.__row_index, headers, 'duracion_minutos', durSeg ? Math.max(1, Math.ceil(durSeg / 60)) : '');
+        _setByHeader(sheet, row.__row_index, headers, 'duracion_segundos', durSeg || '');
+        _setByHeader(sheet, row.__row_index, headers, 'estado', 'suspendida');
+        _setByHeader(sheet, row.__row_index, headers, 'observacion_cierre', 'Cerrada automaticamente por duplicado: misma escuela y mismo usuario con otra sesion en curso.');
+        _setByHeader(sheet, row.__row_index, headers, 'actualizado_en', _timestamp());
+        cerradas++;
+      });
+    });
+
+    return { status: 'ok', message: `Sesiones duplicadas cerradas: ${cerradas}.`, data: { cerradas } };
   }
 
   function getEncuestadores(params) {
@@ -971,7 +1019,7 @@ const SheetsService = (() => {
         escuelas: escuelas.length,
         sesiones: sesiones.length,
         sesiones_cerradas: cerradas,
-        sesiones_abiertas: sesiones.filter(s => String(s.estado) === 'en_curso').length,
+        sesiones_abiertas: sesiones.filter(_isOpenSession_).length,
         promedio_minutos: cerradas ? Math.round(totalMin / cerradas) : null,
         modulos_registrados: modulos.length,
         escuelas_sin_coordenadas: escuelas.filter(e => !_isNumeric(e.latitud) || !_isNumeric(e.longitud)).length,
@@ -1758,6 +1806,88 @@ const SheetsService = (() => {
     return _txt(a).toLowerCase() === _txt(b).toLowerCase();
   }
 
+  function _sessionState_(row) {
+    return _estado(row && row.estado);
+  }
+
+  function _isOpenSession_(row) {
+    return _sessionState_(row) === 'en_curso';
+  }
+
+  function _sessionSchoolKey_(row) {
+    const id = _txt(row && row.id_escuela);
+    const code = _txt(row && row.codigo_local);
+    return _digits(code) || _digits(id) || id || code;
+  }
+
+  function _sameSessionSchool_(row, escuela, requestedId) {
+    const keys = [
+      _txt(escuela && escuela.id_escuela),
+      _txt(escuela && escuela.codigo_local),
+      _txt(requestedId),
+      _digits(escuela && escuela.id_escuela),
+      _digits(escuela && escuela.codigo_local),
+      _digits(requestedId),
+    ].filter(Boolean);
+    const rowKeys = [
+      _txt(row && row.id_escuela),
+      _txt(row && row.codigo_local),
+      _digits(row && row.id_escuela),
+      _digits(row && row.codigo_local),
+    ].filter(Boolean);
+    return rowKeys.some(k => keys.indexOf(k) !== -1);
+  }
+
+  function _formatDateCell_(value) {
+    if (value instanceof Date && !isNaN(value.getTime())) return Utilities.formatDate(value, TZ, 'yyyy-MM-dd');
+    const text = _txt(value);
+    if (!text) return '';
+    const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+    const parsed = new Date(text);
+    if (!isNaN(parsed.getTime())) return Utilities.formatDate(parsed, TZ, 'yyyy-MM-dd');
+    return text;
+  }
+
+  function _formatTimeCell_(value) {
+    if (value instanceof Date && !isNaN(value.getTime())) return Utilities.formatDate(value, TZ, 'HH:mm:ss');
+    const text = _txt(value);
+    if (!text) return '';
+    const isoMatch = text.match(/T(\d{2}:\d{2}:\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    const timeMatch = text.match(/^(\d{1,2}:\d{2}(?::\d{2})?)/);
+    if (timeMatch) return timeMatch[1].length === 5 ? `${timeMatch[1]}:00` : timeMatch[1];
+    return text;
+  }
+
+  function _formatIsoCell_(value) {
+    if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
+    const text = _txt(value);
+    if (!text) return '';
+    if (/^\d{4}-\d{2}-\d{2}T/.test(text)) return text;
+    const parsed = new Date(text);
+    return isNaN(parsed.getTime()) ? text : parsed.toISOString();
+  }
+
+  function _normalizeSessionRow_(row) {
+    const out = Object.assign({}, row || {});
+    out.fecha_inicio = _formatDateCell_(out.fecha_inicio);
+    out.hora_inicio = _formatTimeCell_(out.hora_inicio);
+    out.inicio_iso = _formatIsoCell_(out.inicio_iso) || _asIso(out.fecha_inicio, out.hora_inicio);
+    out.fecha_fin = _formatDateCell_(out.fecha_fin);
+    out.hora_fin = _formatTimeCell_(out.hora_fin);
+    out.fin_iso = _formatIsoCell_(out.fin_iso);
+    out.estado = _sessionState_(out);
+    return out;
+  }
+
+  function _sessionStartMs_(row) {
+    const normalized = _normalizeSessionRow_(row);
+    const text = normalized.inicio_iso || _asIso(normalized.fecha_inicio, normalized.hora_inicio);
+    const ms = text ? new Date(text).getTime() : NaN;
+    return isNaN(ms) ? 0 : ms;
+  }
+
   function _digits(v) {
     return _txt(v).replace(/\D+/g, '');
   }
@@ -1870,7 +2000,7 @@ const SheetsService = (() => {
 
   return {
     getEscuelas, getEscuela, diagnosticoPadron, updateEscuelaEstado, asignarEscuela,
-    iniciarSesion, cerrarSesion, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
+    iniciarSesion, cerrarSesion, repararSesionesDuplicadasEnCurso, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
     saveIncidencia, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,

@@ -97,6 +97,7 @@ function _handleRequest(e) {
       'asignarEscuela',
       'iniciarSesion',
       'cerrarSesion',
+      'repararSesionesDuplicadasEnCurso',
       'registrarEventoSesion',
       'iniciarModulo',
       'cerrarModulo',
@@ -129,6 +130,7 @@ function _handleRequest(e) {
       // Sesiones
       case 'iniciarSesion':   return _respond(SheetsService.iniciarSesion(params));
       case 'cerrarSesion':    return _respond(SheetsService.cerrarSesion(params));
+      case 'repararSesionesDuplicadasEnCurso': return _respond(SheetsService.repararSesionesDuplicadasEnCurso(params));
       case 'getSesionesAbiertas': return _respond(SheetsService.getSesionesAbiertas(params));
       case 'getMisSesiones':  return _respond(SheetsService.getMisSesiones(params));
       case 'registrarEventoSesion': return _respond(SheetsService.registrarEventoSesion(params));
