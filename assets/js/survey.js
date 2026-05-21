@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.6.68
+ * Version: 2.6.70
  */
 
 const SurveyModule = (() => {
@@ -449,6 +449,34 @@ const SurveyModule = (() => {
     }
   }
 
+  async function closeActiveSessionFromGuided(options = {}) {
+    if (_state !== STATE.IN_PROGRESS || !_currentSession) {
+      return { status: 'noop', message: 'No hay sesion activa para cerrar.' };
+    }
+    const estado = options.estado || 'finalizada';
+    const gps = await _getGeoPosition();
+    const duracion = _formatMinutes(_elapsedSeconds);
+    const result = await API.cerrarSesion(_currentSession.id_sesion, {
+      estado,
+      observacion_cierre: options.observacion_cierre || '',
+      duracion_minutos: duracion,
+      duracion_segundos: _elapsedSeconds,
+      folio_externo: options.folio_externo || '',
+      ultimo_registro_externo: options.ultimo_registro_externo || 'Registro guiado CIALPA',
+      calidad_cierre: options.calidad_cierre || 'completo_confirmado',
+      ...gps,
+    });
+
+    if (result.status !== 'ok') return result;
+
+    _stopTimer();
+    if (_currentEscuela) _currentEscuela.estado_relevamiento = estado;
+    _currentSession = null;
+    _setState(estado === 'incidencia' ? STATE.INCIDENT : STATE.COMPLETED);
+    UI.showToast(`Escuela finalizada. Duracion registrada: ${duracion} min.`, 'success', 6200);
+    return result;
+  }
+
   function _renderModuleTracker() {
     if (_state !== STATE.IN_PROGRESS || !_currentSession) return '';
     const completed = new Set(_moduleLogs.filter(m => m.estado === 'finalizado').map(m => m.modulo));
@@ -584,6 +612,7 @@ const SurveyModule = (() => {
     setCurrentEscuela,
     startSurvey,
     endSurvey,
+    closeActiveSessionFromGuided,
     startModule,
     closeModule,
     refreshModuleLogs,

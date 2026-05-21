@@ -4,6 +4,35 @@
 
 ---
 
+## Boton visible para finalizar escuela y cierre con pendientes - 2026-05-20 - v2.6.70
+
+### Objetivo
+- Hacer explicita la accion para dar por finalizada una escuela desde el flujo principal de campo.
+- Evitar que una escuela quede indefinidamente `en_curso` porque el cierre completo solo aparecia si no habia pendientes.
+- Cerrar tambien la sesion operativa abierta cuando el cierre final se dispara desde `Registro guiado`.
+
+### Cambios implementados
+- `Registro guiado` muestra un boton permanente `Finalizar escuela` en el encabezado de `Plano vivo`.
+- La etapa `Revision y salida` incorpora la accion principal `Finalizar escuela`.
+- Si no hay pendientes, el boton final ahora dice `Finalizar escuela y abrir PDF`.
+- Si hay pendientes, aparece `Finalizar con pendientes`, con confirmacion explicita y registro del paquete en `entregas_cierre`.
+- Al finalizar desde `Registro guiado`, la app intenta cerrar la sesion activa en `sesiones_relevamiento` como `finalizada`, registrando duracion y observacion.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.70`.
+
+### Pendiente operativo
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.70`.
+- Probar en una escuela real: iniciar/continuar registro, tocar `Finalizar escuela`, confirmar cierre y verificar `entregas_cierre`, `sesiones_relevamiento` y `escuelas_seleccionadas`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Apunte a nuevo Web App propietario validado - 2026-05-20 - v2.6.69
 
 ### Objetivo

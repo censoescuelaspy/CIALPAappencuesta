@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.63
+ * Version: 2.6.70
  */
 
 const GuidedRegisterModule = (() => {
@@ -170,7 +170,8 @@ const GuidedRegisterModule = (() => {
       summary: 'Validar pendientes, generar PDF/DXF/JSON y dejar el registro listo para supervision.',
       checks: ['Pendientes revisados', 'Fotos anexadas', 'Exportaciones listas'],
       actions: [
-        { label: 'Validar', icon: 'CHK', action: 'validate', primary: true },
+        { label: 'Finalizar escuela', icon: 'FIN', action: 'goClosure', primary: true },
+        { label: 'Validar', icon: 'CHK', action: 'validate' },
         { label: 'PDF', icon: 'PDF', action: 'pdf' },
         { label: 'DXF', icon: 'DXF', action: 'dxf' },
         { label: 'JSON', icon: 'JSN', action: 'json' },
@@ -226,6 +227,7 @@ const GuidedRegisterModule = (() => {
               </div>
               <div class="guided-plan-panel__actions">
                 <small data-guided-save-state>Sin borrador</small>
+                <button class="btn btn-success btn-sm" type="button" data-guided-action="goClosure">Finalizar escuela</button>
                 <button class="btn btn-sm guided-plan-panel__school-action" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
               </div>
             </div>
@@ -325,8 +327,10 @@ const GuidedRegisterModule = (() => {
     if (action === 'confirmClassroomConfigured') return _confirmClassroomConfigured(value);
     if (action === 'confirmSanitaryConfigured') return _confirmSanitaryConfigured(value);
     if (action === 'confirmSiteConfigured') return _confirmSiteConfigured(value);
+    if (action === 'goClosure') return _goClosure();
     if (action === 'syncSheets') return _syncDraftToSheets();
     if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
+    if (action === 'finalizePartial') return _finalizeCompleteRegistration({ allowPending: true });
     if (action === 'workbook') return (typeof AppController !== 'undefined' && AppController.openWorkbook) ? AppController.openWorkbook() : null;
     if (action === 'selectPlanItem') return _selectPlanItem(value);
     if (action === 'module') return _openModule(value);
@@ -1406,6 +1410,7 @@ const GuidedRegisterModule = (() => {
         'Todavia hay datos o confirmaciones por completar. Use el primer pendiente o valide el formulario antes de guardar el paquete final.',
         [
           _pendingAction(status.pending[0]),
+          { label: 'Finalizar con pendientes', action: 'finalizePartial', variant: 'warning' },
           { label: 'Validar', action: 'validate' },
           { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
           { label: 'Datos en Sheets', action: 'workbook' },
@@ -1421,7 +1426,7 @@ const GuidedRegisterModule = (() => {
       'Sin pendientes detectados',
       'El relevamiento esta listo para cierre. Al guardar, se registra el paquete final, se prepara el envio por correo y se abre de inmediato la vista PDF.',
       [
-        { label: 'Guardar completos y abrir PDF', action: 'finalizeComplete', primary: true },
+        { label: 'Finalizar escuela y abrir PDF', action: 'finalizeComplete', variant: 'success', primary: true },
         { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
         { label: 'Ver PDF', action: 'pdf' },
         { label: 'Datos en Sheets', action: 'workbook' },
@@ -1441,6 +1446,11 @@ const GuidedRegisterModule = (() => {
       value: item.value || '',
       primary: true,
     };
+  }
+
+  function _goClosure() {
+    goTo(STEPS.findIndex(step => step.id === 'cierre'));
+    _refreshSoon();
   }
 
   function _closureControlHtml(status, timeTracking = {}) {
@@ -1693,13 +1703,18 @@ const GuidedRegisterModule = (() => {
         ${question.control || ''}
         <div>
           ${question.actions.map(action => `
-            <button class="btn ${action.primary ? 'btn-primary' : 'btn-outline'} btn-sm" type="button"
+            <button class="btn ${_guidedActionButtonClass(action)} btn-sm" type="button"
               data-guided-action="${_escape(action.action)}"
               data-guided-value="${_escape(action.value || '')}">
               ${_escape(action.label)}
             </button>`).join('')}
         </div>
       </section>`;
+  }
+
+  function _guidedActionButtonClass(action = {}) {
+    if (action.variant) return `btn-${String(action.variant).replace(/[^a-z0-9_-]/gi, '')}`;
+    return action.primary ? 'btn-primary' : 'btn-outline';
   }
 
   function _guidedQuestionInfo(question = {}) {
@@ -1842,12 +1857,20 @@ const GuidedRegisterModule = (() => {
     UI.showToast(`${item.ficha?.codigo || 'Elemento exterior'} confirmado.`, 'success');
   }
 
-  async function _finalizeCompleteRegistration() {
+  async function _finalizeCompleteRegistration(options = {}) {
     const snap = _snapshot();
-    if (!snap.completion?.complete) {
-      UI.showToast(`Todavia hay ${snap.completion?.pending?.length || 0} pendiente(s) antes de cerrar.`, 'warning', 7000);
+    const pendingCount = snap.completion?.pending?.length || 0;
+    if (!snap.completion?.complete && !options.allowPending) {
+      UI.showToast(`Todavia hay ${pendingCount} pendiente(s) antes de cerrar.`, 'warning', 7000);
       goTo(STEPS.findIndex(step => step.id === 'cierre'));
       return;
+    }
+    if (!snap.completion?.complete && options.allowPending) {
+      const confirmed = await UI.showConfirm(
+        'Finalizar con pendientes',
+        `Todavia hay ${pendingCount} pendiente(s). Se guardara el paquete final en entregas_cierre como cierre con pendientes y la escuela quedara finalizada para seguimiento.`
+      );
+      if (!confirmed) return;
     }
     const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
     if (!mec?.buildFinalDeliveryPackage || !mec?.printPlanPdf) {
@@ -1880,8 +1903,25 @@ const GuidedRegisterModule = (() => {
       _saveFinalDeliveryState(snap, { email_status: 'pendiente_local', error: err.message }, null);
       UI.showToast('No se pudo enviar al servidor ahora. El PDF se abre igual y el cierre queda anotado localmente.', 'warning', 8200);
     } finally {
+      await _closeSurveySessionAfterFinalDelivery(snap, pendingCount);
       mec.printPlanPdf();
       _refreshSoon();
+    }
+  }
+
+  async function _closeSurveySessionAfterFinalDelivery(snap, pendingCount = 0) {
+    if (typeof SurveyModule === 'undefined' || !SurveyModule.closeActiveSessionFromGuided) return;
+    if (SurveyModule.getState?.() !== 'in_progress') return;
+    const result = await SurveyModule.closeActiveSessionFromGuided({
+      estado: 'finalizada',
+      observacion_cierre: pendingCount
+        ? `Cierre desde Registro guiado con ${pendingCount} pendiente(s) declarados.`
+        : 'Cierre completo desde Registro guiado.',
+      ultimo_registro_externo: 'Registro guiado CIALPA',
+      calidad_cierre: pendingCount ? 'cierre_con_pendientes_confirmado' : 'completo_confirmado',
+    }).catch(err => ({ status: 'error', message: err.message }));
+    if (result?.status === 'error') {
+      UI.showToast(`El cierre final se guardo, pero la sesion operativa no pudo cerrarse: ${result.message || 'error desconocido'}.`, 'warning', 7600);
     }
   }
 
