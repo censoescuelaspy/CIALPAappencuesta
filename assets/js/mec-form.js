@@ -170,7 +170,7 @@ const MecFormModule = (() => {
 
   const SANITARY_FIXTURE_STATES = ['Bueno', 'Regular', 'Malo', 'No tiene', 'No funciona'];
 
-  const SANITARY_EXTRA_TOOLS = SKETCH_TOOLS.filter(tool => !['select', 'door', 'window'].includes(tool.id));
+  const SANITARY_EXTRA_TOOLS = SKETCH_TOOLS.filter(tool => tool.id !== 'select');
 
   function init() {
     _loadDraft();
@@ -5761,7 +5761,7 @@ const MecFormModule = (() => {
     UI.showToast('Sanitario agregado.', 'success');
   }
 
-  function addSanitaryFixture(id, fixtureId) {
+  function addSanitaryFixture(id, fixtureId, options = {}) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     const fixture = SANITARY_FIXTURES.find(tool => tool.id === fixtureId);
     if (!item || !fixture) return;
@@ -5783,13 +5783,15 @@ const MecFormModule = (() => {
         codigo: `${fixture.short} ${next}`,
       },
     };
+    if (options.guided) _markGuidedObjectReview(object);
     if (room) _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
     _selectedSanitaryObjectId = object.id;
+    _selectedPlanId = `sanitary::${item.id}::${object.id}`;
     _saveDraft(false);
     _render();
     renderSchoolPlan();
-    UI.showToast(`${fixture.label} agregado. Complete su ficha de estado.`, 'success');
+    UI.showToast(`${fixture.label} agregado. La guia pedira sus datos paso a paso.`, 'success');
   }
 
   function selectSanitary(id) {
@@ -5830,7 +5832,7 @@ const MecFormModule = (() => {
     return record;
   }
 
-  function addSanitaryOpening(id, type) {
+  function addSanitaryOpening(id, type, options = {}) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item || !['door', 'window'].includes(type)) return;
     if (!_assertSanitaryUnlocked(item, 'agregar aberturas')) return;
@@ -5846,6 +5848,7 @@ const MecFormModule = (() => {
       h: size.h,
       ficha: _defaultSanitaryObjectFicha(item, type),
     };
+    if (options.guided) _markGuidedObjectReview(object);
     _orientOpeningToSide(object, 'bottom');
     object.w = Math.min(object.w, Math.max(18, room.w));
     object.y = room.y + room.h - object.h;
@@ -5853,15 +5856,20 @@ const MecFormModule = (() => {
     object.attached = _openingAttachment(object, room, 'bottom');
     item.objects.push(object);
     _selectedSanitaryObjectId = object.id;
+    _selectedPlanId = `sanitary::${item.id}::${object.id}`;
     _saveDraft(false);
     _render();
     renderSchoolPlan();
-    UI.showToast(`${_sketchLabel(type)} agregada al sanitario.`, 'success');
+    UI.showToast(`${_sketchLabel(type)} agregada al sanitario. La guia pedira sus datos paso a paso.`, 'success');
   }
 
-  function addSanitaryElement(id, type) {
+  function addSanitaryElement(id, type, options = {}) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item || !SANITARY_EXTRA_TOOLS.some(tool => tool.id === type)) return;
+    if (['door', 'window'].includes(type)) {
+      addSanitaryOpening(id, type, options);
+      return;
+    }
     if (!_assertSanitaryUnlocked(item, 'agregar elementos')) return;
     const room = _ensureSanitaryRoomObject(item);
     if (!room) return;
@@ -5902,14 +5910,16 @@ const MecFormModule = (() => {
         ficha: _defaultSketchFicha(type),
       };
     }
+    if (options.guided) _markGuidedObjectReview(object);
     if (object.type === 'wall') _snapWallObject(object);
     else if (object.type !== 'pencil') _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
     _selectedSanitaryObjectId = object.id;
+    _selectedPlanId = `sanitary::${item.id}::${object.id}`;
     _saveDraft(false);
     _render();
     renderSchoolPlan();
-    UI.showToast(`${_sketchToolLabel(type)} agregado al sanitario.`, 'success');
+    UI.showToast(`${_sketchToolLabel(type)} agregado al sanitario. La guia pedira sus datos paso a paso.`, 'success');
   }
 
   function setSanitaryObjectValue(sanitaryId, objectId, key, value, rerender = true) {
@@ -5919,6 +5929,7 @@ const MecFormModule = (() => {
     if (!_assertSanitaryUnlocked(item, 'editar fichas')) return;
     object.ficha = { ..._defaultSanitaryObjectFicha(item, object.type), ...(object.ficha || {}) };
     object.ficha[key] = String(value || '').trim();
+    _markGuidedObjectReviewed(object);
     if (key === 'ubicacion' && _isCeilingOrWallPointObject(object)) {
       const room = _sanitaryRoomObject(item);
       if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
@@ -6394,6 +6405,9 @@ const MecFormModule = (() => {
   function closeSanitaryObjectFicha() {
     const modal = document.getElementById('modal-sanitary-object-ficha');
     if (!modal) return;
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
+    const object = (item?.objects || []).find(child => child.id === _selectedSanitaryObjectId);
+    _markGuidedObjectReviewed(object);
     modal.classList.remove('modal--visible');
     setTimeout(() => modal.remove(), 250);
     _saveDraft(false);
@@ -6402,17 +6416,34 @@ const MecFormModule = (() => {
   }
 
   function flipSelectedSanitaryDoorSwing() {
-    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
-    const object = (item?.objects || []).find(child => child.id === _selectedSanitaryObjectId && child.type === 'door');
+    const context = _selectedSanitaryDoorContext();
+    const item = context?.item;
+    const object = context?.object;
     if (!item || !object) {
       UI.showToast('Seleccione una puerta del sanitario para cambiar apertura.', 'warning');
       return;
     }
+    if (!_assertSanitaryUnlocked(item, 'cambiar la apertura')) return;
     _flipOpeningSwing(object);
     _saveDraft(false);
     _redrawSanitaryCanvas();
     renderSchoolPlan();
     UI.showToast(`Apertura cambiada: ${object.ficha?.abre_hacia || 'Interior'}.`, 'success');
+  }
+
+  function _selectedSanitaryDoorContext() {
+    const active = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
+    const activeObject = (active?.objects || []).find(child => child.id === _selectedSanitaryObjectId && child.type === 'door');
+    if (active && activeObject) return { item: active, object: activeObject };
+    const raw = String(_selectedPlanId || '');
+    if (!raw.startsWith('sanitary::')) return null;
+    const parts = raw.split('::');
+    const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === parts[1]);
+    const object = (item?.objects || []).find(child => child.id === parts[2] && child.type === 'door');
+    if (!item || !object) return null;
+    _activeSanitaryId = item.id;
+    _selectedSanitaryObjectId = object.id;
+    return { item, object };
   }
 
   function rotateSelectedSanitaryObject(delta = 15, absolute = false) {
@@ -7809,7 +7840,7 @@ const MecFormModule = (() => {
     return _clampOpeningToRoom({ id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: _defaultSketchFicha(type) });
   }
 
-  function _createSketchObjectAt(point) {
+  function _createSketchObjectAt(point, options = {}) {
     if (_sketchTool === 'select') return;
     if (!_assertClassroomUnlocked(_activeClassroomRecord(), 'agregar elementos')) return;
     _ensureSketchObjects();
@@ -7859,7 +7890,8 @@ const MecFormModule = (() => {
     _selectedSketchObjectId = object.id;
     _saveDraft(false);
     _announceOpeningDistances(object);
-    if (_hasSketchFicha(object)) setTimeout(() => openSketchObjectFicha(object.id), 420);
+    if (_hasSketchFicha(object) && options.openFicha !== false) setTimeout(() => openSketchObjectFicha(object.id), 420);
+    return object;
   }
 
   function _defaultSketchSize(type) {
@@ -10244,6 +10276,22 @@ const MecFormModule = (() => {
     object.ficha.abre_hacia = object.ficha.abre_hacia === 'Exterior' ? 'Interior' : 'Exterior';
   }
 
+  function _markGuidedObjectReview(object) {
+    if (!object || !object.ficha) return object;
+    object.ficha.__guidedRequired = 'true';
+    object.ficha.__guidedReviewed = '';
+    const requiredFields = object.type === 'door'
+      ? ['subtipo', 'estado', 'abre_hacia', 'bisagra']
+      : ['subtipo', 'estado'];
+    requiredFields.forEach(key => { object.ficha[key] = ''; });
+    return object;
+  }
+
+  function _markGuidedObjectReviewed(object) {
+    if (!object || !object.ficha || object.ficha.__guidedRequired !== 'true') return;
+    object.ficha.__guidedReviewed = new Date().toISOString();
+  }
+
   function _openingAttachment(object, room, side) {
     if (side === 'top' || side === 'bottom') {
       return { target: room.id, side, ratio: (object.x - room.x) / Math.max(1, room.w - object.w) };
@@ -11109,6 +11157,7 @@ const MecFormModule = (() => {
         _clampPointInsideRoom(object, room, 10);
       }
     }
+    _markGuidedObjectReviewed(object);
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
@@ -11411,6 +11460,89 @@ const MecFormModule = (() => {
     return true;
   }
 
+  function setGuidedClassroomField(roomId, fieldId, value) {
+    const room = _activatePlanClassroom(roomId);
+    if (!room) {
+      UI.showToast('Seleccione un aula para responder esta pregunta.', 'warning');
+      return false;
+    }
+    if (!_assertClassroomUnlocked(room, 'responder esta pregunta')) return false;
+    const clean = String(value || '').trim();
+    if (!fieldId || !clean) return false;
+    _data.__classroomSketch = { ...(_data.__classroomSketch || {}), [fieldId]: clean };
+    if (fieldId === 'length' || fieldId === 'width') _resizeActiveRoomGeometryFromDimensions();
+    _syncActiveClassroomFromSketch();
+    _selectedPlanId = `room::${room.id}`;
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    UI.showToast('Respuesta del aula registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
+  function setGuidedClassroomObjectField(roomId, objectId, fieldId, value) {
+    const room = _activatePlanClassroom(roomId, objectId);
+    if (!room) {
+      UI.showToast('Seleccione un aula para responder esta pregunta.', 'warning');
+      return false;
+    }
+    if (!_assertClassroomUnlocked(room, 'responder esta pregunta')) return false;
+    const object = _findSketchObjectById(objectId);
+    const clean = String(value || '').trim();
+    if (!object || !fieldId || !clean) {
+      UI.showToast('No se encontro el elemento del aula para registrar la respuesta.', 'warning');
+      return false;
+    }
+    object.ficha = { ..._defaultSketchFicha(object.type), ...(object.ficha || {}) };
+    object.ficha[fieldId] = clean;
+    if (fieldId === 'ubicacion' && _isCeilingOrWallPointObject(object)) {
+      const sketchRoom = _activeSketchRoomObject();
+      if (sketchRoom && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, sketchRoom, { forceWall: true });
+      else if (sketchRoom) {
+        object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
+        _clampPointInsideRoom(object, sketchRoom, 10);
+      }
+    }
+    _markGuidedObjectReviewed(object);
+    _syncActiveClassroomFromSketch();
+    _selectedPlanId = `${room.id}::${object.id}`;
+    _saveDraft(false);
+    _redrawSketchCanvas();
+    _updateSketchStatus();
+    renderSchoolPlan();
+    UI.showToast('Respuesta del elemento registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
+  function setGuidedSanitaryField(sanitaryId, fieldId, value) {
+    const item = _activatePlanSanitary(sanitaryId);
+    const clean = String(value || '').trim();
+    if (!item || !fieldId || !clean) {
+      UI.showToast('Seleccione un sanitario para responder esta pregunta.', 'warning');
+      return false;
+    }
+    if (!_assertSanitaryUnlocked(item, 'responder esta pregunta')) return false;
+    _selectedPlanId = `sanitary::${item.id}`;
+    setSanitaryValue(item.id, fieldId, clean, true);
+    UI.showToast('Respuesta del sanitario registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
+  function setGuidedSanitaryObjectField(sanitaryId, objectId, fieldId, value) {
+    const item = _activatePlanSanitary(sanitaryId, objectId);
+    const object = (item?.objects || []).find(child => child.id === objectId);
+    const clean = String(value || '').trim();
+    if (!item || !object || !fieldId || !clean) {
+      UI.showToast('No se encontro el elemento sanitario para registrar la respuesta.', 'warning');
+      return false;
+    }
+    if (!_assertSanitaryUnlocked(item, 'responder esta pregunta')) return false;
+    _selectedPlanId = `sanitary::${item.id}::${object.id}`;
+    setSanitaryObjectValue(item.id, object.id, fieldId, clean, true);
+    UI.showToast('Respuesta del elemento sanitario registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
   function openPlanClassroomFicha(roomId = '') {
     const targetId = roomId || _activeClassroomId || _data.__classroomSketch?.id || '';
     if (targetId) _activatePlanClassroom(targetId);
@@ -11608,19 +11740,39 @@ const MecFormModule = (() => {
   }
 
   function flipSelectedDoorSwing() {
-    if (!_assertClassroomUnlocked(_activeClassroomRecord(), 'cambiar la apertura')) return;
-    const object = _findSketchObjectById(_selectedSketchObjectId);
+    const context = _selectedClassroomDoorContext();
+    const room = context?.room || _activeClassroomRecord();
+    if (!_assertClassroomUnlocked(room, 'cambiar la apertura')) return;
+    const object = context?.object;
     if (!object || object.type !== 'door') {
       UI.showToast('Seleccione una puerta para cambiar su lado de apertura.', 'warning');
       return;
     }
-    _pushSketchHistory();
+    if (context?.fromSketch) _pushSketchHistory();
     _flipOpeningSwing(object);
     _saveDraft(false);
     _redrawSketchCanvas();
     _updateSketchStatus();
     renderSchoolPlan();
     UI.showToast(`Apertura de puerta cambiada: ${object.ficha.abre_hacia || 'Interior'}.`, 'success');
+  }
+
+  function _selectedClassroomDoorContext() {
+    const sketchObject = _findSketchObjectById(_selectedSketchObjectId);
+    if (sketchObject?.type === 'door') {
+      return { room: _activeClassroomRecord(), object: sketchObject, fromSketch: true };
+    }
+    const raw = String(_selectedPlanId || '');
+    if (!raw || raw.startsWith('sanitary::') || raw.startsWith('site::') || raw.startsWith('block::') || raw.startsWith('floor::') || !raw.includes('::')) {
+      return null;
+    }
+    const [roomId, objectId] = raw.split('::');
+    const room = _activatePlanClassroom(roomId) || _classroomById(roomId);
+    const object = (room?.objects || []).find(item => item.id === objectId && item.type === 'door');
+    if (!room || !object) return null;
+    _activeClassroomId = room.id;
+    _selectedSketchObjectId = object.id;
+    return { room, object, fromSketch: false };
   }
 
   function rotateSelectedSketchObject(delta = 15, absolute = false) {
@@ -15775,7 +15927,7 @@ const MecFormModule = (() => {
     return center;
   }
 
-  function addPlanClassroomElement(type) {
+  function addPlanClassroomElement(type, options = {}) {
     if (!SKETCH_TOOLS.some(tool => tool.id === type) || type === 'select') return;
     const roomId = _selectedPlanRoomId();
     const room = _activatePlanClassroom(roomId);
@@ -15790,43 +15942,44 @@ const MecFormModule = (() => {
     const previousTool = _sketchTool;
     _sketchTool = type;
     _pushSketchHistory();
-    _createSketchObjectAt(point);
+    const object = _createSketchObjectAt(point, { openFicha: options.guided ? false : true });
+    if (options.guided) _markGuidedObjectReview(object);
     _sketchTool = previousTool;
     _syncActiveClassroomFromSketch();
-    _selectedPlanId = `room::${room.id}`;
+    _selectedPlanId = object?.id ? `${room.id}::${object.id}` : `room::${room.id}`;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`${_sketchToolLabel(type)} agregado al aula.`, 'success');
+    UI.showToast(`${_sketchToolLabel(type)} agregado al aula. La guia pedira sus datos paso a paso.`, 'success');
   }
 
-  function addPlanSanitaryFixture(fixtureId) {
+  function addPlanSanitaryFixture(fixtureId, options = {}) {
     const sanitaryId = _selectedPlanSanitaryId();
     if (!sanitaryId) {
       UI.showToast('Seleccione un sanitario para agregar artefactos.', 'warning');
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryFixture(sanitaryId, fixtureId);
+    addSanitaryFixture(sanitaryId, fixtureId, options);
   }
 
-  function addPlanSanitaryOpening(type) {
+  function addPlanSanitaryOpening(type, options = {}) {
     const sanitaryId = _selectedPlanSanitaryId();
     if (!sanitaryId) {
       UI.showToast('Seleccione un sanitario para agregar aberturas.', 'warning');
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryOpening(sanitaryId, type);
+    addSanitaryOpening(sanitaryId, type, options);
   }
 
-  function addPlanSanitaryElement(type) {
+  function addPlanSanitaryElement(type, options = {}) {
     const sanitaryId = _selectedPlanSanitaryId();
     if (!sanitaryId) {
       UI.showToast('Seleccione un sanitario para agregar elementos.', 'warning');
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryElement(sanitaryId, type);
+    addSanitaryElement(sanitaryId, type, options);
   }
 
   function addPlanSanitaryStall() {
@@ -16638,18 +16791,37 @@ const MecFormModule = (() => {
     return true;
   }
 
-  function newPlanClassroom() {
+  function newPlanClassroom(options = {}) {
     const raw = String(_selectedPlanId || '');
     if (raw.startsWith('block::')) _activatePlanSelection(raw);
     newClassroom();
+    if (options.guided && _activeClassroomId) {
+      _data.__classroomSketch = {
+        ...(_data.__classroomSketch || {}),
+        estado: '',
+        caracteristicas: '',
+        openings: '',
+      };
+      _syncActiveClassroomFromSketch();
+      _saveDraft(false);
+    }
     _selectedPlanId = _activeClassroomId ? `room::${_activeClassroomId}` : _selectedPlanId;
     renderSchoolPlan();
   }
 
-  function addPlanSanitary() {
+  function addPlanSanitary(options = {}) {
     const raw = String(_selectedPlanId || '');
     if (raw.startsWith('block::')) _activatePlanSelection(raw);
     addSanitary();
+    if (options.guided && _activeSanitaryId) {
+      const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
+      if (item) {
+        item.uso = '';
+        item.genero = '';
+        item.agua = '';
+        _saveDraft(false);
+      }
+    }
     _selectedPlanId = _activeSanitaryId ? `sanitary::${_activeSanitaryId}` : _selectedPlanId;
     renderSchoolPlan();
   }
@@ -20501,6 +20673,10 @@ const MecFormModule = (() => {
     setSketchTool,
     setSketchField,
     setGuidedBlockField,
+    setGuidedClassroomField,
+    setGuidedClassroomObjectField,
+    setGuidedSanitaryField,
+    setGuidedSanitaryObjectField,
     selectBlock,
     selectBlockForClassrooms,
     selectBlockForSanitaries,

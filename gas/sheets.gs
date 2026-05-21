@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.82
+ * Version 2.6.95
  */
 
 const SheetsService = (() => {
@@ -920,6 +920,7 @@ const SheetsService = (() => {
       const headers = _headers(sheet);
       const existing = _objectFromRow(sheet, existingIdx, headers);
       _markSchoolFinalizedFromDelivery_(existing, params, existing.fecha_cierre || now);
+      _ensureSessionFromFinalDelivery_(existing, params, null, existing.fecha_cierre || now);
       return {
         status: 'ok',
         message: 'El cierre completo ya estaba registrado.',
@@ -966,6 +967,7 @@ const SheetsService = (() => {
     _appendObject(SHEET_NAMES.ENTREGAS, _entregasHeaders(), row);
     let rowIdx = _findRowIndex(SHEET_NAMES.ENTREGAS, 'id_entrega', deliveryId);
     _markSchoolFinalizedFromDelivery_(row, params, now, closeTimeFields);
+    _ensureSessionFromFinalDelivery_(row, params, closeTimeFields, now);
 
     try {
       const folder = DriveApp.getFolderById(EVIDENCE_FOLDER_ID);
@@ -1088,6 +1090,82 @@ const SheetsService = (() => {
       });
     }
     return _updateEscuelaOperational(id, update);
+  }
+
+  function _ensureSessionFromFinalDelivery_(row, params, timeFields, nowText) {
+    row = row || {};
+    params = params || {};
+    const session = params._session || {};
+    const usuario = _txt(row.usuario || session.usuario || params.usuario_cliente);
+    const idEscuela = _txt(row.id_escuela || params.id_escuela || row.codigo_local || params.codigo_local);
+    if (!usuario || !idEscuela) return false;
+
+    _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
+    const sheet = _getSheet(SHEET_NAMES.SESIONES);
+    const headers = _headers(sheet);
+    const escuelaResult = getEscuela(idEscuela);
+    const escuela = escuelaResult.status === 'ok'
+      ? escuelaResult.data
+      : {
+        id_escuela: row.id_escuela || params.id_escuela || idEscuela,
+        codigo_local: row.codigo_local || params.codigo_local || idEscuela,
+        nombre: row.nombre_escuela || params.nombre_escuela || '',
+      };
+    const sessionId = row.id_entrega ? `SES-${_safeKey(row.id_entrega).slice(0, 80)}` : _genId('SES');
+    const rows = _sheetToObjects(SHEET_NAMES.SESIONES)
+      .map((item, index) => Object.assign({ __row_index: index + 2 }, item));
+    const existing = rows.find(item => _txt(item.id_sesion) === sessionId || (row.id_entrega && _txt(item.folio_externo) === _txt(row.id_entrega)))
+      || rows.find(item => _same(item.usuario, usuario) && _sameSessionSchool_(item, escuela, idEscuela) && _isOpenSession_(item));
+
+    const end = new Date();
+    const minutes = Math.max(1, Math.round(Number(timeFields && timeFields.tiempo_escuela_min) || Number(row.tiempo_escuela_min) || 1));
+    const seconds = minutes * 60;
+    const start = new Date(end.getTime() - seconds * 1000);
+    const fechaInicio = existing ? (_formatDateCell_(existing.fecha_inicio) || _date(start)) : _date(start);
+    const horaInicio = existing ? (_formatTimeCell_(existing.hora_inicio) || _time(start)) : _time(start);
+    const inicioIso = existing ? (_formatIsoCell_(existing.inicio_iso) || start.toISOString()) : start.toISOString();
+    const update = {
+      id_sesion: existing ? (existing.id_sesion || sessionId) : sessionId,
+      id_escuela: escuela.id_escuela || row.id_escuela || idEscuela,
+      codigo_local: escuela.codigo_local || row.codigo_local || '',
+      nombre_escuela: escuela.nombre || row.nombre_escuela || params.nombre_escuela || '',
+      usuario,
+      supervisor: escuela.supervisor_asignado || existing?.supervisor || '',
+      fecha_inicio: fechaInicio,
+      hora_inicio: horaInicio,
+      inicio_iso: inicioIso,
+      fecha_fin: _date(end),
+      hora_fin: _time(end),
+      fin_iso: end.toISOString(),
+      duracion_minutos: existing && existing.duracion_minutos ? existing.duracion_minutos : minutes,
+      duracion_segundos: existing && existing.duracion_segundos ? existing.duracion_segundos : seconds,
+      estado: 'finalizada',
+      observacion_cierre: row.pendientes
+        ? `Cierre final CIALPA con ${row.pendientes} pendiente(s).`
+        : 'Cierre final CIALPA registrado desde Registro guiado.',
+      url_formulario_usada: existing?.url_formulario_usada || '',
+      launch_mode: existing?.launch_mode || 'registro_guiado',
+      dispositivo: existing?.dispositivo || params.dispositivo || '',
+      gps_inicio_lat: existing?.gps_inicio_lat || '',
+      gps_inicio_lng: existing?.gps_inicio_lng || '',
+      gps_fin_lat: existing?.gps_fin_lat || '',
+      gps_fin_lng: existing?.gps_fin_lng || '',
+      folio_externo: row.id_entrega || params.clientMutationId || '',
+      ultimo_registro_externo: 'Registro guiado CIALPA',
+      modulos_completados: existing?.modulos_completados || '',
+      total_modulos: existing?.total_modulos || MODULE_DEFAULTS.length,
+      calidad_cierre: row.pendientes ? 'cierre_con_pendientes_confirmado' : 'completo_confirmado',
+      creado_en: existing?.creado_en || _timestamp(),
+      actualizado_en: _timestamp(),
+    };
+
+    if (existing && existing.__row_index) {
+      Object.entries(update).forEach(([key, value]) => _setByHeader(sheet, existing.__row_index, headers, key, value));
+    } else {
+      _appendObject(SHEET_NAMES.SESIONES, _sesionesHeaders(), update);
+    }
+    _logEvento(update.id_sesion, update.id_escuela, usuario, 'CIERRE_SESION', `Cierre final desde entrega ${row.id_entrega || ''}`);
+    return true;
   }
 
   function _createFinalPdfFile_(folder, pdfHtml, baseName) {

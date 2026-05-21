@@ -113,7 +113,7 @@ const GuidedRegisterModule = (() => {
       number: '04',
       title: 'Aulas y espacios',
       kicker: 'Construccion por partes',
-      summary: 'Agregar aulas, cantinas, bibliotecas, laboratorios y espacios especiales sin perder el plano comun.',
+      summary: 'Agregar aulas y espacios, ubicarlos en el plano y capturar estado, uso, puertas, ventanas e instalaciones desde la guia superior.',
       checks: ['Ambientes ubicados', 'Aberturas cargadas', 'Instalaciones visibles'],
       actions: [
         { label: 'Aula', icon: '+AU', action: 'classroom', primary: true },
@@ -133,7 +133,7 @@ const GuidedRegisterModule = (() => {
       number: '05',
       title: 'Sanitarios',
       kicker: 'Artefactos por botones',
-      summary: 'Configurar banos con o sin cabina y cargar artefactos con ficha de estado.',
+      summary: 'Configurar banos con o sin cabina y responder uso, estado, agua, aberturas y artefactos desde la guia superior.',
       checks: ['Sanitario creado', 'Cabinas o artefactos', 'Puertas y ventilacion'],
       actions: [
         { label: 'Sanitario', icon: '+WC', action: 'sanitary', primary: true },
@@ -327,12 +327,18 @@ const GuidedRegisterModule = (() => {
     if (action === 'confirmClassroomConfigured') return _confirmClassroomConfigured(value);
     if (action === 'confirmSanitaryConfigured') return _confirmSanitaryConfigured(value);
     if (action === 'confirmSiteConfigured') return _confirmSiteConfigured(value);
+    if (action === 'answerClassroomField') return _answerClassroomField(value);
+    if (action === 'answerClassroomObjectField') return _answerClassroomObjectField(value);
+    if (action === 'answerSanitaryField') return _answerSanitaryField(value);
+    if (action === 'answerSanitaryObjectField') return _answerSanitaryObjectField(value);
     if (action === 'goClosure') return _goClosure();
     if (action === 'syncSheets') return _syncDraftToSheets();
     if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
     if (action === 'finalizePartial') return _finalizeCompleteRegistration({ allowPending: true });
     if (action === 'workbook') return (typeof AppController !== 'undefined' && AppController.openWorkbook) ? AppController.openWorkbook() : null;
     if (action === 'selectPlanItem') return _selectPlanItem(value);
+    if (action === 'openClassroomObjectFicha') return _openClassroomObjectFicha(value);
+    if (action === 'openSanitaryObjectFicha') return _openSanitaryObjectFicha(value);
     if (action === 'module') return _openModule(value);
     if (action === 'stage') return _openMecStage(value);
     if (action === 'demo') return _openDemo();
@@ -393,10 +399,7 @@ const GuidedRegisterModule = (() => {
           mec.newPlanClassroom();
           break;
         case 'guidedClassroom':
-          mec.newPlanClassroom();
-          setTimeout(() => {
-            try { mec.openClassroomFicha(); } catch { /* non-fatal */ }
-          }, 140);
+          mec.newPlanClassroom({ guided: true });
           break;
         case 'openClassroomFicha':
           if (mec.openPlanClassroomFicha) mec.openPlanClassroomFicha(value);
@@ -413,19 +416,19 @@ const GuidedRegisterModule = (() => {
           mec.openOtherSpacePicker('plan');
           break;
         case 'roomElement':
-          mec.addPlanClassroomElement(value);
+          mec.addPlanClassroomElement(value, { guided: true });
           break;
         case 'sanitary':
-          mec.addPlanSanitary();
+          mec.addPlanSanitary({ guided: true });
           break;
         case 'stall':
           mec.addPlanSanitaryStall();
           break;
         case 'fixture':
-          mec.addPlanSanitaryFixture(value);
+          mec.addPlanSanitaryFixture(value, { guided: true });
           break;
         case 'sanitaryOpening':
-          mec.addPlanSanitaryOpening(value);
+          mec.addPlanSanitaryOpening(value, { guided: true });
           break;
         case 'site':
           mec.addPlanSiteElement(value, 'plan');
@@ -470,6 +473,10 @@ const GuidedRegisterModule = (() => {
       'floor',
       'floorGuide',
       'answerBlockField',
+      'answerClassroomField',
+      'answerClassroomObjectField',
+      'answerSanitaryField',
+      'answerSanitaryObjectField',
       'classroom',
       'guidedClassroom',
       'openClassroomFicha',
@@ -957,7 +964,7 @@ const GuidedRegisterModule = (() => {
       const scope = room.name || 'Ambiente';
       _roomRequirementItems(room)
         .filter(item => !item.done && !item.optional)
-        .forEach(item => add(scope, item.title, item.help || '', item.plan ? 'selectPlanItem' : 'openClassroomFicha', item.plan ? `room::${room.id}` : room.id));
+        .forEach(item => add(scope, item.title, item.help || '', item.plan ? 'selectPlanItem' : 'openClassroomFicha', item.value || (item.plan ? `room::${room.id}` : room.id)));
       if (_roomReady(room) && !_roomConfigured(room)) add(scope, 'Confirmar configuracion', 'Pulse Confirmar configuracion para cerrar el ambiente.', 'confirmClassroomConfigured', room.id);
     });
 
@@ -965,7 +972,7 @@ const GuidedRegisterModule = (() => {
       const scope = item.codigo || 'Sanitario';
       _sanitaryRequirementItems(item)
         .filter(req => !req.done && !req.optional)
-        .forEach(req => add(scope, req.title, req.help || '', req.plan ? 'selectPlanItem' : 'openSanitaryFicha', req.plan ? `sanitary::${item.id}` : item.id));
+        .forEach(req => add(scope, req.title, req.help || '', req.plan ? 'selectPlanItem' : 'openSanitaryFicha', req.value || (req.plan ? `sanitary::${item.id}` : item.id)));
       if (_sanitaryReady(item) && !_sanitaryConfigured(item)) add(scope, 'Confirmar configuracion', 'Pulse Confirmar configuracion para cerrar el sanitario.', 'confirmSanitaryConfigured', item.id);
     });
 
@@ -1312,17 +1319,20 @@ const GuidedRegisterModule = (() => {
     }
     if (snap.activeClassrooms.length < snap.classroomTarget) {
       const nextNumber = snap.activeClassrooms.length + 1;
-      return _question('Aula pendiente', `Insertar aula ${nextNumber} de ${snap.classroomTarget}`, 'Cree el aula, ubique su rectangulo en el plano, ajuste sus esquinas y complete la ficha emergente.', [
+      return _question('Aula pendiente', `Insertar aula ${nextNumber} de ${snap.classroomTarget}`, 'Cree el aula, ubique su rectangulo en el plano y ajuste sus esquinas. Despues la guia superior preguntara estado, uso y elementos uno por uno.', [
         { label: `Insertar aula ${nextNumber}`, action: 'guidedClassroom', primary: true },
         { label: 'Cambiar cantidad', action: 'resetClassroomTarget' },
       ]);
     }
     if (snap.incompleteClassroom) {
+      const directQuestion = _classroomDirectQuestion(snap.incompleteClassroom);
+      if (directQuestion) return directQuestion;
       const label = snap.incompleteClassroom.name || 'Aula pendiente';
       const pending = _roomRequirementItems(snap.incompleteClassroom);
       const next = _firstPendingRequirement(pending);
-      return _question('Aula pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Revise la ficha y confirme el guardado para habilitar la siguiente pregunta.', [
-        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openClassroomFicha', value: next?.plan ? `room::${snap.incompleteClassroom.id}` : snap.incompleteClassroom.id, primary: true },
+      const primaryValue = next?.value || (next?.plan ? `room::${snap.incompleteClassroom.id}` : snap.incompleteClassroom.id);
+      return _question('Aula pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira estado, caracteristicas y elementos uno por uno.', [
+        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openClassroomFicha', value: primaryValue, primary: true },
         { label: 'Abrir ficha', action: 'openClassroomFicha', value: snap.incompleteClassroom.id },
         { label: 'Confirmar configuracion', action: 'confirmClassroomConfigured', value: snap.incompleteClassroom.id },
       ], false, _guidedRequirementList(pending));
@@ -1347,7 +1357,7 @@ const GuidedRegisterModule = (() => {
     }
     const noSanitary = _flagValue(_flagKeyParts(snap.activeBlock?.id, snap.activeFloorLabel, 'noSanitary'));
     if (!snap.activeSanitaries.length && !noSanitary) {
-      return _question('Pregunta obligatoria', 'Este bloque/piso tiene sanitario?', 'Si responde Si, se inserta el sanitario y debe configurar sus medidas, posicion, artefactos y ficha.', [
+      return _question('Pregunta obligatoria', 'Este bloque/piso tiene sanitario?', 'Si responde Si, se inserta el sanitario. Primero se ubica y dimensiona en el plano; luego la guia pedira uso, estado, agua, aberturas y artefactos.', [
         { label: 'Si, insertar sanitario', action: 'sanitary', primary: true },
         { label: 'No tiene', action: 'markNoSanitary' },
       ]);
@@ -1359,11 +1369,14 @@ const GuidedRegisterModule = (() => {
       ], true);
     }
     if (snap.incompleteSanitary) {
+      const directQuestion = _sanitaryDirectQuestion(snap.incompleteSanitary);
+      if (directQuestion) return directQuestion;
       const label = snap.incompleteSanitary.codigo || 'Sanitario pendiente';
       const pending = _sanitaryRequirementItems(snap.incompleteSanitary);
       const next = _firstPendingRequirement(pending);
-      return _question('Sanitario pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Revise la ficha y confirme el guardado para habilitar la siguiente pregunta.', [
-        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openSanitaryFicha', value: next?.plan ? `sanitary::${snap.incompleteSanitary.id}` : snap.incompleteSanitary.id, primary: true },
+      const primaryValue = next?.value || (next?.plan ? `sanitary::${snap.incompleteSanitary.id}` : snap.incompleteSanitary.id);
+      return _question('Sanitario pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira uso, estado, agua y artefactos uno por uno.', [
+        { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openSanitaryFicha', value: primaryValue, primary: true },
         { label: 'Abrir ficha', action: 'openSanitaryFicha', value: snap.incompleteSanitary.id },
         { label: 'Confirmar configuracion', action: 'confirmSanitaryConfigured', value: snap.incompleteSanitary.id },
       ], false, _guidedRequirementList(pending));
@@ -1372,6 +1385,82 @@ const GuidedRegisterModule = (() => {
       { label: 'Siguiente', action: 'next', primary: true },
       { label: 'Agregar otro', action: 'sanitary' },
     ], true);
+  }
+
+  function _classroomDirectQuestion(room) {
+    if (!_roomHasGeometry(room) || !_hasMeasures(room, 'length', 'width')) return null;
+    const label = room?.name || 'Aula pendiente';
+    if (!_hasAnswer(room?.estado)) {
+      return _question('Pregunta del aula', `${label}: estado general`, 'Responda el estado/calidad observado. La ficha queda solo para revisar o corregir despues.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::estado`, ['Bueno', 'Regular', 'Malo', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    if (!_hasAnswer(room?.caracteristicas) && !_hasAnswer(room?.openings)) {
+      return _question('Pregunta del aula', `${label}: uso o condicion`, 'Registre la caracteristica principal del ambiente antes de seguir con puertas, ventanas e instalaciones.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::caracteristicas`, ['Uso regular', 'Uso compartido', 'Sin uso', 'Clausurada', 'En obra', 'Necesita reparacion'], 'Uso regular'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    const object = _guidedPendingObjects(room?.objects || [])[0];
+    if (object) return _roomObjectDirectQuestion(room, object);
+    return null;
+  }
+
+  function _sanitaryDirectQuestion(item) {
+    if (!_sanitaryHasGeometry(item) || !_hasMeasures(item, 'largo_m', 'ancho_m')) return null;
+    const label = item?.codigo || 'Sanitario pendiente';
+    if (!_hasAnswer(item?.estado)) {
+      return _question('Pregunta del sanitario', `${label}: estado general`, 'Responda el estado/calidad observado del sanitario.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::estado`, ['Bueno', 'Regular', 'Malo', 'No operativo', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.uso)) {
+      return _question('Pregunta del sanitario', `${label}: uso principal`, 'Indique para quien se usa principalmente este sanitario.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::uso`, ['Estudiantes', 'Docentes', 'Mixto', 'Administrativo', 'No operativo'], 'Estudiantes'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.genero)) {
+      return _question('Pregunta del sanitario', `${label}: destino o genero`, 'Registre la senalizacion o destino principal observado.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::genero`, ['Ninas / mujeres', 'Ninos / varones', 'Mixto', 'Accesible', 'No senalizado'], 'Mixto'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.agua)) {
+      return _question('Pregunta del sanitario', `${label}: disponibilidad de agua`, 'Indique si el sanitario cuenta con agua durante la verificacion.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::agua`, ['Si', 'Intermitente', 'No', 'No verificable'], 'Si'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    const object = _guidedPendingObjects(item?.objects || [])[0];
+    if (object) return _sanitaryObjectDirectQuestion(item, object);
+    return null;
+  }
+
+  function _roomObjectDirectQuestion(room, object) {
+    const field = _nextGuidedObjectField(object);
+    if (!field) return null;
+    const valueBase = `${room.id}::${object.id}::${field}`;
+    const planValue = _guidedPendingObjectPlanValue(room, object);
+    return _question('Pregunta del elemento', `${_guidedObjectLabel(object)}: ${_guidedObjectFieldPrompt(object, field)}`, _guidedObjectFieldHelp(object, field), [
+      ..._fieldAnswerActions('answerClassroomObjectField', valueBase, _guidedObjectFieldOptions(object, field), _guidedObjectFieldPrimary(object, field)),
+      { label: 'Ubicar en plano', action: 'selectPlanItem', value: planValue },
+      { label: 'Editar ficha', action: 'openClassroomObjectFicha', value: planValue },
+    ], false, _guidedRequirementList(_guidedObjectRequirementItems(object)));
+  }
+
+  function _sanitaryObjectDirectQuestion(item, object) {
+    const field = _nextGuidedObjectField(object);
+    if (!field) return null;
+    const valueBase = `${item.id}::${object.id}::${field}`;
+    const planValue = _guidedPendingObjectPlanValue(item, object, 'sanitary');
+    return _question('Pregunta del elemento sanitario', `${_guidedObjectLabel(object)}: ${_guidedObjectFieldPrompt(object, field)}`, _guidedObjectFieldHelp(object, field), [
+      ..._fieldAnswerActions('answerSanitaryObjectField', valueBase, _guidedObjectFieldOptions(object, field), _guidedObjectFieldPrimary(object, field)),
+      { label: 'Ubicar en plano', action: 'selectPlanItem', value: planValue },
+      { label: 'Editar ficha', action: 'openSanitaryObjectFicha', value: planValue },
+    ], false, _guidedRequirementList(_guidedObjectRequirementItems(object)));
   }
 
   function _siteQuestion(snap) {
@@ -1609,17 +1698,23 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Condicion de calidad',
-        help: 'Registre el estado general del ambiente antes de confirmarlo.',
+        help: 'Registre el estado general del ambiente desde la pregunta superior antes de confirmarlo.',
         doneText: room?.estado || 'Estado cargado',
         done: _hasAnswer(room?.estado),
-        optional: true,
       },
       {
         title: 'Caracteristicas del ambiente',
-        help: 'Registre uso, particularidades, aberturas u observaciones tecnicas en la ficha.',
+        help: 'Registre uso o condicion principal desde la pregunta superior; la ficha queda para edicion rapida.',
         doneText: 'Caracteristicas registradas',
         done: _hasAnswer(room?.caracteristicas) || _hasAnswer(room?.openings),
-        optional: true,
+      },
+      {
+        title: 'Completar elementos declarados',
+        help: _guidedPendingObjectsHelp(room?.objects || [], 'aula'),
+        doneText: 'Puertas, ventanas y objetos declarados tienen ficha revisada',
+        done: _guidedPendingObjects(room?.objects || []).length === 0,
+        plan: true,
+        value: _guidedPendingObjectPlanValue(room, _guidedPendingObjects(room?.objects || [])[0]),
       },
     ];
   }
@@ -1641,19 +1736,170 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Condicion de calidad',
-        help: 'Registre el estado general del sanitario.',
+        help: 'Registre el estado general del sanitario desde la pregunta superior.',
         doneText: item?.estado || 'Estado cargado',
         done: _hasAnswer(item?.estado),
-        optional: true,
       },
       {
         title: 'Caracteristicas sanitarias',
-        help: 'Complete uso principal, genero/destino y datos basicos de funcionamiento.',
+        help: 'Complete uso principal, genero/destino y agua desde preguntas superiores sucesivas.',
         doneText: [item?.uso, item?.genero, item?.agua].filter(Boolean).join(' / ') || 'Caracteristicas cargadas',
         done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
-        optional: true,
+      },
+      {
+        title: 'Completar elementos declarados',
+        help: _guidedPendingObjectsHelp(item?.objects || [], 'sanitario'),
+        doneText: 'Aberturas y artefactos declarados tienen ficha revisada',
+        done: _guidedPendingObjects(item?.objects || []).length === 0,
+        plan: true,
+        value: _guidedPendingObjectPlanValue(item, _guidedPendingObjects(item?.objects || [])[0], 'sanitary'),
       },
     ];
+  }
+
+  function _guidedPendingObjects(objects = []) {
+    return (objects || [])
+      .filter(object => object && !['room', 'sanitary-room', 'wall', 'pencil'].includes(object.type))
+      .filter(object => !_guidedObjectConfigured(object));
+  }
+
+  function _guidedObjectConfigured(object = {}) {
+    if (!object || !object.ficha || object.ficha.__guidedRequired !== 'true') return true;
+    if (!object.ficha.__guidedReviewed) return false;
+    return _guidedObjectRequiredFields(object).every(key => _hasAnswer(object.ficha?.[key]));
+  }
+
+  function _guidedObjectRequiredFields(object = {}) {
+    if (object.type === 'door') return ['subtipo', 'estado', 'abre_hacia', 'bisagra'];
+    if (object.type === 'window') return ['subtipo', 'estado'];
+    if (['outlet', 'switchboard', 'light', 'fan', 'ac', 'damage', 'board', 'stair'].includes(object.type)) return ['subtipo', 'estado'];
+    if (['toilet', 'sink', 'urinal', 'shower'].includes(object.type)) return ['subtipo', 'estado'];
+    return ['estado'];
+  }
+
+  function _guidedPendingObjectsHelp(objects = [], scope = 'elemento') {
+    const pending = _guidedPendingObjects(objects);
+    if (!pending.length) return 'Los elementos declarados ya tienen ficha revisada.';
+    const object = pending[0];
+    return `Responda en la tarjeta superior los datos de ${_guidedObjectLabel(object)}: tipo, estado/calidad y, si es puerta, apertura/bisagra. La ficha queda como edicion rapida si necesita corregir detalles del ${scope}.`;
+  }
+
+  function _guidedObjectLabel(object = {}) {
+    const ficha = object.ficha || {};
+    const label = ficha.codigo || object.type || 'elemento';
+    const kind = {
+      door: 'puerta',
+      window: 'ventana',
+      outlet: 'toma',
+      switchboard: 'tablero',
+      light: 'luz',
+      fan: 'ventilador',
+      ac: 'aire acondicionado',
+      damage: 'falla/grieta',
+      toilet: 'inodoro',
+      sink: 'lavamanos',
+      urinal: 'urinario',
+      shower: 'ducha',
+    }[object.type] || object.type || 'elemento';
+    return `${kind} ${label}`.trim();
+  }
+
+  function _guidedPendingObjectPlanValue(parent, object, kind = 'room') {
+    if (!parent || !object?.id) return '';
+    if (kind === 'sanitary') return `sanitary::${parent.id}::${object.id}`;
+    return `${parent.id}::${object.id}`;
+  }
+
+  function _fieldAnswerActions(action, baseValue, options = [], primary = '') {
+    return (options || []).map(option => ({
+      label: option,
+      action,
+      value: `${baseValue}::${option}`,
+      primary: primary ? option === primary : false,
+    }));
+  }
+
+  function _nextGuidedObjectField(object = {}) {
+    const fields = _guidedObjectRequiredFields(object);
+    return fields.find(field => !_hasAnswer(object.ficha?.[field])) || (!object.ficha?.__guidedReviewed ? fields[0] : '');
+  }
+
+  function _guidedObjectRequirementItems(object = {}) {
+    return _guidedObjectRequiredFields(object).map(field => ({
+      title: _guidedObjectFieldPrompt(object, field),
+      help: 'Responder desde la tarjeta superior. La ficha queda disponible para correcciones.',
+      doneText: object.ficha?.[field] || 'Respondido',
+      done: _hasAnswer(object.ficha?.[field]),
+    }));
+  }
+
+  function _guidedObjectFieldPrompt(object = {}, field = '') {
+    if (field === 'subtipo') return `tipo de ${_guidedObjectKind(object)}`;
+    if (field === 'estado') return 'estado o calidad';
+    if (field === 'abre_hacia') return 'sentido de apertura';
+    if (field === 'bisagra') return 'lado de bisagra';
+    return field.replace(/_/g, ' ');
+  }
+
+  function _guidedObjectFieldHelp(object = {}, field = '') {
+    const kind = _guidedObjectKind(object);
+    if (field === 'subtipo') return `Indique el tipo observado de ${kind}. Despues podra ubicarlo o ajustar detalles desde la ficha.`;
+    if (field === 'estado') return `Registre la calidad observada de ${kind}.`;
+    if (field === 'abre_hacia') return 'Defina si la puerta abre hacia el interior o exterior. Tambien puede usar el boton Apertura para invertirla visualmente.';
+    if (field === 'bisagra') return 'Indique el lado de giro de la hoja para representar la apertura con mas precision.';
+    return 'Responda la opcion observada para continuar con la guia.';
+  }
+
+  function _guidedObjectFieldPrimary(object = {}, field = '') {
+    if (field === 'estado') return ['damage'].includes(object.type) ? 'Leve' : 'Bueno';
+    if (field === 'abre_hacia') return 'Interior';
+    if (field === 'bisagra') return 'Inicio';
+    return _guidedObjectFieldOptions(object, field)[0] || '';
+  }
+
+  function _guidedObjectFieldOptions(object = {}, field = '') {
+    if (field === 'estado') {
+      if (object.type === 'damage') return ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'];
+      return ['Bueno', 'Regular', 'Malo', 'No funciona', 'No verificable'];
+    }
+    if (field === 'abre_hacia') return ['Interior', 'Exterior', 'Corrediza', 'No verificable'];
+    if (field === 'bisagra') return ['Inicio', 'Fin', 'No verificable'];
+    if (field !== 'subtipo') return ['Si', 'No', 'No verificable'];
+    return {
+      door: ['Con puerta madera', 'Con puerta metalica', 'Reja', 'Corrediza', 'Sin hoja', 'No verificable'],
+      window: ['Corrediza', 'Batiente', 'Vidrio fijo', 'Persiana', 'Sin vidrio', 'No verificable'],
+      outlet: ['Simple', 'Doble', 'Con tierra', 'Sin tapa', 'No verificable'],
+      switchboard: ['Tablero seccional', 'Tablero principal', 'Caja abierta', 'Sin rotulo', 'No verificable'],
+      light: ['Foco LED', 'Tubo fluorescente', 'Panel', 'Artefacto colgante', 'No verificable'],
+      fan: ['Techo', 'Pared', 'Pie', 'Extractor', 'No verificable'],
+      ac: ['Split', 'Ventana', 'Cassette', 'Portatil', 'No verificable'],
+      damage: ['Fisura', 'Humedad', 'Rotura', 'Desprendimiento', 'Instalacion expuesta', 'Otro'],
+      board: ['Tiza', 'Marcador', 'Mixto', 'No tiene', 'No verificable'],
+      stair: ['Recta', 'Con descanso', 'Caracol', 'Rampa/escalera', 'No verificable'],
+      toilet: ['Inodoro pedestal', 'Inodoro turco', 'Con cisterna', 'Sin cisterna', 'No verificable'],
+      sink: ['Lavamanos individual', 'Lavatorio multiple', 'Canilla exterior', 'Sin canilla', 'No verificable'],
+      urinal: ['Individual', 'Canaleta', 'Seco', 'No verificable'],
+      shower: ['Ducha comun', 'Ducha electrica', 'Sin flor', 'No verificable'],
+    }[object.type] || ['General', 'Otro', 'No verificable'];
+  }
+
+  function _guidedObjectKind(object = {}) {
+    return {
+      door: 'puerta',
+      window: 'ventana',
+      outlet: 'toma',
+      switchboard: 'tablero',
+      light: 'luz',
+      fan: 'ventilador',
+      ac: 'aire acondicionado',
+      damage: 'falla/grieta',
+      board: 'pizarron',
+      stair: 'escalera',
+      toilet: 'inodoro',
+      sink: 'lavamanos',
+      urinal: 'urinario',
+      shower: 'ducha',
+    }[object.type] || 'elemento';
   }
 
   function _siteElementRequirementItems(item) {
@@ -1722,7 +1968,7 @@ const GuidedRegisterModule = (() => {
     if (question.done) {
       return 'Este punto ya esta completo para avanzar. Puede volver a abrir la ficha o el plano si necesita corregir datos antes de exportar o sincronizar.';
     }
-    return 'Complete la accion principal antes de avanzar. La informacion de calidad, estado y caracteristicas mejora la auditoria y el PDF, pero la ficha queda disponible para revisar o ampliar datos despues de ubicar el elemento en el plano.';
+    return 'La captura principal se realiza en esta tarjeta superior, paso a paso. Use el plano para ubicar o dimensionar y deje la ficha como herramienta secundaria para revisar o corregir informacion ya declarada.';
   }
 
   function _numberControl(name, label, min = '0', value = '') {
@@ -1772,6 +2018,50 @@ const GuidedRegisterModule = (() => {
     if (mec.setGuidedBlockField(fieldId, value)) _refreshSoon();
   }
 
+  function _answerClassroomField(payload) {
+    const [roomId, fieldId, ...rest] = String(payload || '').split('::');
+    const value = rest.join('::');
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!roomId || !fieldId || !value || !mec?.setGuidedClassroomField) {
+      UI.showToast('No se pudo registrar la respuesta del aula.', 'warning');
+      return;
+    }
+    if (mec.setGuidedClassroomField(roomId, fieldId, value)) _refreshSoon();
+  }
+
+  function _answerClassroomObjectField(payload) {
+    const [roomId, objectId, fieldId, ...rest] = String(payload || '').split('::');
+    const value = rest.join('::');
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!roomId || !objectId || !fieldId || !value || !mec?.setGuidedClassroomObjectField) {
+      UI.showToast('No se pudo registrar la respuesta del elemento.', 'warning');
+      return;
+    }
+    if (mec.setGuidedClassroomObjectField(roomId, objectId, fieldId, value)) _refreshSoon();
+  }
+
+  function _answerSanitaryField(payload) {
+    const [sanitaryId, fieldId, ...rest] = String(payload || '').split('::');
+    const value = rest.join('::');
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!sanitaryId || !fieldId || !value || !mec?.setGuidedSanitaryField) {
+      UI.showToast('No se pudo registrar la respuesta del sanitario.', 'warning');
+      return;
+    }
+    if (mec.setGuidedSanitaryField(sanitaryId, fieldId, value)) _refreshSoon();
+  }
+
+  function _answerSanitaryObjectField(payload) {
+    const [sanitaryId, objectId, fieldId, ...rest] = String(payload || '').split('::');
+    const value = rest.join('::');
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!sanitaryId || !objectId || !fieldId || !value || !mec?.setGuidedSanitaryObjectField) {
+      UI.showToast('No se pudo registrar la respuesta del elemento sanitario.', 'warning');
+      return;
+    }
+    if (mec.setGuidedSanitaryObjectField(sanitaryId, objectId, fieldId, value)) _refreshSoon();
+  }
+
   function _selectPlanItem(value = '') {
     const id = String(value || '').trim();
     const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
@@ -1781,6 +2071,32 @@ const GuidedRegisterModule = (() => {
     }
     mec.selectPlanItem(id);
     _refreshSoon();
+  }
+
+  function _openClassroomObjectFicha(value = '') {
+    const id = String(value || '').trim();
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!id || !mec?.selectPlanItem || !mec?.openSelectedSketchFicha) {
+      UI.showToast('No se pudo abrir la ficha del elemento.', 'warning');
+      return;
+    }
+    mec.selectPlanItem(id);
+    setTimeout(() => {
+      try { mec.openSelectedSketchFicha(); } catch { /* non-fatal */ }
+    }, 80);
+  }
+
+  function _openSanitaryObjectFicha(value = '') {
+    const id = String(value || '').trim();
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!id || !mec?.selectPlanItem || !mec?.openSelectedSanitaryObjectFicha) {
+      UI.showToast('No se pudo abrir la ficha del elemento sanitario.', 'warning');
+      return;
+    }
+    mec.selectPlanItem(id);
+    setTimeout(() => {
+      try { mec.openSelectedSanitaryObjectFicha(); } catch { /* non-fatal */ }
+    }, 80);
   }
 
   function _setScopedFlag(name, value, message = '') {

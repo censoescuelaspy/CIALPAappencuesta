@@ -4,6 +4,45 @@
 
 ---
 
+## Flujo guiado secuencial, sanitarios y jornada - 2026-05-21 - v2.6.95
+
+### Objetivo
+- Hacer que la captura principal ocurra en la tarjeta superior del `Registro guiado`, pregunta por pregunta.
+- Dejar las fichas como herramienta secundaria para revisar o corregir informacion ya declarada.
+- Corregir que el cierre de un relevamiento desde `Registro guiado` no impactara en `Mi Jornada`.
+- Recuperar puertas/ventanas y cambio de apertura para sanitarios con la misma logica de aulas.
+
+### Cambios implementados
+- Las aulas creadas desde la guia ya no abren ficha automaticamente: la guia pide estado, uso/condicion y luego elementos declarados.
+- Los sanitarios creados desde la guia ya no traen uso/genero/agua como respuestas cerradas: la guia los pregunta secuencialmente.
+- Puertas, ventanas, tomas, tableros, luces, ventiladores, aires, fallas y artefactos agregados desde la guia quedan pendientes de preguntas superiores.
+- La tarjeta superior registra tipo, estado/calidad, apertura y bisagra para puertas sin obligar a entrar a ficha.
+- La ficha de aula, elemento, sanitario u objeto sanitario queda disponible como `Editar ficha`, pero no es el camino principal de carga.
+- Los sanitarios vuelven a aceptar puertas y ventanas desde el mismo set de herramientas que aulas.
+- El boton `Apertura` vuelve a cambiar puertas seleccionadas desde el plano general, tanto en aulas como en sanitarios.
+- `guardarCierreCompleto` ahora asegura una fila `finalizada` en `sesiones_relevamiento` para que `Mi Jornada` refleje cierres hechos desde `Registro guiado`.
+- Version visible y cache del Service Worker actualizados a `v2.6.95`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria para activar la reparacion de `Mi Jornada`.
+- Publicar frontend en GitHub Pages.
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.95`.
+- Probar con `diego.meza`: finalizar una escuela desde `Registro guiado` y confirmar que aparece en `Mi Jornada`.
+- Probar en tablet: crear aula, agregar puerta/ventana, responder preguntas superiores y usar `Editar ficha` solo como correccion.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/jornada.js`.
+- Validacion sintactica de `gas/sheets.gs` mediante Node.
+- `git diff --check`.
+- Playwright local con sesion simulada: `Registro guiado` abre en `v2.6.95`, muestra tarjeta superior y no registra errores de consola.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Demo visible para panel Infraestructura MEC - 2026-05-21 - v2.6.94
 
 ### Objetivo
