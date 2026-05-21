@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.1.0
+ * Version: 2.6.79
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -107,6 +107,7 @@ function _handleRequest(e) {
       'deleteEncuestador',
       'saveIncidencia',
       'solicitarRelevamiento',
+      'aprobarSolicitudRelevamiento',
       'uploadEvidence',
       'guardarBorradorMec',
       'guardarCierreCompleto',
@@ -153,6 +154,7 @@ function _handleRequest(e) {
       // Incidencias
       case 'saveIncidencia':  return _respond(SheetsService.saveIncidencia(params));
       case 'solicitarRelevamiento': return _respond(SheetsService.solicitarRelevamiento(params));
+      case 'aprobarSolicitudRelevamiento': return _respond(SheetsService.aprobarSolicitudRelevamiento(params));
       case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));
       case 'guardarBorradorMec': return _respond(SheetsService.guardarBorradorMec(params));
       case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));
@@ -285,4 +287,49 @@ function _now() {
  */
 function _timestamp() {
   return Utilities.formatDate(new Date(), 'America/Asuncion', 'yyyy-MM-dd HH:mm:ss');
+}
+
+function _configValueGlobal_(clave, fallback) {
+  try {
+    const rows = _sheetToObjects(SHEET_NAMES.CONFIG);
+    const row = rows.find(r => String(r.clave) === String(clave));
+    return row && row.valor !== '' && row.valor !== null && row.valor !== undefined ? row.valor : fallback;
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function _adminNotificationEmail_() {
+  const configured = _configValueGlobal_(
+    'ADMIN_NOTIFICATION_EMAIL',
+    _configValueGlobal_('FINAL_REPORT_EMAIL', 'censoescuelaspy@gmail.com')
+  );
+  const cleaned = String(configured || 'censoescuelaspy@gmail.com')
+    .replace(/@gmial\.com/gi, '@gmail.com')
+    .trim();
+  return cleaned || 'censoescuelaspy@gmail.com';
+}
+
+function _sendAdminNotificationEmail_(subject, htmlBody, plainBody) {
+  const to = _adminNotificationEmail_();
+  try {
+    MailApp.sendEmail({
+      to,
+      subject: String(subject || 'CIALPA - notificacion operativa'),
+      body: String(plainBody || '').trim() || String(htmlBody || '').replace(/<[^>]+>/g, ' '),
+      htmlBody: String(htmlBody || plainBody || ''),
+    });
+    return { sent: true, to };
+  } catch (err) {
+    return { sent: false, to, error: err.message || String(err) };
+  }
+}
+
+function _htmlEscape_(value) {
+  return String(value === undefined || value === null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }

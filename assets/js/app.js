@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.74
+ * Version: 2.6.79
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -293,6 +293,9 @@ const IncidenciasModule = (() => {
         <td><span class="badge badge--${_safeClass(i.prioridad || 'media')}">${_escapeHtml(i.prioridad || '—')}</span></td>
         <td><span class="badge badge--${i.estado_resolucion === 'resuelto' ? 'success' : 'danger'}">${_escapeHtml(i.estado_resolucion || 'pendiente')}</span></td>
         <td>
+          ${Auth.canAccess('supervisor') && i.estado_resolucion !== 'resuelto' && String(i.tipo_incidencia || '').toLowerCase() === 'solicitud de relevamiento'
+        ? `<button class="btn btn-xs btn-success" onclick='AdminModule.aprobarSolicitudRelevamiento(${_jsString(i.id_incidencia)})'>Aprobar</button>`
+        : ''}
           ${Auth.canAccess('supervisor') && i.estado_resolucion !== 'resuelto'
         ? `<button class="btn btn-xs btn-success" onclick='IncidenciasModule.resolver(${_jsString(i.id_incidencia)})'>Resolver</button>`
         : ''}
@@ -337,9 +340,9 @@ const AppController = (() => {
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
     plano: { label: 'Plano escuela', icon: '▦', minRole: 'encuestador' },
     arquitectura: { label: 'Arquitectura proyecto', icon: 'A', minRole: 'encuestador' },
-    encuestadores: { label: 'Encuestadores', icon: '👥', minRole: 'admin' },
+    encuestadores: { label: 'Encuestadores', icon: 'ENC', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
-    incidencias: { label: 'Incidencias', icon: '⚠️', minRole: 'encuestador' },
+    incidencias: { label: 'Solicitudes', icon: 'SOL', minRole: 'encuestador' },
     jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
     estadisticas: { label: 'Resultados globales', icon: '📊', minRole: 'supervisor' },
     planificacion: { label: 'Planificación', icon: '⏱', minRole: 'supervisor' },
@@ -552,7 +555,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'planificacion', 'configuracion', 'estadisticas'];
+    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'planificacion', 'configuracion', 'estadisticas'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])

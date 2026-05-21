@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.78
+ * Version: 2.6.79
  */
 
 const API = (() => {
@@ -258,7 +258,7 @@ const API = (() => {
     FORM_ANDROID_INTENT_URL: '',
     FORM_CUSTOM_SCHEME_URL: '',
     FORM_FALLBACK_SECONDS: '2',
-    FINAL_REPORT_EMAIL: 'censoescuelaspy@gmial.com',
+    FINAL_REPORT_EMAIL: 'censoescuelaspy@gmail.com',
     operativo: true,
     fecha_inicio: '2026-04-27',
     fecha_fin: '2026-08-31',
@@ -402,6 +402,7 @@ const API = (() => {
       case 'deleteEncuestador': return { status: 'ok' };
       case 'saveIncidencia': return { status: 'ok', data: { id_incidencia: 'INC_DEMO_' + Date.now() } };
       case 'solicitarRelevamiento': return { status: 'ok', message: 'Solicitud demo enviada al administrador.', data: { id_incidencia: 'SOL_DEMO_' + Date.now(), demo: true } };
+      case 'aprobarSolicitudRelevamiento': return { status: 'ok', message: 'Solicitud demo aprobada.', data: { demo: true } };
       case 'uploadEvidence': return {
         status: 'ok',
         data: {
@@ -753,6 +754,7 @@ const API = (() => {
 
   async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
   async function solicitarRelevamiento(datos) { return call('solicitarRelevamiento', 'POST', datos); }
+  async function aprobarSolicitudRelevamiento(datos) { return call('aprobarSolicitudRelevamiento', 'POST', datos); }
   async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
@@ -788,6 +790,7 @@ const API = (() => {
     deleteEncuestador,
     saveIncidencia,
     solicitarRelevamiento,
+    aprobarSolicitudRelevamiento,
     guardarBorradorMec,
     guardarCierreCompleto,
     uploadEvidence,

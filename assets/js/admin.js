@@ -1,13 +1,14 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.6.71
+ * Version: 2.6.79
  */
 
 const AdminModule = (() => {
   'use strict';
 
   let _encuestadores = [];
+  let _solicitudesRelevamiento = [];
   let _auditFilters = {};
   let _encuestadorFiltersBound = false;
 
@@ -116,9 +117,26 @@ const AdminModule = (() => {
       _encuestadores = result.data || [];
       _renderEncuestadoresSummary(_encuestadores);
       _renderEncuestadoresTable(_filterEncuestadores(_encuestadores));
+      loadSolicitudesRelevamiento({ silent: true });
     } catch (err) {
       UI.showToast('Error al cargar encuestadores: ' + err.message, 'error');
     }
+  }
+
+  async function loadSolicitudesRelevamiento(options = {}) {
+    try {
+      const result = await API.getIncidencias({ estado: 'pendiente' });
+      if (result.status !== 'ok') throw new Error(result.message);
+      _solicitudesRelevamiento = (result.data || []).filter(_isSolicitudRelevamiento);
+      _renderSolicitudesRelevamiento(_solicitudesRelevamiento);
+    } catch (err) {
+      _renderSolicitudesRelevamiento([]);
+      if (!options.silent) UI.showToast('Error al cargar solicitudes: ' + err.message, 'error');
+    }
+  }
+
+  function _isSolicitudRelevamiento(row) {
+    return String(row?.tipo_incidencia || '').toLowerCase() === 'solicitud de relevamiento';
   }
 
   function _bindEncuestadorFilters() {
@@ -187,7 +205,7 @@ const AdminModule = (() => {
 
     if (!rows.length) {
       bodies.forEach(tbody => {
-        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">No hay encuestadores para los filtros seleccionados.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted">No hay encuestadores para los filtros seleccionados.</td></tr>';
       });
       return;
     }
@@ -207,6 +225,7 @@ const AdminModule = (() => {
             ${_isActive(r) ? 'Activo' : 'Inactivo'}
           </span>
         </td>
+        <td>${_escapeHtml(r.fecha_alta || '---')}</td>
         <td class="enc-admin-actions">
           <button class="btn btn-xs btn-outline" onclick='AdminModule.editEncuestador(${_jsString(r.id_encuestador)})'>Editar</button>
           ${_isActive(r)
@@ -215,6 +234,52 @@ const AdminModule = (() => {
         </td>
       </tr>`).join('');
     bodies.forEach(tbody => { tbody.innerHTML = html; });
+  }
+
+  function _renderSolicitudesRelevamiento(rows) {
+    const containers = ['solicitudes-relevamiento-admin', 'solicitudes-relevamiento-config']
+      .map(id => document.getElementById(id))
+      .filter(Boolean);
+    if (!containers.length) return;
+    const pendingCount = rows.length;
+    const body = pendingCount ? `
+      <div class="table-wrapper" style="margin-top:.75rem;">
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th>Escuela</th><th>Solicitante</th><th>Detalle</th><th>Acciones</th></tr>
+          </thead>
+          <tbody>
+            ${rows.slice(0, 12).map(row => {
+              const id = _jsString(row.id_incidencia);
+              const school = [row.codigo_local || row.id_escuela || '', row.nombre_escuela || ''].filter(Boolean).join(' - ');
+              return `
+                <tr>
+                  <td>${_escapeHtml(row.fecha_hora || '---')}</td>
+                  <td>${_escapeHtml(school || 'Sin escuela')}</td>
+                  <td>${_escapeHtml(row.usuario || '---')}</td>
+                  <td>${_escapeHtml(row.descripcion || '')}</td>
+                  <td class="enc-admin-actions">
+                    <button class="btn btn-xs btn-success" onclick='AdminModule.aprobarSolicitudRelevamiento(${id})'>Aprobar</button>
+                    <button class="btn btn-xs btn-outline" onclick='AdminModule.openSolicitudAssignment(${id})'>Asignar manual</button>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>` : '<p class="text-muted" style="margin:.75rem 0 0;">No hay solicitudes pendientes de relevamiento.</p>';
+    const html = `
+      <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+        <div>
+          <strong>Solicitudes de relevamiento pendientes</strong>
+          <p class="text-muted" style="margin:.35rem 0 0;">Cuando un usuario pide relevar una escuela sin asignacion, aparece aqui para aprobarla o asignarla manualmente.</p>
+        </div>
+        <div style="display:flex;gap:.5rem;align-items:center;">
+          <span class="badge ${pendingCount ? 'badge--warning' : 'badge--success'}">${pendingCount} pendiente${pendingCount === 1 ? '' : 's'}</span>
+          <button class="btn btn-outline btn-sm" onclick="AdminModule.loadSolicitudesRelevamiento()">Actualizar</button>
+        </div>
+      </div>
+      ${body}`;
+    containers.forEach(container => { container.innerHTML = html; });
   }
 
   function _roleLabel(rol) {
@@ -320,6 +385,45 @@ const AdminModule = (() => {
     }
   }
 
+  async function aprobarSolicitudRelevamiento(id) {
+    const solicitud = _solicitudesRelevamiento.find(row => row.id_incidencia === id);
+    const schoolLabel = solicitud
+      ? [solicitud.codigo_local || solicitud.id_escuela || '', solicitud.nombre_escuela || ''].filter(Boolean).join(' - ')
+      : 'la escuela solicitada';
+    const userLabel = solicitud?.usuario || 'el solicitante';
+    const confirmed = await UI.showConfirm(
+      'Aprobar solicitud',
+      `Asignar ${schoolLabel} a ${userLabel} y marcar la solicitud como resuelta?`
+    );
+    if (!confirmed) return;
+    try {
+      const result = await API.aprobarSolicitudRelevamiento({ id_incidencia: id });
+      if (result.status !== 'ok') throw new Error(result.message);
+      UI.showToast(result.message || 'Solicitud aprobada y escuela asignada.', 'success', 6500);
+      loadSolicitudesRelevamiento();
+      try {
+        if (typeof IncidenciasModule !== 'undefined' && IncidenciasModule.loadList) IncidenciasModule.loadList();
+      } catch { /* non-fatal */ }
+    } catch (err) {
+      UI.showToast('Error al aprobar solicitud: ' + err.message, 'error', 7000);
+    }
+  }
+
+  function openSolicitudAssignment(id) {
+    const solicitud = _solicitudesRelevamiento.find(row => row.id_incidencia === id);
+    if (typeof AppController !== 'undefined') {
+      AppController.showModule('planificacion');
+      setTimeout(() => {
+        try {
+          if (typeof PlanningModule !== 'undefined' && PlanningModule.switchTab) PlanningModule.switchTab('asignaciones');
+        } catch { /* non-fatal */ }
+      }, 150);
+    }
+    if (solicitud) {
+      UI.showToast(`Solicitud de ${solicitud.usuario || 'usuario'} para ${solicitud.codigo_local || solicitud.id_escuela || 'escuela'}: asignela en Distribucion de escuelas.`, 'info', 9000);
+    }
+  }
+
   async function loadAuditoria(page = 1) {
     try {
       const filters = { ..._auditFilters, page };
@@ -392,11 +496,14 @@ const AdminModule = (() => {
     loadConfig,
     saveConfigItem,
     loadEncuestadores,
+    loadSolicitudesRelevamiento,
     openNewEncuestador,
     editEncuestador,
     saveEncuestador,
     deleteEncuestador,
     setEncuestadorActivo,
+    aprobarSolicitudRelevamiento,
+    openSolicitudAssignment,
     loadAuditoria,
     applyAuditFilters,
   };

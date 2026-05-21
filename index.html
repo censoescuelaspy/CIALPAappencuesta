@@ -172,7 +172,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.78</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.79</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -199,7 +199,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.78</strong>
+      Edición vigente<br><strong class="app-version">v2.6.79</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -290,7 +290,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.78</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.79</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -652,6 +652,16 @@
             </div>
           </div>
 
+          <div id="solicitudes-relevamiento-admin" class="card" style="margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+              <div>
+                <strong>Solicitudes de relevamiento pendientes</strong>
+                <p class="text-muted" style="margin:.35rem 0 0;">Cargando solicitudes de usuarios...</p>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="AdminModule.loadSolicitudesRelevamiento()">Actualizar</button>
+            </div>
+          </div>
+
           <form id="enc-filter-form" class="enc-admin-toolbar">
             <div class="enc-admin-search">
               <label for="enc-filter-search">Buscar</label>
@@ -691,11 +701,12 @@
                   <th>Correo</th>
                   <th>Zona</th>
                   <th>Estado</th>
+                  <th>Alta</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
               <tbody id="enc-tbody">
-                <tr><td colspan="10" class="text-center text-muted">Cargando...</td></tr>
+                <tr><td colspan="11" class="text-center text-muted">Cargando...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1009,16 +1020,25 @@
                   <button class="btn btn-outline btn-sm" onclick="AppController.showModule('planificacion'); setTimeout(() => PlanningModule.switchTab('asignaciones'), 150)">Asignar escuelas</button>
                 </div>
               </div>
+              <div id="solicitudes-relevamiento-config" class="card" style="margin-bottom:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                  <div>
+                    <strong>Solicitudes de relevamiento pendientes</strong>
+                    <p class="text-muted" style="margin:.35rem 0 0;">Cargando solicitudes de usuarios...</p>
+                  </div>
+                  <button class="btn btn-outline btn-sm" onclick="AdminModule.loadSolicitudesRelevamiento()">Actualizar</button>
+                </div>
+              </div>
               <div style="margin-bottom:1rem;display:flex;justify-content:flex-end;">
                 <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo Encuestador</button>
               </div>
               <div class="table-wrapper card">
                 <table>
                   <thead>
-                    <tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Documento</th><th>Teléfono</th><th>Correo</th><th>Zona</th><th>Estado</th><th>Acciones</th></tr>
+                    <tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Documento</th><th>Teléfono</th><th>Correo</th><th>Zona</th><th>Estado</th><th>Alta</th><th>Acciones</th></tr>
                   </thead>
                   <tbody id="enc-tbody-admin">
-                    <tr><td colspan="10" class="text-center text-muted">Cargando...</td></tr>
+                    <tr><td colspan="11" class="text-center text-muted">Cargando...</td></tr>
                   </tbody>
                 </table>
               </div>

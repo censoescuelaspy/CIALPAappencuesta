@@ -4,6 +4,47 @@
 
 ---
 
+## Consola admin de encuestadores, solicitudes y correos - 2026-05-21 - v2.6.79
+
+### Objetivo
+- Dar al administrador una entrada visible para administrar la nomina de encuestadores.
+- Mostrar en la misma zona las solicitudes pendientes de usuarios que piden relevar una escuela sin asignacion.
+- Enviar correo a `censoescuelaspy@gmail.com` cuando alguien se registra y cuando solicita relevar una escuela.
+
+### Cambios implementados
+- El menu principal vuelve a mostrar `Encuestadores` como vista directa para administradores.
+- El menu principal incorpora `Solicitudes`, basado en incidencias, para ver pedidos y casos pendientes.
+- La nomina de encuestadores ahora muestra `fecha_alta`, facilitando detectar usuarios nuevos.
+- `Encuestadores` y `Configuracion > Encuestadores` muestran una bandeja `Solicitudes de relevamiento pendientes`.
+- Cada solicitud pendiente permite `Aprobar`, que asigna la escuela al usuario solicitante y marca la solicitud como resuelta.
+- Se mantiene `Asignar manual` para abrir la distribucion de escuelas cuando el admin quiere revisar antes de aprobar.
+- Apps Script agrega `aprobarSolicitudRelevamiento`.
+- `registrarUsuario` envia notificacion operativa de alta publica al administrador.
+- `solicitarRelevamiento` envia notificacion operativa al administrador con escuela, solicitante y territorio.
+- Se corrige el correo operativo de `censoescuelaspy@gmial.com` a `censoescuelaspy@gmail.com` y se agrega `ADMIN_NOTIFICATION_EMAIL`.
+- Version visible y cache del Service Worker actualizados a `v2.6.79`.
+
+### Pendiente operativo
+- Publicar el Web App desde la cuenta propietaria/aceptada para autorizar el nuevo uso de `MailApp`.
+- Publicar el commit local en GitHub Pages; el push a `origin/main` quedo bloqueado por politica de seguridad del entorno y requiere aprobacion explicita del usuario.
+- En la hoja `configuracion`, verificar o cargar `ADMIN_NOTIFICATION_EMAIL = censoescuelaspy@gmail.com`.
+- Pedir a administradores `Actualizar app` para tomar `cialpa-app-v2.6.79`.
+- Probar con un usuario nuevo: registrarse, verificar correo de alta, solicitar relevar una escuela sin asignacion, aprobar desde `Encuestadores` y confirmar que la escuela queda asignada.
+
+### Validaciones ejecutadas
+- `node --check assets/js/admin.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- Revision estatica: `Encuestadores` en menu, bandeja `Solicitudes de relevamiento pendientes`, endpoint `aprobarSolicitudRelevamiento`, correo `censoescuelaspy@gmail.com` y cache `cialpa-app-v2.6.79`.
+
+---
+
 ## Alta publica activada en Web App propietario - 2026-05-21 - v2.6.78
 
 ### Objetivo

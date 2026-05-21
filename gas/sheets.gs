@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.76
+ * Version 2.6.79
  */
 
 const SheetsService = (() => {
@@ -579,7 +579,68 @@ const SheetsService = (() => {
       longitud: escuela.longitud || params.longitud || ''
     });
     AuditService.log('SOLICITAR_RELEVAMIENTO', session.usuario, `id: ${idSolicitud}, escuela: ${escuela.codigo_local || escuela.id_escuela || id}`);
-    return { status: 'ok', message: 'Solicitud enviada al administrador.', data: { id_incidencia: idSolicitud } };
+    const emailStatus = _sendAdminNotificationEmail_(
+      `CIALPA - solicitud de relevamiento: ${escuela.codigo_local || escuela.id_escuela || id}`,
+      `
+        <p>Un usuario solicito relevar una escuela sin asignacion.</p>
+        <ul>
+          <li><b>Solicitud:</b> ${_htmlEscape_(idSolicitud)}</li>
+          <li><b>Solicitante:</b> ${_htmlEscape_(solicitante)} (${_htmlEscape_(session.usuario)})</li>
+          <li><b>Escuela:</b> ${_htmlEscape_(escuela.codigo_local || id)} - ${_htmlEscape_(escuela.nombre || params.nombre_escuela || '')}</li>
+          <li><b>Departamento:</b> ${_htmlEscape_(escuela.departamento || params.departamento || '-')}</li>
+          <li><b>Distrito:</b> ${_htmlEscape_(escuela.distrito || params.distrito || '-')}</li>
+          <li><b>Localidad:</b> ${_htmlEscape_(escuela.localidad || params.localidad || '-')}</li>
+          <li><b>Fecha:</b> ${_htmlEscape_(_timestamp())}</li>
+        </ul>
+        <p>Puede aprobarla desde CIALPA &gt; Encuestadores &gt; Solicitudes de relevamiento pendientes.</p>
+      `,
+      `Solicitud de relevamiento CIALPA: ${solicitante} solicita ${escuela.codigo_local || id} - ${escuela.nombre || params.nombre_escuela || ''}.`
+    );
+    return { status: 'ok', message: 'Solicitud enviada al administrador.', data: { id_incidencia: idSolicitud, email_status: emailStatus } };
+  }
+
+  function aprobarSolicitudRelevamiento(params) {
+    const session = params._session;
+    if (!['admin', 'supervisor'].includes(String(session.rol))) return { status: 'error', message: 'Acceso restringido.' };
+    const idSolicitud = params.id_incidencia || params.id_solicitud;
+    if (!idSolicitud) return { status: 'error', message: 'Identificador de solicitud requerido.' };
+
+    const rowIdx = _findRowIndex(SHEET_NAMES.INCIDENCIAS, 'id_incidencia', idSolicitud);
+    if (rowIdx === -1) return { status: 'error', message: 'Solicitud no encontrada.' };
+
+    const sheet = _getSheet(SHEET_NAMES.INCIDENCIAS);
+    const headers = _headers(sheet);
+    const solicitud = _objectFromRow(sheet, rowIdx, headers);
+    if (!_same(solicitud.tipo_incidencia, 'Solicitud de relevamiento')) {
+      return { status: 'error', message: 'La incidencia seleccionada no es una solicitud de relevamiento.' };
+    }
+    if (_same(solicitud.estado_resolucion, 'resuelto')) {
+      return { status: 'ok', message: 'La solicitud ya estaba resuelta.', data: { id_incidencia: idSolicitud } };
+    }
+
+    const usuarioSolicitante = _txt(params.encuestador_asignado || solicitud.usuario);
+    const idEscuela = _txt(solicitud.id_escuela || solicitud.codigo_local);
+    if (!usuarioSolicitante || !idEscuela) {
+      return { status: 'error', message: 'La solicitud no tiene usuario o escuela suficiente para aprobar.' };
+    }
+
+    const assignment = asignarEscuela({
+      _session: session,
+      id_escuela: idEscuela,
+      codigo_local: solicitud.codigo_local || idEscuela,
+      encuestador_asignado: usuarioSolicitante,
+    });
+    if (assignment.status !== 'ok') return assignment;
+
+    const resolution = `Aprobada por ${session.usuario} el ${_timestamp()}. Escuela asignada a ${usuarioSolicitante}.`;
+    _setByHeader(sheet, rowIdx, headers, 'estado_resolucion', 'resuelto');
+    _setByHeader(sheet, rowIdx, headers, 'evidencia_url', resolution);
+    AuditService.log('APROBAR_SOLICITUD_RELEVAMIENTO', session.usuario, `solicitud: ${idSolicitud}, escuela: ${idEscuela}, encuestador: ${usuarioSolicitante}`);
+    return {
+      status: 'ok',
+      message: `Solicitud aprobada. Escuela asignada a ${usuarioSolicitante}.`,
+      data: { id_incidencia: idSolicitud, id_escuela: idEscuela, encuestador_asignado: usuarioSolicitante },
+    };
   }
 
   function uploadEvidence(params) {
@@ -785,7 +846,7 @@ const SheetsService = (() => {
     }
     const codigoLocal = params.codigo_local || escuela.codigo_local || '';
     const nombreEscuela = params.nombre_escuela || escuela.nombre || '';
-    const recipient = params.destinatario_email || _config('FINAL_REPORT_EMAIL', 'censoescuelaspy@gmial.com');
+    const recipient = params.destinatario_email || _config('FINAL_REPORT_EMAIL', 'censoescuelaspy@gmail.com');
     const subject = params.asunto_email || `CIALPA cierre completo - ${codigoLocal || idEscuela || 'sin codigo'}`;
     const metadata = params.metadata || {};
     const closeTimeFields = _draftTimeFields_(metadata.timeTracking || params.timeTracking || (params.resumen && params.resumen.timeTracking) || {});
@@ -1674,7 +1735,8 @@ const SheetsService = (() => {
     try {
       const rows = _sheetToObjects(SHEET_NAMES.CONFIG);
       const r = rows.find(x => String(x.clave) === String(clave));
-      return r && r.valor !== '' && r.valor !== null && r.valor !== undefined ? r.valor : fallback;
+      const value = r && r.valor !== '' && r.valor !== null && r.valor !== undefined ? r.valor : fallback;
+      return typeof value === 'string' ? value.replace(/@gmial\.com/gi, '@gmail.com') : value;
     } catch (err) {
       return fallback;
     }
@@ -2127,7 +2189,7 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, repararSesionesDuplicadasEnCurso, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, solicitarRelevamiento, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };

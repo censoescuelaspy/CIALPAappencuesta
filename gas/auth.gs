@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.gs — Authentication service
- * Version: 2.6.74
+ * Version: 2.6.79
  */
 
 const AuthService = (() => {
@@ -168,10 +168,26 @@ const AuthService = (() => {
     });
 
     AuditService.log('USUARIO_REGISTRADO', usuario, 'Alta publica de usuario encuestador sin escuelas asignadas.');
+    const emailStatus = _sendAdminNotificationEmail_(
+      `CIALPA - nuevo usuario registrado: ${usuario}`,
+      `
+        <p>Se registro un nuevo usuario en CIALPA.</p>
+        <ul>
+          <li><b>Usuario:</b> ${_htmlEscape_(usuario)}</li>
+          <li><b>Nombre:</b> ${_htmlEscape_(`${nombres} ${apellidos}`.trim())}</li>
+          <li><b>Documento:</b> ${_htmlEscape_(documento || '-')}</li>
+          <li><b>Telefono:</b> ${_htmlEscape_(telefono || '-')}</li>
+          <li><b>Correo:</b> ${_htmlEscape_(correo || '-')}</li>
+          <li><b>Fecha:</b> ${_htmlEscape_(_timestamp())}</li>
+        </ul>
+        <p>Revise la nomina de encuestadores y asigne escuelas cuando corresponda.</p>
+      `,
+      `Nuevo usuario CIALPA: ${usuario} - ${nombres} ${apellidos}. Revise la nomina de encuestadores.`
+    );
     return {
       status: 'ok',
       message: 'Usuario creado. El administrador podrá asignarle escuelas desde Configuración.',
-      data: { id_usuario: userId, id_encuestador: encId, usuario, rol: 'encuestador' },
+      data: { id_usuario: userId, id_encuestador: encId, usuario, rol: 'encuestador', email_status: emailStatus },
     };
   }
 
