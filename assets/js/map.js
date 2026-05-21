@@ -608,7 +608,7 @@ const MapModule = (() => {
       const emailStatus = result.data?.email_status || {};
       const emailFailed = emailStatus.sent === false || String(emailStatus.error || '').trim();
       UI.showToast(
-        result.message || (emailFailed ? 'Solicitud registrada, pero el correo no pudo enviarse.' : 'Solicitud enviada al administrador.'),
+        _solicitudRelevamientoMessage(result, emailFailed),
         emailFailed ? 'warning' : 'success',
         emailFailed ? 9000 : 6500
       );
@@ -616,6 +616,16 @@ const MapModule = (() => {
     } catch (err) {
       UI.showToast('Error al enviar solicitud: ' + err.message, 'error', 7000);
     }
+  }
+
+  function _solicitudRelevamientoMessage(result, emailFailed) {
+    const message = String(result?.message || '').trim();
+    const error = String(result?.data?.email_status?.error || '').trim();
+    if (!emailFailed) return message || 'Solicitud enviada al administrador.';
+    if (/MailApp|script\.send_mail|send_mail|permiso|authorization/i.test(`${message} ${error}`)) {
+      return 'Solicitud registrada. El correo al administrador quedo pendiente porque falta autorizar MailApp en el Web App. El administrador puede aprobarla desde Encuestadores > Solicitudes.';
+    }
+    return message || 'Solicitud registrada, pero el correo no pudo enviarse. El administrador puede verla en Encuestadores > Solicitudes.';
   }
 
   function invalidateSize() {

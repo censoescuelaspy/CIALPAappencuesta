@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.gs — Authentication service
- * Version: 2.6.81
+ * Version: 2.6.82
  */
 
 const AuthService = (() => {

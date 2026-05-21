@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.81
+ * Version: 2.6.82
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -313,9 +313,6 @@ function _adminNotificationEmail_() {
 function _sendAdminNotificationEmail_(subject, htmlBody, plainBody) {
   const to = _adminNotificationEmail_();
   try {
-    const remainingQuota = typeof MailApp.getRemainingDailyQuota === 'function'
-      ? MailApp.getRemainingDailyQuota()
-      : '';
     MailApp.sendEmail({
       to,
       subject: String(subject || 'CIALPA - notificacion operativa'),
@@ -323,11 +320,11 @@ function _sendAdminNotificationEmail_(subject, htmlBody, plainBody) {
       htmlBody: String(htmlBody || plainBody || ''),
     });
     try {
-      AuditService.log('ADMIN_EMAIL_OK', 'sistema', `to: ${to}, subject: ${subject || ''}, quota: ${remainingQuota}`);
+      AuditService.log('ADMIN_EMAIL_OK', 'sistema', `to: ${to}, subject: ${subject || ''}`);
     } catch (auditErr) {
       // non-fatal
     }
-    return { sent: true, to, remaining_quota: remainingQuota };
+    return { sent: true, to };
   } catch (err) {
     const message = err.message || String(err);
     try {

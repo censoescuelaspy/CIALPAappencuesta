@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.81
+ * Version 2.6.82
  */
 
 const SheetsService = (() => {
@@ -654,8 +654,11 @@ const SheetsService = (() => {
 
   function _solicitudEmailMessage_(successMessage, emailStatus) {
     if (emailStatus && emailStatus.sent) return successMessage;
-    const detail = emailStatus && emailStatus.error ? ` Detalle: ${emailStatus.error}` : '';
-    return `Solicitud registrada, pero no se pudo enviar el correo al administrador.${detail}`;
+    const error = emailStatus && emailStatus.error ? String(emailStatus.error) : '';
+    if (/MailApp|script\.send_mail|send_mail|permiso|authorization/i.test(error)) {
+      return 'Solicitud registrada. El correo al administrador quedo pendiente porque el Web App necesita autorizacion de MailApp. El administrador puede verla y aprobarla desde Encuestadores > Solicitudes.';
+    }
+    return 'Solicitud registrada, pero no se pudo enviar el correo al administrador. El administrador puede verla y aprobarla desde Encuestadores > Solicitudes.';
   }
 
   function aprobarSolicitudRelevamiento(params) {

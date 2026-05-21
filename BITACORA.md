@@ -4,6 +4,37 @@
 
 ---
 
+## Autorizacion explicita de MailApp para correo operativo - 2026-05-21 - v2.6.82
+
+### Objetivo
+- Corregir el aviso visto por usuarios como `dahiana.ramo` al solicitar relevar una escuela: solicitud registrada, pero correo no enviado por falta de permiso `script.send_mail`.
+- Evitar que el usuario final vea el error crudo de Google/Apps Script sobre `MailApp.getRemainingDailyQuota`.
+- Dejar el Web App listo para que la cuenta propietaria autorice el envio de correos operativos.
+
+### Cambios implementados
+- `gas/appsscript.json` declara explicitamente los scopes requeridos: Sheets, Drive, UrlFetch, MailApp y UI de contenedor.
+- `_sendAdminNotificationEmail_` deja de llamar `MailApp.getRemainingDailyQuota()` antes de enviar, porque no aporta al flujo operativo y disparaba el error visible.
+- El mensaje visible de solicitud queda operativo: la solicitud fue registrada y el correo queda pendiente si falta autorizar MailApp.
+- El error tecnico se conserva en la incidencia para revision administrativa, sin bloquear la aprobacion desde `Encuestadores > Solicitudes`.
+- Version visible y cache del Service Worker actualizados a `v2.6.82`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria/aceptada.
+- Al publicar, aceptar el nuevo permiso de envio de correo o ejecutar `probarNotificacionAdmin()` desde Apps Script para forzar la autorizacion.
+- Probar con `dahiana.ramo`: solicitar escuela sin asignacion y confirmar que el correo llega o queda estado visible en `Encuestadores`.
+- Pedir a administradores y usuarios `Actualizar app` para tomar `cialpa-app-v2.6.82`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...gas/appsscript.json...); JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Correccion de solicitudes, correo operativo y filtros del mapa - 2026-05-21 - v2.6.81
 
 ### Objetivo
