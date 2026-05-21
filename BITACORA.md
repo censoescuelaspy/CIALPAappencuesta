@@ -35,6 +35,11 @@
 - Prueba Playwright local: el inicio autenticado no carga `mec-form.js`, `guided-register.js` ni `mec-schema.js`.
 - Prueba Playwright local: al abrir `Plano escuela`, se carga `MecFormModule` bajo demanda.
 - Prueba Playwright local: al abrir `Registro guiado`, se cargan `GuidedRegisterModule` y `MecFormModule` bajo demanda.
+- `git push origin main`: publica commit `e27b710`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.91`, no carga `mec-form.js`, `guided-register.js`, `mec-schema.js` ni `mec-form.css` en el arranque.
+- Verificacion HTTP de GitHub Pages para `assets/js/app.js?v=2.6.91`: contiene `_ensureModuleAssets` y carga diferida del motor MEC.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.91` sin precache de `mec-form.js`, `guided-register.js`, `mec-schema.js` ni `mec-form.css`.
+- `npm.cmd run metrics:web -- --cache-bust`: escritorio FCP `540 ms`, tablet FCP `180 ms`, movil FCP `164 ms`; 21 requests, 0 fallidas, 0 HTTP 4xx/5xx y 0 errores/advertencias de consola.
 
 ---
 
