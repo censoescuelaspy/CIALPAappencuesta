@@ -33,6 +33,10 @@
 - `node --check sw.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
+- `git push origin main`: publica commit `a46eed5`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.83` y URL GAS nueva.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.83`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.83`.
 
 ---
 
