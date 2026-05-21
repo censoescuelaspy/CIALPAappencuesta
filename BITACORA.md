@@ -38,6 +38,7 @@
 - `git diff --check`.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
 - `git commit` local preparado: `fix: corregir solicitudes y filtros mapa v2.6.81`.
+- `git push origin main`: publica commit `c546946`.
 
 ---
 
