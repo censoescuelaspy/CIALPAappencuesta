@@ -23,6 +23,13 @@
 - Web App nuevo `login`: responde JSON publico `Usuario y contraseña son requeridos`, sin HTTP 403.
 - Web App nuevo `diagnosticoPadron`: `source: official_sheet`, `total: 5462`, `con_coordenadas: 5004`, `muestra_piloto: 86`, `filas_operativas: 91`.
 - Web App nuevo `getEscuelas` sin token: responde `Token invalido o expirado`, confirmando backend publico protegido por sesion.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `git push origin main`: publica commit `6ca319b`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.69` y URL GAS nueva.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.69`.
 
 ---
 
