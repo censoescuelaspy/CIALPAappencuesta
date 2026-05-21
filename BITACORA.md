@@ -4,6 +4,39 @@
 
 ---
 
+## Super panel de infraestructura MEC - 2026-05-21 - v2.6.93
+
+### Objetivo
+- Crear un panel separado para interesados del MEC, centrado en infraestructura escolar y no en avance censal.
+- Mostrar una lectura tecnica de ambientes, sanitarios, electricidad, accesibilidad, daños, evidencias y tiempos.
+- Consolidar el tablero con datos globales de `mec_borradores` cuando el backend publicado ya tenga el agregado.
+
+### Cambios implementados
+- Se agrega el modulo `Infraestructura MEC` al menu de supervisores y administradores.
+- `Resultados globales` incorpora acceso directo al nuevo panel, pero mantiene su foco operativo/censal.
+- El nuevo panel muestra radiografia edilicia, KPIs tecnicos, tarjetas de decision, semaforo de estado, alertas prioritarias y tiempos promedio.
+- `StatsModule` agrega `initMecInfrastructure()`, `loadMecInfrastructure()` y exportacion `JSON tecnico`.
+- `CialpaLocalStore.mecMetrics()` amplía metricas locales de infraestructura: exteriores, luces, ventiladores, aires, tableros, rampas, sanitarios accesibles, sanitarios criticos, puesta a tierra, diferencial y circuitos identificados.
+- Apps Script agrega `infraestructura_mec` dentro de `getStats`, calculado desde la ultima fila disponible por escuela en `mec_borradores`.
+- Version visible y cache del Service Worker actualizados a `v2.6.93`.
+
+### Pendiente operativo
+- Publicar el Web App desde la cuenta propietaria/aceptada para que `infraestructura_mec` quede disponible globalmente.
+- Publicar el frontend en GitHub Pages y pedir `Actualizar app`.
+- Abrir `Infraestructura MEC` con una cuenta supervisora/admin y verificar conteos contra `mec_borradores`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/local-store.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante Node por stdin.
+- Playwright local por `file://`: modulo `Infraestructura MEC` visible, 4 tarjetas tecnicas, alertas renderizadas y sin overflow horizontal.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Tablero ejecutivo moderno para Resultados globales - 2026-05-21 - v2.6.92
 
 ### Objetivo

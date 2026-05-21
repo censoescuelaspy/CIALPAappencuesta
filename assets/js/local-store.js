@@ -329,7 +329,16 @@ const CialpaLocalStore = (() => {
     const classrooms = values.__classrooms || [];
     const blocks = values.__blocks || [];
     const sanitaries = values.__sanitaries || [];
+    const siteElements = values.__siteElements || [];
     const objects = classrooms.flatMap(room => (room.objects || []).map(object => ({ ...object, room })));
+    const sanitaryObjects = sanitaries.flatMap(sanitary => [
+      ...(sanitary.objects || []),
+      ...(sanitary.fixtures || []),
+      ...(sanitary.artefactos || []),
+      ...(sanitary.cabins || []),
+      ...(sanitary.cabinas || []),
+    ].map(object => ({ ...object, sanitary })));
+    const allObjects = [...objects, ...sanitaryObjects];
     const evidence = values.__evidence || {};
     const schemaEvidence = _schemaEvidenceFields(values);
     const objectEvidenceCount = objects.reduce((sum, object) => sum + ((object.ficha?.evidencias || []).length), 0);
@@ -337,21 +346,60 @@ const CialpaLocalStore = (() => {
     const fieldEvidenceCount = Object.values(evidence).reduce((sum, photos) => sum + (Array.isArray(photos) ? photos.length : 0), 0);
     const areaClassrooms = classrooms.reduce((sum, room) => sum + (Number(room.length || 0) * Number(room.width || 0)), 0);
     const areaSanitaries = sanitaries.reduce((sum, item) => sum + (Number(item.largo_m || 0) * Number(item.ancho_m || 0)), 0);
+    const areaExteriors = siteElements.reduce((sum, item) => sum + (Number(item.length || item.largo_m || 0) * Number(item.width || item.ancho_m || 0)), 0);
     const evidenceCovered = schemaEvidence.filter(field => Array.isArray(evidence[field.key]) && evidence[field.key].length).length;
+    const typeText = item => String([
+      item?.type,
+      item?.tipo,
+      item?.kind,
+      item?.label,
+      item?.nombre,
+      item?.ficha?.tipo,
+      item?.ficha?.nombre,
+    ].filter(Boolean).join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const has = (item, pattern) => pattern.test(typeText(item));
+    const yes = value => /^(si|sí|true|1|bueno|existe|presente|ok)$/i.test(String(value || '').trim());
+    const maybeBad = value => /(malo|mal|deficiente|fuera|riesgo|roto|danad|dañad|inseguro|no funciona|sin servicio)/i.test(String(value || ''));
+    const sanitaryAccessible = sanitaries.filter(item => yes(item.accesible || item.accesibilidad || item.bano_accesible)).length;
+    const sanitaryBad = sanitaries.filter(item => maybeBad(`${item.estado || ''} ${item.estado_general || ''} ${item.funcionamiento || ''}`)).length;
+    const blocksWithGrounding = blocks.filter(item => yes(item.puesta_tierra || item.puesta_a_tierra)).length;
+    const blocksWithDifferential = blocks.filter(item => yes(item.proteccion_diferencial || item.disyuntor_diferencial)).length;
+    const circuitsIdentified = blocks.filter(item => yes(item.circuitos_identificados || item.tablero_rotulado)).length;
+    const blockSwitchboards = blocks.filter(item => String(item.tablero_estado || item.tablero || '').trim()).length;
+    const ramps = siteElements.filter(item => has(item, /ramp|rampa/)).length
+      + blocks.filter(item => /rampa/.test(String(item.tipo_circulacion || '').toLowerCase())).length;
+    const stairs = allObjects.filter(object => has(object, /stair|escalera/)).length
+      + siteElements.filter(item => has(item, /stair|escalera/)).length
+      + blocks.filter(item => /escalera/.test(String(item.tipo_circulacion || '').toLowerCase())).length;
+    const switchboards = allObjects.filter(object => has(object, /switchboard|tablero/)).length
+      + siteElements.filter(item => has(item, /switchboard|tablero/)).length
+      + blockSwitchboards;
 
     return {
       savedAt: draft?.savedAt || null,
       blocks: blocks.length,
       classrooms: classrooms.length,
       sanitaries: sanitaries.length,
+      siteElements: siteElements.length,
       areaClassrooms,
       areaSanitaries,
-      areaTotal: areaClassrooms + areaSanitaries,
-      doors: objects.filter(object => object.type === 'door').length,
-      windows: objects.filter(object => object.type === 'window').length,
-      outlets: objects.filter(object => object.type === 'outlet').length,
-      damages: objects.filter(object => object.type === 'damage').length,
-      stairs: objects.filter(object => object.type === 'stair').length,
+      areaExteriors,
+      areaTotal: areaClassrooms + areaSanitaries + areaExteriors,
+      doors: allObjects.filter(object => has(object, /door|puerta/)).length,
+      windows: allObjects.filter(object => has(object, /window|ventana/)).length,
+      outlets: allObjects.filter(object => has(object, /outlet|toma|enchufe/)).length,
+      lights: allObjects.filter(object => has(object, /light|foco|luz|ilumin/)).length,
+      fans: allObjects.filter(object => has(object, /fan|ventilador/)).length,
+      airConditioners: allObjects.filter(object => has(object, /air|aire|acond/)).length,
+      switchboards,
+      damages: allObjects.filter(object => has(object, /damage|dano|daño|fisura|grieta|falla/)).length,
+      stairs,
+      ramps,
+      blocksWithGrounding,
+      blocksWithDifferential,
+      circuitsIdentified,
+      sanitaryAccessible,
+      sanitaryBad,
       evidenceFields: schemaEvidence.length,
       evidenceCovered,
       evidencePending: Math.max(0, schemaEvidence.length - evidenceCovered),
@@ -359,7 +407,7 @@ const CialpaLocalStore = (() => {
       fieldEvidenceCount,
       objectEvidenceCount,
       sanitaryEvidenceCount,
-      quality: _qualityBuckets(objects, sanitaries),
+      quality: _qualityBuckets(allObjects, sanitaries),
     };
   }
 

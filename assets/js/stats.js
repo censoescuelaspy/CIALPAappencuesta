@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.6.92
+ * Version: 2.6.93
  */
 
 const StatsModule = (() => {
@@ -11,6 +11,8 @@ const StatsModule = (() => {
   let _statsData = null;
   let _localAnalytics = null;
   let _statsCache = {};
+  let _infraCache = null;
+  let _infraData = null;
   let _chartLoader = null;
   const STATS_CACHE_TTL = 5 * 60 * 1000;
   const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
@@ -104,6 +106,51 @@ const StatsModule = (() => {
     _statsData = _normalizeStats(remoteStats);
     if (!remoteError) _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
     await _renderStatsView();
+  }
+
+  async function initMecInfrastructure() {
+    if (!Auth.canAccess('supervisor')) {
+      const root = document.getElementById('mec-infra-root');
+      if (root) root.innerHTML = '<p class="access-denied">Acceso restringido a supervisores y administradores.</p>';
+      return;
+    }
+    await loadMecInfrastructure();
+  }
+
+  async function loadMecInfrastructure() {
+    const root = document.getElementById('mec-infra-root');
+    if (!root) return;
+    root.innerHTML = '<div class="loading-state">Preparando tablero de infraestructura MEC...</div>';
+    if (_infraCache && Date.now() - _infraCache.time < STATS_CACHE_TTL) {
+      _infraData = _infraCache.data;
+      _renderMecInfrastructurePanel(_infraData);
+      return;
+    }
+
+    let remoteStats = _statsData;
+    let remoteError = null;
+    try {
+      const result = await API.getStats({}, { skipLoading: true });
+      if (result.status !== 'ok') throw new Error(result.message || 'Respuesta invalida');
+      remoteStats = _normalizeStats(result.data || {});
+      _statsData = remoteStats;
+      if (result.localAnalytics) _localAnalytics = result.localAnalytics;
+    } catch (err) {
+      remoteError = err;
+      if (!_localAnalytics && typeof CialpaLocalStore !== 'undefined') {
+        try {
+          _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats);
+        } catch (localErr) {
+          console.warn('No se pudo construir analitica local MEC:', localErr);
+        }
+      }
+    }
+
+    const localMec = _localAnalytics?.mec || (typeof CialpaLocalStore !== 'undefined' ? CialpaLocalStore.mecMetrics() : null);
+    _infraData = _normalizeMecInfrastructure(remoteStats?.infraestructura_mec || remoteStats?.infraestructura || null, localMec);
+    _infraCache = { data: _infraData, time: Date.now() };
+    _renderMecInfrastructurePanel(_infraData);
+    if (remoteError) UI.showToast('Infraestructura MEC calculada con datos locales. Falta publicar/consultar el agregado del servidor.', 'warning', 6500);
   }
 
   async function _renderStatsView() {
@@ -417,6 +464,273 @@ const StatsModule = (() => {
       </section>`;
   }
 
+  function _normalizeMecInfrastructure(raw, localMec) {
+    raw = raw || {};
+    localMec = localMec || {};
+    const nested = (obj, key) => obj && typeof obj === 'object' ? (obj[key] || {}) : {};
+    const electrical = nested(raw, 'electricidad');
+    const accessibility = nested(raw, 'accesibilidad');
+    const times = nested(raw, 'tiempos');
+    const qualityRaw = raw.calidad || localMec.quality || {};
+    const evidenceFields = _pickNumber(raw, ['campos_evidencia', 'evidence_fields'], localMec.evidenceFields);
+    const evidenceCovered = _pickNumber(raw, ['campos_evidencia_con_foto', 'evidence_covered'], localMec.evidenceCovered);
+    const evidencePending = _pickNumber(raw, ['evidencias_pendientes', 'evidence_pending'], localMec.evidencePending || Math.max(0, evidenceFields - evidenceCovered));
+    const infra = {
+      source: raw.source || (Object.keys(raw).length ? 'Servidor MEC' : 'Borrador local del dispositivo'),
+      generatedAt: raw.generated_at || localMec.savedAt || new Date().toISOString(),
+      schools: _pickNumber(raw, ['escuelas_con_borrador', 'schools_with_mec', 'schools'], localMec.blocks || localMec.classrooms || localMec.sanitaries ? 1 : 0),
+      drafts: _pickNumber(raw, ['borradores_total', 'drafts_total', 'drafts'], 0),
+      blocks: _pickNumber(raw, ['bloques', 'blocks'], localMec.blocks),
+      floors: _pickNumber(raw, ['pisos', 'floors'], localMec.floors),
+      classrooms: _pickNumber(raw, ['aulas', 'classrooms'], localMec.classrooms),
+      otherSpaces: _pickNumber(raw, ['otros_espacios', 'other_spaces'], localMec.otherSpaces),
+      sanitaries: _pickNumber(raw, ['sanitarios', 'sanitaries'], localMec.sanitaries),
+      siteElements: _pickNumber(raw, ['exteriores', 'site_elements', 'siteElements'], localMec.siteElements),
+      evidences: _pickNumber(raw, ['evidencias', 'evidence_total'], localMec.evidenceTotal),
+      evidenceFields,
+      evidenceCovered,
+      evidencePending,
+      areaClassrooms: _pickNumber(raw, ['area_aulas_m2', 'area_classrooms_m2'], localMec.areaClassrooms),
+      areaSanitaries: _pickNumber(raw, ['area_sanitarios_m2', 'area_sanitaries_m2'], localMec.areaSanitaries),
+      areaExteriors: _pickNumber(raw, ['area_exteriores_m2', 'area_exteriors_m2'], localMec.areaExteriors),
+      doors: _pickNumber(raw, ['puertas', 'doors'], localMec.doors),
+      windows: _pickNumber(raw, ['ventanas', 'windows'], localMec.windows),
+      outlets: _pickNumber(raw, ['tomas', 'outlets'], _pickNumber(electrical, ['tomas'], localMec.outlets)),
+      lights: _pickNumber(raw, ['luces', 'lights'], _pickNumber(electrical, ['luces'], localMec.lights)),
+      fans: _pickNumber(raw, ['ventiladores', 'fans'], localMec.fans),
+      airConditioners: _pickNumber(raw, ['aires', 'air_conditioners'], localMec.airConditioners),
+      switchboards: _pickNumber(raw, ['tableros', 'switchboards'], _pickNumber(electrical, ['tableros'], localMec.switchboards)),
+      damages: _pickNumber(raw, ['danos', 'daños', 'damages'], localMec.damages),
+      stairs: _pickNumber(raw, ['escaleras', 'stairs'], _pickNumber(accessibility, ['escaleras'], localMec.stairs)),
+      ramps: _pickNumber(raw, ['rampas', 'ramps'], _pickNumber(accessibility, ['rampas'], localMec.ramps)),
+      sanitaryAccessible: _pickNumber(raw, ['sanitarios_accesibles'], _pickNumber(accessibility, ['sanitarios_accesibles'], localMec.sanitaryAccessible)),
+      sanitaryBad: _pickNumber(raw, ['sanitarios_fuera_servicio', 'sanitarios_malos'], localMec.sanitaryBad),
+      grounding: _pickNumber(raw, ['puesta_tierra_si'], _pickNumber(electrical, ['puesta_tierra_si'], localMec.blocksWithGrounding)),
+      differential: _pickNumber(raw, ['diferencial_si'], _pickNumber(electrical, ['diferencial_si'], localMec.blocksWithDifferential)),
+      circuitsIdentified: _pickNumber(raw, ['circuitos_identificados'], _pickNumber(electrical, ['circuitos_identificados'], localMec.circuitsIdentified)),
+      schoolTimeAvg: _pickNumber(times, ['escuela_promedio_min'], _pickNumber(raw, ['tiempo_escuela_promedio_min'], 0)),
+      classroomTimeAvg: _pickNumber(times, ['aulas_promedio_min'], _pickNumber(raw, ['tiempo_aulas_promedio_min'], 0)),
+      sanitaryTimeAvg: _pickNumber(times, ['sanitarios_promedio_min'], _pickNumber(raw, ['tiempo_sanitarios_promedio_min'], 0)),
+      exteriorTimeAvg: _pickNumber(times, ['exteriores_promedio_min'], _pickNumber(raw, ['tiempo_exteriores_promedio_min'], 0)),
+      quality: {
+        Bueno: Number(qualityRaw.Bueno || qualityRaw.bueno || 0),
+        Regular: Number(qualityRaw.Regular || qualityRaw.regular || 0),
+        Malo: Number(qualityRaw.Malo || qualityRaw.malo || 0),
+        'Sin estado': Number(qualityRaw['Sin estado'] || qualityRaw.sin_estado || qualityRaw.sinEstado || 0),
+      },
+    };
+    infra.areaTotal = _pickNumber(raw, ['area_total_m2', 'areaTotal'], infra.areaClassrooms + infra.areaSanitaries + infra.areaExteriors);
+    infra.alerts = Array.isArray(raw.alertas) && raw.alertas.length ? raw.alertas : _mecInfraAlerts(infra);
+    return infra;
+  }
+
+  function _renderMecInfrastructurePanel(infra) {
+    const root = document.getElementById('mec-infra-root');
+    if (!root) return;
+    if (!_hasInfrastructureData(infra)) {
+      root.innerHTML = `
+        <section class="mec-infra-empty">
+          <span class="eyebrow">Infraestructura MEC</span>
+          <h3>Todavia no hay borradores MEC para consolidar.</h3>
+          <p>Cuando las escuelas empiecen a guardar el Registro guiado, este panel va a mostrar ambientes, sanitarios, electricidad, accesibilidad, daños y evidencias.</p>
+        </section>`;
+      return;
+    }
+
+    const evidencePct = infra.evidenceFields ? _pct(infra.evidenceCovered, infra.evidenceFields) : (infra.evidences ? 100 : 0);
+    const qualityTotal = Object.values(infra.quality || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+    const aulaSanitarioRatio = infra.sanitaries ? `${(Number(infra.classrooms || 0) / Number(infra.sanitaries || 1)).toFixed(1)} aulas/sanitario` : 'Sin sanitarios cargados';
+    const electricalCoverage = infra.blocks ? _pct(infra.grounding + infra.differential + infra.circuitsIdentified, infra.blocks * 3) : 0;
+    const accessibilityScore = infra.sanitaries ? _pct(infra.sanitaryAccessible + infra.ramps, infra.sanitaries + infra.blocks) : _pct(infra.ramps, infra.blocks);
+
+    root.innerHTML = `
+      <div class="mec-infra-page">
+        <section class="mec-infra-command">
+          <div class="mec-infra-radial" style="--pct:${evidencePct}%">
+            <strong>${evidencePct}%</strong>
+            <span>Evidencia</span>
+          </div>
+          <div class="mec-infra-copy">
+            <span class="eyebrow">Infraestructura escolar MEC</span>
+            <h3>Radiografia tecnica para priorizar inversion, mantenimiento y seguridad edilicia.</h3>
+            <div class="mec-infra-chips">
+              <span>${infra.schools} escuelas con ficha MEC</span>
+              <span>${_formatArea(infra.areaTotal)} relevados</span>
+              <span>${infra.source}</span>
+              <span>${_formatDate(infra.generatedAt) || 'Actualizado ahora'}</span>
+            </div>
+          </div>
+          <div class="mec-infra-topline">
+            ${_infraMiniMetric('Aulas/ambientes', infra.classrooms + infra.otherSpaces, `${_formatArea(infra.areaClassrooms)} pedagógicos`)}
+            ${_infraMiniMetric('Sanitarios', infra.sanitaries, aulaSanitarioRatio)}
+            ${_infraMiniMetric('Alertas edilicias', infra.damages + infra.sanitaryBad, 'Daños y servicios críticos')}
+            ${_infraMiniMetric('Evidencias', infra.evidences, `${infra.evidencePending} campos pendientes`)}
+          </div>
+        </section>
+
+        <section class="mec-decision-grid">
+          ${_mecDecisionCard('Ambientes pedagogicos', infra.classrooms, [
+            ['Otros espacios', infra.otherSpaces],
+            ['Puertas', infra.doors],
+            ['Ventanas', infra.windows],
+            ['Area', _formatArea(infra.areaClassrooms)],
+          ], '#0b5d3b')}
+          ${_mecDecisionCard('Sanitarios y saneamiento', infra.sanitaries, [
+            ['Accesibles', infra.sanitaryAccessible],
+            ['Con alerta', infra.sanitaryBad],
+            ['Ratio', aulaSanitarioRatio],
+            ['Area', _formatArea(infra.areaSanitaries)],
+          ], '#1d4ed8')}
+          ${_mecDecisionCard('Electricidad y seguridad', `${electricalCoverage}%`, [
+            ['Tableros', infra.switchboards],
+            ['Tomas', infra.outlets],
+            ['Puesta a tierra', infra.grounding],
+            ['Diferencial', infra.differential],
+          ], '#b7791f')}
+          ${_mecDecisionCard('Accesibilidad y circulacion', `${accessibilityScore}%`, [
+            ['Rampas', infra.ramps],
+            ['Escaleras', infra.stairs],
+            ['Sanitarios accesibles', infra.sanitaryAccessible],
+            ['Exteriores', infra.siteElements],
+          ], '#7c3aed')}
+        </section>
+
+        <section class="mec-infra-section-grid">
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Semaforo tecnico</span>
+                <h4>Estado declarado de elementos</h4>
+              </div>
+              <strong>${qualityTotal}</strong>
+            </div>
+            <div class="mec-condition-strip">
+              ${_qualitySegment('Bueno', infra.quality.Bueno || 0, qualityTotal, '#5fbf7a')}
+              ${_qualitySegment('Regular', infra.quality.Regular || 0, qualityTotal, '#f2ad5c')}
+              ${_qualitySegment('Malo', infra.quality.Malo || 0, qualityTotal, '#df6b6b')}
+              ${_qualitySegment('Sin estado', infra.quality['Sin estado'] || 0, qualityTotal, '#9aa4b2')}
+            </div>
+            <div class="mec-quality-legend">
+              ${_infraLegend('Bueno', infra.quality.Bueno, '#5fbf7a')}
+              ${_infraLegend('Regular', infra.quality.Regular, '#f2ad5c')}
+              ${_infraLegend('Malo', infra.quality.Malo, '#df6b6b')}
+              ${_infraLegend('Sin estado', infra.quality['Sin estado'], '#9aa4b2')}
+            </div>
+          </article>
+
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Lectura para decision</span>
+                <h4>Alertas que el MEC necesita ver primero</h4>
+              </div>
+              <strong>${infra.alerts.length}</strong>
+            </div>
+            <div class="mec-alert-list">
+              ${infra.alerts.map(_infraAlert).join('')}
+            </div>
+          </article>
+        </section>
+
+        <section class="mec-infra-board mec-infra-board--wide">
+          <div class="mec-infra-board__head">
+            <div>
+              <span class="eyebrow">Productividad de relevamiento</span>
+              <h4>Tiempos tecnicos promedio</h4>
+            </div>
+          </div>
+          <div class="mec-time-grid">
+            ${_infraBar('Escuela completa', infra.schoolTimeAvg, 180, 'min promedio')}
+            ${_infraBar('Aulas/ambientes', infra.classroomTimeAvg, 90, 'min promedio')}
+            ${_infraBar('Sanitarios', infra.sanitaryTimeAvg, 60, 'min promedio')}
+            ${_infraBar('Exteriores', infra.exteriorTimeAvg, 60, 'min promedio')}
+          </div>
+        </section>
+      </div>`;
+  }
+
+  function _mecDecisionCard(title, value, rows, color) {
+    return `
+      <article class="mec-decision-card" style="--accent:${color}">
+        <span>${_escape(title)}</span>
+        <strong>${_escape(value)}</strong>
+        <div>
+          ${rows.map(([label, itemValue]) => `
+            <p><small>${_escape(label)}</small><b>${_escape(itemValue)}</b></p>
+          `).join('')}
+        </div>
+      </article>`;
+  }
+
+  function _infraMiniMetric(label, value, note) {
+    return `
+      <article>
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note || '')}</small>
+      </article>`;
+  }
+
+  function _infraLegend(label, value, color) {
+    return `<span><i style="background:${color}"></i>${_escape(label)} <b>${Number(value || 0)}</b></span>`;
+  }
+
+  function _infraBar(label, value, max, note) {
+    const numeric = Number(value || 0);
+    const pct = Math.min(100, Math.round((numeric / Math.max(1, max)) * 100));
+    return `
+      <div class="mec-time-row">
+        <span>${_escape(label)}</span>
+        <div><i style="width:${pct}%"></i></div>
+        <strong>${numeric ? numeric.toFixed(1) : '0'} ${_escape(note)}</strong>
+      </div>`;
+  }
+
+  function _infraAlert(item) {
+    if (typeof item === 'string') {
+      return `<div class="mec-alert-item mec-alert-item--warning"><strong>Atencion</strong><span>${_escape(item)}</span></div>`;
+    }
+    const tone = item.tone || item.tipo || 'warning';
+    return `
+      <div class="mec-alert-item mec-alert-item--${_safeClass(tone)}">
+        <strong>${_escape(item.label || item.titulo || 'Alerta')}</strong>
+        <span>${_escape(item.note || item.detalle || item.valor || '')}</span>
+      </div>`;
+  }
+
+  function _mecInfraAlerts(infra) {
+    const alerts = [];
+    if (infra.damages) alerts.push({ tone: 'danger', label: 'Daños relevados', note: `${infra.damages} elementos con falla, grieta o daño.` });
+    if (infra.sanitaryBad) alerts.push({ tone: 'danger', label: 'Sanitarios criticos', note: `${infra.sanitaryBad} sanitarios con estado malo o fuera de servicio.` });
+    if (infra.blocks && infra.grounding < infra.blocks) alerts.push({ tone: 'warning', label: 'Puesta a tierra incompleta', note: `${Math.max(0, infra.blocks - infra.grounding)} bloques sin puesta a tierra confirmada.` });
+    if (infra.blocks && infra.differential < infra.blocks) alerts.push({ tone: 'warning', label: 'Proteccion diferencial', note: `${Math.max(0, infra.blocks - infra.differential)} bloques sin diferencial confirmado.` });
+    if (infra.evidencePending) alerts.push({ tone: 'info', label: 'Evidencias pendientes', note: `${infra.evidencePending} campos recomendados/obligatorios sin foto.` });
+    if (!alerts.length) alerts.push({ tone: 'success', label: 'Sin alertas tecnicas fuertes', note: 'El tablero no detecta daños, pendientes fotograficos ni brechas electricas con los datos disponibles.' });
+    return alerts;
+  }
+
+  function _pickNumber(obj, keys, fallback = 0) {
+    for (const key of keys || []) {
+      const raw = obj && obj[key];
+      if (raw !== undefined && raw !== null && raw !== '') {
+        const n = Number(String(raw).replace(',', '.'));
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+    const fallbackNumber = Number(fallback || 0);
+    return Number.isNaN(fallbackNumber) ? 0 : fallbackNumber;
+  }
+
+  function _hasInfrastructureData(infra) {
+    return ['schools', 'blocks', 'classrooms', 'sanitaries', 'siteElements', 'evidences', 'areaTotal']
+      .some(key => Number(infra?.[key] || 0) > 0);
+  }
+
+  function _formatArea(value) {
+    const numeric = Number(value || 0);
+    return numeric ? `${numeric.toFixed(numeric >= 100 ? 0 : 1)} m2` : '0 m2';
+  }
+
   function _localMetric(label, value, note) {
     return `
       <article class="offline-metric">
@@ -719,6 +1033,15 @@ const StatsModule = (() => {
     _downloadBlob(`cialpa_snapshot_local_${Date.now()}.json`, 'application/json', JSON.stringify(analytics, null, 2));
   }
 
+  async function exportMecInfrastructureJson() {
+    if (!_infraData) await loadMecInfrastructure();
+    if (!_infraData) {
+      UI.showToast('No hay datos de infraestructura MEC para exportar.', 'warning');
+      return;
+    }
+    _downloadBlob(`cialpa_infraestructura_mec_${Date.now()}.json`, 'application/json', JSON.stringify(_infraData, null, 2));
+  }
+
   async function syncQueue() {
     if (typeof CialpaLocalStore === 'undefined') {
       UI.showToast('El almacen local no esta disponible en este navegador.', 'warning');
@@ -794,8 +1117,11 @@ const StatsModule = (() => {
   return {
     init,
     loadStats,
+    initMecInfrastructure,
+    loadMecInfrastructure,
     exportCSV,
     exportLocalJson,
+    exportMecInfrastructureJson,
     syncQueue,
   };
 })();

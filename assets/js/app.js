@@ -345,6 +345,7 @@ const AppController = (() => {
     incidencias: { label: 'Solicitudes', icon: 'SOL', minRole: 'encuestador' },
     jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
     estadisticas: { label: 'Resultados globales', icon: '📊', minRole: 'supervisor' },
+    infraestructura: { label: 'Infraestructura MEC', icon: 'MEC', minRole: 'supervisor' },
     planificacion: { label: 'Planificación', icon: '⏱', minRole: 'supervisor' },
     configuracion: { label: 'Configuración', icon: '⚙️', minRole: 'admin' },
     auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
@@ -571,7 +572,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'planificacion', 'configuracion', 'estadisticas'];
+    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'planificacion', 'configuracion', 'estadisticas', 'infraestructura'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])
@@ -1165,6 +1166,9 @@ const AppController = (() => {
           break;
         case 'estadisticas':
           StatsModule.init();
+          break;
+        case 'infraestructura':
+          StatsModule.initMecInfrastructure();
           break;
         case 'planificacion':
           PlanningModule.init();

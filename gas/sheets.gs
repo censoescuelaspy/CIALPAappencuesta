@@ -1208,6 +1208,267 @@ const SheetsService = (() => {
     return { status: 'ok', message: 'Configuración guardada.' };
   }
 
+  function _mecInfrastructureStats_() {
+    let rows = [];
+    try {
+      rows = _sheetToObjects(SHEET_NAMES.MEC_DRAFTS);
+    } catch (err) {
+      return {
+        source: 'mec_borradores',
+        generated_at: _timestamp(),
+        escuelas_con_borrador: 0,
+        borradores_total: 0,
+        error: 'Hoja mec_borradores no disponible: ' + err.message,
+      };
+    }
+
+    const latestBySchool = {};
+    rows.forEach(function(row, index) {
+      const key = _mecSchoolKey_(row) || ('draft_' + index);
+      const current = latestBySchool[key];
+      const candidate = Object.assign({ __row_order: index }, row);
+      if (!current || _mecRowMs_(candidate) >= _mecRowMs_(current)) latestBySchool[key] = candidate;
+    });
+    const latestRows = Object.values(latestBySchool);
+    const stats = {
+      source: 'mec_borradores',
+      generated_at: _timestamp(),
+      escuelas_con_borrador: latestRows.length,
+      borradores_total: rows.length,
+      bloques: 0,
+      pisos: 0,
+      aulas: 0,
+      otros_espacios: 0,
+      sanitarios: 0,
+      exteriores: 0,
+      evidencias: 0,
+      area_aulas_m2: 0,
+      area_sanitarios_m2: 0,
+      area_exteriores_m2: 0,
+      area_total_m2: 0,
+      puertas: 0,
+      ventanas: 0,
+      tomas: 0,
+      luces: 0,
+      ventiladores: 0,
+      aires: 0,
+      tableros: 0,
+      danos: 0,
+      escaleras: 0,
+      rampas: 0,
+      sanitarios_accesibles: 0,
+      sanitarios_fuera_servicio: 0,
+      puesta_tierra_si: 0,
+      diferencial_si: 0,
+      circuitos_identificados: 0,
+      campos_evidencia: 0,
+      campos_evidencia_con_foto: 0,
+      evidencias_pendientes: 0,
+      calidad: { Bueno: 0, Regular: 0, Malo: 0, 'Sin estado': 0 },
+      tiempos: {
+        escuela_promedio_min: 0,
+        aulas_promedio_min: 0,
+        sanitarios_promedio_min: 0,
+        exteriores_promedio_min: 0,
+      },
+      alertas: [],
+    };
+    const timeTotals = { escuela: 0, escuelaCount: 0, aulas: 0, aulasCount: 0, sanitarios: 0, sanitariosCount: 0, exteriores: 0, exterioresCount: 0 };
+
+    latestRows.forEach(function(row) {
+      stats.bloques += Number(_num(row.bloques) || 0);
+      stats.pisos += Number(_num(row.pisos) || 0);
+      stats.aulas += Number(_num(row.aulas) || 0);
+      stats.otros_espacios += Number(_num(row.otros_espacios) || 0);
+      stats.sanitarios += Number(_num(row.sanitarios) || 0);
+      stats.exteriores += Number(_num(row.exteriores) || 0);
+      stats.evidencias += Number(_num(row.evidencias) || 0);
+      _mecTimeAdd_(timeTotals, 'escuela', row.tiempo_escuela_min);
+      _mecTimeAdd_(timeTotals, 'aulas', row.tiempo_aulas_promedio_min || row.tiempo_aulas_min);
+      _mecTimeAdd_(timeTotals, 'sanitarios', row.tiempo_sanitarios_promedio_min || row.tiempo_sanitarios_min);
+      _mecTimeAdd_(timeTotals, 'exteriores', row.tiempo_exteriores_min);
+
+      const draft = _mecParseJson_(row.draft_json);
+      if (draft) _mecAccumulateDraft_(stats, draft);
+      const evidenceIndex = _mecParseJson_(row.evidence_index_json);
+      if (Array.isArray(evidenceIndex)) stats.evidencias += Math.max(0, evidenceIndex.length - Number(_num(row.evidencias) || 0));
+    });
+
+    stats.area_aulas_m2 = _round1_(stats.area_aulas_m2);
+    stats.area_sanitarios_m2 = _round1_(stats.area_sanitarios_m2);
+    stats.area_exteriores_m2 = _round1_(stats.area_exteriores_m2);
+    stats.area_total_m2 = _round1_(stats.area_aulas_m2 + stats.area_sanitarios_m2 + stats.area_exteriores_m2);
+    stats.tiempos.escuela_promedio_min = _mecAverage_(timeTotals.escuela, timeTotals.escuelaCount);
+    stats.tiempos.aulas_promedio_min = _mecAverage_(timeTotals.aulas, timeTotals.aulasCount);
+    stats.tiempos.sanitarios_promedio_min = _mecAverage_(timeTotals.sanitarios, timeTotals.sanitariosCount);
+    stats.tiempos.exteriores_promedio_min = _mecAverage_(timeTotals.exteriores, timeTotals.exterioresCount);
+    stats.evidencias_pendientes = Math.max(0, stats.campos_evidencia - stats.campos_evidencia_con_foto);
+    stats.electricidad = {
+      tomas: stats.tomas,
+      luces: stats.luces,
+      tableros: stats.tableros,
+      puesta_tierra_si: stats.puesta_tierra_si,
+      diferencial_si: stats.diferencial_si,
+      circuitos_identificados: stats.circuitos_identificados,
+    };
+    stats.accesibilidad = {
+      rampas: stats.rampas,
+      escaleras: stats.escaleras,
+      sanitarios_accesibles: stats.sanitarios_accesibles,
+    };
+    stats.alertas = _mecInfrastructureAlerts_(stats);
+    return stats;
+  }
+
+  function _mecSchoolKey_(row) {
+    return _digits(row.codigo_local) || _digits(row.id_escuela) || _txt(row.id_escuela) || _txt(row.codigo_local);
+  }
+
+  function _mecRowMs_(row) {
+    const text = _txt(row.actualizado_en || row.fecha_guardado || row.creado_en);
+    const parsed = text ? new Date(text).getTime() : NaN;
+    return isNaN(parsed) ? Number(row.__row_order || 0) : parsed;
+  }
+
+  function _mecTimeAdd_(totals, key, value) {
+    const numeric = Number(_num(value) || 0);
+    if (!numeric) return;
+    totals[key] += numeric;
+    totals[key + 'Count'] += 1;
+  }
+
+  function _mecAverage_(sum, count) {
+    return count ? _round1_(sum / count) : 0;
+  }
+
+  function _mecParseJson_(value) {
+    const text = _txt(value);
+    if (!text || text.indexOf('[truncado]') !== -1) return null;
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function _mecAccumulateDraft_(stats, draft) {
+    const values = draft && (draft.values || draft) || {};
+    const blocks = _asArray_(values.__blocks);
+    const classrooms = _asArray_(values.__classrooms);
+    const sanitaries = _asArray_(values.__sanitaries);
+    const siteElements = _asArray_(values.__siteElements);
+    const classObjects = [];
+    classrooms.forEach(function(room) {
+      _asArray_(room.objects).forEach(function(object) { classObjects.push(object); });
+    });
+    const sanitaryObjects = [];
+    sanitaries.forEach(function(sanitary) {
+      ['objects', 'fixtures', 'artefactos', 'cabins', 'cabinas'].forEach(function(key) {
+        _asArray_(sanitary[key]).forEach(function(object) { sanitaryObjects.push(object); });
+      });
+    });
+    const allObjects = classObjects.concat(sanitaryObjects);
+    const evidence = values.__evidence || {};
+
+    stats.area_aulas_m2 += classrooms.reduce(function(sum, room) {
+      return sum + _mecArea_(room.length || room.largo_m, room.width || room.ancho_m);
+    }, 0);
+    stats.area_sanitarios_m2 += sanitaries.reduce(function(sum, item) {
+      return sum + _mecArea_(item.largo_m || item.length, item.ancho_m || item.width);
+    }, 0);
+    stats.area_exteriores_m2 += siteElements.reduce(function(sum, item) {
+      return sum + _mecArea_(item.length || item.largo_m, item.width || item.ancho_m);
+    }, 0);
+
+    stats.puertas += _mecCountType_(allObjects, /door|puerta/);
+    stats.ventanas += _mecCountType_(allObjects, /window|ventana/);
+    stats.tomas += _mecCountType_(allObjects, /outlet|toma|enchufe/);
+    stats.luces += _mecCountType_(allObjects, /light|foco|luz|ilumin/);
+    stats.ventiladores += _mecCountType_(allObjects, /fan|ventilador/);
+    stats.aires += _mecCountType_(allObjects, /air|aire|acond/);
+    stats.tableros += _mecCountType_(allObjects.concat(siteElements), /switchboard|tablero/);
+    stats.danos += _mecCountType_(allObjects, /damage|dano|daño|fisura|grieta|falla/);
+    stats.escaleras += _mecCountType_(allObjects.concat(siteElements), /stair|escalera/)
+      + blocks.filter(function(block) { return /escalera/.test(_mecNorm_(block.tipo_circulacion)); }).length;
+    stats.rampas += _mecCountType_(siteElements, /ramp|rampa/)
+      + blocks.filter(function(block) { return /rampa/.test(_mecNorm_(block.tipo_circulacion)); }).length;
+    stats.sanitarios_accesibles += sanitaries.filter(function(item) {
+      return _mecYes_(item.accesible || item.accesibilidad || item.bano_accesible);
+    }).length;
+    stats.sanitarios_fuera_servicio += sanitaries.filter(function(item) {
+      return _mecBad_([item.estado, item.estado_general, item.funcionamiento].join(' '));
+    }).length;
+    stats.puesta_tierra_si += blocks.filter(function(item) { return _mecYes_(item.puesta_tierra || item.puesta_a_tierra); }).length;
+    stats.diferencial_si += blocks.filter(function(item) { return _mecYes_(item.proteccion_diferencial || item.disyuntor_diferencial); }).length;
+    stats.circuitos_identificados += blocks.filter(function(item) { return _mecYes_(item.circuitos_identificados || item.tablero_rotulado); }).length;
+    stats.tableros += blocks.filter(function(item) { return _txt(item.tablero_estado || item.tablero); }).length;
+
+    allObjects.forEach(function(object) { _mecQualityAdd_(stats.calidad, object.ficha || object); });
+    sanitaries.forEach(function(item) { _mecQualityAdd_(stats.calidad, item); });
+    const evidenceKeys = Object.keys(evidence || {});
+    stats.campos_evidencia += evidenceKeys.length;
+    stats.campos_evidencia_con_foto += evidenceKeys.filter(function(key) {
+      return Array.isArray(evidence[key]) && evidence[key].length;
+    }).length;
+  }
+
+  function _asArray_(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function _mecArea_(length, width) {
+    return Number(_num(length) || 0) * Number(_num(width) || 0);
+  }
+
+  function _mecNorm_(value) {
+    return _txt(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function _mecTypeText_(item) {
+    return _mecNorm_([
+      item && item.type,
+      item && item.tipo,
+      item && item.kind,
+      item && item.label,
+      item && item.nombre,
+      item && item.ficha && item.ficha.tipo,
+      item && item.ficha && item.ficha.nombre,
+    ].filter(Boolean).join(' '));
+  }
+
+  function _mecCountType_(items, pattern) {
+    return _asArray_(items).filter(function(item) { return pattern.test(_mecTypeText_(item)); }).length;
+  }
+
+  function _mecYes_(value) {
+    return /^(si|sí|true|1|bueno|existe|presente|ok)$/i.test(_txt(value));
+  }
+
+  function _mecBad_(value) {
+    return /(malo|mal|deficiente|fuera|riesgo|roto|danad|dañad|inseguro|no funciona|sin servicio)/i.test(_mecNorm_(value));
+  }
+
+  function _mecQualityAdd_(quality, item) {
+    const state = _txt(item && (item.estado || item.estado_general || item.condicion)) || 'Sin estado';
+    const key = ['Bueno', 'Regular', 'Malo'].indexOf(state) !== -1 ? state : 'Sin estado';
+    quality[key] = Number(quality[key] || 0) + 1;
+  }
+
+  function _round1_(value) {
+    return Math.round((Number(value) || 0) * 10) / 10;
+  }
+
+  function _mecInfrastructureAlerts_(stats) {
+    const alerts = [];
+    if (stats.danos) alerts.push({ tone: 'danger', label: 'Daños relevados', note: stats.danos + ' elementos con falla, grieta o daño.' });
+    if (stats.sanitarios_fuera_servicio) alerts.push({ tone: 'danger', label: 'Sanitarios criticos', note: stats.sanitarios_fuera_servicio + ' sanitarios con estado malo o fuera de servicio.' });
+    if (stats.bloques && stats.puesta_tierra_si < stats.bloques) alerts.push({ tone: 'warning', label: 'Puesta a tierra incompleta', note: Math.max(0, stats.bloques - stats.puesta_tierra_si) + ' bloques sin puesta a tierra confirmada.' });
+    if (stats.bloques && stats.diferencial_si < stats.bloques) alerts.push({ tone: 'warning', label: 'Proteccion diferencial', note: Math.max(0, stats.bloques - stats.diferencial_si) + ' bloques sin diferencial confirmado.' });
+    if (stats.evidencias_pendientes) alerts.push({ tone: 'info', label: 'Evidencias pendientes', note: stats.evidencias_pendientes + ' campos recomendados/obligatorios sin foto.' });
+    if (!alerts.length) alerts.push({ tone: 'success', label: 'Sin alertas tecnicas fuertes', note: 'No se detectan daños, brechas electricas ni pendientes fotograficos con los datos disponibles.' });
+    return alerts;
+  }
+
   function getStats(params) {
     const session = params._session;
     params = params || {};
@@ -1230,13 +1491,14 @@ const SheetsService = (() => {
     const por_encuestador = _groupEncuestador(escuelas, sesiones);
     const por_dia = _groupSesionesDia(sesiones);
     const por_modulo = _groupModulos();
+    const infraestructura_mec = _mecInfrastructureStats_();
     const actividad_reciente = sesiones
       .filter(s => s.fecha_inicio || s.inicio_iso)
       .sort((a, b) => String(b.inicio_iso || `${b.fecha_inicio}${b.hora_inicio}`).localeCompare(String(a.inicio_iso || `${a.fecha_inicio}${a.hora_inicio}`)))
       .slice(0, 20)
       .map(s => ({ tipo: s.estado, usuario: s.usuario, escuela: s.nombre_escuela || s.id_escuela, fecha_hora: s.inicio_iso || `${s.fecha_inicio} ${s.hora_inicio}` }));
 
-    return { status: 'ok', data: { total, finalizadas, en_curso, pendientes, con_incidencia, pct_avance, por_departamento, por_zona, por_encuestador, por_dia, por_modulo, actividad_reciente } };
+    return { status: 'ok', data: { total, finalizadas, en_curso, pendientes, con_incidencia, pct_avance, por_departamento, por_zona, por_encuestador, por_dia, por_modulo, actividad_reciente, infraestructura_mec } };
   }
 
   function getResumenOperativo(params) {
