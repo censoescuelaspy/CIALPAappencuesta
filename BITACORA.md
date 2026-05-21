@@ -38,6 +38,7 @@
 - `npm.cmd run simulate:demo -- --count=1000 --run-id=demo1000_20260521 --seed=demo-mec-1000`.
 - Verificacion de salida: `1000` filas en `demo-mec_borradores`, `263` distritos en `demo-allocation`.
 - Resumen por departamento revisado: 18 departamentos con respuestas prorrateadas.
+- `git push origin main`: publica commit `e47a7c3`.
 
 ---
 
