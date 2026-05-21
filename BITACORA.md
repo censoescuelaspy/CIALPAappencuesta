@@ -40,6 +40,8 @@
 - `git diff --check`.
 - Playwright local con sesion simulada: `Registro guiado` abre en `v2.6.95`, muestra tarjeta superior y no registra errores de consola.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git commit`: `7c1fea2` - `fix: guiar captura secuencial v2.6.95`.
+- `git push origin main`: publica `7c1fea2`.
 
 ---
 
