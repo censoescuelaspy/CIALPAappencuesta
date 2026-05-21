@@ -34,6 +34,11 @@
 - Validacion sintactica de `gas/*.gs` mediante Node por stdin.
 - Playwright local por `file://`: modulo `Infraestructura MEC` visible, 4 tarjetas tecnicas, alertas renderizadas y sin overflow horizontal.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git push origin main`: publica commit `d35d765`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.93`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.93`.
+- Verificacion HTTP de GitHub Pages para `assets/js/stats.js`: contiene `initMecInfrastructure` e `infraestructura_mec`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `module-infraestructura` y `Panel tecnico edilicio`.
 
 ---
 
