@@ -30,6 +30,11 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
 - Revision estatica: `Planificacion` mantiene acceso `supervisor`, `Guardar cambios` queda visible para `supervisor`, `saveAssignments()` valida `Auth.canAccess('supervisor')`, y cache `cialpa-app-v2.6.89`.
+- `git push origin main`: publica commit `d5a6597`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.89`.
+- Verificacion HTTP de GitHub Pages para `assets/js/planning.js`: contiene `Auth.canAccess('supervisor')`, `_rememberAssignmentsCache` y guardado visible para `supervisor`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.89` y boton `Guardar cambios`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.89`.
 
 ---
 
