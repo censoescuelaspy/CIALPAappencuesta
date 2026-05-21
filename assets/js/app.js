@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.84
+ * Version: 2.6.91
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -366,6 +366,7 @@ const AppController = (() => {
   let _adminAlertsLastSummaryAt = 0;
   const ADMIN_ALERTS_POLL_MS = 60000;
   const ADMIN_ALERTS_SUMMARY_MS = 15 * 60 * 1000;
+  const _lazyAssetPromises = new Map();
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -1135,46 +1136,124 @@ const AppController = (() => {
   }
 
   async function _initModule(id) {
-    switch (id) {
-      case 'inicio':
-        _initInicio();
-        break;
-      case 'mapa':
-        await _initMapa();
-        break;
-      case 'registro':
-        if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
-        break;
-      case 'encuesta':
-        // survey panel re-renders itself on selectEscuela
-        break;
-      case 'mec':
-        MecFormModule.init();
-        break;
-      case 'plano':
-        MecFormModule.renderSchoolPlan();
-        break;
-      case 'incidencias':
-        IncidenciasModule.loadList();
-        break;
-      case 'jornada':
-        JornadaModule.init();
-        break;
-      case 'estadisticas':
-        StatsModule.init();
-        break;
-      case 'planificacion':
-        PlanningModule.init();
-        break;
-      case 'configuracion':
-        AdminModule.init();
-        break;
-      case 'auditoria':
-        AdminModule.loadAuditoria();
-        break;
-      case 'encuestadores':
-        AdminModule.loadEncuestadores();
-        break;
+    try {
+      await _ensureModuleAssets(id);
+      switch (id) {
+        case 'inicio':
+          _initInicio();
+          break;
+        case 'mapa':
+          await _initMapa();
+          break;
+        case 'registro':
+          if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
+          break;
+        case 'encuesta':
+          // survey panel re-renders itself on selectEscuela
+          break;
+        case 'mec':
+          MecFormModule.init();
+          break;
+        case 'plano':
+          MecFormModule.renderSchoolPlan();
+          break;
+        case 'incidencias':
+          IncidenciasModule.loadList();
+          break;
+        case 'jornada':
+          JornadaModule.init();
+          break;
+        case 'estadisticas':
+          StatsModule.init();
+          break;
+        case 'planificacion':
+          PlanningModule.init();
+          break;
+        case 'configuracion':
+          AdminModule.init();
+          break;
+        case 'auditoria':
+          AdminModule.loadAuditoria();
+          break;
+        case 'encuestadores':
+          AdminModule.loadEncuestadores();
+          break;
+      }
+    } catch (err) {
+      console.error('No se pudo cargar el modulo:', id, err);
+      UI.showToast(`No se pudo cargar ${MODULES[id]?.label || 'el modulo'}: ${err.message}`, 'error', 8000);
+    }
+  }
+
+  async function _ensureModuleAssets(id) {
+    if (!['registro', 'mec', 'plano'].includes(id)) return;
+    const label = id === 'registro' ? 'Cargando registro guiado...' : 'Cargando plano y formulario...';
+    UI.setLoading(true, label);
+    try {
+      await _loadStyleOnce('assets/css/mec-form.css');
+      await _loadScriptOnce('assets/js/mec-schema.js');
+      await _loadScriptOnce('assets/js/mec-form.js');
+      _syncSelectedSchoolToMec();
+      if (id === 'registro') {
+        await _loadScriptOnce('assets/js/guided-register.js');
+      }
+    } finally {
+      UI.setLoading(false);
+    }
+  }
+
+  function _loadScriptOnce(src) {
+    const key = `script:${src}`;
+    if (_lazyAssetPromises.has(key)) return _lazyAssetPromises.get(key);
+    const existing = document.querySelector(`script[data-lazy-src="${src}"]`);
+    if (existing) return Promise.resolve();
+    const promise = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = _versionedAssetUrl(src);
+      script.defer = true;
+      script.dataset.lazySrc = src;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
+      document.body.appendChild(script);
+    });
+    _lazyAssetPromises.set(key, promise);
+    return promise;
+  }
+
+  function _loadStyleOnce(href) {
+    const key = `style:${href}`;
+    if (_lazyAssetPromises.has(key)) return _lazyAssetPromises.get(key);
+    const existing = document.querySelector(`link[data-lazy-href="${href}"]`);
+    if (existing) return Promise.resolve();
+    const promise = new Promise((resolve, reject) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = _versionedAssetUrl(href);
+      link.dataset.lazyHref = href;
+      link.onload = () => resolve();
+      link.onerror = () => reject(new Error(`No se pudo cargar ${href}`));
+      document.head.appendChild(link);
+    });
+    _lazyAssetPromises.set(key, promise);
+    return promise;
+  }
+
+  function _versionedAssetUrl(path) {
+    const url = new URL(path, document.baseURI);
+    url.searchParams.set('v', APP_CONFIG.VERSION || Date.now());
+    return url.href;
+  }
+
+  function _syncSelectedSchoolToMec() {
+    try {
+      const currentSchool = typeof SurveyModule !== 'undefined' && SurveyModule.getCurrentEscuela
+        ? SurveyModule.getCurrentEscuela()
+        : null;
+      if (currentSchool && typeof MecFormModule !== 'undefined' && MecFormModule.setSelectedSchool) {
+        MecFormModule.setSelectedSchool(currentSchool, { render: false });
+      }
+    } catch (err) {
+      console.warn('No se pudo sincronizar la escuela activa con el formulario MEC:', err);
     }
   }
 
@@ -1375,6 +1454,17 @@ const AppController = (() => {
     location.reload();
   }
 
+  async function printPlanPdf() {
+    try {
+      await _ensureModuleAssets('plano');
+      if (typeof MecFormModule !== 'undefined' && MecFormModule.printPlanPdf) {
+        MecFormModule.printPlanPdf();
+      }
+    } catch (err) {
+      UI.showToast('No se pudo preparar el PDF: ' + err.message, 'error', 8000);
+    }
+  }
+
   return {
     init,
     showLoginScreen,
@@ -1387,6 +1477,7 @@ const AppController = (() => {
     refreshAdminAlerts,
     openWorkbook,
     openEvidenceFolder,
+    printPlanPdf,
     logout,
   };
 })();

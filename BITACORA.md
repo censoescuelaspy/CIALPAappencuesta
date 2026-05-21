@@ -4,6 +4,40 @@
 
 ---
 
+## Arranque liviano y carga bajo demanda del motor MEC - 2026-05-21 - v2.6.91
+
+### Objetivo
+- Reducir la lentitud general de la app, especialmente al abrirla en tablet/celular.
+- Evitar que el inicio, mapa y planificacion descarguen y parseen el motor completo de plano/registro MEC si el usuario no lo usa.
+- Mantener el registro guiado y el plano disponibles, pero cargados solo cuando se abren.
+
+### Cambios implementados
+- `index.html` deja de cargar en el arranque inicial `mec-schema.js`, `mec-form.js`, `guided-register.js` y `mec-form.css`.
+- `AppController` agrega carga diferida versionada para `Registro guiado`, `Cuestionario MEC` y `Plano escuela`.
+- Al abrir esos modulos, la app carga `mec-form.css`, `mec-schema.js`, `mec-form.js` y, para registro guiado, `guided-register.js`.
+- El Service Worker deja de precachear esos archivos pesados en el app shell inicial; quedan cacheados cuando se usan.
+- Se difieren aproximadamente `1141 KB` del primer arranque/precache: `mec-form.js`, `guided-register.js`, `mec-schema.js` y `mec-form.css`.
+- `Imprimir PDF` del plano pasa por `AppController.printPlanPdf()` para asegurar que el motor MEC este cargado antes de imprimir.
+- Version visible y cache del Service Worker actualizados a `v2.6.91`.
+
+### Pendiente operativo
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.91`.
+- En tablets de campo, probar: abrir app, entrar a Inicio, luego abrir Mapa/Planificacion y finalmente Registro guiado para confirmar que la primera pantalla carga mas rapido.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Prueba Playwright local: el inicio autenticado no carga `mec-form.js`, `guided-register.js` ni `mec-schema.js`.
+- Prueba Playwright local: al abrir `Plano escuela`, se carga `MecFormModule` bajo demanda.
+- Prueba Playwright local: al abrir `Registro guiado`, se cargan `GuidedRegisterModule` y `MecFormModule` bajo demanda.
+
+---
+
 ## Refuerzo de cache y rol admin para guardado de planificacion - 2026-05-21 - v2.6.90
 
 ### Objetivo
