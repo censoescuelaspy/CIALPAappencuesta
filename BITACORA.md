@@ -28,6 +28,11 @@
 - `node --check sw.js`.
 - Revision estatica: `Guardar asignaciones`, `Guardar cambios`, `planning-save-banner` y cache `cialpa-app-v2.6.75`.
 - `git diff --check`.
+- `git push origin main`: publica commit `0e7fcda`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.75`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.75`.
+- Verificacion HTTP de GitHub Pages para `assets/js/planning.js`: contiene `Guardar cambios`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `Guardar asignaciones`.
 
 ---
 
