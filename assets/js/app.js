@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.79
+ * Version: 2.6.84
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -357,8 +357,15 @@ const AppController = (() => {
   let _sidebarPeekTimer = null;
   let _deferredInstallPrompt = null;
   let _swRegistration = null;
+  let _swMessagesBound = false;
   let _launchHomeResetBound = false;
   let _mapRosterWarningShown = false;
+  let _adminAlertsTimer = null;
+  let _adminAlertsInFlight = false;
+  let _adminAlertsSeenIds = new Set();
+  let _adminAlertsLastSummaryAt = 0;
+  const ADMIN_ALERTS_POLL_MS = 60000;
+  const ADMIN_ALERTS_SUMMARY_MS = 15 * 60 * 1000;
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -501,11 +508,19 @@ const AppController = (() => {
       _renderUserBar();
       Auth.applyRoleVisibility();
       _bindGlobalEvents();
+      _startAdminAlerts();
     } catch (err) {
       console.error('Error inicializando la vista principal:', err);
       UI.showToast?.('Se restauro la vista Inicio despues de actualizar la app.', 'warning', 6000);
     } finally {
-      resetToHome({ clearSelection: true });
+      const requestedModule = _requestedModuleFromUrl();
+      if (requestedModule && MODULES[requestedModule] && Auth.canAccess(MODULES[requestedModule].minRole)) {
+        _clearActiveSchoolContext();
+        showModule(requestedModule);
+        _clearRequestedModuleFromUrl();
+      } else {
+        resetToHome({ clearSelection: true });
+      }
     }
   }
 
@@ -578,6 +593,25 @@ const AppController = (() => {
     }
   }
 
+  function _requestedModuleFromUrl() {
+    try {
+      return new URL(window.location.href).searchParams.get('module') || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function _clearRequestedModuleFromUrl() {
+    try {
+      const url = new URL(window.location.href);
+      if (!url.searchParams.has('module')) return;
+      url.searchParams.delete('module');
+      window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+    } catch {
+      // History API may be unavailable in restricted modes.
+    }
+  }
+
   function _renderUserBar() {
     const user = Auth.getUserInfo();
     if (!user) return;
@@ -586,6 +620,7 @@ const AppController = (() => {
       bar.innerHTML = `
         <span class="app-edition-badge">${_escapeHtml(APP_CONFIG.EDITION_LABEL || `v${APP_CONFIG.VERSION}`)}</span>
         <button id="install-app-btn-header" class="btn btn-sm btn-primary" onclick="AppController.installApp()">Instalar</button>
+        ${Auth.canAccess('admin') ? '<button id="admin-alerts-btn" class="btn btn-sm btn-outline" onclick="AppController.enableAdminAlerts()" title="Activar notificaciones de solicitudes">Alertas<span id="admin-alert-count" class="badge badge--warning" style="margin-left:.35rem;display:none;">0</span></button>' : ''}
         <button class="btn btn-sm btn-outline" onclick="AppController.updateApp()">Actualizar</button>
         <span class="user-bar__name">${_escapeHtml(`${user.nombres || ''} ${user.apellidos || ''}`.trim())}</span>
         <span class="user-bar__role badge badge--role">${_escapeHtml(_rolLabel(user.rol))}</span>`;
@@ -595,6 +630,159 @@ const AppController = (() => {
 
   function _rolLabel(rol) {
     return { admin: 'Admin', supervisor: 'Supervisor', encuestador: 'Encuestador' }[rol] || rol;
+  }
+
+  function _startAdminAlerts() {
+    _stopAdminAlerts();
+    if (!Auth.isLoggedIn() || !Auth.canAccess('admin')) {
+      _setAdminAlertCount(0);
+      return;
+    }
+    _loadAdminAlertSeenIds();
+    _checkAdminAlerts({ forceSummary: true });
+    _adminAlertsTimer = setInterval(() => _checkAdminAlerts(), ADMIN_ALERTS_POLL_MS);
+  }
+
+  function _stopAdminAlerts() {
+    if (_adminAlertsTimer) {
+      clearInterval(_adminAlertsTimer);
+      _adminAlertsTimer = null;
+    }
+  }
+
+  async function _checkAdminAlerts(options = {}) {
+    if (_adminAlertsInFlight || !Auth.isLoggedIn() || !Auth.canAccess('admin')) return;
+    _adminAlertsInFlight = true;
+    try {
+      const result = await API.getIncidencias({ estado: 'pendiente' });
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudieron cargar solicitudes.');
+      const solicitudes = (result.data || []).filter(_isSolicitudRelevamiento);
+      _setAdminAlertCount(solicitudes.length);
+      const newItems = solicitudes.filter(item => !_adminAlertsSeenIds.has(_adminAlertId(item)));
+      const shouldSummarize = solicitudes.length && options.forceSummary && Date.now() - _adminAlertsLastSummaryAt > ADMIN_ALERTS_SUMMARY_MS;
+      if (newItems.length) {
+        _notifyAdminSolicitudes(newItems, solicitudes.length);
+        newItems.forEach(item => _adminAlertsSeenIds.add(_adminAlertId(item)));
+        _saveAdminAlertSeenIds();
+      } else if (shouldSummarize) {
+        UI.showToast(`Hay ${solicitudes.length} solicitud${solicitudes.length === 1 ? '' : 'es'} de relevamiento pendiente${solicitudes.length === 1 ? '' : 's'}.`, 'warning', 0);
+        _adminAlertsLastSummaryAt = Date.now();
+      }
+    } catch (err) {
+      console.warn('No se pudieron revisar solicitudes de admin:', err);
+    } finally {
+      _adminAlertsInFlight = false;
+    }
+  }
+
+  function _isSolicitudRelevamiento(row) {
+    return String(row?.tipo_incidencia || '').toLowerCase() === 'solicitud de relevamiento';
+  }
+
+  function _adminAlertId(item) {
+    return String(item?.id_incidencia || `${item?.id_escuela || ''}:${item?.codigo_local || ''}:${item?.usuario || ''}:${item?.fecha_hora || ''}`);
+  }
+
+  function _notifyAdminSolicitudes(items, totalPending) {
+    const count = items.length;
+    const first = items[0] || {};
+    const school = [first.codigo_local || first.id_escuela || '', first.nombre_escuela || ''].filter(Boolean).join(' - ') || 'escuela sin asignacion';
+    const title = count === 1 ? 'Nueva solicitud de relevamiento' : `${count} solicitudes nuevas de relevamiento`;
+    const body = count === 1
+      ? `${first.usuario || 'Usuario'} solicita relevar ${school}.`
+      : `Hay ${totalPending} solicitudes pendientes para revisar.`;
+    UI.showToast(`${title}: ${body}`, 'warning', 0);
+    _showSystemNotification(title, body);
+  }
+
+  async function _showSystemNotification(title, body) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const options = {
+      body,
+      tag: 'cialpa-solicitudes-relevamiento',
+      renotify: true,
+      data: { url: './?module=encuestadores' },
+    };
+    try {
+      if (_swRegistration?.showNotification) {
+        await _swRegistration.showNotification(title, options);
+      } else {
+        const notice = new Notification(title, options);
+        notice.onclick = () => {
+          window.focus();
+          showModule('encuestadores');
+          notice.close();
+        };
+      }
+    } catch (err) {
+      console.warn('No se pudo mostrar notificacion del sistema:', err);
+    }
+  }
+
+  async function enableAdminAlerts() {
+    if (!Auth.canAccess('admin')) {
+      UI.showToast('Las alertas de solicitudes estan disponibles para administradores autorizados.', 'warning', 6500);
+      return false;
+    }
+    if (!('Notification' in window)) {
+      UI.showToast('Este navegador no permite notificaciones del sistema. La app mostrara avisos internos mientras este abierta.', 'warning', 8000);
+      _checkAdminAlerts({ forceSummary: true });
+      return false;
+    }
+    if (Notification.permission === 'granted') {
+      UI.showToast('Alertas activas. Mientras la app este abierta o instalada, se avisaran nuevas solicitudes.', 'success', 6500);
+      _checkAdminAlerts({ forceSummary: true });
+      return true;
+    }
+    if (Notification.permission === 'denied') {
+      UI.showToast('Las notificaciones estan bloqueadas en el navegador. Active permisos del sitio para recibir avisos del sistema.', 'warning', 9000);
+      _checkAdminAlerts({ forceSummary: true });
+      return false;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      UI.showToast('Alertas activadas para solicitudes de relevamiento.', 'success', 6500);
+      _showSystemNotification('CIALPA alertas activas', 'Recibiras avisos cuando entren nuevas solicitudes de relevamiento.');
+      _checkAdminAlerts({ forceSummary: true });
+      return true;
+    }
+    UI.showToast('Permiso no concedido. Se mantendran avisos internos dentro de la app.', 'warning', 7000);
+    _checkAdminAlerts({ forceSummary: true });
+    return false;
+  }
+
+  function refreshAdminAlerts() {
+    return _checkAdminAlerts({ forceSummary: true });
+  }
+
+  function _setAdminAlertCount(count) {
+    const badge = document.getElementById('admin-alert-count');
+    if (!badge) return;
+    const value = Number(count) || 0;
+    badge.textContent = String(value);
+    badge.style.display = value > 0 ? 'inline-flex' : 'none';
+  }
+
+  function _adminAlertsStorageKey() {
+    return `cialpa_admin_solicitudes_seen_${APP_CONFIG.VERSION}_${Auth.getUserInfo()?.usuario || 'admin'}`;
+  }
+
+  function _loadAdminAlertSeenIds() {
+    try {
+      const raw = localStorage.getItem(_adminAlertsStorageKey());
+      _adminAlertsSeenIds = new Set(JSON.parse(raw || '[]'));
+    } catch {
+      _adminAlertsSeenIds = new Set();
+    }
+  }
+
+  function _saveAdminAlertSeenIds() {
+    try {
+      const ids = [..._adminAlertsSeenIds].slice(-250);
+      localStorage.setItem(_adminAlertsStorageKey(), JSON.stringify(ids));
+    } catch {
+      // localStorage may be unavailable.
+    }
   }
 
   function _bindGlobalEvents() {
@@ -659,6 +847,14 @@ const AppController = (() => {
   async function _registerServiceWorker() {
     if (!('serviceWorker' in navigator)) return;
     try {
+      if (!_swMessagesBound) {
+        _swMessagesBound = true;
+        navigator.serviceWorker.addEventListener('message', event => {
+          if (event.data?.type === 'OPEN_MODULE' && event.data.module && Auth.isLoggedIn()) {
+            showModule(event.data.module);
+          }
+        });
+      }
       _swRegistration = await navigator.serviceWorker.register(`./sw.js?v=${encodeURIComponent(APP_CONFIG.VERSION)}`, {
         updateViaCache: 'none',
       });
@@ -1174,6 +1370,7 @@ const AppController = (() => {
   async function logout() {
     const confirmed = await UI.showConfirm('Cerrar sesión', '¿Seguro que querés salir?');
     if (!confirmed) return;
+    _stopAdminAlerts();
     await Auth.logout();
     location.reload();
   }
@@ -1186,6 +1383,8 @@ const AppController = (() => {
     installApp,
     closeInstallHelp,
     updateApp,
+    enableAdminAlerts,
+    refreshAdminAlerts,
     openWorkbook,
     openEvidenceFolder,
     logout,

@@ -4,6 +4,40 @@
 
 ---
 
+## Alertas internas para solicitudes de relevamiento - 2026-05-21 - v2.6.84
+
+### Objetivo
+- Cubrir el caso en que el correo operativo no llega o queda demorado.
+- Avisar en el celular/dispositivo donde un administrador tiene la sesion iniciada cuando entra una solicitud nueva.
+- Mantener visible el conteo de solicitudes pendientes sin depender de abrir manualmente `Encuestadores`.
+
+### Cambios implementados
+- La app inicia un monitor para administradores autorizados, consultando solicitudes pendientes cada 60 segundos.
+- El encabezado admin incorpora boton `Alertas`, que pide permiso de notificaciones del navegador cuando el dispositivo lo permite.
+- Ante una solicitud nueva, se muestra un aviso interno persistente dentro de la app.
+- Si las notificaciones del navegador estan permitidas, se dispara una notificacion del sistema/PWA con la escuela y solicitante.
+- El badge del boton `Alertas` muestra el total de solicitudes pendientes.
+- Al tocar una notificacion, la app vuelve al modulo `Encuestadores` cuando hay una ventana PWA abierta o abre la app con ese destino.
+- Al aprobar una solicitud, el monitor actualiza el conteo sin esperar al siguiente ciclo.
+- Version visible y cache del Service Worker actualizados a `v2.6.84`.
+
+### Limitacion conocida
+- Esto cubre notificaciones mientras la PWA esta abierta, instalada o con Service Worker activo reciente. Para push garantizado con la app cerrada totalmente haria falta implementar Web Push con VAPID y un servicio de envio dedicado.
+
+### Pendiente operativo
+- Pedir al administrador abrir la app actualizada, iniciar sesion y tocar `Alertas` para permitir notificaciones del navegador.
+- Probar con un usuario real: crear solicitud y confirmar toast interno, badge `Alertas` y notificacion del sistema si el permiso fue concedido.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/admin.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Apunte a Web App MailApp autorizado - 2026-05-21 - v2.6.83
 
 ### Objetivo

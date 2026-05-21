@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.6.83';
+const CACHE_NAME = 'cialpa-app-v2.6.84';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',
@@ -97,3 +97,25 @@ function _cacheIfValid(request, response) {
     console.warn('[SW] No se pudo actualizar cache', request.url, err);
   });
 }
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification?.data?.url || './?module=encuestadores', self.registration.scope).href;
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clientList => {
+        for (const client of clientList) {
+          if ('focus' in client) {
+            try {
+              client.postMessage({ type: 'OPEN_MODULE', module: 'encuestadores' });
+            } catch (_) {
+              // Best-effort navigation hint.
+            }
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) return clients.openWindow(targetUrl);
+        return undefined;
+      })
+  );
+});

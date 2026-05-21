@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.6.79
+ * Version: 2.6.84
  */
 
 const AdminModule = (() => {
@@ -408,6 +408,9 @@ const AdminModule = (() => {
       if (result.status !== 'ok') throw new Error(result.message);
       UI.showToast(result.message || 'Solicitud aprobada y escuela asignada.', 'success', 6500);
       loadSolicitudesRelevamiento();
+      try {
+        if (typeof AppController !== 'undefined' && AppController.refreshAdminAlerts) AppController.refreshAdminAlerts();
+      } catch { /* non-fatal */ }
       try {
         if (typeof IncidenciasModule !== 'undefined' && IncidenciasModule.loadList) IncidenciasModule.loadList();
       } catch { /* non-fatal */ }
