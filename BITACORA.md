@@ -31,6 +31,12 @@
 - Revision estatica: no queda el mensaje viejo `Solo administradores autorizados pueden guardar asignaciones` en `planning.js`.
 - Revision estatica: `index.html` carga `auth.js?v=2.6.90` y `planning.js?v=2.6.90`.
 - Revision estatica: `Auth.isAdminUser()` reconoce sesiones con rol normalizado `admin`.
+- `git push origin main`: publica commit `f3f7857`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.90`, `auth.js?v=2.6.90` y `planning.js?v=2.6.90`.
+- Verificacion HTTP de GitHub Pages para `assets/js/auth.js?v=2.6.90`: contiene `_normalizeRole` y rol admin normalizado.
+- Verificacion HTTP de GitHub Pages para `assets/js/planning.js?v=2.6.90`: no contiene el mensaje viejo y valida `Auth.canAccess('supervisor')`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js?v=2.6.90`: version `2.6.90`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.90`.
 
 ---
 
