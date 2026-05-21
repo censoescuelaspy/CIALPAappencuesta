@@ -4,6 +4,30 @@
 
 ---
 
+## Alta publica activada en Web App propietario - 2026-05-21 - v2.6.78
+
+### Objetivo
+- Confirmar que el deployment propietario actualizado en la misma URL publica ya toma los endpoints publicos de cuenta.
+- Cerrar el pendiente operativo que hacia aparecer `Token invalido o expirado` al crear usuario o recuperar clave.
+
+### Resultado
+- El Web App `AKfycbytu9TcFhKl1PoRO8G0OPAti19ey5KfMG83IFMCInwPOgw5jYElSTcIr-gXMPiSQFM89w` quedo actualizado en `@19`.
+- `registrarUsuario` ya no exige token: sin datos responde validacion de campos requeridos.
+- `recuperarPassword` ya no exige token: sin datos responde validacion de usuario/nueva contrasena.
+- `diagnosticoPadron` sigue respondiendo `source: official_sheet`, `total: 5462`, `con_coordenadas: 5004`, `muestra_piloto: 86`.
+
+### Pendiente operativo
+- Pedir a usuarios y administradores `Actualizar app` para tomar `cialpa-app-v2.6.78`.
+- Probar con un usuario nuevo real: crear cuenta, iniciar sesion, verificar que aparece en `Configuracion > Encuestadores` y asignarle escuelas.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App publicado para `registrarUsuario` sin datos: responde `Usuario, nombres, apellidos y contrasena son requeridos`, sin token.
+- Prueba HTTP del Web App publicado para `recuperarPassword` sin datos: responde `Usuario y nueva contrasena son requeridos`, sin token.
+- `clasp.cmd deployments`: URL publica actualizada a `@19`.
+- Prueba HTTP `diagnosticoPadron`: `official_sheet`, `total: 5462`, `muestra_piloto: 86`.
+
+---
+
 ## Diagnostico claro de alta publica pendiente en backend - 2026-05-21 - v2.6.78
 
 ### Objetivo
