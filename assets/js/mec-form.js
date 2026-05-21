@@ -684,6 +684,7 @@ const MecFormModule = (() => {
           driveFileId: result.data.id || '',
           driveUrl: result.data.url || '',
           driveFolderId: result.data.folderId || folderId,
+          driveSubFolderId: result.data.subFolderId || '',
           uploadedAt: result.data.uploadedAt || new Date().toISOString(),
           evidenceId: result.data.evidenceId || '',
           uploadError: '',
@@ -794,8 +795,8 @@ const MecFormModule = (() => {
     const selected = _selectedSchoolFromContext() || _data.__selectedSchool || {};
     const general = _data.general || {};
     return {
-      schoolCode: _firstPresent(selected, ['codigo_establecimiento', 'codigo', 'CODIGO', 'id']) || general.codigo_establecimiento || general.codigo_local || '',
-      schoolName: _firstPresent(selected, ['nombre', 'institucion', 'NOMBRE', 'nombre_establecimiento']) || general.nombre_institucion || general.nombre_establecimiento || '',
+      schoolCode: _firstPresent(selected, ['codigo_establecimiento', 'codigo_local', 'codigo', 'CODIGO', 'id_escuela', 'id']) || general.codigo_establecimiento || general.codigo_local || '',
+      schoolName: _firstPresent(selected, ['nombre', 'nombre_escuela', 'institucion', 'NOMBRE', 'nombre_establecimiento']) || general.nombre_institucion || general.nombre_establecimiento || '',
     };
   }
 
@@ -20383,6 +20384,7 @@ const MecFormModule = (() => {
         driveFileId: photo.driveFileId || '',
         driveUrl: photo.driveUrl || '',
         driveFolderId: photo.driveFolderId || '',
+        driveSubFolderId: photo.driveSubFolderId || photo.subFolderId || '',
         uploadedAt: photo.uploadedAt || '',
         evidenceId: photo.evidenceId || '',
         context: photo.context || {},
@@ -20403,6 +20405,7 @@ const MecFormModule = (() => {
           driveFileId: photo.driveFileId || '',
           driveUrl: photo.driveUrl || '',
           driveFolderId: photo.driveFolderId || '',
+          driveSubFolderId: photo.driveSubFolderId || photo.subFolderId || '',
           uploadedAt: photo.uploadedAt || '',
           evidenceId: photo.evidenceId || '',
           context: photo.context || _sketchObjectEvidenceContext(object, room),
@@ -20423,6 +20426,7 @@ const MecFormModule = (() => {
         driveFileId: photo.driveFileId || '',
         driveUrl: photo.driveUrl || '',
         driveFolderId: photo.driveFolderId || '',
+        driveSubFolderId: photo.driveSubFolderId || photo.subFolderId || '',
         uploadedAt: photo.uploadedAt || '',
         evidenceId: photo.evidenceId || '',
         context: photo.context || _sanitaryEvidenceContext(item),
@@ -20446,6 +20450,7 @@ const MecFormModule = (() => {
           driveFileId: photo.driveFileId || '',
           driveUrl: photo.driveUrl || '',
           driveFolderId: photo.driveFolderId || '',
+          driveSubFolderId: photo.driveSubFolderId || photo.subFolderId || '',
           uploadedAt: photo.uploadedAt || '',
           evidenceId: photo.evidenceId || '',
           context: photo.context || _sanitaryEvidenceContext(item),
@@ -20466,6 +20471,7 @@ const MecFormModule = (() => {
         driveFileId: photo.driveFileId || '',
         driveUrl: photo.driveUrl || '',
         driveFolderId: photo.driveFolderId || '',
+        driveSubFolderId: photo.driveSubFolderId || photo.subFolderId || '',
         uploadedAt: photo.uploadedAt || '',
         evidenceId: photo.evidenceId || '',
         context: photo.context || _siteElementEvidenceContext(element),

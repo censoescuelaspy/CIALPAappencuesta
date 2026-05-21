@@ -4,6 +4,39 @@
 
 ---
 
+## Verificacion y refuerzo de evidencias indexadas - 2026-05-21 - v2.6.87
+
+### Objetivo
+- Verificar los cambios de `v2.6.86`: fotos por subcarpeta de escuela, mapa con carga masiva de markers y cache de estadisticas.
+- Asegurar que la relacion foto -> escuela -> aula/sanitario/elemento quede visible tambien en el indice local y en el cierre.
+- Subir GAS a HEAD para activar `uploadEvidence` con subcarpetas en Drive.
+
+### Cambios implementados
+- El registro local de cada foto subida guarda tambien `driveSubFolderId`, tomado del `subFolderId` devuelto por Apps Script.
+- El `evidenceIndex` del borrador/cierre incluye `driveSubFolderId` junto con `driveFolderId`, `driveFileId`, URL y contexto.
+- `_schoolEvidenceContext()` reconoce explicitamente `codigo_local`, `id_escuela` y `nombre_escuela`, evitando que una foto quede como `sin_escuela` si el formulario general aun no estaba completo.
+- `uploadEvidence` en GAS usa como respaldo `params.codigo_local`, `params.id_escuela`, `params.schoolCode`, `params.nombre_escuela` o `params.schoolName` si el contexto viene incompleto.
+- El nombre de subcarpeta se sanitiza para Drive, conservando el formato `{codigo_local} - {nombre_escuela}`.
+- `setup.gs` actualiza los encabezados iniciales de `evidencias` para incluir `subfolder_id`.
+- Version visible y cache del Service Worker actualizados a `v2.6.87`.
+
+### Pendiente operativo
+- Pedir a encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.87`.
+- Hacer una carga real de foto desde una escuela y confirmar en Drive la subcarpeta `{codigo_local} - {nombre_escuela}` dentro de `1MtFgyyCaAF4MyfRmpvFAvwjgzSn75V_-`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `node -e "JSON.parse(...package.json...); JSON.parse(...gas/appsscript.json...)"`: OK.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Fotos indexadas por escuela, mapa mas rapido, cache de estadisticas - 2026-05-21 - v2.6.86
 
 ### Objetivo

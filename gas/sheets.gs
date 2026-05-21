@@ -732,11 +732,11 @@ const SheetsService = (() => {
     const rootFolder = DriveApp.getFolderById(folderId);
 
     // Get or create per-school subfolder: "{schoolCode} - {schoolName}"
-    const schoolCode = String(context.schoolCode || '').trim();
-    const schoolName = String(context.schoolName || '').trim();
-    const schoolFolderName = schoolCode
+    const schoolCode = String(context.schoolCode || context.codigo_local || params.schoolCode || params.codigo_local || params.id_escuela || '').trim();
+    const schoolName = String(context.schoolName || context.nombre_escuela || params.schoolName || params.nombre_escuela || params.nombre || '').trim();
+    const schoolFolderName = _safeEvidenceFolderName(schoolCode
       ? (schoolName ? `${schoolCode} - ${schoolName}` : schoolCode)
-      : (schoolName || 'sin_escuela');
+      : (schoolName || 'sin_escuela'));
     let targetFolder = rootFolder;
     let subFolderId = folderId;
     try {
@@ -1143,6 +1143,16 @@ const SheetsService = (() => {
       .replace(/_+/g, '_')
       .slice(0, 180);
     return cleaned || `evidencia_${Date.now()}.jpg`;
+  }
+
+  function _safeEvidenceFolderName(value) {
+    const cleaned = String(value || 'sin_escuela')
+      .replace(/[\\/:*?"<>|]+/g, '-')
+      .replace(/\s+/g, ' ')
+      .replace(/\s*-\s*/g, ' - ')
+      .trim()
+      .slice(0, 180);
+    return cleaned || 'sin_escuela';
   }
 
   function getIncidencias(params) {
