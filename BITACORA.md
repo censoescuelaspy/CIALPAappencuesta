@@ -4,6 +4,38 @@
 
 ---
 
+## Apunte a Web App con evidencias indexadas - 2026-05-21 - v2.6.88
+
+### Objetivo
+- Apuntar la PWA al Web App nuevo publicado por la cuenta propietaria/aceptada.
+- Confirmar que el deployment publico nuevo mantiene padron oficial, endpoints publicos y proteccion por token.
+- Forzar cache nuevo para que usuarios tomen el backend con `uploadEvidence` reforzado.
+
+### Resultado
+- `APP_CONFIG.GAS_URL` apunta a `https://script.google.com/macros/s/AKfycbwvV43sQYTJz0GDmSFAwp4ev0mdG_Hr_2IHK3kr3HIqeN2JXHkWdPrr_A6U3RWfQ6ck5w/exec`.
+- El Web App responde `login` sin credenciales con validacion publica, sin HTTP 403.
+- `registrarUsuario` sigue como endpoint publico y responde validacion de campos requeridos.
+- `diagnosticoPadron` responde `source: official_sheet`, `total: 5462`, `muestra_piloto: 86`, `filas_operativas: 95`.
+- `getEscuelas` sin token responde `Token invalido o expirado`, confirmando proteccion de endpoints privados.
+- Version visible y cache del Service Worker actualizados a `v2.6.88`.
+
+### Pendiente operativo
+- Pedir a administradores y encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.88`.
+- Probar una carga real de foto: confirmar subcarpeta `{codigo_local} - {nombre_escuela}` en Drive y fila de `evidencias` con `subfolder_id`.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App nuevo para `login` sin datos: responde `Usuario y contrasena son requeridos`.
+- Prueba HTTP del Web App nuevo para `diagnosticoPadron`: `official_sheet`, `total: 5462`, `muestra_piloto: 86`, `filas_operativas: 95`.
+- Prueba HTTP del Web App nuevo para `registrarUsuario` sin datos: responde `Usuario, nombres, apellidos y contrasena son requeridos`.
+- Prueba HTTP del Web App nuevo para `recuperarPassword` sin datos: responde `Usuario y nueva contrasena son requeridos`.
+- Prueba HTTP del Web App nuevo para `getEscuelas` sin token: responde `Token invalido o expirado`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Verificacion y refuerzo de evidencias indexadas - 2026-05-21 - v2.6.87
 
 ### Objetivo
