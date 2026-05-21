@@ -37,6 +37,13 @@
 - Prueba Playwright local con datos simulados: renderiza `stats-command-center`, 4 tarjetas de insight, matriz territorial, ranking de encuestadores y version `v2.6.92`.
 - Prueba Playwright local: Chart.js no se carga en Inicio y se carga bajo demanda al abrir `Resultados globales`.
 - Prueba Playwright local movil `390x844`: `Resultados globales` no genera desborde horizontal.
+- `git push origin main`: publica commit `e93d719`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.92`, `stats-executive-dashboard`, `stats-territory-board` y no carga Chart.js al inicio.
+- Verificacion HTTP de GitHub Pages para `assets/js/stats.js?v=2.6.92`: contiene `_renderExecutiveDashboard`, `_renderTerritoryBoard` y carga diferida `CHART_JS_URL`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css?v=2.6.92`: contiene estilos `stats-command-center`, `stats-filter-panel` y `territory-card`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.92`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.92`.
+- `npm.cmd run metrics:web -- --cache-bust`: escritorio FCP `520 ms`, tablet FCP `172 ms`, movil FCP `168 ms`; 20 requests, 0 fallidas, 0 HTTP 4xx/5xx y 0 errores/advertencias de consola.
 
 ---
 
