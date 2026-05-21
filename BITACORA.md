@@ -18,6 +18,7 @@
 - `StatsModule` agrega `initMecInfrastructure()`, `loadMecInfrastructure()` y exportacion `JSON tecnico`.
 - `CialpaLocalStore.mecMetrics()` amplía metricas locales de infraestructura: exteriores, luces, ventiladores, aires, tableros, rampas, sanitarios accesibles, sanitarios criticos, puesta a tierra, diferencial y circuitos identificados.
 - Apps Script agrega `infraestructura_mec` dentro de `getStats`, calculado desde la ultima fila disponible por escuela en `mec_borradores`.
+- El agregado global de infraestructura se calcula solo cuando el modulo `Infraestructura MEC` lo solicita, evitando cargar de mas `Resultados globales`.
 - Version visible y cache del Service Worker actualizados a `v2.6.93`.
 
 ### Pendiente operativo

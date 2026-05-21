@@ -130,7 +130,7 @@ const StatsModule = (() => {
     let remoteStats = _statsData;
     let remoteError = null;
     try {
-      const result = await API.getStats({}, { skipLoading: true });
+      const result = await API.getStats({ infraestructura_mec: true }, { skipLoading: true });
       if (result.status !== 'ok') throw new Error(result.message || 'Respuesta invalida');
       remoteStats = _normalizeStats(result.data || {});
       _statsData = remoteStats;

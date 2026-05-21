@@ -1491,14 +1491,16 @@ const SheetsService = (() => {
     const por_encuestador = _groupEncuestador(escuelas, sesiones);
     const por_dia = _groupSesionesDia(sesiones);
     const por_modulo = _groupModulos();
-    const infraestructura_mec = _mecInfrastructureStats_();
+    const includeInfra = _isTrueish(params.infraestructura_mec) || _isTrueish(params.include_infraestructura) || _isTrueish(params.infraestructura);
     const actividad_reciente = sesiones
       .filter(s => s.fecha_inicio || s.inicio_iso)
       .sort((a, b) => String(b.inicio_iso || `${b.fecha_inicio}${b.hora_inicio}`).localeCompare(String(a.inicio_iso || `${a.fecha_inicio}${a.hora_inicio}`)))
       .slice(0, 20)
       .map(s => ({ tipo: s.estado, usuario: s.usuario, escuela: s.nombre_escuela || s.id_escuela, fecha_hora: s.inicio_iso || `${s.fecha_inicio} ${s.hora_inicio}` }));
 
-    return { status: 'ok', data: { total, finalizadas, en_curso, pendientes, con_incidencia, pct_avance, por_departamento, por_zona, por_encuestador, por_dia, por_modulo, actividad_reciente, infraestructura_mec } };
+    const data = { total, finalizadas, en_curso, pendientes, con_incidencia, pct_avance, por_departamento, por_zona, por_encuestador, por_dia, por_modulo, actividad_reciente };
+    if (includeInfra) data.infraestructura_mec = _mecInfrastructureStats_();
+    return { status: 'ok', data };
   }
 
   function getResumenOperativo(params) {
