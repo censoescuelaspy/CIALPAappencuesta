@@ -30,6 +30,10 @@
 - `node --check sw.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
+- `git push origin main`: publica commit `7ab881b`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.70`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `Finalizar escuela`, `Finalizar con pendientes` y cierre de sesion guiado.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.70`.
 
 ---
 
