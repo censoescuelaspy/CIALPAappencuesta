@@ -33,6 +33,11 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
 - Revision estatica: `START_MODULE = 'inicio'`, `clearActiveSchoolContext`, `MapModule.clearSelection` y cache `cialpa-app-v2.6.72`.
+- `git push origin main`: publica commit `96aa015`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.72`.
+- Verificacion HTTP de GitHub Pages para `assets/js/app.js`: `START_MODULE = 'inicio'` y limpieza de seleccion al inicio.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `clearActiveSchoolContext`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.72`.
 
 ---
 
