@@ -4,6 +4,39 @@
 
 ---
 
+## Diagnostico claro de alta publica pendiente en backend - 2026-05-21 - v2.6.78
+
+### Objetivo
+- Evitar que `Crear usuario` y `Recuperar clave` muestren el error confuso `Token invalido o expirado` cuando el Web App publicado todavia no tiene activos los endpoints publicos.
+- Dejar claro al administrador que falta publicar Apps Script desde la cuenta propietaria para habilitar el alta publica real.
+
+### Diagnostico
+- La app publicada ya llama `registrarUsuario` sin token.
+- El Web App publicado `AKfycbytu9TcFhKl1PoRO8G0OPAti19ey5KfMG83IFMCInwPOgw5jYElSTcIr-gXMPiSQFM89w` sigue en deployment `@18`, anterior al alta publica.
+- Prueba HTTP sin escritura `registrarUsuario` sin datos obligatorios responde `Token invalido o expirado`, confirmando que el backend publicado aun trata esa accion como privada.
+
+### Cambios implementados
+- `API.call` detecta errores de token en endpoints publicos de cuenta (`registrarUsuario` y `recuperarPassword`) sin cerrar sesion ni mostrarlo como problema de contrasena.
+- El mensaje visible indica que el registro publico o recuperacion todavia no esta activo en el servidor publicado.
+- El mensaje operativo sugiere publicar el Web App de Apps Script desde la cuenta propietaria y, mientras tanto, crear/editar la cuenta desde `Configuracion > Encuestadores`.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.78`.
+
+### Pendiente operativo
+- Publicar el Web App de Apps Script desde la cuenta propietaria/aceptada para que el deployment publico tome `registrarUsuario` y `recuperarPassword` como acciones sin token.
+- Repetir la prueba HTTP: `registrarUsuario` sin datos debe responder validacion de campos requeridos, no `Token invalido o expirado`.
+- Pedir a usuarios y administradores `Actualizar app` para tomar `cialpa-app-v2.6.78`.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App publicado para `registrarUsuario` sin datos: responde `Token invalido o expirado`, confirmando deployment GAS pendiente.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Revision estatica: `PUBLIC_ACCOUNT_ENDPOINTS`, `backendNeedsPublish` y cache `cialpa-app-v2.6.78`.
+- `git diff --check`.
+
+---
+
 ## Scroll tactil de filtros del mapa - 2026-05-21 - v2.6.77
 
 ### Objetivo

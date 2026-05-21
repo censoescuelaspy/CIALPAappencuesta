@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.76
+ * Version: 2.6.78
  */
 
 const API = (() => {
@@ -9,6 +9,7 @@ const API = (() => {
 
   const _IS_DEMO = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
   const EXAMPLE_SCHOOL_ID = 'ESC_DEMO_CIALPA';
+  const PUBLIC_ACCOUNT_ENDPOINTS = new Set(['registrarUsuario', 'recuperarPassword']);
 
   function _exampleMecDraft() {
     return {
@@ -602,6 +603,22 @@ const API = (() => {
     return code === '401' || /token/i.test(message);
   }
 
+  function _normalizePublicAccountResponse(json, endpoint, skipAuth) {
+    if (!skipAuth || !PUBLIC_ACCOUNT_ENDPOINTS.has(endpoint)) return json;
+    if (!json || json.status !== 'error') return json;
+    const code = String(json.code || '');
+    const message = String(json.message || '');
+    if (code !== '401' && !/token/i.test(message)) return json;
+    const label = endpoint === 'recuperarPassword'
+      ? 'La recuperacion de contrasena'
+      : 'El registro publico de usuarios';
+    return {
+      ...json,
+      backendNeedsPublish: true,
+      message: `${label} todavia no esta activo en el servidor publicado. Falta publicar el Web App de Apps Script desde la cuenta propietaria. Mientras tanto, un administrador puede crear o editar la cuenta desde Configuracion > Encuestadores.`,
+    };
+  }
+
   function _handleInvalidSession(json) {
     const message = json?.message || 'Sesion vencida. Inicie sesion nuevamente.';
     if (typeof Auth !== 'undefined' && Auth.expireSession) {
@@ -655,6 +672,7 @@ const API = (() => {
         } catch {
           throw new Error('Respuesta inválida del servidor, no es JSON.');
         }
+        json = _normalizePublicAccountResponse(json, endpoint, skipAuth);
         if (_isInvalidSessionResponse(json, endpoint, skipAuth)) {
           throw _handleInvalidSession(json);
         }
