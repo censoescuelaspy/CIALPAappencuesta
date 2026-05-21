@@ -40,6 +40,8 @@
 - Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.93`.
 - Verificacion HTTP de GitHub Pages para `assets/js/stats.js`: contiene `initMecInfrastructure` e `infraestructura_mec`.
 - Verificacion HTTP de GitHub Pages para `index.html`: contiene `module-infraestructura` y `Panel tecnico edilicio`.
+- `git push origin main`: publica ajuste `7a83530`, dejando `infraestructura_mec` bajo demanda.
+- Verificacion HTTP de GitHub Pages para `assets/js/stats.js`: `API.getStats({ infraestructura_mec: true })`.
 
 ---
 
