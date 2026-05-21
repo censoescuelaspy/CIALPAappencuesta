@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.79
+ * Version 2.6.81
  */
 
 const SheetsService = (() => {
@@ -22,6 +22,13 @@ const SheetsService = (() => {
     'ultimo_registro_externo', 'ultimo_cierre_id', 'ultimo_pdf_url', 'ultimo_metadata_url',
     'email_cierre_estado', 'email_cierre_destino', 'ultimo_borrador_mec_id',
     'ultimo_borrador_mec_at', 'ultimo_borrador_mec_usuario'
+  ];
+
+  const INCIDENCIA_HEADERS = [
+    'id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion',
+    'prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','nombre_escuela',
+    'departamento','distrito','localidad','latitud','longitud','notificacion_email_estado',
+    'notificacion_email_destino','notificacion_email_error','notificacion_email_fecha'
   ];
 
   const MODULE_DEFAULTS = [
@@ -149,8 +156,14 @@ const SheetsService = (() => {
   function asignarEscuela(params) {
     const session = params._session;
     if (!['admin', 'supervisor'].includes(String(session.rol))) return { status: 'error', message: 'Acceso restringido.' };
-    let rowIdx = _findEscuelaRow(params.id_escuela || params.codigo_local);
-    if (rowIdx === -1) rowIdx = _appendEmbeddedEscuelaOperationalRow_(params.id_escuela || params.codigo_local);
+    const candidates = _schoolIdentityCandidates_(params.id_escuela, params.codigo_local);
+    let rowIdx = -1;
+    for (let i = 0; i < candidates.length && rowIdx === -1; i++) {
+      rowIdx = _findEscuelaRow(candidates[i]);
+    }
+    for (let i = 0; i < candidates.length && rowIdx === -1; i++) {
+      rowIdx = _appendEmbeddedEscuelaOperationalRow_(candidates[i]);
+    }
     if (rowIdx === -1) return { status: 'error', message: 'Escuela no encontrada.' };
     _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
     const sheet = _getSheet(SHEET_NAMES.ESCUELAS);
@@ -500,14 +513,14 @@ const SheetsService = (() => {
 
   function saveIncidencia(params) {
     const session = params._session;
-    _ensureColumns(SHEET_NAMES.INCIDENCIAS, ['id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion','prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','latitud','longitud']);
+    _ensureColumns(SHEET_NAMES.INCIDENCIAS, INCIDENCIA_HEADERS);
     const requestedId = _clientMutationId(params);
     if (requestedId) {
       const existingIdx = _findRowIndex(SHEET_NAMES.INCIDENCIAS, 'id_incidencia', requestedId);
       if (existingIdx !== -1) return { status: 'ok', message: 'Incidencia offline ya sincronizada.', data: { id_incidencia: requestedId } };
     }
     const id = requestedId || _genId('INC');
-    _appendObject(SHEET_NAMES.INCIDENCIAS, ['id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion','prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','latitud','longitud'], {
+    _appendObject(SHEET_NAMES.INCIDENCIAS, INCIDENCIA_HEADERS, {
       id_incidencia: id,
       id_escuela: params.id_escuela || '',
       usuario: session.usuario,
@@ -519,6 +532,10 @@ const SheetsService = (() => {
       evidencia_url: params.evidencia_url || '',
       id_sesion: params.id_sesion || '',
       codigo_local: params.codigo_local || '',
+      nombre_escuela: params.nombre_escuela || '',
+      departamento: params.departamento || '',
+      distrito: params.distrito || '',
+      localidad: params.localidad || '',
       latitud: params.gps_lat || '',
       longitud: params.gps_lng || ''
     });
@@ -542,7 +559,7 @@ const SheetsService = (() => {
       return { status: 'error', message: 'La escuela ya esta asignada a un responsable.' };
     }
 
-    const headers = ['id_incidencia','id_escuela','usuario','fecha_hora','tipo_incidencia','descripcion','prioridad','estado_resolucion','evidencia_url','id_sesion','codigo_local','latitud','longitud'];
+    const headers = INCIDENCIA_HEADERS;
     _ensureColumns(SHEET_NAMES.INCIDENCIAS, headers);
     const requestedId = _clientMutationId(params);
     if (requestedId) {
@@ -551,14 +568,27 @@ const SheetsService = (() => {
     }
 
     const existing = _sheetToObjects(SHEET_NAMES.INCIDENCIAS).find(function(row) {
-      const sameSchool = _same(row.id_escuela, escuela.id_escuela) || _same(row.codigo_local, escuela.codigo_local);
+      const sameSchool = _schoolIdentityCandidates_(escuela.id_escuela, escuela.codigo_local, id)
+        .some(candidate => _idMatch(row, candidate));
       return sameSchool
         && _same(row.usuario, session.usuario)
         && _same(row.estado_resolucion, 'pendiente')
         && _same(row.tipo_incidencia, 'Solicitud de relevamiento');
     });
     if (existing) {
-      return { status: 'ok', message: 'Ya existe una solicitud pendiente para esta escuela.', data: { id_incidencia: existing.id_incidencia } };
+      let emailStatus = null;
+      if (!_same(existing.notificacion_email_estado, 'enviado')) {
+        const solicitanteExistente = `${session.nombres || ''} ${session.apellidos || ''}`.trim() || session.usuario;
+        emailStatus = _notifySolicitudRelevamiento_(existing.id_incidencia, solicitanteExistente, session, escuela, params);
+        _writeSolicitudEmailStatus_(existing.id_incidencia, emailStatus);
+      }
+      return {
+        status: 'ok',
+        message: emailStatus
+          ? _solicitudEmailMessage_('Ya existe una solicitud pendiente para esta escuela y se reintento el aviso al administrador.', emailStatus)
+          : 'Ya existe una solicitud pendiente para esta escuela.',
+        data: { id_incidencia: existing.id_incidencia, email_status: emailStatus || { sent: _same(existing.notificacion_email_estado, 'enviado'), to: existing.notificacion_email_destino || _adminNotificationEmail_() } }
+      };
     }
 
     const solicitante = `${session.nombres || ''} ${session.apellidos || ''}`.trim() || session.usuario;
@@ -575,12 +605,24 @@ const SheetsService = (() => {
       evidencia_url: '',
       id_sesion: '',
       codigo_local: escuela.codigo_local || params.codigo_local || '',
+      nombre_escuela: escuela.nombre || params.nombre_escuela || '',
+      departamento: escuela.departamento || params.departamento || '',
+      distrito: escuela.distrito || params.distrito || '',
+      localidad: escuela.localidad || params.localidad || '',
       latitud: escuela.latitud || params.latitud || '',
       longitud: escuela.longitud || params.longitud || ''
     });
     AuditService.log('SOLICITAR_RELEVAMIENTO', session.usuario, `id: ${idSolicitud}, escuela: ${escuela.codigo_local || escuela.id_escuela || id}`);
-    const emailStatus = _sendAdminNotificationEmail_(
-      `CIALPA - solicitud de relevamiento: ${escuela.codigo_local || escuela.id_escuela || id}`,
+    const emailStatus = _notifySolicitudRelevamiento_(idSolicitud, solicitante, session, escuela, params);
+    _writeSolicitudEmailStatus_(idSolicitud, emailStatus);
+    return { status: 'ok', message: _solicitudEmailMessage_('Solicitud enviada al administrador.', emailStatus), data: { id_incidencia: idSolicitud, email_status: emailStatus } };
+  }
+
+  function _notifySolicitudRelevamiento_(idSolicitud, solicitante, session, escuela, params) {
+    params = params || {};
+    const id = escuela.codigo_local || escuela.id_escuela || params.id_escuela || params.codigo_local || '';
+    return _sendAdminNotificationEmail_(
+      `CIALPA - solicitud de relevamiento: ${id}`,
       `
         <p>Un usuario solicito relevar una escuela sin asignacion.</p>
         <ul>
@@ -594,9 +636,26 @@ const SheetsService = (() => {
         </ul>
         <p>Puede aprobarla desde CIALPA &gt; Encuestadores &gt; Solicitudes de relevamiento pendientes.</p>
       `,
-      `Solicitud de relevamiento CIALPA: ${solicitante} solicita ${escuela.codigo_local || id} - ${escuela.nombre || params.nombre_escuela || ''}.`
+      `Solicitud de relevamiento CIALPA: ${solicitante} solicita ${id} - ${escuela.nombre || params.nombre_escuela || ''}.`
     );
-    return { status: 'ok', message: 'Solicitud enviada al administrador.', data: { id_incidencia: idSolicitud, email_status: emailStatus } };
+  }
+
+  function _writeSolicitudEmailStatus_(idSolicitud, emailStatus) {
+    const rowIdx = _findRowIndex(SHEET_NAMES.INCIDENCIAS, 'id_incidencia', idSolicitud);
+    if (rowIdx === -1) return;
+    _ensureColumns(SHEET_NAMES.INCIDENCIAS, INCIDENCIA_HEADERS);
+    const sheet = _getSheet(SHEET_NAMES.INCIDENCIAS);
+    const headers = _headers(sheet);
+    _setByHeader(sheet, rowIdx, headers, 'notificacion_email_estado', emailStatus && emailStatus.sent ? 'enviado' : 'error');
+    _setByHeader(sheet, rowIdx, headers, 'notificacion_email_destino', emailStatus && emailStatus.to ? emailStatus.to : _adminNotificationEmail_());
+    _setByHeader(sheet, rowIdx, headers, 'notificacion_email_error', emailStatus && emailStatus.sent ? '' : (emailStatus && emailStatus.error ? emailStatus.error : 'No se pudo confirmar el envio.'));
+    _setByHeader(sheet, rowIdx, headers, 'notificacion_email_fecha', _timestamp());
+  }
+
+  function _solicitudEmailMessage_(successMessage, emailStatus) {
+    if (emailStatus && emailStatus.sent) return successMessage;
+    const detail = emailStatus && emailStatus.error ? ` Detalle: ${emailStatus.error}` : '';
+    return `Solicitud registrada, pero no se pudo enviar el correo al administrador.${detail}`;
   }
 
   function aprobarSolicitudRelevamiento(params) {
@@ -608,6 +667,7 @@ const SheetsService = (() => {
     const rowIdx = _findRowIndex(SHEET_NAMES.INCIDENCIAS, 'id_incidencia', idSolicitud);
     if (rowIdx === -1) return { status: 'error', message: 'Solicitud no encontrada.' };
 
+    _ensureColumns(SHEET_NAMES.INCIDENCIAS, INCIDENCIA_HEADERS);
     const sheet = _getSheet(SHEET_NAMES.INCIDENCIAS);
     const headers = _headers(sheet);
     const solicitud = _objectFromRow(sheet, rowIdx, headers);
@@ -619,7 +679,8 @@ const SheetsService = (() => {
     }
 
     const usuarioSolicitante = _txt(params.encuestador_asignado || solicitud.usuario);
-    const idEscuela = _txt(solicitud.id_escuela || solicitud.codigo_local);
+    const escuelaSolicitud = _resolveEscuelaByCandidates_(solicitud.id_escuela, solicitud.codigo_local);
+    const idEscuela = _txt((escuelaSolicitud && (escuelaSolicitud.id_escuela || escuelaSolicitud.codigo_local)) || solicitud.id_escuela || solicitud.codigo_local);
     if (!usuarioSolicitante || !idEscuela) {
       return { status: 'error', message: 'La solicitud no tiene usuario o escuela suficiente para aprobar.' };
     }
@@ -627,7 +688,7 @@ const SheetsService = (() => {
     const assignment = asignarEscuela({
       _session: session,
       id_escuela: idEscuela,
-      codigo_local: solicitud.codigo_local || idEscuela,
+      codigo_local: (escuelaSolicitud && escuelaSolicitud.codigo_local) || solicitud.codigo_local || idEscuela,
       encuestador_asignado: usuarioSolicitante,
     });
     if (assignment.status !== 'ok') return assignment;
@@ -635,11 +696,19 @@ const SheetsService = (() => {
     const resolution = `Aprobada por ${session.usuario} el ${_timestamp()}. Escuela asignada a ${usuarioSolicitante}.`;
     _setByHeader(sheet, rowIdx, headers, 'estado_resolucion', 'resuelto');
     _setByHeader(sheet, rowIdx, headers, 'evidencia_url', resolution);
+    if (escuelaSolicitud) {
+      _setByHeader(sheet, rowIdx, headers, 'id_escuela', escuelaSolicitud.id_escuela || idEscuela);
+      _setByHeader(sheet, rowIdx, headers, 'codigo_local', escuelaSolicitud.codigo_local || solicitud.codigo_local || '');
+      _setByHeader(sheet, rowIdx, headers, 'nombre_escuela', escuelaSolicitud.nombre || solicitud.nombre_escuela || '');
+      _setByHeader(sheet, rowIdx, headers, 'departamento', escuelaSolicitud.departamento || solicitud.departamento || '');
+      _setByHeader(sheet, rowIdx, headers, 'distrito', escuelaSolicitud.distrito || solicitud.distrito || '');
+      _setByHeader(sheet, rowIdx, headers, 'localidad', escuelaSolicitud.localidad || solicitud.localidad || '');
+    }
     AuditService.log('APROBAR_SOLICITUD_RELEVAMIENTO', session.usuario, `solicitud: ${idSolicitud}, escuela: ${idEscuela}, encuestador: ${usuarioSolicitante}`);
     return {
       status: 'ok',
       message: `Solicitud aprobada. Escuela asignada a ${usuarioSolicitante}.`,
-      data: { id_incidencia: idSolicitud, id_escuela: idEscuela, encuestador_asignado: usuarioSolicitante },
+      data: { id_incidencia: idSolicitud, id_escuela: idEscuela, codigo_local: (escuelaSolicitud && escuelaSolicitud.codigo_local) || solicitud.codigo_local || '', encuestador_asignado: usuarioSolicitante },
     };
   }
 
@@ -1064,8 +1133,13 @@ const SheetsService = (() => {
     if (params.prioridad) rows = rows.filter(r => _same(r.prioridad, params.prioridad));
     const escuelas = _escuelasMap();
     rows.forEach(r => {
-      const e = escuelas[r.id_escuela] || escuelas[r.codigo_local] || {};
-      r.nombre_escuela = e.nombre || r.id_escuela || r.codigo_local || 'Sin escuela';
+      const keys = _schoolIdentityCandidates_(r.id_escuela, r.codigo_local);
+      const e = keys.map(key => escuelas[key]).find(Boolean) || {};
+      r.codigo_local = r.codigo_local || e.codigo_local || '';
+      r.nombre_escuela = r.nombre_escuela || e.nombre || r.id_escuela || r.codigo_local || 'Sin escuela';
+      r.departamento = r.departamento || e.departamento || '';
+      r.distrito = r.distrito || e.distrito || '';
+      r.localidad = r.localidad || e.localidad || '';
     });
     rows.sort((a, b) => String(b.fecha_hora).localeCompare(String(a.fecha_hora)));
     return { status: 'ok', data: rows };
@@ -1304,14 +1378,32 @@ const SheetsService = (() => {
     return merged;
   }
 
-  function _appendEmbeddedEscuelaOperationalRow_(id) {
-    if (typeof getEmbeddedEscuelasRecords_ !== 'function') return -1;
-    const rows = getEmbeddedEscuelasRecords_() || [];
-    if (!rows.length) return -1;
+  function _schoolIdentityCandidates_() {
+    const out = [];
+    Array.prototype.slice.call(arguments).forEach(value => {
+      const raw = _txt(value);
+      if (!raw) return;
+      out.push(raw);
+      const digits = _digits(raw);
+      if (digits) {
+        out.push(digits);
+        out.push(`ESC_${digits}`);
+      }
+    });
+    return out.filter((value, idx, arr) => arr.findIndex(item => _same(item, value)) === idx);
+  }
 
-    const found = rows
-      .map((r, idx) => _normalizarEscuela(r, r.__embedded_csv_row || idx + 2))
-      .find(r => _idMatch(r, id));
+  function _resolveEscuelaByCandidates_() {
+    const candidates = _schoolIdentityCandidates_.apply(null, arguments);
+    if (!candidates.length) return null;
+    const source = _escuelasRawRows_();
+    return source.rows
+      .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || r.__official_sheet_row || idx + 2))
+      .find(r => candidates.some(candidate => _idMatch(r, candidate))) || null;
+  }
+
+  function _appendEmbeddedEscuelaOperationalRow_(id) {
+    const found = _resolveEscuelaByCandidates_(id);
     if (!found) return -1;
 
     _ensureColumns(SHEET_NAMES.ESCUELAS, OP_COLS_ESCUELAS);
@@ -1422,7 +1514,11 @@ const SheetsService = (() => {
 
   function _idMatch(e, id) {
     const v = _txt(id);
-    return _same(e.id_escuela, v) || _same(e.codigo_local, v) || _same(_digits(e.codigo_local), _digits(v));
+    const digits = _digits(v);
+    return _same(e.id_escuela, v)
+      || _same(e.codigo_local, v)
+      || (digits && _same(_digits(e.id_escuela), digits))
+      || (digits && _same(_digits(e.codigo_local), digits));
   }
 
   function _updateEscuelaOperational(id, fields) {
@@ -1773,8 +1869,9 @@ const SheetsService = (() => {
   function _escuelasMap() {
     const map = {};
     getEscuelas({}).data.forEach(e => {
-      map[e.id_escuela] = e;
-      if (e.codigo_local) map[e.codigo_local] = e;
+      _schoolIdentityCandidates_(e.id_escuela, e.codigo_local).forEach(key => {
+        map[key] = e;
+      });
     });
     return map;
   }

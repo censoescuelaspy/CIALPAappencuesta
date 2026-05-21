@@ -605,7 +605,13 @@ const MapModule = (() => {
         localidad: escuela.localidad || '',
       });
       if (result.status !== 'ok') throw new Error(result.message || 'No se pudo enviar la solicitud.');
-      UI.showToast(result.message || 'Solicitud enviada al administrador.', 'success', 6500);
+      const emailStatus = result.data?.email_status || {};
+      const emailFailed = emailStatus.sent === false || String(emailStatus.error || '').trim();
+      UI.showToast(
+        result.message || (emailFailed ? 'Solicitud registrada, pero el correo no pudo enviarse.' : 'Solicitud enviada al administrador.'),
+        emailFailed ? 'warning' : 'success',
+        emailFailed ? 9000 : 6500
+      );
       if (_markers[escuela.id_escuela]) _markers[escuela.id_escuela].closePopup();
     } catch (err) {
       UI.showToast('Error al enviar solicitud: ' + err.message, 'error', 7000);
@@ -768,7 +774,7 @@ const MapModule = (() => {
     const departamentos = [...new Set(_escuelas.map(e => e.departamento).filter(Boolean))].sort();
     const encuestadores = [...new Set(_escuelas.map(e => e.encuestador_asignado).filter(Boolean))].sort();
 
-    _populateButtonChoices('filter-departamento', departamentos, 'Todos');
+    _populateSelectChoices('filter-departamento', departamentos, 'Todos');
     populateDistrictButtons();
     _populateButtonChoices('filter-encuestador', encuestadores, 'Todos');
   }
@@ -780,7 +786,19 @@ const MapModule = (() => {
       .map(e => e.distrito)
       .filter(Boolean))]
       .sort();
-    _populateButtonChoices('filter-distrito', distritos, 'Todos');
+    _populateSelectChoices('filter-distrito', distritos, 'Todos');
+  }
+
+  function _populateSelectChoices(id, options, placeholder) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const current = String(select.value || '');
+    const nextValue = current && options.includes(current) ? current : '';
+    select.innerHTML = [
+      `<option value="">${_escape(placeholder)}</option>`,
+      ...options.map(option => `<option value="${_escape(option)}">${_escape(option)}</option>`),
+    ].join('');
+    select.value = nextValue;
   }
 
   function _populateButtonChoices(id, options, placeholder) {

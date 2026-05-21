@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.79
+ * Version: 2.6.81
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -292,7 +292,7 @@ function _timestamp() {
 function _configValueGlobal_(clave, fallback) {
   try {
     const rows = _sheetToObjects(SHEET_NAMES.CONFIG);
-    const row = rows.find(r => String(r.clave) === String(clave));
+    const row = rows.find(r => String(r.clave || r.parametro) === String(clave));
     return row && row.valor !== '' && row.valor !== null && row.valor !== undefined ? row.valor : fallback;
   } catch (err) {
     return fallback;
@@ -313,16 +313,38 @@ function _adminNotificationEmail_() {
 function _sendAdminNotificationEmail_(subject, htmlBody, plainBody) {
   const to = _adminNotificationEmail_();
   try {
+    const remainingQuota = typeof MailApp.getRemainingDailyQuota === 'function'
+      ? MailApp.getRemainingDailyQuota()
+      : '';
     MailApp.sendEmail({
       to,
       subject: String(subject || 'CIALPA - notificacion operativa'),
       body: String(plainBody || '').trim() || String(htmlBody || '').replace(/<[^>]+>/g, ' '),
       htmlBody: String(htmlBody || plainBody || ''),
     });
-    return { sent: true, to };
+    try {
+      AuditService.log('ADMIN_EMAIL_OK', 'sistema', `to: ${to}, subject: ${subject || ''}, quota: ${remainingQuota}`);
+    } catch (auditErr) {
+      // non-fatal
+    }
+    return { sent: true, to, remaining_quota: remainingQuota };
   } catch (err) {
-    return { sent: false, to, error: err.message || String(err) };
+    const message = err.message || String(err);
+    try {
+      AuditService.log('ADMIN_EMAIL_ERROR', 'sistema', `to: ${to}, subject: ${subject || ''}, error: ${message}`);
+    } catch (auditErr) {
+      // non-fatal
+    }
+    return { sent: false, to, error: message };
   }
+}
+
+function probarNotificacionAdmin() {
+  return _sendAdminNotificationEmail_(
+    'CIALPA - prueba de correo operativo',
+    `<p>Prueba de correo operativo CIALPA ejecutada el ${_htmlEscape_(_timestamp())}.</p>`,
+    `Prueba de correo operativo CIALPA ejecutada el ${_timestamp()}.`
+  );
 }
 
 function _htmlEscape_(value) {

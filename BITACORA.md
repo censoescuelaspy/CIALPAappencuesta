@@ -4,6 +4,43 @@
 
 ---
 
+## Correccion de solicitudes, correo operativo y filtros del mapa - 2026-05-21 - v2.6.81
+
+### Objetivo
+- Corregir el error `Escuela no encontrada` al aprobar solicitudes de relevamiento.
+- Hacer visible cuando el correo operativo al administrador no se envia correctamente.
+- Reducir la molestia de filtros largos de departamento y distrito en el mapa.
+
+### Cambios implementados
+- La aprobacion de solicitudes ahora resuelve la escuela por `id_escuela`, `codigo_local` y digitos normalizados.
+- Si la escuela viene del padron oficial y todavia no existe en `escuelas_seleccionadas`, la fila operativa se crea desde el padron disponible antes de asignarla.
+- Las incidencias de solicitud guardan nombre de escuela, territorio y estado del correo operativo.
+- Si `MailApp` falla o no esta autorizado, la app avisa que la solicitud quedo registrada pero el correo no pudo enviarse.
+- `Encuestadores` muestra el estado del correo de cada solicitud: enviado, error o pendiente.
+- Se agrega `probarNotificacionAdmin()` para probar desde Apps Script si `MailApp` puede enviar a `censoescuelaspy@gmail.com`.
+- Los filtros de `Mapa > Territorio` para departamento y distrito pasan de botones largos a listas desplegables.
+- Version visible y cache del Service Worker actualizados a `v2.6.81`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria/aceptada para autorizar y activar `MailApp`.
+- Publicar el frontend en GitHub Pages.
+- Pedir a administradores y usuarios `Actualizar app` para tomar `cialpa-app-v2.6.81`.
+- Probar con una solicitud real: solicitar escuela sin asignacion, verificar estado de correo, aprobar y confirmar asignacion en `escuelas_seleccionadas`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/admin.js`.
+- `node --check assets/js/auth.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git commit` local preparado: `fix: corregir solicitudes y filtros mapa v2.6.81`.
+
+---
+
 ## Apunte a nuevo Web App propietario - 2026-05-21 - v2.6.80
 
 ### Objetivo

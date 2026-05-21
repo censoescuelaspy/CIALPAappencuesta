@@ -246,17 +246,24 @@ const AdminModule = (() => {
       <div class="table-wrapper" style="margin-top:.75rem;">
         <table>
           <thead>
-            <tr><th>Fecha</th><th>Escuela</th><th>Solicitante</th><th>Detalle</th><th>Acciones</th></tr>
+            <tr><th>Fecha</th><th>Escuela</th><th>Solicitante</th><th>Correo</th><th>Detalle</th><th>Acciones</th></tr>
           </thead>
           <tbody>
             ${rows.slice(0, 12).map(row => {
               const id = _jsString(row.id_incidencia);
               const school = [row.codigo_local || row.id_escuela || '', row.nombre_escuela || ''].filter(Boolean).join(' - ');
+              const emailState = String(row.notificacion_email_estado || '').toLowerCase();
+              const emailError = row.notificacion_email_error || '';
+              const emailClass = emailState === 'enviado' ? 'badge--success' : (emailState === 'error' ? 'badge--danger' : 'badge--warning');
+              const emailLabel = emailState === 'enviado' ? 'Enviado' : (emailState === 'error' ? 'Error' : 'Pendiente');
               return `
                 <tr>
                   <td>${_escapeHtml(row.fecha_hora || '---')}</td>
                   <td>${_escapeHtml(school || 'Sin escuela')}</td>
                   <td>${_escapeHtml(row.usuario || '---')}</td>
+                  <td>
+                    <span class="badge ${emailClass}" title="${_escapeHtml(emailError)}">${emailLabel}</span>
+                  </td>
                   <td>${_escapeHtml(row.descripcion || '')}</td>
                   <td class="enc-admin-actions">
                     <button class="btn btn-xs btn-success" onclick='AdminModule.aprobarSolicitudRelevamiento(${id})'>Aprobar</button>

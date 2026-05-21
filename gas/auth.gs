@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * auth.gs — Authentication service
- * Version: 2.6.79
+ * Version: 2.6.81
  */
 
 const AuthService = (() => {
@@ -186,7 +186,9 @@ const AuthService = (() => {
     );
     return {
       status: 'ok',
-      message: 'Usuario creado. El administrador podrá asignarle escuelas desde Configuración.',
+      message: emailStatus && emailStatus.sent
+        ? 'Usuario creado. El administrador podrá asignarle escuelas desde Configuración.'
+        : `Usuario creado, pero no se pudo enviar el correo al administrador.${emailStatus && emailStatus.error ? ` Detalle: ${emailStatus.error}` : ''}`,
       data: { id_usuario: userId, id_encuestador: encId, usuario, rol: 'encuestador', email_status: emailStatus },
     };
   }
