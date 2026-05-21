@@ -27,6 +27,10 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - Revision estatica: `map-sidebar__filters`, `data-choice-list`, `map-filter-group__body` y cache `cialpa-app-v2.6.77`.
 - `git diff --check`.
+- `git push origin main`: publica commit `ef9f46c`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.77`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.77`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene scroll de filtros `data-choice-list`.
 
 ---
 
