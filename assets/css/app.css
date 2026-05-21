@@ -3001,6 +3001,42 @@ td {
   margin: .25rem 0;
 }
 
+.planning-save-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: .85rem 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.planning-save-banner--dirty {
+  background: #fff8eb;
+  border-color: #f0c36c;
+  border-left-color: #fd7e14;
+}
+
+.planning-save-banner strong,
+.planning-save-banner span {
+  display: block;
+}
+
+.planning-save-banner strong {
+  color: var(--color-secondary);
+  font-weight: 850;
+}
+
+.planning-save-banner span {
+  color: var(--color-text-muted);
+  font-size: .82rem;
+  margin-top: .15rem;
+}
+
 .planning-two-col {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr);
@@ -3127,8 +3163,14 @@ td {
   }
 
   .planning-toolbar__actions,
-  .planning-assignee-buttons {
+  .planning-assignee-buttons,
+  .planning-save-banner {
     justify-content: flex-start;
+  }
+
+  .planning-save-banner {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .planning-table-wrapper {

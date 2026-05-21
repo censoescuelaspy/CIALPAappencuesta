@@ -172,7 +172,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.74</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.75</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -199,7 +199,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.74</strong>
+      Edición vigente<br><strong class="app-version">v2.6.75</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -290,7 +290,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.74</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.75</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -968,6 +968,7 @@
           </div>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
             <button class="btn btn-sm btn-outline" onclick="PlanningModule.exportCSV()">Exportar CSV</button>
+            <button class="btn btn-sm btn-primary" data-min-role="admin" onclick="PlanningModule.saveAssignments()">Guardar asignaciones</button>
             <button class="btn btn-sm btn-primary" onclick="PlanningModule.load()">↺ Actualizar</button>
           </div>
         </div>
@@ -1004,6 +1005,9 @@
               <div class="card" style="margin-bottom:1rem;">
                 <strong>Registro de nuevo encuestador</strong>
                 <p class="text-muted" style="margin:.35rem 0 0;">Los usuarios pueden registrarse desde el acceso inicial. El admin puede editar datos, estado, rol y luego asignar escuelas.</p>
+                <div style="margin-top:.75rem;">
+                  <button class="btn btn-outline btn-sm" onclick="AppController.showModule('planificacion'); setTimeout(() => PlanningModule.switchTab('asignaciones'), 150)">Asignar escuelas</button>
+                </div>
               </div>
               <div style="margin-bottom:1rem;display:flex;justify-content:flex-end;">
                 <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo Encuestador</button>

@@ -4,6 +4,33 @@
 
 ---
 
+## Guardado visible de asignaciones de escuelas - 2026-05-21 - v2.6.75
+
+### Objetivo
+- Hacer evidente para administradores donde se guardan los cambios de asignacion de escuelas a encuestadores.
+- Evitar que una distribucion quede solo como borrador visual por no encontrar la accion de guardado.
+
+### Cambios implementados
+- `Planificacion > Distribucion de escuelas` muestra una franja superior de estado con los cambios pendientes.
+- El boton principal ahora dice `Guardar cambios (N)` cuando hay asignaciones modificadas y queda deshabilitado cuando no hay nada pendiente.
+- La cabecera de `Planificacion operativa` agrega el boton visible `Guardar asignaciones` para administradores.
+- La vista `Configuracion > Encuestadores` agrega acceso directo `Asignar escuelas`, que abre la distribucion operativa.
+- Mientras se guarda, la pantalla muestra `Guardando...` y bloquea un segundo envio concurrente.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.75`.
+
+### Pendiente operativo
+- Pedir a los administradores `Actualizar app` para tomar `cialpa-app-v2.6.75`.
+- Probar con admin: ir a `Configuracion > Encuestadores`, abrir `Asignar escuelas`, cambiar una escuela, confirmar que aparece `Guardar cambios (1)` y verificar que queda persistida en `escuelas_seleccionadas`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/planning.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Revision estatica: `Guardar asignaciones`, `Guardar cambios`, `planning-save-banner` y cache `cialpa-app-v2.6.75`.
+- `git diff --check`.
+
+---
+
 ## Cierre final no bloqueado por PDF/correo - 2026-05-21 - v2.6.74
 
 ### Objetivo

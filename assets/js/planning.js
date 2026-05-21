@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * planning.js — Estimacion de tiempos y distribucion operativa
- * Version: 2.5.36
+ * Version: 2.6.75
  */
 
 const PlanningModule = (() => {
@@ -21,6 +21,7 @@ const PlanningModule = (() => {
   let _activeTab = 'tiempos';
   let _filters = { estado: '', encuestador: '', search: '' };
   let _settings = _loadSettings();
+  let _savingAssignments = false;
 
   async function init() {
     const root = document.getElementById('planning-root');
@@ -109,6 +110,10 @@ const PlanningModule = (() => {
       UI.showToast('Solo administradores autorizados pueden guardar asignaciones.', 'warning');
       return;
     }
+    if (_savingAssignments) {
+      UI.showToast('Ya se estan guardando las asignaciones.', 'info');
+      return;
+    }
     const changes = _schools.filter(school => _draftAssignments[_schoolId(school)] !== _originalAssignments[_schoolId(school)]);
     if (!changes.length) {
       UI.showToast('No hay cambios de asignacion para guardar.', 'info');
@@ -119,6 +124,8 @@ const PlanningModule = (() => {
     if (!ok) return;
 
     try {
+      _savingAssignments = true;
+      _render();
       for (const school of changes) {
         const id = _schoolId(school);
         const assigned = _draftAssignments[id] || '';
@@ -135,9 +142,11 @@ const PlanningModule = (() => {
       }
       _refreshMapAssignments();
       UI.showToast('Asignaciones guardadas.', 'success');
-      _render();
     } catch (err) {
       UI.showToast('Error al guardar asignaciones: ' + err.message, 'error');
+    } finally {
+      _savingAssignments = false;
+      _render();
     }
   }
 
@@ -247,7 +256,17 @@ const PlanningModule = (() => {
 
   function _renderAssignmentPanel(summary) {
     const filtered = _filteredSchools();
+    const saveLabel = _savingAssignments ? 'Guardando...' : `Guardar cambios${summary.dirty ? ` (${summary.dirty})` : ''}`;
+    const saveDisabled = !summary.dirty || _savingAssignments ? 'disabled' : '';
     return `
+      <div class="planning-save-banner ${summary.dirty ? 'planning-save-banner--dirty' : ''}" data-min-role="admin">
+        <div>
+          <strong>${summary.dirty ? `${summary.dirty} cambio(s) de asignacion pendiente(s)` : 'Sin cambios de asignacion pendientes'}</strong>
+          <span>${summary.dirty ? 'Las escuelas marcadas en amarillo todavia no estan guardadas en Sheets.' : 'Cuando cambie un responsable, el boton de guardado quedara habilitado aqui.'}</span>
+        </div>
+        <button class="btn btn-primary" type="button" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
+      </div>
+
       <div class="planning-toolbar card">
         <input class="form-control form-control-sm" type="text" value="${_escape(_filters.search)}"
           placeholder="Buscar escuela, codigo o distrito..."
@@ -261,7 +280,7 @@ const PlanningModule = (() => {
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.autoBalance('pending')">Balancear pendientes</button>
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.autoBalance('all')">Rebalancear todo</button>
           <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.resetDraft()">Deshacer</button>
-          <button class="btn btn-sm btn-primary" type="button" data-min-role="admin" onclick="PlanningModule.saveAssignments()">Guardar</button>
+          <button class="btn btn-sm btn-primary" type="button" data-min-role="admin" ${saveDisabled} onclick="PlanningModule.saveAssignments()">${saveLabel}</button>
         </div>
       </div>
 
