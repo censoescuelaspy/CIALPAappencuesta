@@ -38,6 +38,11 @@
 - Revision estatica: `cierre_final` con `force`, estado `finalizada` antes de PDF/correo y cache `cialpa-app-v2.6.74`.
 - `git diff --check`.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git push origin main`: publica commit `b34b13b`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.74`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.74`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `cierre_final`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `recover-form`.
 
 ---
 
