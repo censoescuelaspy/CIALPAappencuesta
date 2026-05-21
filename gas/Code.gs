@@ -76,7 +76,7 @@ function _handleRequest(e) {
     const action = params.action || '';
 
     // Public endpoints (no auth required)
-    const publicActions = ['login'];
+    const publicActions = ['login', 'diagnosticoPadron'];
     const token = params.token || '';
 
     if (!publicActions.includes(action)) {
@@ -120,6 +120,7 @@ function _handleRequest(e) {
       case 'logout':          return _respond(AuthService.logout(params.token));
 
       // Escuelas
+      case 'diagnosticoPadron': return _respond(SheetsService.diagnosticoPadron());
       case 'getEscuelas':     return _respond(SheetsService.getEscuelas(params));
       case 'getEscuela':      return _respond(SheetsService.getEscuela(params.id_escuela));
       case 'updateEscuelaEstado': return _respond(SheetsService.updateEscuelaEstado(params));

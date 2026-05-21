@@ -629,7 +629,7 @@ const API = (() => {
 
   async function getEscuelas(filters = {}) {
     const result = await call('getEscuelas', 'GET', filters, { skipLoading: true });
-    if (result.status === 'ok') result.data = _withExampleSchool(result.data || []);
+    if (result.status === 'ok' && filters?.includeExample) result.data = _withExampleSchool(result.data || []);
     return result;
   }
   async function getEscuela(id) {

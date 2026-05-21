@@ -4,6 +4,38 @@
 
 ---
 
+## Correccion de demo fijo y diagnostico de padron publicado - 2026-05-20 - v2.6.67
+
+### Objetivo
+- Evitar que la escuela ficticia quede siempre seleccionada/anclada en el mapa real.
+- Confirmar desde el Web App publicado si el backend lee el padron completo o cae a la hoja operativa corta.
+- Publicar una nueva version del frontend y GAS para activar la lectura del padron oficial completo.
+
+### Cambios implementados
+- `API.getEscuelas()` ya no agrega la escuela demo al listado real salvo que se solicite explicitamente.
+- `MapModule.loadMarkers()` deja de auto-seleccionar y centrar `ESC_DEMO_CIALPA`.
+- Se agrega el endpoint publico `diagnosticoPadron`, que devuelve solo conteos y fuente del padron sin exponer datos nominales.
+- Version visible, etiqueta de edicion y cache del Service Worker actualizados a `v2.6.67`.
+
+### Pendiente operativo
+- Publicar el Web App desde la cuenta propietaria/aceptada por Google, porque el deployment actualizado desde la sesion local responde HTTP 403.
+- Verificar despues del deployment propietario que `diagnosticoPadron` informe `total: 5462` y `source: official_sheet` o `embedded_csv`.
+- Pedir a los usuarios `Actualizar app` para tomar `cialpa-app-v2.6.67`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/api.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Validacion sintactica de `gas/*.gs` mediante Node.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `clasp.cmd deploy -i AKfycbwwFYlYkar_mnYy4hW7ne_qt85xHQnUk2VeALniVDPtu5MUP5B7pEZHEnFIlo5zxuY`: crea version `@16`, pero el Web App responde HTTP 403.
+- `clasp.cmd redeploy ... --versionNumber 15`: vuelve a apuntar a `@15`, pero la URL continua respondiendo HTTP 403 desde esta cuenta.
+
+---
+
 ## Confirmacion visible de guardado y padron oficial completo - 2026-05-20 - v2.6.66
 
 ### Objetivo

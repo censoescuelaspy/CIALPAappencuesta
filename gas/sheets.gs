@@ -98,6 +98,32 @@ const SheetsService = (() => {
     return { status: 'ok', data: found, meta: { source: source.source } };
   }
 
+  function diagnosticoPadron() {
+    const source = _escuelasRawRows_();
+    const rows = source.rows
+      .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || r.__official_sheet_row || idx + 2))
+      .filter(r => r.codigo_local || r.id_escuela || r.nombre);
+    const withCoords = rows.filter(r => r.latitud !== '' && r.longitud !== '').length;
+    const pilot = rows.filter(_isPilotSchool_).length;
+    let operationalRows = 0;
+    try {
+      operationalRows = _sheetToObjects(SHEET_NAMES.ESCUELAS).length;
+    } catch (err) {
+      operationalRows = -1;
+    }
+    return {
+      status: 'ok',
+      data: {
+        source: source.source,
+        total: rows.length,
+        con_coordenadas: withCoords,
+        muestra_piloto: pilot,
+        filas_operativas: operationalRows,
+        embedded_updated_at: source.embeddedUpdatedAt || '',
+      }
+    };
+  }
+
   function updateEscuelaEstado(params) {
     const session = params._session;
     const id = params.id_escuela || params.codigo_local;
@@ -1843,7 +1869,7 @@ const SheetsService = (() => {
   }
 
   return {
-    getEscuelas, getEscuela, updateEscuelaEstado, asignarEscuela,
+    getEscuelas, getEscuela, diagnosticoPadron, updateEscuelaEstado, asignarEscuela,
     iniciarSesion, cerrarSesion, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,

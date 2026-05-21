@@ -253,22 +253,7 @@ const MapModule = (() => {
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
     _renderRoutes(_escuelas);
-    _selectExampleSchool();
     updateOfflineStatus();
-  }
-
-  function _selectExampleSchool() {
-    const example = _escuelas.find(e => e.es_ejemplo || e.id_escuela === 'ESC_DEMO_CIALPA');
-    if (!example) return;
-    _selectedEscuela = example;
-    _updateInfoPanel(example);
-    _highlightListItem(example.id_escuela);
-    const marker = _markers[example.id_escuela];
-    if (_map && marker) {
-      const latlng = marker.getLatLng();
-      _map.setView(latlng, Math.max(_map.getZoom(), 16));
-      marker.openPopup();
-    }
   }
 
   function _visibleForCurrentUser(e) {
