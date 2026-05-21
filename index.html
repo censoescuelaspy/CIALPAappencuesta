@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.91" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.92" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.91" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.92" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.91</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.92</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.91</strong>
+      Edición vigente<br><strong class="app-version">v2.6.92</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -289,7 +289,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.91</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.92</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -833,135 +833,181 @@
       <!-- ======================================================
            MODULE: PANEL ESTADÍSTICO (supervisor/admin)
            ====================================================== -->
-      <div id="module-estadisticas" class="module-panel" data-min-role="supervisor">
-        <div class="page-header">
-          <h2>Panel Estadístico</h2>
-          <div style="display:flex;gap:.5rem;">
+      <div id="module-estadisticas" class="module-panel stats-module" data-min-role="supervisor">
+        <div class="stats-hero">
+          <div>
+            <span class="eyebrow">Resultados globales</span>
+            <h2>Tablero ejecutivo CIALPA</h2>
+            <p>Avance territorial, desempeño de campo, evidencias y alertas en una vista navegable.</p>
+          </div>
+          <div class="stats-hero__actions">
             <button class="btn btn-sm btn-outline" onclick="StatsModule.exportCSV()">Exportar CSV</button>
             <button class="btn btn-sm btn-outline" onclick="StatsModule.exportLocalJson()">JSON local</button>
-            <button class="btn btn-sm btn-primary" onclick="StatsModule.loadStats()">↺ Actualizar</button>
+            <button class="btn btn-sm btn-primary" onclick="StatsModule.loadStats()">Actualizar</button>
           </div>
         </div>
-        <div class="page-content">
+        <div class="page-content stats-page">
+          <div class="stats-workbench">
+            <aside class="stats-filter-panel">
+              <form id="stats-filter-form">
+                <div class="stats-filter-panel__head">
+                  <strong>Explorar resultados</strong>
+                  <span>Filtros activos</span>
+                </div>
+                <div class="stats-filter-row">
+                  <label>Fecha desde</label>
+                  <input type="date" name="fecha_desde" class="form-control form-control-sm" />
+                </div>
+                <div class="stats-filter-row">
+                  <label>Fecha hasta</label>
+                  <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
+                </div>
+                <div class="stats-filter-row">
+                  <label>Departamento</label>
+                  <input id="stats-filter-departamento" name="departamento" type="hidden" value="" />
+                  <div id="stats-dep-choices" class="choice-button-strip stats-choice-strip">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-departamento" data-choice-value="">Todos</button>
+                  </div>
+                </div>
+                <div class="stats-filter-row">
+                  <label>Encuestador</label>
+                  <input id="stats-filter-encuestador" name="encuestador" type="hidden" value="" />
+                  <div id="stats-enc-choices" class="choice-button-strip stats-choice-strip">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-encuestador" data-choice-value="">Todos</button>
+                  </div>
+                </div>
+                <div class="stats-filter-actions">
+                  <button id="stats-filter-apply" type="button" class="btn btn-sm btn-primary">Aplicar</button>
+                  <button id="stats-filter-reset" type="button" class="btn btn-sm btn-outline">Limpiar</button>
+                </div>
+              </form>
+            </aside>
 
-          <!-- Filters -->
-          <div class="card" style="margin-bottom:1.25rem;">
-            <form id="stats-filter-form" class="form-row" style="align-items:flex-end;gap:.75rem;">
-              <div class="form-group" style="margin:0;">
-                <label>Fecha desde</label>
-                <input type="date" name="fecha_desde" class="form-control form-control-sm" />
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label>Fecha hasta</label>
-                <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
-              </div>
-              <div class="form-group" style="margin:0;">
-                <label>Departamento</label>
-                <input id="stats-filter-departamento" name="departamento" type="hidden" value="" />
-                <div class="choice-button-strip">
-                  <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-departamento" data-choice-value="">Todos</button>
+            <main class="stats-main-panel">
+              <div id="stats-executive-dashboard"></div>
+
+              <div class="stats-grid stats-grid--premium">
+                <div class="kpi-card stats-kpi-card" id="kpi-total">
+                  <span class="kpi-label">Universo</span>
+                  <span class="kpi-value" id="kpi-total-val">—</span>
+                  <small data-kpi-note>Escuelas monitoreadas</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-finalizadas">
+                  <span class="kpi-label">Relevadas</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Cerradas</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-en-curso">
+                  <span class="kpi-label">En curso</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Trabajo activo</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-pendientes">
+                  <span class="kpi-label">Pendientes</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Por iniciar</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-incidencias">
+                  <span class="kpi-label">Incidencias</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Alertas</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-avance">
+                  <span class="kpi-label">Avance</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Progreso general</small>
                 </div>
               </div>
-              <div class="form-group" style="margin:0;">
-                <label>Encuestador</label>
-                <input id="stats-filter-encuestador" name="encuestador" type="hidden" value="" />
-                <div class="choice-button-strip">
-                  <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-encuestador" data-choice-value="">Todos</button>
+
+              <section class="stats-progress-panel">
+                <div>
+                  <strong>Avance general</strong>
+                  <span>Progreso consolidado del operativo</span>
+                </div>
+                <div class="progress-track">
+                  <div id="stats-progress-bar" class="progress-bar" style="width:0%;">0%</div>
+                </div>
+              </section>
+
+              <div id="stats-insights" class="stats-insights-grid"></div>
+
+              <div class="charts-grid charts-grid--premium">
+                <div class="chart-card chart-card--full chart-card--premium">
+                  <div class="chart-card__head">
+                    <div>
+                      <span class="eyebrow">Territorio</span>
+                      <h4>Estado por departamento</h4>
+                    </div>
+                  </div>
+                  <canvas id="chart-departamento"></canvas>
+                </div>
+                <div class="chart-card chart-card--premium">
+                  <div class="chart-card__head">
+                    <div>
+                      <span class="eyebrow">Composición</span>
+                      <h4>Distribución general</h4>
+                    </div>
+                  </div>
+                  <canvas id="chart-donut"></canvas>
+                </div>
+                <div class="chart-card chart-card--premium">
+                  <div class="chart-card__head">
+                    <div>
+                      <span class="eyebrow">Ritmo</span>
+                      <h4>Progreso diario</h4>
+                    </div>
+                  </div>
+                  <canvas id="chart-daily"></canvas>
                 </div>
               </div>
-              <div style="display:flex;gap:.5rem;">
-                <button id="stats-filter-apply" type="button" class="btn btn-sm btn-primary">Filtrar</button>
-                <button id="stats-filter-reset" type="button" class="btn btn-sm btn-outline">Limpiar</button>
+
+              <section class="stats-section-grid">
+                <div class="card stats-territory-panel">
+                  <div class="card__header">
+                    <h4 class="card__title">Navegación territorial</h4>
+                  </div>
+                  <div id="stats-territory-board" class="territory-grid">
+                    <p class="text-muted text-center">Cargando...</p>
+                  </div>
+                </div>
+
+                <div class="card stats-activity-panel">
+                  <div class="card__header">
+                    <h4 class="card__title">Actividad reciente</h4>
+                  </div>
+                  <div id="stats-activity">
+                    <p class="text-muted text-center">Cargando...</p>
+                  </div>
+                </div>
+              </section>
+
+              <div class="card stats-ranking-panel">
+                <div class="card__header">
+                  <h4 class="card__title">Desempeño por encuestador</h4>
+                </div>
+                <div class="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Encuestador</th>
+                        <th>Asignadas</th>
+                        <th>Finalizadas</th>
+                        <th>Incidencias</th>
+                        <th>Tiempo promedio</th>
+                      </tr>
+                    </thead>
+                    <tbody id="stats-enc-tbody">
+                      <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </form>
+
+              <div id="offline-dashboard" class="offline-dashboard"></div>
+              <div id="infra-dashboard" class="infra-dashboard"></div>
+            </main>
           </div>
-
-          <div id="offline-dashboard" class="offline-dashboard"></div>
-          <div id="infra-dashboard" class="infra-dashboard"></div>
-
-          <!-- KPIs -->
-          <div class="stats-grid">
-            <div class="kpi-card" id="kpi-total" style="border-top-color:#1F3864;">
-              <span class="kpi-value" id="kpi-total-val">—</span>
-              <span class="kpi-label">Total Escuelas</span>
-            </div>
-            <div class="kpi-card" id="kpi-finalizadas" style="border-top-color:#28a745;">
-              <span class="kpi-value">—</span>
-              <span class="kpi-label">Relevadas</span>
-            </div>
-            <div class="kpi-card" id="kpi-en-curso" style="border-top-color:#fd7e14;">
-              <span class="kpi-value">—</span>
-              <span class="kpi-label">En Curso</span>
-            </div>
-            <div class="kpi-card" id="kpi-pendientes" style="border-top-color:#6c757d;">
-              <span class="kpi-value">—</span>
-              <span class="kpi-label">Pendientes</span>
-            </div>
-            <div class="kpi-card" id="kpi-incidencias" style="border-top-color:#dc3545;">
-              <span class="kpi-value">—</span>
-              <span class="kpi-label">Con Incidencia</span>
-            </div>
-            <div class="kpi-card" id="kpi-avance" style="border-top-color:#E84C22;">
-              <span class="kpi-value">—</span>
-              <span class="kpi-label">% Avance</span>
-            </div>
-          </div>
-
-          <!-- Progress bar -->
-          <div class="card" style="margin-bottom:1.25rem;">
-            <h5 class="card__title" style="margin-bottom:.5rem;">Avance general</h5>
-            <div class="progress-track">
-              <div id="stats-progress-bar" class="progress-bar" style="width:0%;">0%</div>
-            </div>
-          </div>
-
-          <!-- Charts -->
-          <div class="charts-grid">
-            <div class="chart-card chart-card--full">
-              <canvas id="chart-departamento"></canvas>
-            </div>
-            <div class="chart-card">
-              <canvas id="chart-donut"></canvas>
-            </div>
-            <div class="chart-card">
-              <canvas id="chart-daily"></canvas>
-            </div>
-          </div>
-
-          <!-- Encuestadores ranking -->
-          <div class="card">
-            <div class="card__header">
-              <h4 class="card__title">Ranking de Encuestadores</h4>
-            </div>
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Encuestador</th>
-                    <th>Asignadas</th>
-                    <th>Finalizadas</th>
-                    <th>Incidencias</th>
-                    <th>Tiempo promedio</th>
-                  </tr>
-                </thead>
-                <tbody id="stats-enc-tbody">
-                  <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Recent activity -->
-          <div class="card" style="margin-top:1.25rem;">
-            <div class="card__header">
-              <h4 class="card__title">Actividad Reciente</h4>
-            </div>
-            <div id="stats-activity">
-              <p class="text-muted text-center">Cargando...</p>
-            </div>
-          </div>
-
         </div>
       </div>
 
@@ -1263,22 +1309,19 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.91"></script>
-<script src="assets/js/local-store.js?v=2.6.91"></script>
-<script src="assets/js/api.js?v=2.6.91"></script>
-<script src="assets/js/auth.js?v=2.6.91"></script>
-<script src="assets/js/map.js?v=2.6.91"></script>
-<script src="assets/js/survey.js?v=2.6.91"></script>
-<script src="assets/js/stats.js?v=2.6.91"></script>
-<script src="assets/js/planning.js?v=2.6.91"></script>
-<script src="assets/js/admin.js?v=2.6.91"></script>
-<script src="assets/js/jornada.js?v=2.6.91"></script>
-<script src="assets/js/manual.js?v=2.6.91"></script>
-<script src="assets/js/app.js?v=2.6.91"></script>
+<script src="assets/js/config.js?v=2.6.92"></script>
+<script src="assets/js/local-store.js?v=2.6.92"></script>
+<script src="assets/js/api.js?v=2.6.92"></script>
+<script src="assets/js/auth.js?v=2.6.92"></script>
+<script src="assets/js/map.js?v=2.6.92"></script>
+<script src="assets/js/survey.js?v=2.6.92"></script>
+<script src="assets/js/stats.js?v=2.6.92"></script>
+<script src="assets/js/planning.js?v=2.6.92"></script>
+<script src="assets/js/admin.js?v=2.6.92"></script>
+<script src="assets/js/jornada.js?v=2.6.92"></script>
+<script src="assets/js/manual.js?v=2.6.92"></script>
+<script src="assets/js/app.js?v=2.6.92"></script>
 
 <script>
   // Set today's date in Inicio module

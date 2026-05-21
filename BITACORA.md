@@ -4,6 +4,42 @@
 
 ---
 
+## Tablero ejecutivo moderno para Resultados globales - 2026-05-21 - v2.6.92
+
+### Objetivo
+- Transformar `Resultados globales` en un tablero ejecutivo atractivo para presentar CIALPA como una herramienta integral.
+- Facilitar la navegacion por resultados con filtros, KPIs, graficos, matriz territorial, ranking y actividad reciente.
+- Mantener el arranque liviano cargando Chart.js solo cuando se abre el panel estadistico.
+
+### Cambios implementados
+- `Resultados globales` incorpora una cabecera ejecutiva `Tablero ejecutivo CIALPA` con acciones de exportacion y actualizacion.
+- Se agrega un panel principal con aro de avance, chips de universo/territorios/responsables, ritmo operativo, riesgo y territorio lider.
+- Los KPIs se rediseñan con notas dinamicas de porcentaje/estado.
+- Los filtros pasan a un panel lateral persistente con opciones dinamicas por departamento y encuestador.
+- Se agregan tarjetas de lectura ejecutiva: prioridad operativa, mejor avance, punto de atencion y evidencias locales.
+- Se agrega `Navegacion territorial` con tarjetas por departamento y barras de avance.
+- El ranking de encuestadores incorpora barras de progreso e indicador visual de incidencias.
+- Los graficos reciben titulos propios y una paleta mas sobria: avance, composicion y ritmo diario.
+- Chart.js deja de cargarse en `index.html` y pasa a carga diferida desde `StatsModule` al abrir `Resultados globales`.
+- Version visible y cache del Service Worker actualizados a `v2.6.92`.
+
+### Pendiente operativo
+- Pedir a administradores/supervisores `Actualizar app` para tomar `cialpa-app-v2.6.92`.
+- Revisar en tablet real la lectura del panel con datos vivos y ajustar si algun texto territorial resulta demasiado largo.
+
+### Validaciones ejecutadas
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/app.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Prueba Playwright local con datos simulados: renderiza `stats-command-center`, 4 tarjetas de insight, matriz territorial, ranking de encuestadores y version `v2.6.92`.
+- Prueba Playwright local: Chart.js no se carga en Inicio y se carga bajo demanda al abrir `Resultados globales`.
+- Prueba Playwright local movil `390x844`: `Resultados globales` no genera desborde horizontal.
+
+---
+
 ## Arranque liviano y carga bajo demanda del motor MEC - 2026-05-21 - v2.6.91
 
 ### Objetivo

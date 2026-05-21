@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.5.18
+ * Version: 2.6.92
  */
 
 const StatsModule = (() => {
@@ -11,7 +11,9 @@ const StatsModule = (() => {
   let _statsData = null;
   let _localAnalytics = null;
   let _statsCache = {};
+  let _chartLoader = null;
   const STATS_CACHE_TTL = 5 * 60 * 1000;
+  const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
 
   async function init() {
     if (!Auth.canAccess('supervisor')) {
@@ -24,6 +26,22 @@ const StatsModule = (() => {
   }
 
   function _bindFilterEvents() {
+    const form = document.getElementById('stats-filter-form');
+    if (form && form.dataset.bound !== 'true') {
+      form.dataset.bound = 'true';
+      let timer = null;
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(loadStats, 140);
+      };
+      form.addEventListener('change', schedule);
+      form.addEventListener('click', event => {
+        if (event.target.closest('[data-choice-target][data-choice-value]')) {
+          setTimeout(schedule, 0);
+        }
+      });
+    }
+
     const applyBtn = document.getElementById('stats-filter-apply');
     if (applyBtn && applyBtn.dataset.bound !== 'true') {
       applyBtn.dataset.bound = 'true';
@@ -49,12 +67,7 @@ const StatsModule = (() => {
     if (cached && (Date.now() - cached.time < STATS_CACHE_TTL)) {
       _statsData = cached.stats;
       _localAnalytics = cached.local;
-      _renderOfflineDashboard(_localAnalytics);
-      _renderInfrastructureDashboard(_localAnalytics);
-      _renderKPIs(_statsData);
-      _renderCharts(_statsData);
-      _renderEncuestadoresTable(_statsData.por_encuestador || []);
-      _renderRecentActivity(_statsData.actividad_reciente || []);
+      await _renderStatsView();
       return;
     }
 
@@ -90,12 +103,39 @@ const StatsModule = (() => {
 
     _statsData = _normalizeStats(remoteStats);
     if (!remoteError) _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
+    await _renderStatsView();
+  }
+
+  async function _renderStatsView() {
+    _renderFilterChoices(_statsData);
+    _renderExecutiveDashboard(_statsData, _localAnalytics);
+    _renderInsightCards(_statsData, _localAnalytics);
+    _renderTerritoryBoard(_statsData.por_departamento || []);
     _renderOfflineDashboard(_localAnalytics);
     _renderInfrastructureDashboard(_localAnalytics);
     _renderKPIs(_statsData);
+    try {
+      await _ensureChartLibrary();
+    } catch (err) {
+      console.warn('No se pudo cargar Chart.js, se usaran vistas compactas:', err);
+    }
     _renderCharts(_statsData);
     _renderEncuestadoresTable(_statsData.por_encuestador || []);
     _renderRecentActivity(_statsData.actividad_reciente || []);
+  }
+
+  function _ensureChartLibrary() {
+    if (window.Chart) return Promise.resolve();
+    if (_chartLoader) return _chartLoader;
+    _chartLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = CHART_JS_URL;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('No se pudo cargar la libreria de graficos.'));
+      document.body.appendChild(script);
+    });
+    return _chartLoader;
   }
 
   function _getFilters() {
@@ -103,6 +143,38 @@ const StatsModule = (() => {
     if (!form) return {};
     const data = new FormData(form);
     return Object.fromEntries([...data.entries()].filter(([, v]) => v));
+  }
+
+  function _renderFilterChoices(data) {
+    const form = document.getElementById('stats-filter-form');
+    if (!form) return;
+    const depInput = document.getElementById('stats-filter-departamento');
+    const encInput = document.getElementById('stats-filter-encuestador');
+    const depStrip = document.getElementById('stats-dep-choices');
+    const encStrip = document.getElementById('stats-enc-choices');
+    if (depStrip) {
+      const current = depInput?.value || '';
+      const rows = (data?.por_departamento || [])
+        .filter(row => row.departamento)
+        .sort((a, b) => (b.total || 0) - (a.total || 0))
+        .slice(0, 8);
+      depStrip.innerHTML = _choiceButton('stats-filter-departamento', '', 'Todos', current === '')
+        + rows.map(row => _choiceButton('stats-filter-departamento', row.departamento, `${row.departamento} (${row.total || 0})`, current === row.departamento)).join('');
+    }
+    if (encStrip) {
+      const current = encInput?.value || '';
+      const rows = (data?.por_encuestador || [])
+        .filter(row => row.encuestador)
+        .sort((a, b) => (b.total_asignadas || 0) - (a.total_asignadas || 0))
+        .slice(0, 8);
+      encStrip.innerHTML = _choiceButton('stats-filter-encuestador', '', 'Todos', current === '')
+        + rows.map(row => _choiceButton('stats-filter-encuestador', row.encuestador, `${_shortLabel(row.encuestador)} (${row.total_asignadas || 0})`, current === row.encuestador)).join('');
+    }
+    UI.refreshButtonChoices?.(form);
+  }
+
+  function _choiceButton(target, value, label, active) {
+    return `<button class="choice-button ${active ? 'choice-button--active' : ''}" type="button" data-choice-target="${_escape(target)}" data-choice-value="${_escape(value)}">${_escape(label)}</button>`;
   }
 
   function _normalizeStats(data) {
@@ -122,6 +194,131 @@ const StatsModule = (() => {
       por_dia: data?.por_dia || data?.historico || [],
       actividad_reciente: data?.actividad_reciente || [],
     };
+  }
+
+  function _renderExecutiveDashboard(data, local) {
+    const container = document.getElementById('stats-executive-dashboard');
+    if (!container) return;
+    const total = Number(data?.total || 0);
+    const pct = Math.max(0, Math.min(100, Number(data?.pct_avance || 0)));
+    const activeTeam = (data?.por_encuestador || []).filter(row => Number(row.total_asignadas || 0) > 0).length;
+    const territoryCount = (data?.por_departamento || []).filter(row => Number(row.total || 0) > 0).length;
+    const riskPct = total ? Math.round((Number(data?.con_incidencia || 0) / total) * 100) : 0;
+    const synced = Number(local?.queuePending || 0) === 0;
+    const leadingTerritory = [...(data?.por_departamento || [])].sort((a, b) => (b.finalizadas || 0) - (a.finalizadas || 0))[0];
+    const pace = _dailyPace(data?.por_dia || []);
+    container.innerHTML = `
+      <section class="stats-command-center">
+        <div class="stats-radial" style="--pct:${pct}%;--accent:${_colorForPct(pct)}">
+          <strong>${pct}%</strong>
+          <span>Avance</span>
+        </div>
+        <div class="stats-command-copy">
+          <span class="eyebrow">Centro ejecutivo</span>
+          <h3>Resultados globales CIALPA</h3>
+          <div class="stats-command-chips">
+            <span>${_escape(total)} escuelas</span>
+            <span>${territoryCount} territorios</span>
+            <span>${activeTeam} responsables</span>
+            <span class="${synced ? 'chip-ok' : 'chip-warn'}">${synced ? 'Sin cola pendiente' : `${Number(local?.queuePending || 0)} en cola`}</span>
+          </div>
+        </div>
+        <div class="stats-command-metrics">
+          ${_executiveMetric('Relevadas', data.finalizadas || 0, `${_pct(data.finalizadas || 0, total)}% del universo`, '#207c55')}
+          ${_executiveMetric('En curso', data.en_curso || 0, 'Operativo activo', '#b86b00')}
+          ${_executiveMetric('Riesgo', `${riskPct}%`, `${data.con_incidencia || 0} incidencias`, '#b42318')}
+          ${_executiveMetric('Ritmo', pace.value, pace.label, '#1d4ed8')}
+        </div>
+        <div class="stats-command-focus">
+          <span>Territorio lider</span>
+          <strong>${_escape(leadingTerritory?.departamento || 'Sin datos')}</strong>
+          <small>${Number(leadingTerritory?.finalizadas || 0)} finalizadas de ${Number(leadingTerritory?.total || 0)}</small>
+        </div>
+      </section>`;
+  }
+
+  function _executiveMetric(label, value, note, color) {
+    return `
+      <article class="stats-exec-metric" style="--accent:${color}">
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note)}</small>
+      </article>`;
+  }
+
+  function _renderInsightCards(data, local) {
+    const container = document.getElementById('stats-insights');
+    if (!container) return;
+    const total = Number(data?.total || 0);
+    const rows = data?.por_departamento || [];
+    const mostPending = [...rows].sort((a, b) => (b.pendientes || 0) - (a.pendientes || 0))[0];
+    const bestProgress = [...rows].filter(row => Number(row.total || 0) > 0)
+      .sort((a, b) => _pct(b.finalizadas || 0, b.total || 0) - _pct(a.finalizadas || 0, a.total || 0))[0];
+    const weakestProgress = [...rows].filter(row => Number(row.total || 0) > 0)
+      .sort((a, b) => _pct(a.finalizadas || 0, a.total || 0) - _pct(b.finalizadas || 0, b.total || 0))[0];
+    const evidence = local?.mec?.evidenceTotal || 0;
+    const cards = [
+      {
+        label: 'Prioridad operativa',
+        value: mostPending?.departamento || 'Sin datos',
+        note: `${Number(mostPending?.pendientes || data?.pendientes || 0)} pendientes por resolver`,
+        tone: 'warning',
+      },
+      {
+        label: 'Mejor avance',
+        value: bestProgress?.departamento || 'Sin datos',
+        note: `${_pct(bestProgress?.finalizadas || 0, bestProgress?.total || 0)}% finalizado`,
+        tone: 'success',
+      },
+      {
+        label: 'Punto de atencion',
+        value: weakestProgress?.departamento || 'Sin datos',
+        note: total ? `${_pct(weakestProgress?.finalizadas || 0, weakestProgress?.total || 0)}% finalizado` : 'Esperando registros',
+        tone: 'danger',
+      },
+      {
+        label: 'Evidencias locales',
+        value: evidence,
+        note: `${Number(local?.mec?.evidencePending || 0)} campos pendientes`,
+        tone: 'info',
+      },
+    ];
+    container.innerHTML = cards.map(card => `
+      <article class="stats-insight stats-insight--${card.tone}">
+        <span>${_escape(card.label)}</span>
+        <strong>${_escape(card.value)}</strong>
+        <small>${_escape(card.note)}</small>
+      </article>`).join('');
+  }
+
+  function _renderTerritoryBoard(rows) {
+    const container = document.getElementById('stats-territory-board');
+    if (!container) return;
+    const sorted = [...rows].sort((a, b) => (b.total || 0) - (a.total || 0)).slice(0, 10);
+    if (!sorted.length) {
+      container.innerHTML = '<p class="text-muted text-center">Sin territorios para mostrar.</p>';
+      return;
+    }
+    container.innerHTML = sorted.map(row => {
+      const pct = _pct(row.finalizadas || 0, row.total || 0);
+      const active = Number(row.en_curso || 0);
+      const pending = Number(row.pendientes || 0);
+      return `
+        <article class="territory-card">
+          <div class="territory-card__head">
+            <strong>${_escape(row.departamento || 'Sin dato')}</strong>
+            <span>${pct}%</span>
+          </div>
+          <div class="territory-card__bar">
+            <i style="width:${pct}%;background:${_colorForPct(pct)}"></i>
+          </div>
+          <div class="territory-card__meta">
+            <span>${Number(row.finalizadas || 0)} finalizadas</span>
+            <span>${active} en curso</span>
+            <span>${pending} pendientes</span>
+          </div>
+        </article>`;
+    }).join('');
   }
 
   function _renderOfflineDashboard(local) {
@@ -235,13 +432,14 @@ const StatsModule = (() => {
   }
 
   function _renderKPIs(data) {
+    const total = Number(data.total || 0);
     const kpis = [
-      { id: 'kpi-total', value: data.total || 0, color: '#1F3864' },
-      { id: 'kpi-finalizadas', value: data.finalizadas || 0, color: '#28a745' },
-      { id: 'kpi-en-curso', value: data.en_curso || 0, color: '#fd7e14' },
-      { id: 'kpi-pendientes', value: data.pendientes || 0, color: '#6c757d' },
-      { id: 'kpi-incidencias', value: data.con_incidencia || 0, color: '#dc3545' },
-      { id: 'kpi-avance', value: `${data.pct_avance || 0}%`, color: _colorForPct(data.pct_avance || 0) },
+      { id: 'kpi-total', value: data.total || 0, color: '#173b63', note: 'Universo monitoreado' },
+      { id: 'kpi-finalizadas', value: data.finalizadas || 0, color: '#207c55', note: `${_pct(data.finalizadas || 0, total)}% cerradas` },
+      { id: 'kpi-en-curso', value: data.en_curso || 0, color: '#b86b00', note: 'Trabajo activo' },
+      { id: 'kpi-pendientes', value: data.pendientes || 0, color: '#64748b', note: `${_pct(data.pendientes || 0, total)}% por iniciar` },
+      { id: 'kpi-incidencias', value: data.con_incidencia || 0, color: '#b42318', note: `${_pct(data.con_incidencia || 0, total)}% con alerta` },
+      { id: 'kpi-avance', value: `${data.pct_avance || 0}%`, color: _colorForPct(data.pct_avance || 0), note: 'Progreso general' },
     ];
 
     kpis.forEach(kpi => {
@@ -249,6 +447,8 @@ const StatsModule = (() => {
       if (!el) return;
       const valueEl = el.querySelector('.kpi-value');
       if (valueEl) valueEl.textContent = kpi.value;
+      const noteEl = el.querySelector('[data-kpi-note]');
+      if (noteEl) noteEl.textContent = kpi.note;
       el.style.borderTopColor = kpi.color;
     });
 
@@ -262,9 +462,31 @@ const StatsModule = (() => {
   }
 
   function _colorForPct(pct) {
-    if (pct >= 80) return '#28a745';
-    if (pct >= 50) return '#fd7e14';
-    return '#dc3545';
+    if (pct >= 80) return '#207c55';
+    if (pct >= 50) return '#b86b00';
+    return '#b42318';
+  }
+
+  function _pct(value, total) {
+    const t = Number(total || 0);
+    if (!t) return 0;
+    return Math.max(0, Math.min(100, Math.round((Number(value || 0) / t) * 100)));
+  }
+
+  function _dailyPace(rows) {
+    const recent = (rows || []).slice(-7);
+    const total = recent.reduce((sum, row) => sum + Number(row.count || row.finalizadas || 0), 0);
+    if (!recent.length) return { value: '0/dia', label: 'Sin historico reciente' };
+    const avg = Math.round((total / recent.length) * 10) / 10;
+    return { value: `${avg}/dia`, label: 'Promedio 7 dias' };
+  }
+
+  function _shortLabel(value) {
+    const text = String(value || '').trim();
+    if (text.length <= 18) return text;
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]} ${parts[1][0]}.`;
+    return `${text.slice(0, 16)}...`;
   }
 
   function _renderCharts(data) {
@@ -309,17 +531,20 @@ const StatsModule = (() => {
       data: {
         labels: porDep.map(d => d.departamento),
         datasets: [
-          { label: 'Finalizadas', data: porDep.map(d => d.finalizadas || 0), backgroundColor: '#28a745' },
-          { label: 'En curso', data: porDep.map(d => d.en_curso || 0), backgroundColor: '#fd7e14' },
-          { label: 'Pendientes', data: porDep.map(d => d.pendientes || 0), backgroundColor: '#6c757d' },
-          { label: 'Incidencias', data: porDep.map(d => d.incidencias || 0), backgroundColor: '#dc3545' },
+          { label: 'Finalizadas', data: porDep.map(d => d.finalizadas || 0), backgroundColor: '#207c55', borderRadius: 5 },
+          { label: 'En curso', data: porDep.map(d => d.en_curso || 0), backgroundColor: '#d9982f', borderRadius: 5 },
+          { label: 'Pendientes', data: porDep.map(d => d.pendientes || 0), backgroundColor: '#64748b', borderRadius: 5 },
+          { label: 'Incidencias', data: porDep.map(d => d.incidencias || 0), backgroundColor: '#b42318', borderRadius: 5 },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' }, title: { display: true, text: 'Estado por Departamento' } },
-        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+        plugins: { legend: { position: 'top', labels: { boxWidth: 10, usePointStyle: true } }, title: { display: false } },
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(100,116,139,.16)' } },
+        },
       },
     });
   }
@@ -347,10 +572,10 @@ const StatsModule = (() => {
       _renderFallback('chart-donut', `
         <h4>Distribucion general</h4>
         <div class="status-stack">
-          <i style="width:${(data.finalizadas || 0) / total * 100}%;background:#28a745"></i>
-          <i style="width:${(data.en_curso || 0) / total * 100}%;background:#fd7e14"></i>
-          <i style="width:${(data.pendientes || 0) / total * 100}%;background:#6c757d"></i>
-          <i style="width:${(data.con_incidencia || 0) / total * 100}%;background:#dc3545"></i>
+          <i style="width:${(data.finalizadas || 0) / total * 100}%;background:#207c55"></i>
+          <i style="width:${(data.en_curso || 0) / total * 100}%;background:#d9982f"></i>
+          <i style="width:${(data.pendientes || 0) / total * 100}%;background:#64748b"></i>
+          <i style="width:${(data.con_incidencia || 0) / total * 100}%;background:#b42318"></i>
         </div>
         <p class="chart-note">Finalizadas ${data.finalizadas || 0} · En curso ${data.en_curso || 0} · Pendientes ${data.pendientes || 0} · Incidencias ${data.con_incidencia || 0}</p>`);
       return;
@@ -363,16 +588,16 @@ const StatsModule = (() => {
         labels: ['Finalizadas', 'En Curso', 'Pendientes', 'Con Incidencia'],
         datasets: [{
           data: [data.finalizadas || 0, data.en_curso || 0, data.pendientes || 0, data.con_incidencia || 0],
-          backgroundColor: ['#28a745', '#fd7e14', '#6c757d', '#dc3545'],
-          borderWidth: 2,
+          backgroundColor: ['#207c55', '#d9982f', '#64748b', '#b42318'],
+          borderWidth: 4,
           borderColor: '#fff',
         }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'right' }, title: { display: true, text: 'Distribucion General' } },
-        cutout: '65%',
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } }, title: { display: false } },
+        cutout: '72%',
       },
     });
   }
@@ -402,18 +627,24 @@ const StatsModule = (() => {
         datasets: [{
           label: 'Encuestas completadas',
           data: porDia.map(d => d.count || d.finalizadas || 0),
-          borderColor: '#E84C22',
-          backgroundColor: 'rgba(232,76,34,0.1)',
+          borderColor: '#1d4ed8',
+          backgroundColor: 'rgba(29,78,216,0.12)',
           fill: true,
-          tension: 0.3,
+          tension: 0.38,
           pointRadius: 4,
+          pointBackgroundColor: '#ffffff',
+          pointBorderColor: '#1d4ed8',
+          pointBorderWidth: 2,
         }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false }, title: { display: true, text: 'Progreso Diario' } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+        plugins: { legend: { display: false }, title: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(100,116,139,.16)' } },
+        },
       },
     });
   }
@@ -427,15 +658,25 @@ const StatsModule = (() => {
       return;
     }
 
-    tbody.innerHTML = rows.map((r, i) => `
+    tbody.innerHTML = rows.map((r, i) => {
+      const assigned = Number(r.total_asignadas || 0);
+      const finished = Number(r.finalizadas || 0);
+      const pct = _pct(finished, assigned);
+      return `
       <tr>
-        <td>${i + 1}</td>
-        <td>${_escape(r.encuestador || 'Sin asignar')}</td>
-        <td>${Number(r.total_asignadas || 0)}</td>
-        <td>${Number(r.finalizadas || 0)}</td>
-        <td>${Number(r.incidencias || 0)}</td>
+        <td><span class="rank-badge">${i + 1}</span></td>
+        <td><strong>${_escape(r.encuestador || 'Sin asignar')}</strong></td>
+        <td>${assigned}</td>
+        <td>
+          <div class="table-progress">
+            <span>${finished} (${pct}%)</span>
+            <i><b style="width:${pct}%"></b></i>
+          </div>
+        </td>
+        <td><span class="${Number(r.incidencias || 0) ? 'risk-pill risk-pill--on' : 'risk-pill'}">${Number(r.incidencias || 0)}</span></td>
         <td>${r.promedio_minutos ? _escape(r.promedio_minutos + ' min') : '—'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
   }
 
   function _renderRecentActivity(items) {
@@ -447,7 +688,7 @@ const StatsModule = (() => {
     }
     container.innerHTML = items.map(item => `
       <div class="activity-item">
-        <span class="activity-item__badge badge--${_escape(item.tipo || 'info')}">${_escape(item.tipo || 'evento')}</span>
+        <span class="activity-item__badge badge--${_safeClass(item.tipo || 'info')}">${_escape(item.tipo || 'evento')}</span>
         <div class="activity-item__text">
           <strong>${_escape(item.usuario || 'Usuario')}</strong> - ${_escape(item.escuela || item.detalle || 'Actividad')}
         </div>
@@ -531,6 +772,10 @@ const StatsModule = (() => {
     const text = String(value ?? '');
     if (!/[",\n]/.test(text)) return text;
     return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  function _safeClass(value) {
+    return String(value || '').replace(/[^a-z0-9_-]/gi, '') || 'info';
   }
 
   function _formatDate(iso) {
