@@ -36,6 +36,11 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
 - Playwright/Chromium local: `Registro guiado` abre en `module-registro`, la pregunta superior aparece visible y no hay botones `primary/success/warning/danger` dentro de la tarjeta de pregunta.
+- `git commit`: `adda29c` - `fix: ordenar guia visual y pasillos v2.6.100`.
+- `git push origin main`: publica `adda29c`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.100`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.100`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `btn-guided-soft`, `_guidedHistory` y `Pregunta guiada`.
 
 ---
 
