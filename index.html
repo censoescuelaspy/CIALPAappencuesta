@@ -796,24 +796,26 @@
           </div>
 
           <div class="card" style="margin-bottom:1.25rem;">
-            <div class="card__header">
-              <h4 class="card__title">Historial de sesiones</h4>
+            <div class="card__header" style="flex-wrap:wrap;gap:.5rem;">
+              <h4 class="card__title">Mis relevamientos</h4>
+              <div id="jornada-toolbar" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;"></div>
             </div>
             <div class="table-wrapper">
               <table>
-                <thead>
+                <thead id="jornada-sessions-thead">
                   <tr>
+                    <th>Escuela</th>
                     <th>Fecha</th>
                     <th>Inicio</th>
-                    <th>Escuela</th>
                     <th>Fin</th>
                     <th>Duración</th>
                     <th>Estado</th>
                     <th>Observaciones</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody id="jornada-sessions-tbody">
-                  <tr><td colspan="7" class="text-center text-muted">Cargando...</td></tr>
+                  <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
                 </tbody>
               </table>
             </div>
