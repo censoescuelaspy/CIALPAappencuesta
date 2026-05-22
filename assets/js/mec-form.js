@@ -5917,6 +5917,11 @@ const MecFormModule = (() => {
     object.x = Math.max(room.x, Math.min(object.x, room.x + room.w - object.w));
     object.attached = _openingAttachment(object, room, 'bottom');
     item.objects.push(object);
+    const _sanOpSameType = (item.objects || []).filter(o => o.type === type);
+    if (_sanOpSameType.length > 1) {
+      const _sanOpBase = type === 'door' ? 'Pta' : 'Vtna';
+      _sanOpSameType.forEach((o, idx) => { if (o.ficha) o.ficha.codigo = `${_sanOpBase} ${idx + 1}`; });
+    }
     _selectedSanitaryObjectId = object.id;
     _selectedPlanId = `sanitary::${item.id}::${object.id}`;
     _saveDraft(false);
@@ -5977,6 +5982,11 @@ const MecFormModule = (() => {
     if (object.type === 'wall') _snapWallObject(object);
     else if (object.type !== 'pencil') _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
+    const _sanElSameType = (item.objects || []).filter(o => o.type === type);
+    if (_sanElSameType.length > 1) {
+      const _sanElBase = (_defaultSketchFicha(type).codigo || type).replace(/\s+\d+$/, '').trim();
+      _sanElSameType.forEach((o, idx) => { if (o.ficha) o.ficha.codigo = `${_sanElBase} ${idx + 1}`; });
+    }
     _selectedSanitaryObjectId = object.id;
     _selectedPlanId = `sanitary::${item.id}::${object.id}`;
     _saveDraft(false);
@@ -6033,7 +6043,27 @@ const MecFormModule = (() => {
     _selectedSanitaryObjectId = object.id;
     _saveDraft(false);
     _render();
+    const _sanObjCountEl = document.querySelector(`[data-guided-photo-count="${objectId}"]`);
+    if (_sanObjCountEl) _sanObjCountEl.textContent = `${object.ficha.evidencias.length} foto${object.ficha.evidencias.length === 1 ? '' : 's'}`;
     UI.showToast('Foto asociada al objeto sanitario.', 'success');
+  }
+
+  async function addClassroomObjectEvidence(roomId, objectId, input) {
+    const room = (_data.__classrooms || []).find(r => r.id === roomId);
+    const object = (room?.objects || []).find(o => o.id === objectId);
+    if (!room || !object) { if (input) input.value = ''; return; }
+    if (!_assertClassroomUnlocked(room, 'anexar fotos')) { if (input) input.value = ''; return; }
+    object.ficha = { ..._defaultSketchFicha(object.type), ...(object.ficha || {}) };
+    const context = _sketchObjectEvidenceContext(object, room);
+    const current = object.ficha.evidencias || [];
+    const added = await Promise.all([...input.files].map(file => _readEvidenceFile(file, context)));
+    object.ficha.evidencias = [...current, ...added];
+    if (input) input.value = '';
+    const countEl = document.querySelector(`[data-guided-photo-count="${objectId}"]`);
+    if (countEl) countEl.textContent = `${object.ficha.evidencias.length} foto${object.ficha.evidencias.length === 1 ? '' : 's'}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Foto asociada al elemento del aula.', 'success');
   }
 
   function setSanitaryValue(id, key, value, rerender = true, options = {}) {
@@ -16444,6 +16474,13 @@ const MecFormModule = (() => {
     _sketchTool = type;
     _pushSketchHistory();
     const object = _createSketchObjectAt(point, { openFicha: guided ? false : true });
+    if (object?.ficha) {
+      const _sameType = (_data.__classroomSketch?.objects || []).filter(o => o.type === type);
+      if (_sameType.length > 1) {
+        const _numBase = (_defaultSketchFicha(type).codigo || _sketchLabel(type) || type).replace(/\s+\d+$/, '').trim();
+        _sameType.forEach((o, i) => { if (o.ficha) o.ficha.codigo = `${_numBase} ${i + 1}`; });
+      }
+    }
     if (guided) _markGuidedObjectReview(object);
     _sketchTool = previousTool;
     _syncActiveClassroomFromSketch();
@@ -21384,6 +21421,7 @@ const MecFormModule = (() => {
     openPlanFloorFicha,
     closePlanFloorFicha,
     savePlanFloorFicha,
+    addClassroomObjectEvidence,
     addPlanClassroomElement,
     setPlanClassroomShape,
     addPlanClassroomVertex,

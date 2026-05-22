@@ -343,6 +343,7 @@ const GuidedRegisterModule = (() => {
     if (action === 'resetNoFloor') return _setScopedFlag('noFloor', false, 'Se volvera a pedir el piso del bloque.');
     if (action === 'saveBlockMeasures') return _saveBlockMeasures();
     if (action === 'saveFloorMeasures') return _saveFloorMeasures(value);
+    if (action === 'resetFloorMeasures') return _resetFloorMeasures(value);
     if (action === 'saveClassroomMeasures') return _saveClassroomMeasures(value);
     if (action === 'saveSanitaryMeasures') return _saveSanitaryMeasures(value);
     if (action === 'answerFloorField') return _answerFloorField(value);
@@ -1388,11 +1389,13 @@ const GuidedRegisterModule = (() => {
         return _question('Paso 3', 'Piso: estado general', 'Registre el estado/calidad del piso antes de avanzar a aulas o sanitarios.', [
           ..._fieldAnswerActions('answerFloorField', `${floorValue}::estado`, ['Bueno', 'Regular', 'Malo', 'No verificable'], 'Bueno'),
           { label: 'Seleccionar piso', action: 'selectPlanItem', value: `floor::${floorValue}` },
+          { label: 'Corregir medidas', action: 'resetFloorMeasures', value: floorValue },
           { label: 'Editar ficha', action: 'floorGuide' },
         ], false, _guidedRequirementList(pending));
       }
       return _question('Paso 3', next ? `Piso: ${next.title}` : 'Graficar y medir el piso', next?.help || 'El piso debe quedar dibujado sobre el bloque, con posicion, largo, ancho y rotacion antes de cargar ambientes.', [
         { label: next?.plan ? 'Seleccionar piso' : 'Completar piso', action: next?.plan ? 'selectPlanItem' : 'floorGuide', value: `floor::${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Piso 1'}`, primary: true },
+        { label: 'Corregir medidas', action: 'resetFloorMeasures', value: floorValue },
         { label: 'Abrir ficha', action: 'floorGuide' },
       ], false, _guidedRequirementList(pending));
     }
@@ -1686,6 +1689,18 @@ const GuidedRegisterModule = (() => {
     ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
   }
 
+  function _guidedObjectPhotoHtml(parentId, object, parentKind) {
+    const count = (object?.ficha?.evidencias || []).length;
+    const countText = count ? `${count} foto${count === 1 ? '' : 's'}` : 'Sin foto';
+    const sParentId = String(parentId || '').replace(/['"\\\s]/g, '');
+    const sObjId = String(object?.id || '').replace(/['"\\\s]/g, '');
+    const inputId = `gphoto_${sParentId.slice(-8)}_${sObjId.slice(-8)}`;
+    const onchange = parentKind === 'sanitary'
+      ? `MecFormModule.setSanitaryObjectEvidence('${sParentId}', '${sObjId}', this)`
+      : `MecFormModule.addClassroomObjectEvidence('${sParentId}', '${sObjId}', this)`;
+    return `<div class="guided-photo-row"><input id="${inputId}" type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="${onchange}"><button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${inputId}')?.click()">Sacar foto</button><small class="guided-photo-count" data-guided-photo-count="${sObjId}">${countText}</small></div>`;
+  }
+
   function _roomObjectDirectQuestion(room, object) {
     const field = _nextGuidedObjectField(object);
     if (!field) return null;
@@ -1695,7 +1710,7 @@ const GuidedRegisterModule = (() => {
       ..._fieldAnswerActions('answerClassroomObjectField', valueBase, _guidedObjectFieldOptions(object, field), _guidedObjectFieldPrimary(object, field)),
       { label: 'Ubicar en plano', action: 'selectPlanItem', value: planValue },
       { label: 'Editar ficha', action: 'openClassroomObjectFicha', value: planValue },
-    ], false, _guidedRequirementList(_guidedObjectRequirementItems(object)));
+    ], false, _guidedRequirementList(_guidedObjectRequirementItems(object)) + _guidedObjectPhotoHtml(room.id, object, 'classroom'));
   }
 
   function _sanitaryObjectDirectQuestion(item, object) {
@@ -1707,7 +1722,7 @@ const GuidedRegisterModule = (() => {
       ..._fieldAnswerActions('answerSanitaryObjectField', valueBase, _guidedObjectFieldOptions(object, field), _guidedObjectFieldPrimary(object, field)),
       { label: 'Ubicar en plano', action: 'selectPlanItem', value: planValue },
       { label: 'Editar ficha', action: 'openSanitaryObjectFicha', value: planValue },
-    ], false, _guidedRequirementList(_guidedObjectRequirementItems(object)));
+    ], false, _guidedRequirementList(_guidedObjectRequirementItems(object)) + _guidedObjectPhotoHtml(item.id, object, 'sanitary'));
   }
 
   function _siteQuestion(snap) {
@@ -2601,6 +2616,17 @@ const GuidedRegisterModule = (() => {
     } else if (!okLength || !okWidth) {
       UI.showToast('No se pudo guardar las medidas del piso. Verifique que el bloque/piso este activo.', 'warning', 6000);
     }
+  }
+
+  function _resetFloorMeasures(payload = '') {
+    const [, floorId] = String(payload || '').split('::');
+    const snap = _snapshot();
+    const floor = (snap.activeFloors || []).find(f => f.id === floorId || _floorLabel(f) === floorId) || snap.activeFloors?.[0];
+    const floorKey = floor?.id || floorId || _floorLabel(floor || {});
+    _setMeasureConfirmed('floor', floorKey, false);
+    _saveState();
+    UI.showToast('Ingrese las medidas correctas del piso.', 'info', 3500);
+    _refreshSoon(200);
   }
 
   function _saveClassroomMeasures(roomId = '') {
