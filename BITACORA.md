@@ -4,6 +4,44 @@
 
 ---
 
+## Registro guiado como captura principal y botones visibles - 2026-05-21 - v2.6.98
+
+### Objetivo
+- Evitar que la insercion de elementos dentro de `Registro guiado` abra fichas automaticamente.
+- Asegurar que aulas, sanitarios, pisos, exteriores y sus elementos se completen desde preguntas superiores secuenciales.
+- Mejorar la visibilidad de los botones de insercion para que no queden escondidos o solapados en tablet.
+
+### Cambios implementados
+- El motor del plano detecta cuando esta dentro de `Registro guiado` y activa modo guiado para inserciones directas desde cinta, panel contextual o botones del plano.
+- Aulas, otros espacios, sanitarios, pisos, cabinas, artefactos, aberturas, equipos, fallas y exteriores ya no abren ficha automaticamente cuando se crean desde `Registro guiado`.
+- Los elementos insertados quedan seleccionados y pendientes para que la tarjeta superior pida tipo, estado/calidad, apertura, bisagra u otros datos segun corresponda.
+- La guia agrega preguntas para piso: largo, ancho y estado, sin depender de la ficha.
+- La guia agrega preguntas para exteriores: medidas, estado y caracteristica tecnica principal, sin depender de la ficha.
+- La secuencia de sanitarios incorpora cabina, tomas, tablero, ventilador y aire acondicionado ademas de puerta, ventana, artefactos, luz y fallas.
+- La secuencia de aulas incorpora escalera interna y nota/rotulo ademas de puertas, ventanas, electricidad, equipos, pizarron y fallas.
+- La cinta de herramientas dentro de `Registro guiado` ahora permite envoltura vertical y scroll propio para evitar botones ocultos o montados.
+- Version visible y cache del Service Worker actualizados a `v2.6.98`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages.
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.98`.
+- Probar en tablet: insertar aula, sanitario, cabina y exterior desde la cinta y confirmar que aparece la pregunta superior antes de usar ficha.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/jornada.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Playwright/Chromium local: `Registro guiado` abre en `v2.6.98`, sin errores de consola, y la cinta del plano reporta `flex-wrap: wrap`.
+- Playwright/Chromium local con escuela simulada: crea bloque, piso y aula; pestaña `Insertar` muestra 27 botones, sin solapes detectados y con scroll vertical propio.
+
+---
+
 ## Cierre con siguiente escuela y guia secuencial reforzada - 2026-05-21 - v2.6.97
 
 ### Objetivo

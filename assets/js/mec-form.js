@@ -185,6 +185,21 @@ const MecFormModule = (() => {
     _syncPendingEvidenceUploads();
   }
 
+  function _isGuidedRegisterActive() {
+    const registroPanel = document.getElementById('module-registro');
+    if (registroPanel?.classList.contains('module-panel--active')) return true;
+    const root = _activeSchoolPlanRoot();
+    return Boolean(root?.closest?.('#module-registro'));
+  }
+
+  function _isGuidedInsert(options = {}) {
+    return Boolean(options.guided || _isGuidedRegisterActive());
+  }
+
+  function _guidedInsertOptions(options = {}) {
+    return _isGuidedInsert(options) ? { ...options, guided: true } : options;
+  }
+
   function _schoolIdentityValues(school) {
     const values = [
       school?.id_escuela,
@@ -3398,7 +3413,8 @@ const MecFormModule = (() => {
       .length + 1;
   }
 
-  function _createRoomLikeSpace(kind = 'classroom') {
+  function _createRoomLikeSpace(kind = 'classroom', options = {}) {
+    const guided = _isGuidedInsert(options);
     if (_activeClassroomId || _data.__classroomSketch?.id) _syncActiveClassroomFromSketch();
     _data.__allowEmptyClassrooms = false;
     const block = _blockById(_data.__activeBlockId);
@@ -3422,7 +3438,8 @@ const MecFormModule = (() => {
       rotacion_grados: '0',
       length: defaults.length,
       width: defaults.width,
-      estado: 'Operativa',
+      estado: guided ? '' : 'Operativa',
+      caracteristicas: '',
       openings: '',
       objects: [roomObject],
     };
@@ -3433,11 +3450,13 @@ const MecFormModule = (() => {
     _requestSketchCenter();
     _saveDraft(false);
     _render();
-    UI.showToast(`${cfg.label} creada con base editable. Ajuste medidas o arrastrela en el plano.`, 'success');
+    UI.showToast(guided
+      ? `${cfg.label} creado. La guia superior pedira medidas, estado y elementos paso a paso.`
+      : `${cfg.label} creada con base editable. Ajuste medidas o arrastrela en el plano.`, 'success');
   }
 
-  function newClassroom() {
-    _createRoomLikeSpace('classroom');
+  function newClassroom(options = {}) {
+    _createRoomLikeSpace('classroom', _guidedInsertOptions(options));
   }
 
   function openOtherSpacePicker(origin = 'classrooms') {
@@ -3477,14 +3496,14 @@ const MecFormModule = (() => {
     setTimeout(() => modal.remove(), 200);
   }
 
-  function chooseOtherSpaceType(kind, origin = 'classrooms') {
+  function chooseOtherSpaceType(kind, origin = 'classrooms', options = {}) {
     closeOtherSpacePicker();
     if (origin === 'plan' && _activeModuleId !== 'aulas') selectModule('aulas');
-    setTimeout(() => _createRoomLikeSpace(kind), origin === 'plan' ? 120 : 0);
+    setTimeout(() => _createRoomLikeSpace(kind, _guidedInsertOptions(options)), origin === 'plan' ? 120 : 0);
   }
 
-  function addPlanOtherSpace(kind) {
-    chooseOtherSpaceType(kind, 'plan');
+  function addPlanOtherSpace(kind, options = {}) {
+    chooseOtherSpaceType(kind, 'plan', _guidedInsertOptions(options));
   }
 
   function saveCurrentClassroom() {
@@ -4501,15 +4520,14 @@ const MecFormModule = (() => {
     }
     const floors = _ensureBlockFloors(block);
     if (!floors.length) {
-      addPlanFloor(block.id);
+      addPlanFloor(block.id, { guided: true });
       return;
     }
     const floor = floors.find(item => !item.largo_m || !item.ancho_m) || floors[0];
     _selectedPlanId = _floorRecordPlanId(block, floor);
     _setActiveFloor(_floorRecordLabel(floor));
     renderSchoolPlan();
-    setTimeout(() => openPlanFloorFicha(block.id, floor.id), 80);
-    UI.showToast('Complete y ubique el piso dentro del bloque.', 'info', 5600);
+    UI.showToast('Piso seleccionado. Complete medidas y estado desde la guia superior; use la ficha solo para corregir.', 'info', 6200);
   }
 
   function addFloorToActiveBlock() {
@@ -4521,7 +4539,8 @@ const MecFormModule = (() => {
     return addPlanFloor(block.id);
   }
 
-  function addPlanFloor(blockId = _data.__activeBlockId) {
+  function addPlanFloor(blockId = _data.__activeBlockId, options = {}) {
+    const guided = _isGuidedInsert(options);
     const block = _blockById(blockId);
     if (!block) {
       UI.showToast('Seleccione un bloque para agregar un piso.', 'warning');
@@ -4535,8 +4554,8 @@ const MecFormModule = (() => {
       id: `piso_${Date.now().toString(36)}_${index}`,
       label,
       floor: label,
-      largo_m: block.largo_m || '',
-      ancho_m: block.ancho_m || '',
+      largo_m: guided ? '' : (block.largo_m || ''),
+      ancho_m: guided ? '' : (block.ancho_m || ''),
       xRatio: .06,
       yRatio: .16 + Math.min(index, 4) * .08,
       wRatio: .88,
@@ -4555,8 +4574,10 @@ const MecFormModule = (() => {
     _render();
     renderSchoolPlan();
     closePlanBlockFicha();
-    setTimeout(() => openPlanFloorFicha(block.id, floor.id), 80);
-    UI.showToast(`${label} agregado. Ajuste medidas y ubicacion en su ficha.`, 'success');
+    if (!guided) setTimeout(() => openPlanFloorFicha(block.id, floor.id), 80);
+    UI.showToast(guided
+      ? `${label} agregado. La guia superior pedira medidas, estado y ubicacion.`
+      : `${label} agregado. Ajuste medidas y ubicacion en su ficha.`, 'success');
     return floor;
   }
 
@@ -5749,13 +5770,20 @@ const MecFormModule = (() => {
       </svg>`;
   }
 
-  function addSanitary() {
+  function addSanitary(options = {}) {
+    const guided = _isGuidedInsert(options);
     _ensureSanitaries();
     const block = _blockById(_data.__activeBlockId);
     if (!_assertBlockUnlocked(block, 'agregar sanitarios')) return;
     if (!_requireActiveFloorForContent('agregar sanitarios')) return;
     const next = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || []).length + 1;
     const item = _sanitaryTemplate(next);
+    if (guided) {
+      item.estado = '';
+      item.uso = '';
+      item.genero = '';
+      item.agua = '';
+    }
     _ensureSanitaryPlan(item, true);
     _ensureSanitaryRoomObject(item);
     _data.__sanitaries.push(item);
@@ -5763,10 +5791,11 @@ const MecFormModule = (() => {
     _startTimeLog('sanitario', item.id, item.codigo || 'Sanitario');
     _saveDraft(false);
     _render();
-    UI.showToast('Sanitario agregado.', 'success');
+    UI.showToast(guided ? 'Sanitario agregado. La guia superior pedira medidas, uso, agua y artefactos.' : 'Sanitario agregado.', 'success');
   }
 
   function addSanitaryFixture(id, fixtureId, options = {}) {
+    const guided = _isGuidedInsert(options);
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     const fixture = SANITARY_FIXTURES.find(tool => tool.id === fixtureId);
     if (!item || !fixture) return;
@@ -5788,7 +5817,7 @@ const MecFormModule = (() => {
         codigo: `${fixture.short} ${next}`,
       },
     };
-    if (options.guided) _markGuidedObjectReview(object);
+    if (guided) _markGuidedObjectReview(object);
     if (room) _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
     _selectedSanitaryObjectId = object.id;
@@ -5838,6 +5867,7 @@ const MecFormModule = (() => {
   }
 
   function addSanitaryOpening(id, type, options = {}) {
+    const guided = _isGuidedInsert(options);
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item || !['door', 'window'].includes(type)) return;
     if (!_assertSanitaryUnlocked(item, 'agregar aberturas')) return;
@@ -5853,7 +5883,7 @@ const MecFormModule = (() => {
       h: size.h,
       ficha: _defaultSanitaryObjectFicha(item, type),
     };
-    if (options.guided) _markGuidedObjectReview(object);
+    if (guided) _markGuidedObjectReview(object);
     _orientOpeningToSide(object, 'bottom');
     object.w = Math.min(object.w, Math.max(18, room.w));
     object.y = room.y + room.h - object.h;
@@ -5869,6 +5899,7 @@ const MecFormModule = (() => {
   }
 
   function addSanitaryElement(id, type, options = {}) {
+    const guided = _isGuidedInsert(options);
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item || !SANITARY_EXTRA_TOOLS.some(tool => tool.id === type)) return;
     if (['door', 'window'].includes(type)) {
@@ -5915,7 +5946,7 @@ const MecFormModule = (() => {
         ficha: _defaultSketchFicha(type),
       };
     }
-    if (options.guided) _markGuidedObjectReview(object);
+    if (guided) _markGuidedObjectReview(object);
     if (object.type === 'wall') _snapWallObject(object);
     else if (object.type !== 'pencil') _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
@@ -6013,7 +6044,8 @@ const MecFormModule = (() => {
     UI.showToast('Croquis sanitario regenerado segun inodoros.', 'success');
   }
 
-  function addSanitaryStall(id) {
+  function addSanitaryStall(id, options = {}) {
+    const guided = _isGuidedInsert(options);
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
     if (!_assertSanitaryUnlocked(item, 'agregar cabinas')) return;
@@ -6041,17 +6073,22 @@ const MecFormModule = (() => {
         fixtures: _defaultStallFixtures(item),
       },
     };
+    if (guided) _markGuidedObjectReview(object);
     _clampSanitaryChildToRoom(item, object);
     item.objects.push(object);
-    item.objects.push(_createSanitaryStallDoor(item, object));
+    const door = _createSanitaryStallDoor(item, object);
+    if (guided) _markGuidedObjectReview(door);
+    item.objects.push(door);
     item.plano.cabinas.push({ id: cabinId, label: `Cbn ${next}`, artefacto: 'Inodoro', estado: item.estado || '' });
     item.inodoros = String(Math.max(Number(item.inodoros || 0), item.plano.cabinas.length, (item.objects || []).filter(child => child.type === 'stall').length));
     _selectedSanitaryObjectId = object.id;
     _saveDraft(false);
     _render();
     renderSchoolPlan();
-    UI.showToast('Cabina agregada con puerta y objetos basicos.', 'success');
-    setTimeout(() => openSanitaryStallFicha(item.id, object.id), 120);
+    UI.showToast(guided
+      ? 'Cabina agregada. La guia superior pedira estado, puerta y artefactos antes de continuar.'
+      : 'Cabina agregada con puerta y objetos basicos.', 'success');
+    if (!guided) setTimeout(() => openSanitaryStallFicha(item.id, object.id), 120);
   }
 
   function _defaultStallFixtures(item) {
@@ -11465,6 +11502,29 @@ const MecFormModule = (() => {
     return true;
   }
 
+  function setGuidedFloorField(blockId, floorId, fieldId, value) {
+    const block = _blockById(blockId || _data.__activeBlockId);
+    if (!block) {
+      UI.showToast('Seleccione un piso para responder esta pregunta.', 'warning');
+      return false;
+    }
+    const floor = _blockFloorRecord(block, floorId) || _ensureBlockFloors(block)[0];
+    if (!floor) {
+      UI.showToast('Seleccione un piso para responder esta pregunta.', 'warning');
+      return false;
+    }
+    if (!_assertBlockUnlocked(block, 'responder esta pregunta del piso')) return false;
+    floor[fieldId] = value;
+    if (fieldId === 'estado') floor.estado_piso = value;
+    _setActiveFloor(_floorRecordLabel(floor));
+    _selectedPlanId = _floorRecordPlanId(block, floor);
+    _syncBlockFloorCountFromRecords(block);
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Respuesta del piso registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
   function setGuidedClassroomField(roomId, fieldId, value) {
     const room = _activatePlanClassroom(roomId);
     if (!room) {
@@ -11545,6 +11605,29 @@ const MecFormModule = (() => {
     _selectedPlanId = `sanitary::${item.id}::${object.id}`;
     setSanitaryObjectValue(item.id, object.id, fieldId, clean, true);
     UI.showToast('Respuesta del elemento sanitario registrada. Continue con la siguiente pregunta.', 'success', 3200);
+    return true;
+  }
+
+  function setGuidedSiteElementField(siteId, fieldId, value) {
+    const element = _ensureSiteElements().find(item => item.id === siteId);
+    const clean = String(value || '').trim();
+    if (!element || !fieldId || !clean) {
+      UI.showToast('No se encontro el elemento exterior para registrar la respuesta.', 'warning');
+      return false;
+    }
+    if (!_assertSiteElementUnlocked(element, 'responder esta pregunta')) return false;
+    element.ficha = { ..._defaultSiteElementFicha(element.type, 1, element.shape), ...(element.ficha || {}) };
+    element.ficha[fieldId] = clean;
+    if (fieldId === 'rotacion_grados') element.rotationDeg = _normalizeSiteRotation(clean);
+    if (element.type === 'recreation' && fieldId === 'forma') {
+      element.shape = _normalizeRecreationShape(clean);
+      element.ficha.forma = _recreationShapeLabel(element.shape);
+    }
+    _updateSiteElementDerivedFields(element);
+    _selectedPlanId = `site::${element.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Respuesta exterior registrada. Continue con la siguiente pregunta.', 'success', 3200);
     return true;
   }
 
@@ -15933,6 +16016,7 @@ const MecFormModule = (() => {
   }
 
   function addPlanClassroomElement(type, options = {}) {
+    const guided = _isGuidedInsert(options);
     if (!SKETCH_TOOLS.some(tool => tool.id === type) || type === 'select') return;
     const roomId = _selectedPlanRoomId();
     const room = _activatePlanClassroom(roomId);
@@ -15947,14 +16031,16 @@ const MecFormModule = (() => {
     const previousTool = _sketchTool;
     _sketchTool = type;
     _pushSketchHistory();
-    const object = _createSketchObjectAt(point, { openFicha: options.guided ? false : true });
-    if (options.guided) _markGuidedObjectReview(object);
+    const object = _createSketchObjectAt(point, { openFicha: guided ? false : true });
+    if (guided) _markGuidedObjectReview(object);
     _sketchTool = previousTool;
     _syncActiveClassroomFromSketch();
     _selectedPlanId = object?.id ? `${room.id}::${object.id}` : `room::${room.id}`;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast(`${_sketchToolLabel(type)} agregado al aula. La guia pedira sus datos paso a paso.`, 'success');
+    UI.showToast(guided
+      ? `${_sketchToolLabel(type)} agregado al aula. La guia pedira sus datos paso a paso.`
+      : `${_sketchToolLabel(type)} agregado al aula.`, 'success');
   }
 
   function addPlanSanitaryFixture(fixtureId, options = {}) {
@@ -15964,7 +16050,7 @@ const MecFormModule = (() => {
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryFixture(sanitaryId, fixtureId, options);
+    addSanitaryFixture(sanitaryId, fixtureId, _guidedInsertOptions(options));
   }
 
   function addPlanSanitaryOpening(type, options = {}) {
@@ -15974,7 +16060,7 @@ const MecFormModule = (() => {
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryOpening(sanitaryId, type, options);
+    addSanitaryOpening(sanitaryId, type, _guidedInsertOptions(options));
   }
 
   function addPlanSanitaryElement(type, options = {}) {
@@ -15984,17 +16070,17 @@ const MecFormModule = (() => {
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryElement(sanitaryId, type, options);
+    addSanitaryElement(sanitaryId, type, _guidedInsertOptions(options));
   }
 
-  function addPlanSanitaryStall() {
+  function addPlanSanitaryStall(options = {}) {
     const sanitaryId = _selectedPlanSanitaryId();
     if (!sanitaryId) {
       UI.showToast('Seleccione un sanitario para agregar una cabina.', 'warning');
       return;
     }
     _selectedPlanId = `sanitary::${sanitaryId}`;
-    addSanitaryStall(sanitaryId);
+    addSanitaryStall(sanitaryId, _guidedInsertOptions(options));
   }
 
   function _rectOverlapArea(a, b) {
@@ -16292,6 +16378,7 @@ const MecFormModule = (() => {
   }
 
   function _createBlockDrivenPlanElement(block, fieldId, spec) {
+    const guided = _isGuidedRegisterActive();
     const cfg = _siteElementConfig(spec.type);
     if (!cfg) return null;
     const next = _ensureSiteElements().filter(item => item.type === spec.type).length + 1;
@@ -16319,14 +16406,17 @@ const MecFormModule = (() => {
         origen_registro: `${block.bloque_codigo || 'Bloque'} / ${fieldId}`,
       },
     };
+    if (guided) _prepareSiteElementForGuided(element);
     _updateSiteElementDerivedFields(element);
     _ensureSiteElements().push(element);
     _planLayers.exteriores = true;
     _startTimeLog('exterior', element.id, element.ficha.codigo || cfg.label);
     _saveDraft(false);
     _showSchoolPlanAfterSiteInsert(element);
-    setTimeout(() => openSiteElementFicha(element.id), 220);
-    UI.showToast(`${cfg.label} agregado automaticamente al plano. Complete su ficha y arrastrelo a su ubicacion exacta.`, 'success', 6500);
+    if (!guided) setTimeout(() => openSiteElementFicha(element.id), 220);
+    UI.showToast(guided
+      ? `${cfg.label} agregado automaticamente. La guia superior pedira medidas y condicion.`
+      : `${cfg.label} agregado automaticamente al plano. Complete su ficha y arrastrelo a su ubicacion exacta.`, 'success', 6500);
     return element;
   }
 
@@ -16528,7 +16618,34 @@ const MecFormModule = (() => {
     return true;
   }
 
-  function _createPlanSiteElement(type, origin = 'plan', shape = '') {
+  function _guidedSiteElementCharacteristicKey(type) {
+    return {
+      water_tank: 'material',
+      well: 'tipo_pozo',
+      recreation: 'uso',
+      gallery: 'ubicacion_relativa',
+      walkway: 'superficie',
+      open_space: 'uso',
+      pillar: 'material',
+      stair: 'material',
+      ramp: 'material',
+      service_connection: 'tipo_acometida',
+      meter: 'propiedad',
+      main_switchboard: 'proteccion',
+      grounding: 'conductor_visible',
+    }[type] || '';
+  }
+
+  function _prepareSiteElementForGuided(element) {
+    if (!element?.ficha) return element;
+    element.ficha.estado = '';
+    const key = _guidedSiteElementCharacteristicKey(element.type);
+    if (key) element.ficha[key] = '';
+    return element;
+  }
+
+  function _createPlanSiteElement(type, origin = 'plan', shape = '', options = {}) {
+    const guided = _isGuidedInsert(options);
     const cfg = _siteElementConfig(type);
     if (!cfg) return null;
     _planLayers.exteriores = true;
@@ -16547,13 +16664,16 @@ const MecFormModule = (() => {
       rotationDeg: 0,
       ficha: _defaultSiteElementFicha(type, next, normalizedShape),
     };
+    if (guided) _prepareSiteElementForGuided(element);
     _updateSiteElementDerivedFields(element);
     elements.push(element);
     _startTimeLog('exterior', element.id, element.ficha.codigo || cfg.label);
     _saveDraft(false);
     _showSchoolPlanAfterSiteInsert(element);
-    setTimeout(() => openSiteElementFicha(element.id), 180);
-    UI.showToast(`${cfg.label} ubicado en el plano general. Complete la ficha y luego muevalo si hace falta.`, 'success', 5600);
+    if (!guided) setTimeout(() => openSiteElementFicha(element.id), 180);
+    UI.showToast(guided
+      ? `${cfg.label} ubicado en el plano. La guia superior pedira medidas, estado y caracteristicas.`
+      : `${cfg.label} ubicado en el plano general. Complete la ficha y luego muevalo si hace falta.`, 'success', 5600);
     return element;
   }
 
@@ -16595,10 +16715,11 @@ const MecFormModule = (() => {
 
   function chooseRecreationShape(shape, origin = 'plan') {
     closeRecreationShapePicker();
-    addPlanSiteElement('recreation', origin, shape);
+    addPlanSiteElement('recreation', origin, shape, _guidedInsertOptions());
   }
 
-  function addPlanSiteElement(type, origin = 'plan', shape = '') {
+  function addPlanSiteElement(type, origin = 'plan', shape = '', options = {}) {
+    const guidedOptions = _guidedInsertOptions(options);
     const cfg = _siteElementConfig(type);
     if (!cfg) return;
     if (type === 'recreation' && !shape) {
@@ -16606,7 +16727,7 @@ const MecFormModule = (() => {
       return;
     }
     const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape) : '';
-    const createAndEdit = () => _createPlanSiteElement(type, origin, normalizedShape);
+    const createAndEdit = () => _createPlanSiteElement(type, origin, normalizedShape, guidedOptions);
     if (_isStandaloneSchoolPlanActive()) {
       renderSchoolPlan();
       setTimeout(createAndEdit, 0);
@@ -16797,10 +16918,11 @@ const MecFormModule = (() => {
   }
 
   function newPlanClassroom(options = {}) {
+    const guided = _isGuidedInsert(options);
     const raw = String(_selectedPlanId || '');
     if (raw.startsWith('block::')) _activatePlanSelection(raw);
-    newClassroom();
-    if (options.guided && _activeClassroomId) {
+    newClassroom({ ...options, guided });
+    if (guided && _activeClassroomId) {
       _data.__classroomSketch = {
         ...(_data.__classroomSketch || {}),
         estado: '',
@@ -16815,10 +16937,11 @@ const MecFormModule = (() => {
   }
 
   function addPlanSanitary(options = {}) {
+    const guided = _isGuidedInsert(options);
     const raw = String(_selectedPlanId || '');
     if (raw.startsWith('block::')) _activatePlanSelection(raw);
-    addSanitary();
-    if (options.guided && _activeSanitaryId) {
+    addSanitary({ ...options, guided });
+    if (guided && _activeSanitaryId) {
       const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === _activeSanitaryId);
       if (item) {
         item.uso = '';
@@ -20678,10 +20801,12 @@ const MecFormModule = (() => {
     setSketchTool,
     setSketchField,
     setGuidedBlockField,
+    setGuidedFloorField,
     setGuidedClassroomField,
     setGuidedClassroomObjectField,
     setGuidedSanitaryField,
     setGuidedSanitaryObjectField,
+    setGuidedSiteElementField,
     selectBlock,
     selectBlockForClassrooms,
     selectBlockForSanitaries,

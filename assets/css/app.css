@@ -5234,6 +5234,26 @@ textarea.form-control {
   min-height: 54px;
   padding: .32rem .36rem;
   gap: .34rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  max-height: 186px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#module-registro .school-plan-ribbon__group {
+  min-width: min(100%, 176px);
+  max-width: 100%;
+  padding-right: .34rem;
+}
+
+#module-registro .school-plan-ribbon__group-body,
+#module-registro .school-plan-ribbon__zoom,
+#module-registro .school-plan-ribbon__basemap,
+#module-registro .school-plan-ribbon__checks {
+  flex-wrap: wrap;
+  align-items: stretch;
 }
 
 #module-registro .school-plan-ribbon__tab {
@@ -5246,10 +5266,13 @@ textarea.form-control {
   min-width: 46px;
   min-height: 38px;
   padding: .18rem .28rem;
+  flex: 0 0 52px;
 }
 
 #module-registro .school-plan-ribbon__label {
   max-width: 58px;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-size: .53rem;
 }
 
