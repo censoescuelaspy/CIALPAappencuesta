@@ -35,6 +35,11 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
 - Servidor local `127.0.0.1:8061`: `index.html` responde HTTP 200.
+- `git push origin main`: publica commit `9442c75`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.109`.
+- Verificacion HTTP de GitHub Pages para `assets/js/location-audit.js`: contiene `LocationAuditModule`, `CSV base` y `street_view_url`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.109` y `location-audit.js`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `module-ubicacion` y assets `v=2.6.109`.
 
 ---
 
