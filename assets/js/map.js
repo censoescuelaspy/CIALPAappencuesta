@@ -555,6 +555,91 @@ const MapModule = (() => {
     AppController.showModule('mapa');
   }
 
+  function showNextAfterFinalized(currentSchool = {}) {
+    const current = _findSchoolLike(currentSchool);
+    if (current) {
+      current.estado_relevamiento = 'finalizada';
+      current.fecha_ultimo_cierre = current.fecha_ultimo_cierre || new Date().toISOString();
+    }
+    const next = _suggestNextAssignedSchool(current || currentSchool);
+    if (typeof AppController !== 'undefined' && AppController.showModule) AppController.showModule('mapa');
+    setTimeout(() => {
+      if (current?.id_escuela) {
+        _renderList(_filteredEscuelas.length ? _filteredEscuelas : _escuelas);
+        _updateSummaryBadges(_filteredEscuelas.length ? _filteredEscuelas : _escuelas);
+      }
+      if (next?.id_escuela) {
+        flyTo(next.id_escuela);
+        UI.showToast(`Siguiente escuela sugerida: ${next.nombre || next.codigo_local || next.id_escuela}.`, 'success', 9000);
+      } else {
+        UI.showToast('Escuela finalizada. No quedan escuelas pendientes asignadas visibles para este usuario.', 'success', 9000);
+      }
+    }, 700);
+    return next || null;
+  }
+
+  function _findSchoolLike(school = {}) {
+    const keys = _schoolIdentityKeys(school);
+    if (!keys.length) return null;
+    return _escuelas.find(item => _schoolIdentityKeys(item).some(key => keys.includes(key))) || null;
+  }
+
+  function _schoolIdentityKeys(school = {}) {
+    return [
+      school.id_escuela,
+      school.codigo_local,
+      school.codigo,
+      school.id,
+      school.code,
+    ]
+      .map(value => String(value ?? '').trim())
+      .filter(Boolean);
+  }
+
+  function _suggestNextAssignedSchool(currentSchool = {}) {
+    const currentKeys = _schoolIdentityKeys(currentSchool);
+    const currentPoint = _schoolPoint(currentSchool);
+    const candidates = _escuelas
+      .filter(item => item && !item.es_ejemplo)
+      .filter(item => Auth.canOperateSchool(item))
+      .filter(item => !_isClosed(item))
+      .filter(item => !_schoolIdentityKeys(item).some(key => currentKeys.includes(key)));
+    if (!candidates.length) return null;
+    return candidates
+      .map((item, index) => ({
+        item,
+        score: _nextSchoolScore(item, currentPoint, index),
+      }))
+      .sort((a, b) => a.score - b.score)[0]?.item || null;
+  }
+
+  function _nextSchoolScore(item, currentPoint, index) {
+    const point = _schoolPoint(item);
+    const distance = currentPoint && point ? _distanceKm(currentPoint, point) : 9999;
+    const pilotBoost = _isPilotSchool(item) ? -50 : 0;
+    const order = Number(item.orden_muestra_piloto || item.orden_visita || index + 1);
+    return distance * 100 + pilotBoost + (Number.isFinite(order) ? order / 100 : index / 100);
+  }
+
+  function _schoolPoint(item = {}) {
+    const lat = Number(item.latitud);
+    const lng = Number(item.longitud);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+  }
+
+  function _distanceKm(a, b) {
+    const toRad = deg => Number(deg || 0) * Math.PI / 180;
+    const earthKm = 6371;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const h = Math.sin(dLat / 2) ** 2
+      + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * earthKm * Math.asin(Math.min(1, Math.sqrt(h)));
+  }
+
   function startGuidedRegister(id) {
     if (!Auth.requireAuth()) return;
     const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
@@ -834,6 +919,7 @@ const MapModule = (() => {
     clearFilters,
     flyTo,
     focusListItem,
+    showNextAfterFinalized,
     startGuidedRegister,
     solicitarRelevamiento,
     invalidateSize,

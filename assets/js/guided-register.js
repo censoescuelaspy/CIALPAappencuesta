@@ -320,6 +320,7 @@ const GuidedRegisterModule = (() => {
     if (action === 'resetClassroomTarget') return _resetClassroomTarget();
     if (action === 'markNoFloor') return _setScopedFlag('noFloor', true, 'Bloque registrado sin piso para esta ronda.');
     if (action === 'resetNoFloor') return _setScopedFlag('noFloor', false, 'Se volvera a pedir el piso del bloque.');
+    if (action === 'saveBlockMeasures') return _saveBlockMeasures();
     if (action === 'markNoSanitary') return _setScopedFlag('noSanitary', true, 'Respuesta registrada: sin sanitario para este bloque/piso.');
     if (action === 'resetNoSanitary') return _setScopedFlag('noSanitary', false, 'Se volvera a pedir sanitario para este bloque/piso.');
     if (action === 'markNoSiteElements') return _setScopedFlag('noSiteElements', true, 'Respuesta registrada: sin exteriores por ahora.');
@@ -331,6 +332,10 @@ const GuidedRegisterModule = (() => {
     if (action === 'answerClassroomObjectField') return _answerClassroomObjectField(value);
     if (action === 'answerSanitaryField') return _answerSanitaryField(value);
     if (action === 'answerSanitaryObjectField') return _answerSanitaryObjectField(value);
+    if (action === 'addGuidedRoomElement') return _addGuidedRoomElement(value);
+    if (action === 'markRoomElementAbsent') return _markRoomElementDecision(value, false);
+    if (action === 'addGuidedSanitaryElement') return _addGuidedSanitaryElement(value);
+    if (action === 'markSanitaryElementAbsent') return _markSanitaryElementDecision(value, false);
     if (action === 'goClosure') return _goClosure();
     if (action === 'syncSheets') return _syncDraftToSheets();
     if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
@@ -473,10 +478,15 @@ const GuidedRegisterModule = (() => {
       'floor',
       'floorGuide',
       'answerBlockField',
+      'saveBlockMeasures',
       'answerClassroomField',
       'answerClassroomObjectField',
       'answerSanitaryField',
       'answerSanitaryObjectField',
+      'addGuidedRoomElement',
+      'markRoomElementAbsent',
+      'addGuidedSanitaryElement',
+      'markSanitaryElementAbsent',
       'classroom',
       'guidedClassroom',
       'openClassroomFicha',
@@ -1200,15 +1210,30 @@ const GuidedRegisterModule = (() => {
 
   function _blockQuestion(snap) {
     if (!snap.blocks) {
-      return _question('Paso 1', 'Crear bloque y cargar medidas', 'Primero cree el bloque. La ficha se abrira para registrar largo, ancho, estado y observaciones.', [
+      return _question('Paso 1', 'Crear bloque', 'Primero cree el bloque. Luego la tarjeta superior pedira largo, ancho y las respuestas tecnicas sin depender de la ficha.', [
         { label: 'Iniciar bloque', action: 'guidedBlock', primary: true },
       ]);
     }
     const blockPending = _blockRequirementItems(snap.activeBlock);
     const blockNext = _firstPendingRequirement(blockPending);
     if (blockNext) {
-      return _question('Paso 1', `Bloque: ${blockNext.title}`, blockNext.help || 'Complete la ficha del bloque antes de continuar.', [
-        { label: 'Completar ficha bloque', action: 'blockFicha', primary: true },
+      if (blockNext.field === 'medidas_bloque') {
+        return _question('Paso 1', 'Bloque: medidas principales', 'Ingrese largo y ancho del bloque desde la guia. La ficha queda disponible solo para revisar o ampliar.', [
+          { label: 'Guardar medidas', action: 'saveBlockMeasures', primary: true },
+          { label: 'Editar ficha', action: 'blockFicha' },
+        ], false, _measureControl('guided-block', 'Largo del bloque (m)', 'Ancho del bloque (m)', snap.activeBlock?.largo_m || '', snap.activeBlock?.ancho_m || ''), '', true);
+      }
+      if (blockNext.field === 'estado_bloque') {
+        return _question('Paso 1', 'Bloque: estado general', 'Registre la condicion observada del bloque antes de ubicarlo.', [
+          { label: 'Bueno', action: 'answerBlockField', value: 'estado_bloque::Bueno', primary: true },
+          { label: 'Regular', action: 'answerBlockField', value: 'estado_bloque::Regular' },
+          { label: 'Malo', action: 'answerBlockField', value: 'estado_bloque::Malo' },
+          { label: 'No verificable', action: 'answerBlockField', value: 'estado_bloque::No verificable' },
+          { label: 'Editar ficha', action: 'blockFicha' },
+        ], false, _guidedRequirementList(blockPending));
+      }
+      return _question('Paso 1', `Bloque: ${blockNext.title}`, blockNext.help || 'Complete la respuesta principal antes de continuar.', [
+        { label: 'Editar ficha bloque', action: 'blockFicha', primary: true },
       ], false, _guidedRequirementList(blockPending));
     }
     if (!snap.blockPositioned) {
@@ -1404,6 +1429,8 @@ const GuidedRegisterModule = (() => {
     }
     const object = _guidedPendingObjects(room?.objects || [])[0];
     if (object) return _roomObjectDirectQuestion(room, object);
+    const nextDecision = _nextRoomElementDecision(room);
+    if (nextDecision) return _roomElementDecisionQuestion(room, nextDecision);
     return null;
   }
 
@@ -1436,7 +1463,27 @@ const GuidedRegisterModule = (() => {
     }
     const object = _guidedPendingObjects(item?.objects || [])[0];
     if (object) return _sanitaryObjectDirectQuestion(item, object);
+    const nextDecision = _nextSanitaryElementDecision(item);
+    if (nextDecision) return _sanitaryElementDecisionQuestion(item, nextDecision);
     return null;
+  }
+
+  function _roomElementDecisionQuestion(room, spec) {
+    const label = room?.name || 'Aula pendiente';
+    return _question('Pregunta del aula', `${label}: ${spec.question}`, spec.help || 'La guia decide primero si el elemento existe; si existe, se agrega al plano y luego se preguntan sus caracteristicas.', [
+      { label: spec.yesLabel || `Si, agregar ${spec.label}`, action: 'addGuidedRoomElement', value: `${room.id}::${spec.type}`, primary: true },
+      { label: spec.noLabel || `No tiene ${spec.label}`, action: 'markRoomElementAbsent', value: `${room.id}::${spec.type}` },
+      { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+    ], false, _guidedRequirementList(_roomRequirementItems(room)));
+  }
+
+  function _sanitaryElementDecisionQuestion(item, spec) {
+    const label = item?.codigo || 'Sanitario pendiente';
+    return _question('Pregunta del sanitario', `${label}: ${spec.question}`, spec.help || 'La guia decide primero si el elemento existe; si existe, se agrega al plano y luego se preguntan sus caracteristicas.', [
+      { label: spec.yesLabel || `Si, agregar ${spec.label}`, action: 'addGuidedSanitaryElement', value: `${item.id}::${spec.type}`, primary: true },
+      { label: spec.noLabel || `No tiene ${spec.label}`, action: 'markSanitaryElementAbsent', value: `${item.id}::${spec.type}` },
+      { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+    ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
   }
 
   function _roomObjectDirectQuestion(room, object) {
@@ -1513,9 +1560,9 @@ const GuidedRegisterModule = (() => {
     return _question(
       'Todo completo',
       'Sin pendientes detectados',
-      'El relevamiento esta listo para cierre. Al guardar, se registra el paquete final, se prepara el envio por correo y se abre de inmediato la vista PDF.',
+      'El relevamiento esta listo para cierre. Al guardar, se registra el paquete final, se muestra la confirmacion y la app vuelve al mapa con la siguiente escuela sugerida.',
       [
-        { label: 'Finalizar escuela y abrir PDF', action: 'finalizeComplete', variant: 'success', primary: true },
+        { label: 'Finalizar escuela', action: 'finalizeComplete', variant: 'success', primary: true },
         { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
         { label: 'Ver PDF', action: 'pdf' },
         { label: 'Datos en Sheets', action: 'workbook' },
@@ -1631,13 +1678,14 @@ const GuidedRegisterModule = (() => {
         help: 'Complete largo y ancho del bloque. Estas medidas fijan la escala de pisos, aulas y sanitarios.',
         doneText: `${block?.largo_m || '?'} x ${block?.ancho_m || '?'} m`,
         done: _hasMeasures(block, 'largo_m', 'ancho_m'),
+        field: 'medidas_bloque',
       },
       {
         title: 'Condicion de calidad',
-        help: 'Registre el estado general del bloque antes de ubicarlo en el plano.',
+        help: 'Registre el estado general del bloque desde la guia antes de ubicarlo en el plano.',
         doneText: block?.estado_bloque || 'Estado cargado',
         done: _hasAnswer(block?.estado_bloque),
-        optional: true,
+        field: 'estado_bloque',
       },
       {
         title: 'Caracteristicas / observacion',
@@ -1709,6 +1757,12 @@ const GuidedRegisterModule = (() => {
         done: _hasAnswer(room?.caracteristicas) || _hasAnswer(room?.openings),
       },
       {
+        title: 'Responder elementos del aula',
+        help: _roomElementDecisionHelp(room),
+        doneText: 'Puertas, ventanas e instalaciones basicas respondidas',
+        done: _roomElementDecisionsComplete(room),
+      },
+      {
         title: 'Completar elementos declarados',
         help: _guidedPendingObjectsHelp(room?.objects || [], 'aula'),
         doneText: 'Puertas, ventanas y objetos declarados tienen ficha revisada',
@@ -1745,6 +1799,12 @@ const GuidedRegisterModule = (() => {
         help: 'Complete uso principal, genero/destino y agua desde preguntas superiores sucesivas.',
         doneText: [item?.uso, item?.genero, item?.agua].filter(Boolean).join(' / ') || 'Caracteristicas cargadas',
         done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
+      },
+      {
+        title: 'Responder elementos del sanitario',
+        help: _sanitaryElementDecisionHelp(item),
+        doneText: 'Aberturas y artefactos basicos respondidos',
+        done: _sanitaryElementDecisionsComplete(item),
       },
       {
         title: 'Completar elementos declarados',
@@ -1808,6 +1868,83 @@ const GuidedRegisterModule = (() => {
     if (!parent || !object?.id) return '';
     if (kind === 'sanitary') return `sanitary::${parent.id}::${object.id}`;
     return `${parent.id}::${object.id}`;
+  }
+
+  function _roomElementDecisionSequence() {
+    return [
+      { type: 'door', label: 'puerta', question: 'Tiene puerta?', yesLabel: 'Si, agregar puerta', noLabel: 'No tiene puerta' },
+      { type: 'window', label: 'ventana', question: 'Tiene ventana?', yesLabel: 'Si, agregar ventana', noLabel: 'No tiene ventana' },
+      { type: 'outlet', label: 'toma', question: 'Tiene toma electrica?', yesLabel: 'Si, agregar toma', noLabel: 'No tiene toma' },
+      { type: 'switchboard', label: 'tablero', question: 'Tiene tablero o llave visible?', yesLabel: 'Si, agregar tablero', noLabel: 'No tiene tablero' },
+      { type: 'light', label: 'luz', question: 'Tiene luz o foco?', yesLabel: 'Si, agregar luz', noLabel: 'No tiene luz' },
+      { type: 'fan', label: 'ventilador', question: 'Tiene ventilador?', yesLabel: 'Si, agregar ventilador', noLabel: 'No tiene ventilador' },
+      { type: 'ac', label: 'aire acondicionado', question: 'Tiene aire acondicionado?', yesLabel: 'Si, agregar aire', noLabel: 'No tiene aire' },
+      { type: 'board', label: 'pizarron', question: 'Tiene pizarron?', yesLabel: 'Si, agregar pizarron', noLabel: 'No tiene pizarron' },
+      { type: 'damage', label: 'falla/grieta', question: 'Hay falla, grieta o dano visible?', yesLabel: 'Si, marcar falla', noLabel: 'Sin falla visible' },
+    ];
+  }
+
+  function _sanitaryElementDecisionSequence() {
+    return [
+      { type: 'door', label: 'puerta', question: 'Tiene puerta?', yesLabel: 'Si, agregar puerta', noLabel: 'No tiene puerta' },
+      { type: 'window', label: 'ventana', question: 'Tiene ventana o ventilacion?', yesLabel: 'Si, agregar ventana', noLabel: 'No tiene ventana' },
+      { type: 'toilet', label: 'inodoro', question: 'Tiene inodoro?', yesLabel: 'Si, agregar inodoro', noLabel: 'No tiene inodoro' },
+      { type: 'sink', label: 'lavamanos', question: 'Tiene lavamanos?', yesLabel: 'Si, agregar lavamanos', noLabel: 'No tiene lavamanos' },
+      { type: 'urinal', label: 'urinario', question: 'Tiene urinario?', yesLabel: 'Si, agregar urinario', noLabel: 'No tiene urinario' },
+      { type: 'shower', label: 'ducha', question: 'Tiene ducha?', yesLabel: 'Si, agregar ducha', noLabel: 'No tiene ducha' },
+      { type: 'light', label: 'luz', question: 'Tiene luz o foco?', yesLabel: 'Si, agregar luz', noLabel: 'No tiene luz' },
+      { type: 'damage', label: 'falla/grieta', question: 'Hay falla, grieta o dano visible?', yesLabel: 'Si, marcar falla', noLabel: 'Sin falla visible' },
+    ];
+  }
+
+  function _nextRoomElementDecision(room) {
+    return _roomElementDecisionSequence().find(spec => !_roomElementDecisionDone(room, spec.type)) || null;
+  }
+
+  function _nextSanitaryElementDecision(item) {
+    return _sanitaryElementDecisionSequence().find(spec => !_sanitaryElementDecisionDone(item, spec.type)) || null;
+  }
+
+  function _roomElementDecisionsComplete(room) {
+    return !_nextRoomElementDecision(room);
+  }
+
+  function _sanitaryElementDecisionsComplete(item) {
+    return !_nextSanitaryElementDecision(item);
+  }
+
+  function _roomElementDecisionHelp(room) {
+    const next = _nextRoomElementDecision(room);
+    return next
+      ? `Pendiente responder: ${next.question}`
+      : 'Ya se respondieron los elementos basicos del aula.';
+  }
+
+  function _sanitaryElementDecisionHelp(item) {
+    const next = _nextSanitaryElementDecision(item);
+    return next
+      ? `Pendiente responder: ${next.question}`
+      : 'Ya se respondieron las aberturas y artefactos basicos del sanitario.';
+  }
+
+  function _roomElementDecisionDone(room, type) {
+    return _hasObjectOfType(room?.objects || [], type) || _flagValue(_roomElementDecisionKey(room, type));
+  }
+
+  function _sanitaryElementDecisionDone(item, type) {
+    return _hasObjectOfType(item?.objects || [], type) || _flagValue(_sanitaryElementDecisionKey(item, type));
+  }
+
+  function _hasObjectOfType(objects = [], type = '') {
+    return (objects || []).some(object => object?.type === type);
+  }
+
+  function _roomElementDecisionKey(room, type) {
+    return _flagKeyParts(`room:${room?.id || ''}`, _normalizeFloorLabel(room?.floor || 'Piso 1'), `elementAbsent:${type}`);
+  }
+
+  function _sanitaryElementDecisionKey(item, type) {
+    return _flagKeyParts(`sanitary:${item?.id || ''}`, _normalizeFloorLabel(item?.planta || 'Piso 1'), `elementAbsent:${type}`);
   }
 
   function _fieldAnswerActions(action, baseValue, options = [], primary = '') {
@@ -1979,6 +2116,42 @@ const GuidedRegisterModule = (() => {
       </label>`;
   }
 
+  function _measureControl(name, lengthLabel, widthLabel, lengthValue = '', widthValue = '') {
+    return `
+      <div class="guided-question-fields guided-question-fields--pair">
+        <label class="guided-question-control">
+          <span>${_escape(lengthLabel)}</span>
+          <input class="form-control" type="number" min="0" step="0.1" value="${_escape(lengthValue)}" data-${_escape(name)}-length>
+        </label>
+        <label class="guided-question-control">
+          <span>${_escape(widthLabel)}</span>
+          <input class="form-control" type="number" min="0" step="0.1" value="${_escape(widthValue)}" data-${_escape(name)}-width>
+        </label>
+      </div>`;
+  }
+
+  function _saveBlockMeasures() {
+    const lengthInput = document.querySelector('[data-guided-block-length]');
+    const widthInput = document.querySelector('[data-guided-block-width]');
+    const length = Number(lengthInput?.value);
+    const width = Number(widthInput?.value);
+    if (!Number.isFinite(length) || length <= 0 || !Number.isFinite(width) || width <= 0) {
+      UI.showToast('Ingrese largo y ancho validos del bloque antes de continuar.', 'warning', 6200);
+      return;
+    }
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.setGuidedBlockField) {
+      UI.showToast('No se pudo guardar las medidas del bloque desde la guia.', 'warning');
+      return;
+    }
+    const okLength = mec.setGuidedBlockField('largo_m', String(length));
+    const okWidth = mec.setGuidedBlockField('ancho_m', String(width));
+    if (okLength && okWidth) {
+      UI.showToast('Medidas del bloque registradas. Ahora complete su estado y ubiquelo en el plano.', 'success', 5200);
+      _refreshSoon();
+    }
+  }
+
   function _saveClassroomTarget() {
     const input = document.querySelector('[data-guided-classroom-target]');
     const target = Math.floor(Number(input?.value));
@@ -2060,6 +2233,58 @@ const GuidedRegisterModule = (() => {
       return;
     }
     if (mec.setGuidedSanitaryObjectField(sanitaryId, objectId, fieldId, value)) _refreshSoon();
+  }
+
+  function _addGuidedRoomElement(payload) {
+    const [roomId, type] = String(payload || '').split('::');
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!roomId || !type || !mec?.selectPlanItem || !mec?.addPlanClassroomElement) {
+      UI.showToast('No se pudo agregar el elemento del aula.', 'warning');
+      return;
+    }
+    mec.selectPlanItem(`room::${roomId}`);
+    mec.addPlanClassroomElement(type, { guided: true });
+    _refreshSoon();
+  }
+
+  function _markRoomElementDecision(payload, exists) {
+    const [roomId, type] = String(payload || '').split('::');
+    const snap = _snapshot();
+    const room = (snap.values?.__classrooms || []).find(item => item.id === roomId);
+    if (!room || !type) return;
+    _setFlag(_roomElementDecisionKey(room, type), !exists);
+    _saveState();
+    _updateSnapshot();
+    UI.showToast('Respuesta registrada. Continue con la siguiente pregunta.', 'success', 3200);
+  }
+
+  function _addGuidedSanitaryElement(payload) {
+    const [sanitaryId, type] = String(payload || '').split('::');
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!sanitaryId || !type || !mec?.selectPlanItem) {
+      UI.showToast('No se pudo agregar el elemento sanitario.', 'warning');
+      return;
+    }
+    mec.selectPlanItem(`sanitary::${sanitaryId}`);
+    if (['toilet', 'sink', 'urinal', 'shower'].includes(type) && mec.addPlanSanitaryFixture) {
+      mec.addPlanSanitaryFixture(type, { guided: true });
+    } else if (['door', 'window'].includes(type) && mec.addPlanSanitaryOpening) {
+      mec.addPlanSanitaryOpening(type, { guided: true });
+    } else if (mec.addPlanSanitaryElement) {
+      mec.addPlanSanitaryElement(type, { guided: true });
+    }
+    _refreshSoon();
+  }
+
+  function _markSanitaryElementDecision(payload, exists) {
+    const [sanitaryId, type] = String(payload || '').split('::');
+    const snap = _snapshot();
+    const item = (snap.values?.__sanitaries || []).find(current => current.id === sanitaryId);
+    if (!item || !type) return;
+    _setFlag(_sanitaryElementDecisionKey(item, type), !exists);
+    _saveState();
+    _updateSnapshot();
+    UI.showToast('Respuesta registrada. Continue con la siguiente pregunta.', 'success', 3200);
   }
 
   function _selectPlanItem(value = '') {
@@ -2189,10 +2414,11 @@ const GuidedRegisterModule = (() => {
       if (!confirmed) return;
     }
     const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
-    if (!mec?.buildFinalDeliveryPackage || !mec?.printPlanPdf) {
+    if (!mec?.buildFinalDeliveryPackage) {
       UI.showToast('No se pudo preparar el paquete final desde el motor del plano.', 'error');
       return;
     }
+    UI.showToast('Finalizando escuela... guardando cierre, jornada y evidencias.', 'info', 9000);
     const packageData = mec.buildFinalDeliveryPackage(snap.completion);
     if (mec.syncDraftToSheets) {
       await mec.syncDraftToSheets('cierre_final', { silent: true, force: true }).catch(err => {
@@ -2220,8 +2446,46 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo enviar al servidor ahora. El PDF se abre igual y el cierre queda anotado localmente.', 'warning', 8200);
     } finally {
       await _closeSurveySessionAfterFinalDelivery(snap, pendingCount);
-      mec.printPlanPdf();
+      const nextSchool = _returnToMapAfterFinalDelivery(snap);
+      _showFinalDeliveryMessage(snap, nextSchool, pendingCount);
       _refreshSoon();
+    }
+  }
+
+  function _returnToMapAfterFinalDelivery(snap) {
+    const selectedSchool = snap.values?.__selectedSchool || {};
+    const currentSchool = {
+      ...selectedSchool,
+      id_escuela: selectedSchool.id_escuela || selectedSchool.id || snap.school?.code || '',
+      codigo_local: selectedSchool.codigo_local || selectedSchool.codigo || snap.school?.code || '',
+      nombre: selectedSchool.nombre || selectedSchool.nombre_escuela || snap.school?.name || '',
+      code: snap.school?.code || '',
+    };
+    if (typeof MapModule !== 'undefined' && MapModule.showNextAfterFinalized) {
+      return MapModule.showNextAfterFinalized(currentSchool);
+    }
+    if (typeof AppController !== 'undefined' && AppController.showModule) AppController.showModule('mapa');
+    return null;
+  }
+
+  function _showFinalDeliveryMessage(snap, nextSchool, pendingCount = 0) {
+    const schoolName = snap.school?.name || snap.values?.__selectedSchool?.nombre || 'la escuela';
+    const nextName = nextSchool
+      ? `${nextSchool.nombre || nextSchool.nombre_escuela || 'Escuela'}${nextSchool.codigo_local ? ` (${nextSchool.codigo_local})` : ''}`
+      : '';
+    const html = `
+      <div class="guided-final-message">
+        <p><strong>${_escape(schoolName)} quedo finalizada.</strong></p>
+        <p>${pendingCount ? `Se cerro con ${pendingCount} pendiente(s) declarado(s), sin perder trazabilidad.` : 'Excelente trabajo: el paquete final quedo registrado y trazable.'}</p>
+        ${nextName
+          ? `<p>La app ya te lleva al mapa y enfoca la siguiente escuela sugerida: <strong>${_escape(nextName)}</strong>.</p>`
+          : '<p>La app ya vuelve al mapa. No quedan escuelas pendientes asignadas visibles para este usuario.</p>'}
+        <p>Respire un segundo, sincronice si hace falta y continue con la siguiente visita.</p>
+      </div>`;
+    if (typeof UI !== 'undefined' && UI.showHtmlAlert) {
+      UI.showHtmlAlert('Escuela finalizada', html, 'success');
+    } else {
+      UI.showToast('Escuela finalizada. Volviendo al mapa con la siguiente sugerencia.', 'success', 9000);
     }
   }
 

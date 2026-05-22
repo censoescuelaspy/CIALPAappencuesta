@@ -4851,6 +4851,17 @@ textarea.form-control {
   max-width: 340px;
 }
 
+.guided-question-fields {
+  display: grid;
+  gap: .35rem;
+  min-width: 0;
+}
+
+.guided-question-fields--pair {
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  width: min(100%, 520px);
+}
+
 .guided-question-control span {
   color: #334155;
   font-size: .64rem;

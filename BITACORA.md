@@ -4,6 +4,43 @@
 
 ---
 
+## Cierre con siguiente escuela y guia secuencial reforzada - 2026-05-21 - v2.6.97
+
+### Objetivo
+- Hacer que `Finalizar escuela` siempre muestre una respuesta visible y motivadora.
+- Al finalizar, devolver inmediatamente al `Mapa` y enfocar la siguiente escuela sugerida para el encuestador.
+- Reforzar que la captura principal ocurra en la tarjeta superior del `Registro guiado`, paso a paso, dejando las fichas como apoyo secundario.
+
+### Cambios implementados
+- `Finalizar escuela` muestra aviso de progreso mientras guarda cierre, jornada y evidencias.
+- Al cerrar, aparece un mensaje emergente `Escuela finalizada` con confirmacion, contexto de pendientes y siguiente escuela sugerida.
+- `Registro guiado` deja de abrir PDF automaticamente al cierre y vuelve al mapa operativo.
+- `Mapa` agrega `showNextAfterFinalized()`, marca la escuela actual como finalizada localmente y enfoca la siguiente escuela asignada pendiente.
+- La sugerencia prioriza escuelas asignadas al usuario, no finalizadas, con preferencia por cercania y muestra piloto.
+- La creacion guiada de bloque ya no abre la ficha automaticamente: la guia superior pide largo, ancho y estado general.
+- Aulas y sanitarios ahora preguntan en secuencia si existen puertas, ventanas, artefactos, luces, fallas y otros elementos basicos antes de agregarlos al plano.
+- Las fichas quedan disponibles como `Editar ficha`, pero ya no son la ruta principal de captura.
+- Version visible y cache del Service Worker actualizados a `v2.6.97`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages.
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.97`.
+- Probar con un encuestador real: finalizar escuela, ver mensaje emergente, volver al mapa y confirmar enfoque de siguiente escuela asignada.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/jornada.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Playwright/Chromium local: `Registro guiado` abre en `v2.6.97` sin errores de consola.
+
+---
+
 ## Apunte a nuevo Web App propietario - 2026-05-21 - v2.6.96
 
 ### Objetivo

@@ -4469,10 +4469,15 @@ const MecFormModule = (() => {
       block = _blockById(_data.__activeBlockId);
     }
     if (!block) return;
+    if (block.estado_bloque === 'Operativo' && !block.largo_m && !block.ancho_m) {
+      block.estado_bloque = '';
+      _data.bloques = { ...(_data.bloques || {}), estado_bloque: '' };
+      _syncActiveBlock();
+      _saveDraft(false);
+    }
     _selectedPlanId = `block::${block.id}`;
     renderSchoolPlan();
-    setTimeout(() => openPlanBlockFicha(block.id), 80);
-    UI.showToast('Paso 1: cargue medidas del bloque. Luego ubíquelo en el plano.', 'info', 6200);
+    UI.showToast('Paso 1: responda largo, ancho y estado del bloque desde la guia superior. La ficha queda para correcciones.', 'info', 7200);
   }
 
   function positionActiveBlockOnPlan() {
