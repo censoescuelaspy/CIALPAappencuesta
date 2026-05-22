@@ -142,6 +142,7 @@ const MapModule = (() => {
           ${canOperate ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>` : ''}
           ${canOperate ? `<button class="btn btn-primary btn-sm" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>` : ''}
           ${canRequest ? `<button class="btn btn-warning btn-sm" onclick='MapModule.solicitarRelevamiento(${idArg})'>Solicitar relevar</button>` : ''}
+          ${_locationReviewActions(e)}
           ${canSurvey && !canOperate ? _readonlyNotice(e) : ''}
           <button class="btn btn-outline btn-sm" onclick='MapModule.focusListItem(${idArg})'>Ver en lista</button>
         </div>
@@ -375,6 +376,7 @@ const MapModule = (() => {
         <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
         <p><b>Tiempo estimado:</b> ${_estimateMinutes(e)} min</p>
         <p><b>Estado:</b> <span class="badge badge--${state}">${_escape(APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento)}</span></p>
+        ${_locationReviewActions(e, true)}
         ${canOperate ? `
           <button class="btn btn-success btn-block mt-2" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>
           <button class="btn btn-primary btn-block mt-2" onclick='SurveyModule.selectEscuela(${idArg})'>Migrar datos al RUE-MEC</button>
@@ -411,11 +413,56 @@ const MapModule = (() => {
     return parseInt(e.tiempo_estimado_min || e.tiempo_estimado || '45', 10) || 45;
   }
 
+  function _locationReviewActions(e, block = false) {
+    const point = _validPoint(e);
+    if (!point) return '<p class="map-location-review map-location-review--empty">Sin coordenadas para revisar ubicacion.</p>';
+    const idArg = _jsString(e.id_escuela || e.codigo_local || '');
+    const cls = block ? 'map-location-review map-location-review--block' : 'map-location-review';
+    return `
+      <div class="${cls}">
+        <button class="btn btn-outline btn-sm" onclick='MapModule.openLocationReview(${idArg}, "maps")'>Maps</button>
+        <button class="btn btn-outline btn-sm" onclick='MapModule.openLocationReview(${idArg}, "street")'>Street View</button>
+        <button class="btn btn-outline btn-sm" onclick='MapModule.openLocationReview(${idArg}, "osm")'>OSM</button>
+      </div>`;
+  }
+
   function _validPoint(e) {
     const lat = parseFloat(e.latitud);
     const lng = parseFloat(e.longitud);
     if (Number.isNaN(lat) || Number.isNaN(lng)) return null;
     return { lat, lng };
+  }
+
+  function _locationLinks(e = {}) {
+    const point = _validPoint(e);
+    if (!point) return {};
+    const label = encodeURIComponent(`${point.lat},${point.lng} ${e.nombre || e.nombre_escuela || e.codigo_local || ''}`.trim());
+    const viewpoint = encodeURIComponent(`${point.lat},${point.lng}`);
+    return {
+      maps: `https://www.google.com/maps/search/?api=1&query=${label}`,
+      street: `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${viewpoint}`,
+      osm: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(point.lat)}&mlon=${encodeURIComponent(point.lng)}#map=18/${encodeURIComponent(point.lat)}/${encodeURIComponent(point.lng)}`,
+    };
+  }
+
+  function _findSchoolById(id) {
+    const key = String(id || '').trim();
+    return _escuelas.find(e => String(e.id_escuela || '').trim() === key || String(e.codigo_local || '').trim() === key) || null;
+  }
+
+  function openLocationReview(id, type = 'maps') {
+    const escuela = _findSchoolById(id);
+    if (!escuela) {
+      UI.showToast('No se encontro la escuela para revisar ubicacion.', 'warning');
+      return;
+    }
+    const links = _locationLinks(escuela);
+    const url = links[type] || links.maps;
+    if (!url) {
+      UI.showToast('La escuela no tiene coordenadas para revisar.', 'warning');
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   function _groupBySurveyor(escuelas) {
@@ -529,10 +576,12 @@ const MapModule = (() => {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   function flyTo(id) {
-    const marker = _markers[id];
+    const targetSchool = _findSchoolById(id);
+    const marker = _markers[id] || (targetSchool ? _markers[targetSchool.id_escuela] : null);
+    const highlightId = targetSchool?.id_escuela || id;
     if (!marker || !_map) {
-      _highlightListItem(id);
-      const escuela = _escuelas.find(e => e.id_escuela === id);
+      _highlightListItem(highlightId);
+      const escuela = targetSchool;
       if (escuela) {
         _selectedEscuela = escuela;
         _updateInfoPanel(escuela);
@@ -542,8 +591,8 @@ const MapModule = (() => {
     }
     _map.flyTo(marker.getLatLng(), 14, { animate: true, duration: 0.8 });
     setTimeout(() => marker.openPopup(), 900);
-    _highlightListItem(id);
-    const escuela = _escuelas.find(e => e.id_escuela === id);
+    _highlightListItem(highlightId);
+    const escuela = targetSchool;
     if (escuela) {
       _selectedEscuela = escuela;
       _hideInfoPanel();
@@ -935,5 +984,6 @@ const MapModule = (() => {
     autoAssignClusters,
     cacheVisibleMap,
     updateOfflineStatus,
+    openLocationReview,
   };
 })();

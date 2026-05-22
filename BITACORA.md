@@ -4,6 +4,40 @@
 
 ---
 
+## Integracion de ubicacion real en la app - 2026-05-22 - v2.6.109
+
+### Objetivo
+- Llevar la auditoria de ubicacion al uso cotidiano de la app.
+- Ayudar a ajustar la base mapa del plano escolar sobre el predio real.
+- Mantener el criterio de no guardar fotos de Google Street View como evidencia propia.
+
+### Cambios implementados
+- Se agrega el modulo `Ubicacion real` para supervisores y administradores.
+- El modulo carga escuelas desde `getEscuelas`, muestra KPIs de coordenadas y una muestra territorial para revision.
+- Se puede exportar un `CSV base` con coordenadas y enlaces de revision.
+- Se puede importar el CSV generado por la herramienta privada de auditoria para visualizar confianza y distancia dentro de la app.
+- En cada escuela del mapa se agregan botones `Maps`, `Street View` y `OSM`.
+- `Street View` se abre como vista en vivo de Google Maps; no se descarga ni se guarda imagen.
+- El Service Worker precachea `assets/js/location-audit.js`.
+- Version visible, assets y cache actualizados a `v2.6.109`.
+
+### Pendiente operativo
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.109`.
+- Usar `npm run audit:locations -- --limit=100 --source=all` para generar auditorias mas amplias desde una maquina con red.
+- Revisar manualmente casos `baja` o `sin_candidato` antes de corregir coordenadas oficiales.
+
+### Validaciones ejecutadas
+- `node --check assets/js/location-audit.js`.
+- `node --check assets/js/map.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Servidor local `127.0.0.1:8061`: `index.html` responde HTTP 200.
+
+---
+
 ## Auditoria de ubicacion real de escuelas - 2026-05-22
 
 ### Objetivo
