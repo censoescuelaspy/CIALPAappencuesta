@@ -16062,13 +16062,29 @@ const MecFormModule = (() => {
     }
     if (raw.startsWith('sanitary::')) {
       const parts = raw.split('::');
-      _activatePlanSanitary(parts[1], parts[2] || '');
+      const _sId = parts[1] || '';
+      const _sObjId = parts[2] || '';
+      let _sReset = false;
+      if (_sObjId) {
+        const _san = (_data.__sanitaries || []).find(s => s.id === _sId);
+        const _sObj = (_san?.objects || []).find(o => o.id === _sObjId);
+        if (_sObj?.ficha && _sObj.ficha.__guidedReviewed) { _sObj.ficha.__guidedReviewed = ''; _sReset = true; }
+      }
+      _activatePlanSanitary(_sId, _sObjId);
+      if (_sReset) { _saveDraft(false, { skipGuidedSync: true }); _notifyGuidedPlanSync(); }
       return;
     }
     if (raw.startsWith('site::')) return;
     if (raw.includes('::')) {
       const [roomId, objectId] = raw.split('::');
+      let _rReset = false;
+      if (objectId) {
+        const _room = (_data.__classrooms || []).find(r => r.id === roomId);
+        const _obj = (_room?.objects || []).find(o => o.id === objectId);
+        if (_obj?.ficha && _obj.ficha.__guidedReviewed) { _obj.ficha.__guidedReviewed = ''; _rReset = true; }
+      }
       _activatePlanClassroom(roomId, objectId);
+      if (_rReset) { _saveDraft(false, { skipGuidedSync: true }); _notifyGuidedPlanSync(); }
     }
   }
 

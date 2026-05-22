@@ -4,6 +4,36 @@
 
 ---
 
+## Fix dimensiones piso + reinicio preguntas al seleccionar elemento — 2026-05-22 — v2.6.106
+
+### Objetivos
+1. Que al seleccionar un elemento ya cargado en el plano, el flujo guiado vuelva a mostrar desde la primera pregunta del elemento para poder corregir cualquier dato.
+2. Corregir el bug que impedía confirmar las medidas de un piso recién insertado en un bloque.
+
+### Causa raíz (Issue 1 — reinicio de preguntas al seleccionar)
+`_activatePlanSelection(id)` en `mec-form.js` no reseteaba el flag `__guidedReviewed` al seleccionar un elemento. Cuando ese flag contiene un timestamp (ISO), `_nextGuidedObjectField` devuelve `''` (hecho), de modo que el flujo guiado mostraba el elemento como completo y no presentaba sus preguntas.
+
+### Causa raíz (Issue 2 — dimensiones del piso atascadas)
+En `_saveFloorMeasures` (guided-register.js), después de llamar a `setGuidedFloorField` (que internamente ejecuta `_ensureBlockFloors` y asigna IDs a los pisos), la búsqueda del piso usaba `item.id || item.label` como expresión única: si `item.id` era truthy, nunca comparaba con el label. El piso buscado por label ("Piso 1") no era encontrado, el flag de confirmación se guardaba bajo la clave equivocada, y el requisito "Cargar dimensiones" nunca se marcaba como completado.
+
+### Cambios implementados
+
+**mec-form.js (`_activatePlanSelection`)**
+- Al seleccionar un elemento de aula (`roomId::objectId`) o sanitario (`sanitary::sanitaryId::objectId`), si su `ficha.__guidedReviewed` es truthy, se resetea a `''`.
+- Luego se llama `_saveDraft` y `_notifyGuidedPlanSync` para persistir el cambio y refrescar el panel guiado.
+- Resultado: el flujo guiado muestra las preguntas desde el primer campo cada vez que el usuario selecciona un elemento.
+
+**guided-register.js (`_saveFloorMeasures`)**
+- Corregida la búsqueda del piso post-guardado: ahora compara `item.id` y `item.label` por separado (en lugar de `item.id || item.label`), de modo que funciona tanto si `floorId` es un UUID como si es un label.
+- La clave del flag de confirmación usa `floor.id || _floorLabel(floor) || floorId`, alineada con lo que espera `_floorRequirementItems`.
+
+### Pendiente operativo
+- Actualizar app: "cialpa-app-v2.6.106".
+- Probar: insertar piso en bloque → ingresar medidas → click "Guardar medidas" → debe avanzar a "estado".
+- Probar: seleccionar un elemento ya completado en el plano → flujo guiado debe mostrar primera pregunta del elemento.
+
+---
+
 ## Botones de forma y agregar elementos — 2026-05-22 — v2.6.104
 
 ### Objetivos

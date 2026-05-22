@@ -2607,8 +2607,12 @@ const GuidedRegisterModule = (() => {
     try { okLength = mec.setGuidedFloorField(blockId, floorId, 'largo_m', String(length)); } catch (e) { console.warn('[Guided] Error largo piso:', e); }
     try { okWidth = mec.setGuidedFloorField(blockId, floorId, 'ancho_m', String(width)); } catch (e) { console.warn('[Guided] Error ancho piso:', e); }
     if (okLength && okWidth) {
-      const floor = (_snapshot().activeFloors || []).find(item => String(item.id || item.label || '') === String(floorId || '')) || {};
-      _setMeasureConfirmed('floor', floor.id || floorId || _floorLabel(floor), true);
+      const snappedFloors = _snapshot().activeFloors || [];
+      const floor = snappedFloors.find(item =>
+        String(item.id || '') === String(floorId || '') ||
+        String(item.label || '') === String(floorId || '')
+      ) || snappedFloors[0] || {};
+      _setMeasureConfirmed('floor', floor.id || _floorLabel(floor) || floorId, true);
       _saveState();
       UI.showToast('Medidas del piso registradas. Ahora complete su estado y ubicacion.', 'success', 5200);
       _updateSnapshot();
