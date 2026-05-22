@@ -550,6 +550,30 @@ body.sidebar-auto-hidden #sidebar.sidebar--open {
 
 .btn-warning   { background: var(--color-warning); color: #fff; border-color: var(--color-warning); }
 
+.btn-guided-soft {
+  background: #fff7ed;
+  color: #7c2d12;
+  border-color: #fed7aa;
+}
+.btn-guided-soft:hover:not(:disabled),
+.btn-guided-soft:focus-visible {
+  background: #ffedd5;
+  color: #7c2d12;
+  border-color: #fdba74;
+}
+
+.btn-guided-selected {
+  background: #e84c22;
+  color: #ffffff;
+  border-color: #e84c22;
+}
+.btn-guided-selected:hover:not(:disabled),
+.btn-guided-selected:focus-visible {
+  background: #c2410c;
+  border-color: #c2410c;
+  color: #ffffff;
+}
+
 .btn-outline {
   background: transparent;
   color: var(--color-secondary);
@@ -4745,6 +4769,42 @@ textarea.form-control {
 
 .guided-next-card--question {
   min-height: 0;
+  padding: .68rem .72rem;
+  background: #fffaf7;
+  border-width: 2px;
+  box-shadow: 0 10px 24px rgba(232, 76, 34, .10);
+}
+
+.guided-next-card--question > span {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  padding: .13rem .38rem;
+  background: #ffedd5;
+  border: 1px solid #fed7aa;
+  border-radius: 999px;
+}
+
+.guided-next-card--question > strong {
+  display: block;
+  font-size: .92rem;
+  line-height: 1.18;
+}
+
+.guided-next-card--question > strong::before {
+  content: "Pregunta: ";
+  color: #c2410c;
+  font-weight: 950;
+}
+
+.guided-next-card--question > p {
+  color: #334155;
+  font-size: .72rem;
+}
+
+.guided-next-card--question .btn {
+  min-height: 32px;
+  font-weight: 850;
 }
 
 .guided-requirements {
@@ -4963,15 +5023,46 @@ textarea.form-control {
 }
 
 .guided-action--primary {
-  background: #1f3864;
-  color: #ffffff;
-  border-color: #1f3864;
+  background: #fff7ed;
+  color: #7c2d12;
+  border-color: #fed7aa;
 }
 
 .guided-action--primary span {
-  background: #ffffff;
-  color: #e84c22;
-  border-color: transparent;
+  background: #ffedd5;
+  color: #c2410c;
+  border-color: #fed7aa;
+}
+
+#module-registro .school-plan-ribbon__button.btn-guided-soft,
+#module-registro .guided-plan-panel__actions .btn-guided-soft {
+  background: #fff7ed;
+  color: #7c2d12;
+  border-color: #fed7aa;
+}
+
+#module-registro .school-plan-ribbon__button.btn-guided-selected,
+#module-registro .school-plan-ribbon__button.school-plan-ribbon__button--active {
+  background: #e84c22;
+  color: #ffffff;
+  border-color: #e84c22;
+}
+
+#module-registro .mec-choice--success,
+#module-registro .mec-choice--warning,
+#module-registro .mec-choice--danger,
+#module-registro .mec-choice--muted,
+#module-registro .mec-choice--neutral {
+  background: #fff7ed;
+  color: #7c2d12;
+  border-color: #fed7aa;
+}
+
+#module-registro .mec-choice--active,
+#module-registro .mec-choice[aria-pressed="true"] {
+  background: #e84c22;
+  color: #ffffff;
+  border-color: #e84c22;
 }
 
 .guided-slide__footer {

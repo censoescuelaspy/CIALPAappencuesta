@@ -14,6 +14,7 @@ const GuidedRegisterModule = (() => {
   let _touchStartX = 0;
   let _touchStartY = 0;
   let _guidedState = { targets: {}, flags: {} };
+  let _guidedHistory = [];
   let _timeRefreshTimer = null;
   let _planSyncTimer = null;
 
@@ -228,7 +229,7 @@ const GuidedRegisterModule = (() => {
               </div>
               <div class="guided-plan-panel__actions">
                 <small data-guided-save-state>Sin borrador</small>
-                <button class="btn btn-success btn-sm" type="button" data-guided-action="goClosure">Finalizar escuela</button>
+                <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="goClosure">Finalizar escuela</button>
                 <button class="btn btn-sm guided-plan-panel__school-action" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
               </div>
             </div>
@@ -264,7 +265,7 @@ const GuidedRegisterModule = (() => {
         <footer class="guided-slide__footer">
           <button class="btn btn-outline btn-sm" type="button" data-guided-action="prev">Anterior</button>
           <span>${_escape(step.number)} / ${String(STEPS.length).padStart(2, '0')}</span>
-          <button class="btn btn-primary btn-sm" type="button" data-guided-action="next">Siguiente</button>
+          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="next">Siguiente</button>
         </footer>
       </article>`;
   }
@@ -566,11 +567,17 @@ const GuidedRegisterModule = (() => {
   }
 
   function previous() {
-    goTo(Math.max(0, _activeIndex - 1));
+    const previousIndex = _guidedHistory.length ? _guidedHistory.pop() : Math.max(0, _activeIndex - 1);
+    goTo(previousIndex, { skipHistory: true });
   }
 
-  function goTo(index) {
-    _activeIndex = Math.max(0, Math.min(STEPS.length - 1, Number(index) || 0));
+  function goTo(index, options = {}) {
+    const target = Math.max(0, Math.min(STEPS.length - 1, Number(index) || 0));
+    if (target !== _activeIndex && !options.skipHistory) {
+      _guidedHistory.push(_activeIndex);
+      if (_guidedHistory.length > 20) _guidedHistory = _guidedHistory.slice(-20);
+    }
+    _activeIndex = target;
     _saveState();
     _updateSlide();
   }
@@ -583,7 +590,7 @@ const GuidedRegisterModule = (() => {
       const step = STEPS[index];
       const question = _activeGuidedQuestion(step?.id, snap);
       if (!question || question.blocking === false || question.done) continue;
-      if (index !== _activeIndex) goTo(index);
+      if (index !== _activeIndex) goTo(index, { skipHistory: true });
       UI.showToast(`Complete primero: ${question.title}`, 'warning', 5200);
       return false;
     }
@@ -1122,7 +1129,7 @@ const GuidedRegisterModule = (() => {
         <p>${_escape(body)}</p>
         <div>
           ${actions.map(action => `
-            <button class="btn ${action.primary ? 'btn-primary' : 'btn-outline'} btn-sm" type="button"
+            <button class="btn ${_guidedActionButtonClass(action)} btn-sm" type="button"
               data-guided-action="${_escape(action.action)}"
               data-guided-value="${_escape(action.value || '')}">
               ${_escape(action.label)}
@@ -2056,7 +2063,7 @@ const GuidedRegisterModule = (() => {
       label: option,
       action,
       value: `${baseValue}::${option}`,
-      primary: primary ? option === primary : false,
+      suggested: primary ? option === primary : false,
     }));
   }
 
@@ -2185,7 +2192,7 @@ const GuidedRegisterModule = (() => {
   function _guidedQuestionCard(question) {
     const info = _guidedQuestionInfo(question);
     return `
-      <section class="guided-next-card guided-next-card--question ${question.done ? 'guided-next-card--done' : ''}">
+      <section class="guided-next-card guided-next-card--question ${question.done ? 'guided-next-card--done' : ''}" aria-label="Pregunta guiada">
         <span>${_escape(question.kicker)}</span>
         <strong>${_escape(question.title)}</strong>
         <p>${_escape(question.body)}</p>
@@ -2206,8 +2213,8 @@ const GuidedRegisterModule = (() => {
   }
 
   function _guidedActionButtonClass(action = {}) {
-    if (action.variant) return `btn-${String(action.variant).replace(/[^a-z0-9_-]/gi, '')}`;
-    return action.primary ? 'btn-primary' : 'btn-outline';
+    if (action.selected || action.done || action.active) return 'btn-guided-selected';
+    return 'btn-guided-soft';
   }
 
   function _guidedQuestionInfo(question = {}) {
@@ -3076,9 +3083,13 @@ const GuidedRegisterModule = (() => {
         targets: saved.targets && typeof saved.targets === 'object' ? saved.targets : {},
         flags: saved.flags && typeof saved.flags === 'object' ? saved.flags : {},
       };
+      _guidedHistory = Array.isArray(saved.history)
+        ? saved.history.map(Number).filter(Number.isFinite).slice(-20)
+        : [];
     } catch {
       _activeIndex = 0;
       _guidedState = { targets: {}, flags: {} };
+      _guidedHistory = [];
     }
   }
 
@@ -3087,6 +3098,7 @@ const GuidedRegisterModule = (() => {
       activeIndex: _activeIndex,
       targets: _guidedState.targets || {},
       flags: _guidedState.flags || {},
+      history: _guidedHistory.slice(-20),
       updatedAt: new Date().toISOString(),
     });
     localStorage.setItem(STATE_KEY, payload);

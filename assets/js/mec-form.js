@@ -12104,14 +12104,22 @@ const MecFormModule = (() => {
 
   function _renderPlanRibbonButton({ icon = '', label = '', onClick = '', tone = 'btn-outline', active = false, disabled = false, title = '', wide = false } = {}) {
     const caption = title || label;
+    const effectiveTone = _guidedPlanButtonTone(tone, active);
     const state = disabled ? ` disabled title="${_escape(caption || 'Accion no disponible')}"` : ` title="${_escape(caption)}"`;
     const pressed = active ? ' aria-pressed="true"' : '';
     const click = disabled ? '' : ` onclick="${_escape(onClick)}"`;
     return `
-      <button class="btn ${_escape(tone)} btn-sm school-plan-ribbon__button ${active ? 'school-plan-ribbon__button--active' : ''} ${wide ? 'school-plan-ribbon__button--wide' : ''}" type="button"${click}${state} aria-label="${_escape(caption)}"${pressed}>
+      <button class="btn ${_escape(effectiveTone)} btn-sm school-plan-ribbon__button ${active ? 'school-plan-ribbon__button--active' : ''} ${wide ? 'school-plan-ribbon__button--wide' : ''}" type="button"${click}${state} aria-label="${_escape(caption)}"${pressed}>
         ${icon ? `<span class="school-plan-ribbon__icon" aria-hidden="true">${icon}</span>` : ''}
         <span class="school-plan-ribbon__label">${_escape(label)}</span>
       </button>`;
+  }
+
+  function _guidedPlanButtonTone(tone = 'btn-outline', active = false) {
+    const guidedRoot = document.getElementById('module-registro');
+    const inGuidedRegister = guidedRoot?.classList.contains('module-panel--active');
+    if (!inGuidedRegister) return tone;
+    return active ? 'btn-guided-selected' : 'btn-guided-soft';
   }
 
   function _renderPlanRibbonGroup(title, content, extraClass = '') {
@@ -13926,6 +13934,7 @@ const MecFormModule = (() => {
         ctx.font = _canvasFont(700, 12);
         ctx.fillText('Bloque sin pisos: use + Piso para implantar el primer nivel', x + 12, y + 56);
       }
+      _drawPlanBlockFloorResidue(ctx, block, floors, blockRect);
       floors.forEach((floor, floorIndex) => {
         const floorLabel = _floorRecordLabel(floor);
         const floorRooms = blockRooms.filter(room => _normalizeFloor(room.floor) === floorLabel);
@@ -13966,6 +13975,10 @@ const MecFormModule = (() => {
             metersPerPx: floorMetersPerPx,
           }));
         }
+        _drawPlanAutoCorridors(ctx, [
+          ...(_planLayers.aulas ? roomItems : []).map(item => ({ x: item.x, y: item.y, w: item.w, h: item.h })),
+          ...(_planLayers.sanitarios ? sanitaryItems : []).map(item => ({ x: item.x, y: item.y, w: item.w, h: item.h })),
+        ], floorContentRect);
         roomItems.forEach(item => {
           if (_planLayers.aulas) _drawPlanClassroom(ctx, item.room, item.x, item.y, item.w, item.h, floorContentRect);
         });
@@ -14057,6 +14070,40 @@ const MecFormModule = (() => {
     if (blockWidth && floorWidth) floorRecord.hRatio = Math.max(.08, Math.min(.82, floorWidth / blockWidth));
     if (!Number.isFinite(Number(floorRecord.xRatio))) floorRecord.xRatio = .06;
     if (!Number.isFinite(Number(floorRecord.yRatio))) floorRecord.yRatio = .16;
+  }
+
+  function _drawPlanBlockFloorResidue(ctx, block, floors = [], blockRect = null) {
+    if (!blockRect || !Array.isArray(floors) || !floors.length) return;
+    const bounds = {
+      x: blockRect.x + 10,
+      y: blockRect.y + 40,
+      w: Math.max(50, blockRect.w - 20),
+      h: Math.max(42, blockRect.h - 52),
+    };
+    const floorRects = floors.map((floor, index) => {
+      const fallback = _planFloorRect(blockRect.x, blockRect.y, blockRect.w, blockRect.h, index, floors.length, false);
+      return _planFloorRectForRecord(block, floor, fallback, blockRect);
+    });
+    const hasResidue = floorRects.some(rect => (
+      rect.x > bounds.x + 5 ||
+      rect.y > bounds.y + 5 ||
+      rect.x + rect.w < bounds.x + bounds.w - 5 ||
+      rect.y + rect.h < bounds.y + bounds.h - 5
+    ));
+    if (!hasResidue) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(100,116,139,.13)';
+    ctx.strokeStyle = 'rgba(100,116,139,.28)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 5]);
+    ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+    ctx.strokeRect(bounds.x, bounds.y, bounds.w, bounds.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(51,65,85,.64)';
+    ctx.font = _canvasFont(900, 9);
+    ctx.textAlign = 'left';
+    ctx.fillText('PASILLO / GALERIA', bounds.x + 8, bounds.y + bounds.h - 8);
+    ctx.restore();
   }
 
   function _drawPlanFloorFrame(ctx, block, floor, floorRect, floorIndex = 0, blockRect = null) {
@@ -15296,6 +15343,80 @@ const MecFormModule = (() => {
       ctx.lineTo(x, bottom);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  function _drawPlanAutoCorridors(ctx, items = [], floorRect = null) {
+    const rects = (items || [])
+      .filter(item => item && Number.isFinite(item.x) && Number.isFinite(item.y) && item.w > 8 && item.h > 8)
+      .map(item => ({ x: item.x, y: item.y, w: item.w, h: item.h }));
+    if (rects.length < 2) return;
+    const corridors = new Map();
+    const addCorridor = rect => {
+      if (!rect || rect.w < 10 || rect.h < 10) return;
+      if (floorRect) {
+        const clipped = _clampRectToBounds(rect, floorRect);
+        if (clipped.w < 10 || clipped.h < 10) return;
+        rect = clipped;
+      }
+      const key = [rect.x, rect.y, rect.w, rect.h].map(value => Math.round(value / 4)).join(':');
+      corridors.set(key, rect);
+    };
+    for (let i = 0; i < rects.length; i += 1) {
+      for (let j = i + 1; j < rects.length; j += 1) {
+        const a = rects[i];
+        const b = rects[j];
+        const left = a.x <= b.x ? a : b;
+        const right = left === a ? b : a;
+        const horizontalGap = right.x - (left.x + left.w);
+        const verticalOverlapTop = Math.max(left.y, right.y);
+        const verticalOverlapBottom = Math.min(left.y + left.h, right.y + right.h);
+        const verticalOverlap = verticalOverlapBottom - verticalOverlapTop;
+        if (horizontalGap >= 10 && horizontalGap <= 84 && verticalOverlap >= 22) {
+          addCorridor({
+            x: left.x + left.w,
+            y: verticalOverlapTop,
+            w: horizontalGap,
+            h: verticalOverlap,
+          });
+        }
+
+        const top = a.y <= b.y ? a : b;
+        const bottom = top === a ? b : a;
+        const verticalGap = bottom.y - (top.y + top.h);
+        const horizontalOverlapLeft = Math.max(top.x, bottom.x);
+        const horizontalOverlapRight = Math.min(top.x + top.w, bottom.x + bottom.w);
+        const horizontalOverlap = horizontalOverlapRight - horizontalOverlapLeft;
+        if (verticalGap >= 10 && verticalGap <= 84 && horizontalOverlap >= 22) {
+          addCorridor({
+            x: horizontalOverlapLeft,
+            y: top.y + top.h,
+            w: horizontalOverlap,
+            h: verticalGap,
+          });
+        }
+      }
+    }
+    if (!corridors.size) return;
+    ctx.save();
+    ctx.fillStyle = 'rgba(100,116,139,.14)';
+    ctx.strokeStyle = 'rgba(71,85,105,.38)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 4]);
+    Array.from(corridors.values()).slice(0, 18).forEach(rect => {
+      ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      if (rect.w >= 38 && rect.h >= 16) {
+        ctx.save();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(51,65,85,.72)';
+        ctx.font = _canvasFont(900, Math.min(9, Math.max(7, rect.h * .32)));
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('PASILLO', rect.x + rect.w / 2, rect.y + rect.h / 2);
+        ctx.restore();
+      }
+    });
     ctx.restore();
   }
 

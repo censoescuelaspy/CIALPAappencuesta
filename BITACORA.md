@@ -4,6 +4,41 @@
 
 ---
 
+## Preguntas visibles, botones neutros y pasillos automaticos - 2026-05-22 - v2.6.100
+
+### Objetivo
+- Evitar que los botones del `Registro guiado` parezcan seleccionados por defecto.
+- Usar una sola escala visual para opciones: suave antes de responder y fuerte solo cuando hay seleccion/estado activo real.
+- Hacer mas clara y visible la pregunta superior que guia la captura.
+- Señalar espacios residuales como pasillo/galeria cuando el piso no ocupa todo el bloque o cuando quedan huecos entre ambientes.
+- Corregir `Anterior` para volver al paso visitado inmediatamente antes, en vez de saltar al inicio del flujo.
+
+### Cambios implementados
+- Los botones principales de la guia dejan de usar colores fuertes por defecto aunque internamente sean acciones sugeridas.
+- Las opciones de preguntas usan `btn-guided-soft`; el estado fuerte queda reservado para botones realmente activos/seleccionados.
+- La tarjeta de pregunta superior ahora destaca explicitamente `Pregunta:` con mayor tamaño, borde y contraste.
+- La cinta del plano dentro de `Registro guiado` usa una escala visual unica, sin verdes/amarillos/rojos que confundan respuesta con advertencia.
+- Los botones tipo opcion del MEC dentro de `Registro guiado` se neutralizan hasta que el usuario marque una respuesta.
+- El historial de navegacion guiada guarda los ultimos pasos visitados y `Anterior` usa ese historial.
+- El sobrante entre bloque y piso se pinta en gris y se etiqueta como `PASILLO / GALERIA`.
+- Los huecos estrechos entre aulas, sanitarios y otros ambientes se detectan visualmente y se etiquetan como `PASILLO`.
+- Version visible y cache del Service Worker actualizados a `v2.6.100`.
+
+### Pendiente operativo
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.100`.
+- Probar en tablet: abrir `Registro guiado`, verificar que ninguna opcion aparece marcada antes de responder, usar `Anterior` y revisar pisos/ambientes con espacios sobrantes.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Playwright/Chromium local: `Registro guiado` abre en `module-registro`, la pregunta superior aparece visible y no hay botones `primary/success/warning/danger` dentro de la tarjeta de pregunta.
+
+---
+
 ## Sincronizacion de medidas entre plano y guia - 2026-05-22 - v2.6.99
 
 ### Objetivo
