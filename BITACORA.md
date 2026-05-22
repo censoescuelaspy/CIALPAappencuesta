@@ -23,7 +23,6 @@
 - Version visible y cache del Service Worker actualizados a `v2.6.98`.
 
 ### Pendiente operativo
-- Publicar frontend en GitHub Pages.
 - Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.98`.
 - Probar en tablet: insertar aula, sanitario, cabina y exterior desde la cinta y confirmar que aparece la pregunta superior antes de usar ficha.
 
@@ -37,6 +36,14 @@
 - `node --check assets/js/jornada.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
+- `git commit`: `1707b80` - `fix: completar captura guiada y ribbon v2.6.98`.
+- `git push origin main`: publica `1707b80`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.98`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.98`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.98`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `saveSiteMeasures`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `_isGuidedRegisterActive`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene `school-plan-ribbon__panel`.
 - Playwright/Chromium local: `Registro guiado` abre en `v2.6.98`, sin errores de consola, y la cinta del plano reporta `flex-wrap: wrap`.
 - Playwright/Chromium local con escuela simulada: crea bloque, piso y aula; pestaña `Insertar` muestra 27 botones, sin solapes detectados y con scroll vertical propio.
 
