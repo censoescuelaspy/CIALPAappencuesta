@@ -38,6 +38,14 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
 - Playwright/Chromium local: `Registro guiado` abre en `v2.6.97` sin errores de consola.
+- `git commit`: `ff79764` - `fix: reforzar cierre y guia secuencial v2.6.97`.
+- `git push origin main`: publica `ff79764`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.97`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.97`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.97`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `addGuidedRoomElement`.
+- Verificacion HTTP de GitHub Pages para `assets/js/map.js`: contiene `showNextAfterFinalized`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene `guided-question-fields--pair`.
 
 ---
 
