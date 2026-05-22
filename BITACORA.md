@@ -37,6 +37,11 @@
 - `node --check assets/js/jornada.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
+- `git commit`: `265f8c3` - `fix: apuntar nuevo web app v2.6.96`.
+- `git push origin main`: publica `265f8c3`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.96` y URL GAS nueva.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.96`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.96`.
 
 ---
 
