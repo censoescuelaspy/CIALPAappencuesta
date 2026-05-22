@@ -4869,6 +4869,19 @@ textarea.form-control {
   color: #2b6cb0;
 }
 
+.guided-requirements__item--summary {
+  padding: .18rem .5rem;
+  min-height: 0;
+  border-color: #d1fae5;
+}
+
+.guided-requirements__item--summary small {
+  font-size: .7rem;
+  color: #15803d;
+  opacity: .85;
+  line-height: 1.2;
+}
+
 .guided-closure-list {
   max-height: 180px;
   overflow: auto;

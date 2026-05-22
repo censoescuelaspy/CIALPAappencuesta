@@ -4,6 +4,55 @@
 
 ---
 
+## Techo/piso no bloqueante, pilares multiples, checklist compacta, bloques poligonales - 2026-05-22 - v2.6.102
+
+### Objetivo
+- Eliminar el cuelgue infinito de la guia al responder techo y piso del aula.
+- Permitir declarar la cantidad exacta de pilares (0-6+) y crearlos todos a la vez sin requerir ficha detallada.
+- Reducir el espacio que ocupa el checklist de requisitos en la tarjeta guiada.
+- Extender el soporte de formas libres (Forma L / + Vertice / - Vertice) a bloques.
+
+### Cambios implementados
+
+**mec-form.js (`_cloneClassroom`)**
+- Agregados `techo_tipo`, `techo_estado`, `piso_tipo`, `piso_estado` al objeto que retorna `_cloneClassroom`.
+- Sin este fix, cada respuesta de techo se guardaba en el sketch pero se descartaba al sincronizar, haciendo que la guia repitiera la misma pregunta indefinidamente.
+
+**mec-form.js (`_blockDrivenPlanSpecs`, `_syncBlockDrivenPlanElements`)**
+- `_blockDrivenPlanSpecs`: para `pilares_bloque`, parsea el valor numerico y retorna N specs de pilar.
+- `_syncBlockDrivenPlanElements`: caso especial para `pilares_bloque` — limpia todos los pilares existentes del bloque antes de crear los nuevos, garantizando que el conteo declarado sea exacto.
+- Cada pilar creado recibe codigo unico: `Pil B1 1`, `Pil B1 2`, etc.
+
+**mec-form.js (dibujo de bloque, `setPlanBlockShape`, `addPlanBlockVertex`, `removePlanBlockVertex`)**
+- El renderizador de bloques en `_drawSchoolPlan` ahora usa `_drawPlanShapePath` si el bloque tiene `planShape`.
+- En forma poligonal, se dibujan los handles de vertice con `_drawPlanShapeVertices` y se ocultan los handles de resize/rotate.
+- `_planVertexDragConfig` extiende soporte a `block-vertex` para arrastre interactivo de vertices.
+- `_movePlanVertex` maneja el caso `block` guardando el vertice ajustado en `block.planShape`.
+- Botones "Forma L / + Vertice / - Vertice / Rectangular" agregados al panel de seleccion del bloque.
+
+**guided-register.js (pregunta de pilares)**
+- Pregunta reemplazada: de "Hay pilares visibles?" (si/no) a "Cuantos pilares visibles hay en el piso?" con opciones 0 a 6+.
+
+**guided-register.js (`_siteElementRequirementItems`)**
+- Para pilares, los requisitos "Cargar dimensiones", "Condicion de calidad" y "Caracteristicas tecnicas" se marcan como `optional: true`. Solo "Ubicar en plano" es obligatorio.
+
+**guided-register.js (`_guidedRequirementList`)**
+- Items completados (done) se colapsan en una sola linea: "✓ Ubicar en plano · Condicion de calidad ...".
+- Solo el primer item pendiente muestra el texto de ayuda; los demas solo muestran titulo e icono.
+- CSS: selector `.guided-requirements__item--summary` para el estilo compacto de los completados.
+
+### Pendiente operativo
+- Actualizar app: "cialpa-app-v2.6.102".
+- Probar el flujo completo de techo/piso en un aula real para confirmar que la guia avanza.
+- Probar declarar 3 pilares: deben aparecer 3 fichas separadas en el plano.
+- Seleccionar un bloque → "Forma L" → verificar vertices arrastrables.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`: OK.
+- `node --check assets/js/guided-register.js`: OK.
+
+---
+
 ## Reinicio de escuela, confirmacion de medidas y preguntas edilicias - 2026-05-22 - v2.6.101
 
 ### Objetivo

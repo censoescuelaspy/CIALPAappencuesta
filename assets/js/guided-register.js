@@ -1403,11 +1403,14 @@ const GuidedRegisterModule = (() => {
       ]);
     }
     if (!_hasAnswer(block.pilares_bloque)) {
-      return _question('Pregunta obligatoria', 'Hay pilares visibles asociados al bloque?', 'Si existen pilares estructurales o aislados, la app puede agregarlos al plano para ubicarlos y cargar material, medidas y estado.', [
-        { label: 'Si, agregar pilar', action: 'answerBlockField', value: 'pilares_bloque::Si visible', primary: true },
-        { label: 'Si, sin ubicar aun', action: 'answerBlockField', value: 'pilares_bloque::Si, pendiente de ubicar' },
-        { label: 'No tiene', action: 'answerBlockField', value: 'pilares_bloque::No tiene' },
-        { label: 'No verificable', action: 'answerBlockField', value: 'pilares_bloque::No verificable' },
+      return _question('Pregunta obligatoria', 'Cuantos pilares visibles hay en el piso?', 'Indique la cantidad de pilares estructurales visibles. Se agregan al plano para ubicarlos; las dimensiones y condicion son opcionales.', [
+        { label: '0 — no tiene', action: 'answerBlockField', value: 'pilares_bloque::0', primary: true },
+        { label: '1', action: 'answerBlockField', value: 'pilares_bloque::1' },
+        { label: '2', action: 'answerBlockField', value: 'pilares_bloque::2' },
+        { label: '3', action: 'answerBlockField', value: 'pilares_bloque::3' },
+        { label: '4', action: 'answerBlockField', value: 'pilares_bloque::4' },
+        { label: '5', action: 'answerBlockField', value: 'pilares_bloque::5' },
+        { label: '6 o mas', action: 'answerBlockField', value: 'pilares_bloque::6' },
       ]);
     }
     if (!_hasAnswer(block.acometida_tipo)) {
@@ -1888,14 +1891,20 @@ const GuidedRegisterModule = (() => {
 
   function _guidedRequirementList(items = []) {
     if (!items.length) return '';
+    const done = items.filter(item => item.done);
+    const pending = items.filter(item => !item.done);
+    const doneLabel = done.length
+      ? `<li class="guided-requirements__item--done guided-requirements__item--summary"><span aria-hidden="true">&#10003;</span><small>${done.map(item => _escape(item.title)).join(' &middot; ')}</small></li>`
+      : '';
+    const pendingRows = pending.map((item, index) => `
+      <li class="${item.optional ? 'guided-requirements__item--optional' : ''}">
+        <span aria-hidden="true">${item.optional ? 'i' : '!'}</span>
+        <strong>${_escape(item.title)}</strong>
+        ${index === 0 ? `<small>${_escape(`${item.optional ? 'Recomendado: ' : ''}${item.help || 'Pendiente'}`)}</small>` : ''}
+      </li>`).join('');
     return `
       <ul class="guided-requirements" aria-label="Pendientes del elemento">
-        ${items.map(item => `
-          <li class="${item.done ? 'guided-requirements__item--done' : ''} ${item.optional ? 'guided-requirements__item--optional' : ''}">
-            <span aria-hidden="true">${item.done ? '&#10003;' : (item.optional ? 'i' : '!')}</span>
-            <strong>${_escape(item.title)}</strong>
-            <small>${_escape(item.done ? (item.doneText || 'Completado') : `${item.optional ? 'Recomendado: ' : ''}${item.help || 'Pendiente'}`)}</small>
-          </li>`).join('')}
+        ${doneLabel}${pendingRows}
       </ul>`;
   }
 
@@ -2326,6 +2335,7 @@ const GuidedRegisterModule = (() => {
 
   function _siteElementRequirementItems(item) {
     const ficha = item?.ficha || {};
+    const isPillar = item?.type === 'pillar';
     return [
       {
         title: 'Ubicar en plano',
@@ -2339,18 +2349,21 @@ const GuidedRegisterModule = (() => {
         help: 'Complete las medidas propias del elemento, o estire sus vertices para sincronizarlas con la ficha.',
         doneText: `${_siteElementDimensionText(item)} confirmadas`,
         done: _siteElementHasMeasures(item) && _measureConfirmed('site', item?.id),
+        optional: isPillar,
       },
       {
         title: 'Condicion de calidad',
         help: 'Registre el estado general observado.',
         doneText: ficha.estado || 'Estado cargado',
         done: _hasAnswer(ficha.estado),
+        optional: isPillar,
       },
       {
         title: 'Caracteristicas tecnicas',
         help: 'Complete el campo tecnico principal que corresponde a este tipo de elemento.',
         doneText: _siteElementCharacteristicText(item),
         done: _siteElementHasCharacteristic(item),
+        optional: isPillar,
       },
     ];
   }

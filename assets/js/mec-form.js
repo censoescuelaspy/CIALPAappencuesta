@@ -2825,6 +2825,10 @@ const MecFormModule = (() => {
       estado: sketch.estado || '',
       caracteristicas: sketch.caracteristicas || '',
       openings: sketch.openings || '',
+      techo_tipo: sketch.techo_tipo || '',
+      techo_estado: sketch.techo_estado || '',
+      piso_tipo: sketch.piso_tipo || '',
+      piso_estado: sketch.piso_estado || '',
       locked: Boolean(sketch.locked),
       lockedAt: sketch.lockedAt || '',
       planShape: _clonePlanShape(sketch.planShape || _roomObjectForClassroom(sketch)?.planShape),
@@ -12728,6 +12732,10 @@ const MecFormModule = (() => {
           ..._quickOtherSpaceActions(),
           { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
           { label: '+ Exterior', onClick: "MecFormModule.openSiteElementTypePicker('plan')" },
+          { label: 'Forma L', onClick: `MecFormModule.setPlanBlockShape('${_escape(block.id)}', 'l')` },
+          { label: '+ Vertice', onClick: `MecFormModule.addPlanBlockVertex('${_escape(block.id)}')` },
+          { label: '- Vertice', onClick: `MecFormModule.removePlanBlockVertex('${_escape(block.id)}')` },
+          { label: 'Rectangular', onClick: `MecFormModule.setPlanBlockShape('${_escape(block.id)}', 'rect')` },
           { label: 'Girar -15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', -15)` },
           { label: 'Girar +15', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', 15)` },
           { label: '0 grados', onClick: `MecFormModule.rotatePlanBlock('${_escape(block.id)}', ${-_blockRotationDeg(block)})` },
@@ -14006,11 +14014,17 @@ const MecFormModule = (() => {
         h,
         metersPerPx: scale ? 1 / scale : 1,
       });
+      const blockShapePoints = _planShapePoints(block, blockRect);
       ctx.fillStyle = 'rgba(226,232,240,.20)';
-      ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = blockSelected ? '#111827' : '#374151';
       ctx.lineWidth = blockSelected ? 2 : 1;
-      ctx.strokeRect(x, y, w, h);
+      if (blockShapePoints && _drawPlanShapePath(ctx, blockShapePoints)) {
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeRect(x, y, w, h);
+      }
       ctx.fillStyle = '#172033';
       ctx.font = _canvasFont(800, 12);
       ctx.textAlign = 'left';
@@ -14026,7 +14040,12 @@ const MecFormModule = (() => {
         ctx.fillText('Sin dimensiones: abrir ficha', x + 10, y + 26);
       }
       _drawBlockInfrastructureHints(ctx, block, x, y, w, h);
-      if (blockSelected) {
+      if (blockSelected && blockShapePoints) {
+        _drawPlanShapeVertices(ctx, block, blockRect, blockPlanId, 'block-vertex', {
+          blockId: block.id, baseX: x, baseY: y, baseW: w, baseH: h,
+        });
+      }
+      if (blockSelected && !blockShapePoints) {
         _drawPlanRotateHandle(ctx, blockRect, 0);
         _drawPlanResizeHandles(ctx, blockRect, 0);
         const handle = _planRotateHandle(blockRect, 0);
@@ -16614,18 +16633,22 @@ const MecFormModule = (() => {
       }
       return specs;
     }
-    if (fieldId === 'pilares_bloque' && text.startsWith('si')) {
-      return [{
-        type: 'pillar',
-        reason: 'pilar visible declarado',
-        ficha: {
-          codigo: `Pil ${blockLabel}`,
-          subtipo: 'Pilar del bloque',
-          material: '',
-          forma_pilar: 'Cuadrado',
-          nota_i: `Creado automaticamente al registrar pilares visibles en ${blockLabel}.`,
-        },
-      }];
+    if (fieldId === 'pilares_bloque') {
+      const count = parseInt(text, 10);
+      if (!isNaN(count) && count > 0) {
+        return Array.from({ length: count }, (_, i) => ({
+          type: 'pillar',
+          reason: 'pilar visible declarado',
+          ficha: {
+            codigo: count > 1 ? `Pil ${blockLabel} ${i + 1}` : `Pil ${blockLabel}`,
+            subtipo: 'Pilar del bloque',
+            material: '',
+            forma_pilar: 'Cuadrado',
+            nota_i: `Creado automaticamente (${i + 1} de ${count}) en ${blockLabel}.`,
+          },
+        }));
+      }
+      return [];
     }
     if (fieldId === 'acometida_tipo' && !['no', 'no visible'].includes(text)) {
       return [{
@@ -16794,6 +16817,12 @@ const MecFormModule = (() => {
       }
       return [];
     }
+    // Pillars: always clear all existing driven pillars then create fresh, to respect the declared count
+    if (fieldId === 'pilares_bloque') {
+      _removeBlockDrivenPlanElements(block.id, [fieldId]);
+      return specs.map(spec => _createBlockDrivenPlanElement(block, fieldId, spec)).filter(Boolean);
+    }
+
     _removeBlockDrivenPlanElements(block.id, fieldId, specs.map(spec => spec.type));
     return specs.map(spec => {
       const existing = _findBlockDrivenPlanElement(block.id, fieldId, spec.type);
@@ -18429,6 +18458,34 @@ const MecFormModule = (() => {
     );
   }
 
+  function setPlanBlockShape(blockId, shape = 'l') {
+    const block = _blockById(blockId);
+    if (!block) { UI.showToast('Seleccione un bloque para cambiar su forma.', 'warning'); return; }
+    if (shape === 'rect') delete block.planShape;
+    else block.planShape = _defaultPlanShape(shape);
+    _selectedPlanId = `block::${block.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function addPlanBlockVertex(blockId) {
+    const block = _blockById(blockId);
+    if (!block) return;
+    _insertPlanShapeVertex(block);
+    _selectedPlanId = `block::${block.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function removePlanBlockVertex(blockId) {
+    const block = _blockById(blockId);
+    if (!block) return;
+    _removePlanShapeVertex(block);
+    _selectedPlanId = `block::${block.id}`;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function setPlanClassroomShape(roomId, shape = 'l') {
     const room = _classroomById(roomId);
     if (!room) {
@@ -18525,7 +18582,19 @@ const MecFormModule = (() => {
   }
 
   function _planVertexDragConfig(area) {
-    if (!area || !['room-vertex', 'sanitary-vertex'].includes(area.type)) return null;
+    if (!area || !['room-vertex', 'sanitary-vertex', 'block-vertex'].includes(area.type)) return null;
+    if (area.type === 'block-vertex') {
+      const block = _blockById(area.blockId);
+      if (!block || !_clonePlanShape(block.planShape)) return null;
+      return {
+        type: 'block',
+        selectedId: `block::${block.id}`,
+        blockId: block.id,
+        index: area.vertexIndex,
+        rect: area.rect,
+        rotation: 0,
+      };
+    }
     if (area.type === 'room-vertex') {
       const room = _classroomById(area.roomId);
       if (!room || !_clonePlanShape(room.planShape)) return null;
@@ -18557,6 +18626,14 @@ const MecFormModule = (() => {
     const localPoint = drag.rotation
       ? _rotatePointAround(_planRectCenter(drag.rect), point, -drag.rotation)
       : point;
+    if (drag.type === 'block') {
+      const block = _blockById(drag.blockId);
+      if (!block) return false;
+      _setPlanShapeVertex(block, drag.index, localPoint, drag.rect);
+      _selectedPlanId = `block::${block.id}`;
+      _drawSchoolPlan();
+      return true;
+    }
     if (drag.type === 'room') {
       const room = _classroomById(drag.roomId);
       if (!room) return false;
