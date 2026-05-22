@@ -674,7 +674,21 @@ const GuidedRegisterModule = (() => {
       label.closest('.guided-step')?.classList.toggle('guided-step--done', done);
     });
     root.querySelectorAll('[data-guided-next]').forEach(panel => {
+      const _measSels = [
+        '[data-guided-block-length]', '[data-guided-block-width]',
+        '[data-guided-floor-length]', '[data-guided-floor-width]',
+        '[data-guided-room-length]', '[data-guided-room-width]',
+        '[data-guided-sanitary-length]', '[data-guided-sanitary-width]',
+        '[data-guided-site-diameter]', '[data-guided-site-length]', '[data-guided-site-width]',
+      ];
+      const _preserved = {};
+      _measSels.forEach(sel => { const el = panel.querySelector(sel); if (el?.value) _preserved[sel] = el.value; });
       panel.innerHTML = _guidedNextHtml(panel.dataset.guidedNext || '', snap);
+      _measSels.forEach(sel => {
+        if (!_preserved[sel]) return;
+        const el = panel.querySelector(sel);
+        if (el && !el.value) el.value = _preserved[sel];
+      });
     });
     requestAnimationFrame(() => _syncDeckHeight(root));
   }
@@ -2543,13 +2557,18 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo guardar las medidas del bloque desde la guia.', 'warning');
       return;
     }
-    const okLength = mec.setGuidedBlockField('largo_m', String(length));
-    const okWidth = mec.setGuidedBlockField('ancho_m', String(width));
+    let okLength = false;
+    let okWidth = false;
+    try { okLength = mec.setGuidedBlockField('largo_m', String(length)); } catch (e) { console.warn('[Guided] Error largo bloque:', e); }
+    try { okWidth = mec.setGuidedBlockField('ancho_m', String(width)); } catch (e) { console.warn('[Guided] Error ancho bloque:', e); }
     if (okLength && okWidth) {
       _setMeasureConfirmed('block', _snapshot().activeBlock?.id || 'active', true);
       _saveState();
       UI.showToast('Medidas del bloque registradas. Ahora complete su estado y ubiquelo en el plano.', 'success', 5200);
-      _refreshSoon();
+      _updateSnapshot();
+      _refreshSoon(400);
+    } else if (!okLength || !okWidth) {
+      UI.showToast('No se pudo guardar las medidas. Verifique que el bloque este activo y desbloqueado.', 'warning', 6000);
     }
   }
 
@@ -2568,14 +2587,19 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo guardar las medidas del piso desde la guia.', 'warning');
       return;
     }
-    const okLength = mec.setGuidedFloorField(blockId, floorId, 'largo_m', String(length));
-    const okWidth = mec.setGuidedFloorField(blockId, floorId, 'ancho_m', String(width));
+    let okLength = false;
+    let okWidth = false;
+    try { okLength = mec.setGuidedFloorField(blockId, floorId, 'largo_m', String(length)); } catch (e) { console.warn('[Guided] Error largo piso:', e); }
+    try { okWidth = mec.setGuidedFloorField(blockId, floorId, 'ancho_m', String(width)); } catch (e) { console.warn('[Guided] Error ancho piso:', e); }
     if (okLength && okWidth) {
       const floor = (_snapshot().activeFloors || []).find(item => String(item.id || item.label || '') === String(floorId || '')) || {};
       _setMeasureConfirmed('floor', floor.id || floorId || _floorLabel(floor), true);
       _saveState();
       UI.showToast('Medidas del piso registradas. Ahora complete su estado y ubicacion.', 'success', 5200);
-      _refreshSoon();
+      _updateSnapshot();
+      _refreshSoon(400);
+    } else if (!okLength || !okWidth) {
+      UI.showToast('No se pudo guardar las medidas del piso. Verifique que el bloque/piso este activo.', 'warning', 6000);
     }
   }
 

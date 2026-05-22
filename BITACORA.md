@@ -4,6 +4,36 @@
 
 ---
 
+## Fix cuelgue en medidas de bloque - 2026-05-22 - v2.6.103
+
+### Objetivo
+- Eliminar el cuelgue de la guia en "Bloque: medidas principales" que impedia avanzar al estado del bloque.
+
+### Causa raiz
+`_updateSnapshot()` reemplaza el innerHTML de todos los paneles `[data-guided-next]` ante cualquier sincronizacion automatica (incluida la que dispara `newBlock()` ~180ms despues de crear el bloque). Al hacerlo, destruia los inputs de largo/ancho que el usuario acababa de empezar a escribir. El usuario terminaba con inputs vacios, la validacion fallaba silenciosamente, y la pregunta "quedaba colgada".
+
+### Cambios implementados
+
+**guided-register.js (`_updateSnapshot`)**
+- Antes de reemplazar el HTML de cada panel, captura los valores actuales de todos los inputs de medicion (`data-guided-*-length/width/diameter`).
+- Despues del reemplazo, restaura esos valores en los nuevos inputs si todavia no tienen valor guardado en el snapshot.
+- Esto preserva lo que el usuario esta escribiendo incluso cuando llega un refresh automatico.
+
+**guided-register.js (`_saveBlockMeasures`, `_saveFloorMeasures`)**
+- Las llamadas a `setGuidedBlockField`/`setGuidedFloorField` ahora estan envueltas en `try/catch` para evitar que errores silenciosos dejen la pregunta colgada sin feedback.
+- Si alguna devuelve `false`, se muestra un toast explicativo.
+- Al guardar exitosamente, se llama `_updateSnapshot()` inmediatamente (ademas del `_refreshSoon(400)`) para garantizar que la pregunta avanza sin esperar el delay.
+
+### Pendiente operativo
+- Actualizar app: "cialpa-app-v2.6.103".
+- Probar el flujo de medidas con bloc recien creado: escribir valores, click Guardar, verificar que avanza a estado.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`: OK.
+- `node --check assets/js/mec-form.js`: OK.
+
+---
+
 ## Techo/piso no bloqueante, pilares multiples, checklist compacta, bloques poligonales - 2026-05-22 - v2.6.102
 
 ### Objetivo
