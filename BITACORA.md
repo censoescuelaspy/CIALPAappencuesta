@@ -42,6 +42,9 @@
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
 - `git commit`: `7c1fea2` - `fix: guiar captura secuencial v2.6.95`.
 - `git push origin main`: publica `7c1fea2`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.95`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.95`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene captura secuencial `answerClassroomObjectField`.
 
 ---
 
