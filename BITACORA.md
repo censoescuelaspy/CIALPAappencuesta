@@ -34,6 +34,13 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - Playwright/Chromium local: al simular medidas de bloque provenientes del plano, la tarjeta superior pasa de `Bloque: medidas principales` a `Bloque: estado general`.
 - Playwright/Chromium local: sanitarios pendientes muestran cuadritos superiores `Largo del sanitario` y `Ancho del sanitario`.
+- `git commit`: `8909c45` - `fix: sincronizar medidas guiadas v2.6.99`.
+- `git push origin main`: publica `8909c45`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.99`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.99`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.99`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `syncFromPlan` y `saveClassroomMeasures`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `_scheduleGuidedRegisterSync`.
 
 ---
 
