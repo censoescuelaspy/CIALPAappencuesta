@@ -15,6 +15,7 @@ const GuidedRegisterModule = (() => {
   let _touchStartY = 0;
   let _guidedState = { targets: {}, flags: {} };
   let _timeRefreshTimer = null;
+  let _planSyncTimer = null;
 
   function _schoolIdentityValues(school) {
     const values = [
@@ -322,6 +323,8 @@ const GuidedRegisterModule = (() => {
     if (action === 'resetNoFloor') return _setScopedFlag('noFloor', false, 'Se volvera a pedir el piso del bloque.');
     if (action === 'saveBlockMeasures') return _saveBlockMeasures();
     if (action === 'saveFloorMeasures') return _saveFloorMeasures(value);
+    if (action === 'saveClassroomMeasures') return _saveClassroomMeasures(value);
+    if (action === 'saveSanitaryMeasures') return _saveSanitaryMeasures(value);
     if (action === 'answerFloorField') return _answerFloorField(value);
     if (action === 'markNoSanitary') return _setScopedFlag('noSanitary', true, 'Respuesta registrada: sin sanitario para este bloque/piso.');
     if (action === 'resetNoSanitary') return _setScopedFlag('noSanitary', false, 'Se volvera a pedir sanitario para este bloque/piso.');
@@ -484,6 +487,8 @@ const GuidedRegisterModule = (() => {
       'answerBlockField',
       'saveBlockMeasures',
       'saveFloorMeasures',
+      'saveClassroomMeasures',
+      'saveSanitaryMeasures',
       'answerFloorField',
       'answerClassroomField',
       'answerClassroomObjectField',
@@ -537,6 +542,13 @@ const GuidedRegisterModule = (() => {
       _refreshPlan();
       _updateSnapshot();
     }, 220);
+  }
+
+  function syncFromPlan() {
+    clearTimeout(_planSyncTimer);
+    _planSyncTimer = setTimeout(() => {
+      _updateSnapshot();
+    }, 90);
   }
 
   function _refreshPlan() {
@@ -1378,6 +1390,13 @@ const GuidedRegisterModule = (() => {
       const label = snap.incompleteClassroom.name || 'Aula pendiente';
       const pending = _roomRequirementItems(snap.incompleteClassroom);
       const next = _firstPendingRequirement(pending);
+      if (next?.title === 'Cargar dimensiones') {
+        return _question('Aula pendiente', `${label}: medidas principales`, 'Ingrese largo y ancho desde la guia o estire el ambiente en el plano. Ambos caminos quedan sincronizados.', [
+          { label: 'Guardar medidas', action: 'saveClassroomMeasures', value: snap.incompleteClassroom.id, primary: true },
+          { label: 'Seleccionar en plano', action: 'selectPlanItem', value: `room::${snap.incompleteClassroom.id}` },
+          { label: 'Editar ficha', action: 'openClassroomFicha', value: snap.incompleteClassroom.id },
+        ], false, _measureControl('guided-room', 'Largo del aula/ambiente (m)', 'Ancho del aula/ambiente (m)', snap.incompleteClassroom.length || '', snap.incompleteClassroom.width || ''), '', true);
+      }
       const primaryValue = next?.value || (next?.plan ? `room::${snap.incompleteClassroom.id}` : snap.incompleteClassroom.id);
       return _question('Aula pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira estado, caracteristicas y elementos uno por uno.', [
         { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openClassroomFicha', value: primaryValue, primary: true },
@@ -1422,6 +1441,13 @@ const GuidedRegisterModule = (() => {
       const label = snap.incompleteSanitary.codigo || 'Sanitario pendiente';
       const pending = _sanitaryRequirementItems(snap.incompleteSanitary);
       const next = _firstPendingRequirement(pending);
+      if (next?.title === 'Cargar dimensiones') {
+        return _question('Sanitario pendiente', `${label}: medidas principales`, 'Ingrese largo y ancho desde la guia o estire el sanitario en el plano. Ambos caminos quedan sincronizados.', [
+          { label: 'Guardar medidas', action: 'saveSanitaryMeasures', value: snap.incompleteSanitary.id, primary: true },
+          { label: 'Seleccionar en plano', action: 'selectPlanItem', value: `sanitary::${snap.incompleteSanitary.id}` },
+          { label: 'Editar ficha', action: 'openSanitaryFicha', value: snap.incompleteSanitary.id },
+        ], false, _measureControl('guided-sanitary', 'Largo del sanitario (m)', 'Ancho del sanitario (m)', snap.incompleteSanitary.largo_m || '', snap.incompleteSanitary.ancho_m || ''), '', true);
+      }
       const primaryValue = next?.value || (next?.plan ? `sanitary::${snap.incompleteSanitary.id}` : snap.incompleteSanitary.id);
       return _question('Sanitario pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira uso, estado, agua y artefactos uno por uno.', [
         { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openSanitaryFicha', value: primaryValue, primary: true },
@@ -1807,7 +1833,7 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Cargar dimensiones',
-        help: 'Complete largo y ancho desde la ficha o estirando el ambiente sobre el plano.',
+        help: 'Complete largo y ancho desde la guia superior o estirando el ambiente sobre el plano.',
         doneText: `${room?.length || '?'} x ${room?.width || '?'} m`,
         done: _hasMeasures(room, 'length', 'width'),
       },
@@ -1851,7 +1877,7 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Cargar dimensiones',
-        help: 'Complete largo y ancho desde la ficha o estirando el sanitario sobre el plano.',
+        help: 'Complete largo y ancho desde la guia superior o estirando el sanitario sobre el plano.',
         doneText: `${item?.largo_m || '?'} x ${item?.ancho_m || '?'} m`,
         done: _hasMeasures(item, 'largo_m', 'ancho_m'),
       },
@@ -2271,6 +2297,50 @@ const GuidedRegisterModule = (() => {
     const okWidth = mec.setGuidedFloorField(blockId, floorId, 'ancho_m', String(width));
     if (okLength && okWidth) {
       UI.showToast('Medidas del piso registradas. Ahora complete su estado y ubicacion.', 'success', 5200);
+      _refreshSoon();
+    }
+  }
+
+  function _saveClassroomMeasures(roomId = '') {
+    const lengthInput = document.querySelector('[data-guided-room-length]');
+    const widthInput = document.querySelector('[data-guided-room-width]');
+    const length = Number(lengthInput?.value);
+    const width = Number(widthInput?.value);
+    if (!roomId || !Number.isFinite(length) || length <= 0 || !Number.isFinite(width) || width <= 0) {
+      UI.showToast('Ingrese largo y ancho validos del aula o ambiente antes de continuar.', 'warning', 6200);
+      return;
+    }
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.setGuidedClassroomField) {
+      UI.showToast('No se pudo guardar las medidas del aula desde la guia.', 'warning');
+      return;
+    }
+    const okLength = mec.setGuidedClassroomField(roomId, 'length', String(length));
+    const okWidth = mec.setGuidedClassroomField(roomId, 'width', String(width));
+    if (okLength && okWidth) {
+      UI.showToast('Medidas del ambiente registradas. Ahora complete estado, uso y elementos.', 'success', 5200);
+      _refreshSoon();
+    }
+  }
+
+  function _saveSanitaryMeasures(sanitaryId = '') {
+    const lengthInput = document.querySelector('[data-guided-sanitary-length]');
+    const widthInput = document.querySelector('[data-guided-sanitary-width]');
+    const length = Number(lengthInput?.value);
+    const width = Number(widthInput?.value);
+    if (!sanitaryId || !Number.isFinite(length) || length <= 0 || !Number.isFinite(width) || width <= 0) {
+      UI.showToast('Ingrese largo y ancho validos del sanitario antes de continuar.', 'warning', 6200);
+      return;
+    }
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.setGuidedSanitaryField) {
+      UI.showToast('No se pudo guardar las medidas del sanitario desde la guia.', 'warning');
+      return;
+    }
+    const okLength = mec.setGuidedSanitaryField(sanitaryId, 'largo_m', String(length));
+    const okWidth = mec.setGuidedSanitaryField(sanitaryId, 'ancho_m', String(width));
+    if (okLength && okWidth) {
+      UI.showToast('Medidas del sanitario registradas. Ahora complete uso, estado, agua y artefactos.', 'success', 5200);
       _refreshSoon();
     }
   }
@@ -3039,5 +3109,6 @@ const GuidedRegisterModule = (() => {
     goTo,
     next,
     previous,
+    syncFromPlan,
   };
 })();

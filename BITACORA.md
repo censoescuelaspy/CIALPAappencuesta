@@ -4,6 +4,39 @@
 
 ---
 
+## Sincronizacion de medidas entre plano y guia - 2026-05-22 - v2.6.99
+
+### Objetivo
+- Asegurar que las dimensiones modificadas manualmente estirando objetos en el plano impacten en la tarjeta superior del `Registro guiado`.
+- Asegurar el camino inverso: cuando se cargan medidas en los cuadritos de la guia, el objeto visible del plano se redimensiona.
+- Extender los controles superiores de largo/ancho a aulas/ambientes y sanitarios, no solo a bloque, piso y exteriores.
+
+### Cambios implementados
+- El motor MEC notifica al `Registro guiado` despues de guardar cambios del plano, permitiendo refrescar la tarjeta superior sin depender de cerrar o cambiar de paso.
+- `Registro guiado` agrega `syncFromPlan()`, refrescando preguntas y controles cuando el plano actualiza medidas.
+- Aulas/ambientes con geometria pero sin medidas muestran ahora cuadritos superiores de largo y ancho.
+- Sanitarios con geometria pero sin medidas muestran ahora cuadritos superiores de largo y ancho.
+- Al guardar medidas de aula/ambiente desde la guia, se actualiza la geometria del aula en el plano.
+- Al guardar medidas de sanitario desde la guia, se actualiza la geometria del sanitario en el plano.
+- Al editar medidas de bloque desde la guia, si el bloque ya tenia una forma estirada en el plano, se ajusta proporcionalmente el ancho/alto visual.
+- Al editar medidas de piso desde la guia, se recalculan las proporciones visuales del piso dentro del bloque.
+- Version visible y cache del Service Worker actualizados a `v2.6.99`.
+
+### Pendiente operativo
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.99`.
+- Probar en tablet: estirar bloque, piso, aula, sanitario y exterior; confirmar que la guia superior avanza o muestra medidas sincronizadas.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Playwright/Chromium local: al simular medidas de bloque provenientes del plano, la tarjeta superior pasa de `Bloque: medidas principales` a `Bloque: estado general`.
+- Playwright/Chromium local: sanitarios pendientes muestran cuadritos superiores `Largo del sanitario` y `Ancho del sanitario`.
+
+---
+
 ## Registro guiado como captura principal y botones visibles - 2026-05-21 - v2.6.98
 
 ### Objetivo

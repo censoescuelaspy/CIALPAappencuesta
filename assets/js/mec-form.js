@@ -46,6 +46,7 @@ const MecFormModule = (() => {
   let _draftSyncTimer = null;
   let _draftSyncRunning = false;
   let _lastDraftSyncAt = 0;
+  let _guidedRegisterSyncTimer = null;
   const DRAFT_SYNC_DEBOUNCE_MS = 18000;
   const DRAFT_SYNC_MIN_INTERVAL_MS = 12000;
   const _sketchHistory = [];
@@ -200,6 +201,19 @@ const MecFormModule = (() => {
     return _isGuidedInsert(options) ? { ...options, guided: true } : options;
   }
 
+  function _scheduleGuidedRegisterSync(reason = 'draft') {
+    if (!_isGuidedRegisterActive()) return;
+    clearTimeout(_guidedRegisterSyncTimer);
+    _guidedRegisterSyncTimer = setTimeout(() => {
+      try {
+        const guided = typeof GuidedRegisterModule !== 'undefined' ? GuidedRegisterModule : null;
+        guided?.syncFromPlan?.({ reason });
+      } catch (err) {
+        console.warn('[MEC] No se pudo sincronizar la guia superior:', err);
+      }
+    }, 90);
+  }
+
   function _schoolIdentityValues(school) {
     const values = [
       school?.id_escuela,
@@ -327,6 +341,7 @@ const MecFormModule = (() => {
       const state = document.getElementById('mec-save-state');
       if (state) state.textContent = _formatSavedAt(savedAt);
       if (options.skipRemoteSync !== true) _scheduleDraftSync(showToast ? 'manual-local' : 'auto');
+      if (options.skipGuidedSync !== true) _scheduleGuidedRegisterSync(options.guidedReason || 'draft');
     } catch (err) {
       console.warn('[MEC] No se pudo guardar el borrador local:', err);
       UI.showToast('No se pudo guardar el borrador local. Revise espacio del dispositivo o sincronice evidencias.', 'warning', 7000);
@@ -11483,6 +11498,48 @@ const MecFormModule = (() => {
     }
   }
 
+  function _syncBlockPlanSizeFromMeasures(block, previousLength = 0, previousWidth = 0) {
+    if (!block) return;
+    const currentPosition = block.planPosition || block.plano_general || null;
+    if (!currentPosition) return;
+    const logicalWidth = Math.max(1, _planCanvasWidth());
+    const logicalHeight = Math.max(1, _planCanvasHeight());
+    const nextLength = Number(block.largo_m || 0);
+    const nextWidth = Number(block.ancho_m || 0);
+    const prevLength = Number(previousLength || 0);
+    const prevWidth = Number(previousWidth || 0);
+    let wRatio = Number(currentPosition.wRatio);
+    let hRatio = Number(currentPosition.hRatio);
+    let changed = false;
+    if (Number.isFinite(wRatio) && wRatio > 0 && prevLength > 0 && nextLength > 0 && Math.abs(nextLength - prevLength) > .001) {
+      wRatio = Math.max(.045, Math.min(.96, wRatio * (nextLength / prevLength)));
+      changed = true;
+    }
+    if (Number.isFinite(hRatio) && hRatio > 0 && prevWidth > 0 && nextWidth > 0 && Math.abs(nextWidth - prevWidth) > .001) {
+      const floorCount = Math.max(1, _planFloorsForBlock(block).length || 1);
+      const currentH = hRatio * logicalHeight;
+      const contentH = _planBlockMeasureHeight({ h: currentH }, floorCount);
+      const nextContentH = Math.max(1, contentH * (nextWidth / prevWidth));
+      const totalH = nextContentH + 68 + Math.max(0, floorCount - 1) * 34;
+      hRatio = Math.max(.07, Math.min(.96, totalH / logicalHeight));
+      changed = true;
+    }
+    if (!changed) return;
+    if (!Number.isFinite(wRatio) || wRatio <= 0) wRatio = .24;
+    if (!Number.isFinite(hRatio) || hRatio <= 0) hRatio = .18;
+    const xRatio = Math.max(0, Math.min(.98, Number(currentPosition.xRatio || 0)));
+    const yRatio = Math.max(0, Math.min(.98, Number(currentPosition.yRatio || 0)));
+    const next = {
+      ...currentPosition,
+      xRatio: Math.max(0, Math.min(.98 - Math.min(wRatio, .96), xRatio)),
+      yRatio: Math.max(0, Math.min(.98 - Math.min(hRatio, .96), yRatio)),
+      wRatio,
+      hRatio,
+    };
+    block.planPosition = { ...(block.planPosition || {}), ...next };
+    block.plano_general = { ...(block.plano_general || {}), ...next, rotacion_grados: String(_blockRotationDeg(block)) };
+  }
+
   function setGuidedBlockField(fieldId, value) {
     const block = _blockById(_data.__activeBlockId);
     if (!block) {
@@ -11490,8 +11547,11 @@ const MecFormModule = (() => {
       return false;
     }
     if (!_assertBlockUnlocked(block, 'responder esta pregunta')) return false;
+    const previousLength = Number(block.largo_m || 0);
+    const previousWidth = Number(block.ancho_m || 0);
     _data.bloques = { ...(_data.bloques || {}), [fieldId]: value };
     block[fieldId] = value;
+    if (fieldId === 'largo_m' || fieldId === 'ancho_m') _syncBlockPlanSizeFromMeasures(block, previousLength, previousWidth);
     if (BLOCK_ELECTRIC_FIELDS.includes(fieldId) || fieldId === 'tipo_circulacion') {
       _syncBlockDrivenPlanElements(fieldId, value);
     }
@@ -11516,6 +11576,7 @@ const MecFormModule = (() => {
     if (!_assertBlockUnlocked(block, 'responder esta pregunta del piso')) return false;
     floor[fieldId] = value;
     if (fieldId === 'estado') floor.estado_piso = value;
+    if (fieldId === 'largo_m' || fieldId === 'ancho_m') _applyFloorMeasureRatios(block, floor);
     _setActiveFloor(_floorRecordLabel(floor));
     _selectedPlanId = _floorRecordPlanId(block, floor);
     _syncBlockFloorCountFromRecords(block);
