@@ -4,6 +4,48 @@
 
 ---
 
+## Auditoria de ubicacion real de escuelas - 2026-05-22
+
+### Objetivo
+- Preparar una forma reproducible de revisar si las coordenadas del padron coinciden con referencias externas.
+- Ensayar con al menos 10 escuelas sin guardar imagenes de Google Street View ni contenido de Google Maps como evidencia propia.
+- Dejar enlaces de revision en vivo para ajustar mejor la base mapa del plano escolar.
+
+### Cambios implementados
+- Se agrega `tools/location-audit/verify_school_locations.mjs`.
+- Se agrega script `npm run audit:locations`.
+- La herramienta lee el padron local ignorado por Git y genera reportes privados en `tools/location-audit/output/`.
+- Se normalizan coordenadas en grados/minutos/segundos del padron completo y coordenadas decimales de la muestra piloto.
+- Se consulta Nominatim y, si no hay coincidencia nominal, Overpass/OpenStreetMap alrededor de la coordenada del padron.
+- El reporte calcula distancia entre coordenada del padron y candidato externo, confianza y recomendacion operativa.
+- Se generan enlaces de Google Maps y Street View para revision manual en vivo, sin descargar ni guardar fotos de Street View.
+- Se agrega `tools/location-audit/README.md` con criterios de uso y limites de licencia.
+- `tools/location-audit/output/` queda ignorado por Git porque puede contener nombres y coordenadas de escuelas.
+
+### Ensayo ejecutado
+- Comando: `node tools/location-audit/verify_school_locations.mjs --limit=10 --source=all`.
+- Fuente: padron completo local `tools/simulation/lista_oficial_escuelas_2025_listado_ini.csv`.
+- Proveedor externo: Nominatim + Overpass/OpenStreetMap.
+- Resultado de la muestra de 10 escuelas:
+  - `alta`: 3.
+  - `media`: 0.
+  - `baja`: 2.
+  - `sin_candidato`: 5.
+- Reporte local generado: `tools/location-audit/output/location-audit-20260522225024.md`.
+
+### Interpretacion operativa
+- En los casos `alta`, la coordenada del padron es compatible con una escuela mapeada y puede usarse como base inicial del plano.
+- En los casos `baja` o `sin_candidato`, no conviene reemplazar coordenadas automaticamente: corresponde abrir mapa/Street View, revisar visualmente y confirmar en campo.
+- El mecanismo es util para priorizar escuelas con coordenadas dudosas antes del relevamiento.
+
+### Validaciones ejecutadas
+- `node --check tools/location-audit/verify_school_locations.mjs`.
+- `node tools/location-audit/verify_school_locations.mjs --help`.
+- `node tools/location-audit/verify_school_locations.mjs --limit=10 --source=all` con red habilitada.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+
+---
+
 ## Ajustes de plano y registro guiado MEC - 2026-05-22 - v2.6.108
 
 ### Objetivo
