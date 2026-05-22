@@ -4,6 +4,42 @@
 
 ---
 
+## Apunte a nuevo Web App propietario - 2026-05-21 - v2.6.96
+
+### Objetivo
+- Apuntar la PWA al nuevo deployment publicado desde la cuenta propietaria/aceptada.
+- Confirmar que el backend publicado incluye el codigo necesario para cierre final, `Mi Jornada` y padron oficial completo.
+- Forzar cache nuevo para que los navegadores tomen la URL backend correcta.
+
+### Resultado
+- `APP_CONFIG.GAS_URL` apunta a `https://script.google.com/macros/s/AKfycbyt-THSOSgFwvH8Oxl8ojpfJR_8gNhezYA1N7JPmgG0L2RyEtfHq9E58BgfcG33yD2voA/exec`.
+- El Web App nuevo responde `login` sin credenciales con validacion publica, sin HTTP 403.
+- `diagnosticoPadron` responde `source: official_sheet`, `total: 5462`, `con_coordenadas: 5004`, `muestra_piloto: 86`, `filas_operativas: 108`.
+- `guardarCierreCompleto` sin token responde `Token inválido o expirado`, confirmando endpoint protegido y disponible.
+- `getEscuelas` sin token responde `Token inválido o expirado`, confirmando backend publico protegido por sesion.
+- Version visible y cache del Service Worker actualizados a `v2.6.96`.
+
+### Pendiente operativo
+- Pedir a usuarios y administradores `Actualizar app` para tomar `cialpa-app-v2.6.96`.
+- Probar con `diego.meza`: finalizar una escuela real desde `Registro guiado` y confirmar que aparece en `Mi Jornada`.
+- Probar puerta/ventana en sanitario y boton `Apertura` en tablet con la version publicada.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App nuevo para `login` sin datos: responde `Usuario y contraseña son requeridos`.
+- Prueba HTTP del Web App nuevo para `diagnosticoPadron`: `official_sheet`, `total: 5462`, `muestra_piloto: 86`, `filas_operativas: 108`.
+- Prueba HTTP del Web App nuevo para `guardarCierreCompleto` sin token: responde `Token inválido o expirado`.
+- Prueba HTTP del Web App nuevo para `getEscuelas` sin token: responde `Token inválido o expirado`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/jornada.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Flujo guiado secuencial, sanitarios y jornada - 2026-05-21 - v2.6.95
 
 ### Objetivo
