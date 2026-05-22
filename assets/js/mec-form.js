@@ -12192,9 +12192,30 @@ const MecFormModule = (() => {
     if (!_selectedPlanId) return '';
     const context = _planSelectionContext(_selectedPlanId);
     const title = context?.title || 'Elemento seleccionado';
+    const _raw = String(_selectedPlanId);
+    let _quickAddBtn = '';
+    if (_raw.includes('::') && !_raw.startsWith('block::') && !_raw.startsWith('floor::') && !_raw.startsWith('room::') && !_raw.startsWith('sanitary::') && !_raw.startsWith('site::')) {
+      const _parts = _raw.split('::');
+      const _qRoom = (_data.__classrooms || []).find(r => r.id === _parts[0]);
+      const _qObj = (_qRoom?.objects || []).find(o => o.id === _parts[1]);
+      const _clLabels = { door: 'Puerta', window: 'Ventana', outlet: 'Enchufe', switchboard: 'Tablero', light: 'Foco', fan: 'Ventilador', ac: 'Aire', damage: 'Falla', stair: 'Escalera', text: 'Texto', board: 'Pizarron' };
+      if (_qObj?.type && _clLabels[_qObj.type]) {
+        _quickAddBtn = `<button class="btn btn-secondary btn-sm" type="button" onclick="${_escape(`MecFormModule.addPlanClassroomElement('${_qObj.type}')`)}" title="Agregar otro elemento del mismo tipo">+ ${_clLabels[_qObj.type]}</button>`;
+      }
+    } else if (_raw.startsWith('sanitary::') && _raw.split('::').length >= 3) {
+      const _sParts = _raw.split('::');
+      const _qSan = (_data.__sanitaries || []).find(s => s.id === _sParts[1]);
+      const _qObj = (_qSan?.objects || []).find(o => o.id === _sParts[2]);
+      const _sanFn = { door: "MecFormModule.addPlanSanitaryOpening('door')", window: "MecFormModule.addPlanSanitaryOpening('window')", stall: 'MecFormModule.addPlanSanitaryStall()', toilet: "MecFormModule.addPlanSanitaryFixture('toilet')", sink: "MecFormModule.addPlanSanitaryFixture('sink')", shower: "MecFormModule.addPlanSanitaryFixture('shower')", urinal: "MecFormModule.addPlanSanitaryFixture('urinal')", outlet: "MecFormModule.addPlanSanitaryElement('outlet')", light: "MecFormModule.addPlanSanitaryElement('light')", fan: "MecFormModule.addPlanSanitaryElement('fan')", ac: "MecFormModule.addPlanSanitaryElement('ac')" };
+      const _sanLabels = { door: 'Puerta', window: 'Ventana', stall: 'Cabina', toilet: 'Inodoro', sink: 'Lavamanos', shower: 'Ducha', urinal: 'Urinario', outlet: 'Enchufe', light: 'Foco', fan: 'Ventilador', ac: 'Aire' };
+      if (_qObj?.type && _sanFn[_qObj.type]) {
+        _quickAddBtn = `<button class="btn btn-secondary btn-sm" type="button" onclick="${_escape(_sanFn[_qObj.type])}" title="Agregar otro elemento del mismo tipo">+ ${_sanLabels[_qObj.type] || _qObj.type}</button>`;
+      }
+    }
     return `
       <div class="school-plan-floating-actions" aria-label="Acciones rapidas del elemento seleccionado">
         <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openPlanSelection()" title="Abrir ficha de ${_escape(title)}">Ficha</button>
+        ${_quickAddBtn}
       </div>`;
   }
 
@@ -12424,6 +12445,33 @@ const MecFormModule = (() => {
       ].join(''));
     }
     const canDelete = Boolean(_selectedPlanId);
+    const _selForma = String(_selectedPlanId || '');
+    let _formaGroupContent = '';
+    if (_selForma.startsWith('block::')) {
+      const _fbId = _selForma.replace('block::', '');
+      _formaGroupContent = [
+        _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanBlockShape('${_escape(_fbId)}', 'l')`, title: 'Cambiar a forma en L' }),
+        _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanBlockVertex('${_escape(_fbId)}')`, title: 'Agregar vertice al bloque' }),
+        _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanBlockVertex('${_escape(_fbId)}')`, title: 'Eliminar vertice del bloque' }),
+        _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanBlockShape('${_escape(_fbId)}', 'rect')`, title: 'Restablecer forma rectangular' }),
+      ].join('');
+    } else if (_selForma.startsWith('room::')) {
+      const _frId = _selForma.replace('room::', '');
+      _formaGroupContent = [
+        _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanClassroomShape('${_escape(_frId)}', 'l')`, title: 'Cambiar a forma en L' }),
+        _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanClassroomVertex('${_escape(_frId)}')`, title: 'Agregar vertice al aula' }),
+        _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanClassroomVertex('${_escape(_frId)}')`, title: 'Eliminar vertice del aula' }),
+        _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanClassroomShape('${_escape(_frId)}', 'rect')`, title: 'Restablecer forma rectangular' }),
+      ].join('');
+    } else if (_selForma.startsWith('sanitary::') && _selForma.split('::').length < 3) {
+      const _fsId = _selForma.split('::')[1];
+      _formaGroupContent = [
+        _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanSanitaryShape('${_escape(_fsId)}', 'l')`, title: 'Cambiar a forma en L' }),
+        _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanSanitaryVertex('${_escape(_fsId)}')`, title: 'Agregar vertice al sanitario' }),
+        _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanSanitaryVertex('${_escape(_fsId)}')`, title: 'Eliminar vertice del sanitario' }),
+        _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanSanitaryShape('${_escape(_fsId)}', 'rect')`, title: 'Restablecer forma rectangular' }),
+      ].join('');
+    }
     return [
       _renderPlanRibbonGroup('Seleccion', [
         _renderPlanRibbonButton({
@@ -12440,6 +12488,7 @@ const MecFormModule = (() => {
         _renderPlanRibbonButton({ icon: '&#10005;', label: 'Eliminar', onClick: 'MecFormModule.deletePlanSelection()', tone: 'btn-danger', disabled: !canDelete, title: canDelete ? 'Eliminar seleccion' : 'Seleccione un elemento para eliminar' }),
       ].join('')),
       _renderPlanRibbonGroup('Orientar', _renderSelectedPlanOrientationButtons('btn-sm', true, true), 'school-plan-ribbon__group--wide'),
+      _formaGroupContent ? _renderPlanRibbonGroup('Forma', _formaGroupContent) : '',
     ].join('');
   }
 

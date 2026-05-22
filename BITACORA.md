@@ -4,6 +4,35 @@
 
 ---
 
+## Botones de forma y agregar elementos — 2026-05-22 — v2.6.104
+
+### Objetivos
+1. Hacer visibles los botones "Forma L", "+ Vértice", "- Vértice", "Rect." para bloques, aulas y sanitarios dentro del flujo de registro guiado.
+2. Facilitar agregar más de un elemento del mismo tipo (foco, puerta, ventana, enchufe, etc.) al seleccionar un elemento ya colocado.
+
+### Causa raíz (Issue 1 — botones de forma)
+`_renderPlanBuilderPanel()` (que contiene las acciones de forma) está oculto por CSS en `#module-registro` (`display: none`). Al estar el flujo guiado dentro de ese módulo, los botones de polígono nunca eran accesibles.
+
+### Causa raíz (Issue 2 — múltiples elementos)
+Los botones de inserción existen en la pestaña "Insertar" del ribbon, pero los usuarios no descubrían que podían volver a hacer click en el mismo botón para agregar otro elemento. No había feedback visual al seleccionar un elemento ya colocado.
+
+### Cambios implementados
+
+**mec-form.js (`_renderPlanRibbonPanel` — pestaña "Editar")**
+- Cuando hay un bloque, aula o sanitario seleccionado, se agrega un grupo "Forma" al ribbon con los botones: "Forma L", "+ Vértice", "- Vértice", "Rect."
+- El grupo aparece condicionalmente según el tipo de ID seleccionado y llama a las funciones existentes (`setPlanBlockShape`, `addPlanBlockVertex`, etc.).
+
+**mec-form.js (`_renderPlanFloatingActions`)**
+- Cuando se selecciona un elemento dentro de un aula (puerta, ventana, foco, enchufe, etc.), el panel flotante ahora muestra un botón "+ [Tipo]" para agregar otro elemento del mismo tipo directamente.
+- Mismo comportamiento para elementos dentro de sanitarios (cabinas, artefactos, aberturas).
+
+### Pendiente operativo
+- Actualizar app: "cialpa-app-v2.6.104".
+- Verificar en el flujo guiado: seleccionar un bloque → pestaña "Editar" → debe aparecer grupo "Forma".
+- Verificar: agregar una puerta a un aula → seleccionarla → debe aparecer botón "+ Puerta" en el panel flotante.
+
+---
+
 ## Fix cuelgue en medidas de bloque - 2026-05-22 - v2.6.103
 
 ### Objetivo
