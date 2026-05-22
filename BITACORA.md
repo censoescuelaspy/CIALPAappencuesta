@@ -4,6 +4,48 @@
 
 ---
 
+## Ajustes de plano y registro guiado MEC - 2026-05-22 - v2.6.108
+
+### Objetivo
+- Corregir inconsistencias visibles en medidas, fotos y elementos del plano.
+- Reducir trabas del flujo guiado en pilares, techo y piso.
+- Avanzar sobre nuevas necesidades del MEC: puertas especiales, sanitarios dentro de aulas y plano electrico aproximado.
+
+### Cambios implementados
+- Las etiquetas de medidas de puertas, ventanas y objetos redimensionables ahora prefieren las medidas sincronizadas de la ficha y se actualizan al estirar el objeto en el plano.
+- Se agregan tipos de puerta PVC, doble hoja y corrediza en la guia y en la ficha.
+- Las puertas corredizas y de doble hoja tienen marca visual propia en plano y PDF.
+- La capa de electricidad dibuja conexiones aproximadas entre tablero y tomas, luces, ventiladores o aire acondicionado dentro de aulas y sanitarios.
+- La foto tomada desde la guia de un elemento actualiza el contador visible, evitando que quede `Sin foto`.
+- Se agregan fotos directas de techo y piso del ambiente desde la pregunta guiada correspondiente.
+- El indice de evidencias y el anexo fotografico incorporan fotos de techo y piso.
+- Los pilares declarados por cantidad se crean todos y se distribuyen en el bloque; no se piden detalles por cada pilar.
+- Los pendientes del elemento se compactan para no ocupar demasiada altura en la vista.
+- Se elimina el zoom automatico al seleccionar objetos; `Escape` mantiene la limpieza de seleccion y zoom.
+- Los sanitarios ya no bloquean ni son bloqueados por aulas al ubicarse, permitiendo representar sanitarios dentro de aulas u otros ambientes.
+- El PDF imprime pizarrones y agrega un resumen de exteriores/galerias asociados.
+- Version visible y cache actualizados a `v2.6.108`.
+
+### Revision MEC
+- Se verifico acceso al archivo validado `H:\Mi unidad\PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx`.
+- Hojas detectadas: `Gral.`, `Servicios`, `Electricidad`, `Bloque&Nivel`, `Area Rec.`, `Aula (1)`, `Dependencia`, `Laboratorio`, `Taller`, `Sanitario (1)`.
+- Queda pendiente una matriz completa campo por campo contra el flujo guiado para cerrar brechas finas del cuestionario.
+
+### Pendiente operativo
+- Subir frontend a GitHub Pages y pedir `Actualizar app` para tomar `cialpa-app-v2.6.108`.
+- Probar en tablet: cantidad de pilares, foto de techo/piso, puerta doble/corrediza, pizarron, sanitario dentro de aula y PDF.
+- Continuar con una pasada especifica de deshacer/rehacer para elementos generales, sanitarios y exteriores.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Fix dimensiones piso + reinicio preguntas al seleccionar elemento — 2026-05-22 — v2.6.106
 
 ### Objetivos

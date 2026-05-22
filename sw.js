@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'cialpa-app-v2.6.107';
+const CACHE_NAME = 'cialpa-app-v2.6.108';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',
@@ -116,4 +116,3 @@ self.addEventListener('notificationclick', event => {
       })
   );
 });
-

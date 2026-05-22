@@ -1604,7 +1604,7 @@ const GuidedRegisterModule = (() => {
       return _question('Pregunta del aula', `${label}: estado del techo`, 'Registre la calidad del techo: filtraciones, roturas, deformaciones o imposibilidad de verificar.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::techo_estado`, ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
-      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+      ], false, _guidedRequirementList(_roomRequirementItems(room)) + _guidedRoomSectionPhotoHtml(room, 'techo'));
     }
     if (!_hasAnswer(room?.piso_tipo)) {
       return _question('Pregunta del aula', `${label}: tipo de piso`, 'Indique el material principal del piso del ambiente.', [
@@ -1616,7 +1616,7 @@ const GuidedRegisterModule = (() => {
       return _question('Pregunta del aula', `${label}: estado/calidad del piso`, 'Registre si el piso esta en buen estado, presenta desgaste, roturas, humedad o desniveles.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Con roturas', 'Con humedad', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
-      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+      ], false, _guidedRequirementList(_roomRequirementItems(room)) + _guidedRoomSectionPhotoHtml(room, 'piso'));
     }
     const object = _guidedPendingObjects(room?.objects || [])[0];
     if (object) return _roomObjectDirectQuestion(room, object);
@@ -1696,9 +1696,19 @@ const GuidedRegisterModule = (() => {
     const sObjId = String(object?.id || '').replace(/['"\\\s]/g, '');
     const inputId = `gphoto_${sParentId.slice(-8)}_${sObjId.slice(-8)}`;
     const onchange = parentKind === 'sanitary'
-      ? `MecFormModule.setSanitaryObjectEvidence('${sParentId}', '${sObjId}', this)`
-      : `MecFormModule.addClassroomObjectEvidence('${sParentId}', '${sObjId}', this)`;
+      ? `MecFormModule.setSanitaryObjectEvidence('${sParentId}', '${sObjId}', this); setTimeout(() => GuidedRegisterModule.syncFromPlan(), 700)`
+      : `MecFormModule.addClassroomObjectEvidence('${sParentId}', '${sObjId}', this); setTimeout(() => GuidedRegisterModule.syncFromPlan(), 700)`;
     return `<div class="guided-photo-row"><input id="${inputId}" type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="${onchange}"><button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${inputId}')?.click()">Sacar foto</button><small class="guided-photo-count" data-guided-photo-count="${sObjId}">${countText}</small></div>`;
+  }
+
+  function _guidedRoomSectionPhotoHtml(room, section) {
+    const normalized = section === 'piso' ? 'piso' : 'techo';
+    const photos = normalized === 'piso' ? (room?.evidencias_piso || []) : (room?.evidencias_techo || []);
+    const count = photos.length;
+    const countText = count ? `${count} foto${count === 1 ? '' : 's'}` : 'Sin foto';
+    const sRoomId = String(room?.id || '').replace(/['"\\\s]/g, '');
+    const inputId = `gphoto_${sRoomId.slice(-8)}_${normalized}`;
+    return `<div class="guided-photo-row"><input id="${inputId}" type="file" accept="image/*" capture="environment" multiple style="display:none" onchange="MecFormModule.addClassroomSectionEvidence('${sRoomId}', '${normalized}', this); setTimeout(() => GuidedRegisterModule.syncFromPlan(), 700)"><button class="btn btn-outline btn-sm" type="button" onclick="document.getElementById('${inputId}')?.click()">Sacar foto del ${normalized}</button><small class="guided-photo-count" data-guided-photo-count="${sRoomId}-${normalized}">${countText}</small></div>`;
   }
 
   function _roomObjectDirectQuestion(room, object) {
@@ -1922,18 +1932,24 @@ const GuidedRegisterModule = (() => {
     if (!items.length) return '';
     const done = items.filter(item => item.done);
     const pending = items.filter(item => !item.done);
+    const total = items.length;
+    const firstPending = pending[0] || null;
+    const visiblePending = pending.slice(0, 2);
     const doneLabel = done.length
-      ? `<li class="guided-requirements__item--done guided-requirements__item--summary"><span aria-hidden="true">&#10003;</span><small>${done.map(item => _escape(item.title)).join(' &middot; ')}</small></li>`
+      ? `<li class="guided-requirements__item--done guided-requirements__item--summary"><span aria-hidden="true">&#10003;</span><strong>${done.length}/${total}</strong><small>${_escape(firstPending ? `Siguiente: ${firstPending.title}` : 'Todo completo')}</small></li>`
       : '';
-    const pendingRows = pending.map((item, index) => `
+    const pendingRows = visiblePending.map((item, index) => `
       <li class="${item.optional ? 'guided-requirements__item--optional' : ''}">
         <span aria-hidden="true">${item.optional ? 'i' : '!'}</span>
         <strong>${_escape(item.title)}</strong>
         ${index === 0 ? `<small>${_escape(`${item.optional ? 'Recomendado: ' : ''}${item.help || 'Pendiente'}`)}</small>` : ''}
       </li>`).join('');
+    const moreRow = pending.length > visiblePending.length
+      ? `<li class="guided-requirements__item--optional guided-requirements__item--summary"><span aria-hidden="true">+</span><strong>${pending.length - visiblePending.length}</strong><small>pendiente(s) adicional(es)</small></li>`
+      : '';
     return `
       <ul class="guided-requirements" aria-label="Pendientes del elemento">
-        ${doneLabel}${pendingRows}
+        ${doneLabel}${pendingRows}${moreRow}
       </ul>`;
   }
 
@@ -2301,7 +2317,7 @@ const GuidedRegisterModule = (() => {
     if (field === 'puerta') return ['Con puerta', 'Sin puerta', 'Puerta rota', 'No verificable'];
     if (field !== 'subtipo') return ['Si', 'No', 'No verificable'];
     return {
-      door: ['Con puerta madera', 'Con puerta metalica', 'Reja', 'Corrediza', 'Sin hoja', 'No verificable'],
+      door: ['Con puerta madera', 'Con puerta metalica', 'Con puerta PVC', 'Doble hoja', 'Corrediza', 'Reja', 'Sin hoja', 'Otro', 'No verificable'],
       window: ['Corrediza', 'Batiente', 'Vidrio fijo', 'Persiana', 'Sin vidrio', 'No verificable'],
       outlet: ['Simple', 'Doble', 'Con tierra', 'Sin tapa', 'No verificable'],
       switchboard: ['Tablero seccional', 'Tablero principal', 'Caja abierta', 'Sin rotulo', 'No verificable'],
@@ -3208,6 +3224,7 @@ const GuidedRegisterModule = (() => {
 
   function _siteElementConfigured(item) {
     if (!_siteElementReady(item)) return false;
+    if (item?.autoSource?.fieldId === 'pilares_bloque') return true;
     return _flagValue(_flagKeyParts('predio', 'exteriores', `siteConfigured:${item.id}`));
   }
 

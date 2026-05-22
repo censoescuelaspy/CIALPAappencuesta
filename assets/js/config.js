@@ -1,7 +1,7 @@
 ﻿/**
  * CIALPA — Relevamiento Escolar
  * config.js — Central application configuration
- * Version: 2.6.107
+ * Version: 2.6.108
  */
 
 const APP_CONFIG = {
@@ -17,8 +17,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA — Relevamiento Escolar',
-  VERSION: '2.6.107',
-  EDITION_LABEL: 'Edición vigente v2.6.107',
+  VERSION: '2.6.108',
+  EDITION_LABEL: 'Edición vigente v2.6.108',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -135,4 +135,3 @@ Object.freeze(APP_CONFIG.ROLES);
 Object.freeze(APP_CONFIG.STATES);
 Object.freeze(APP_CONFIG.STATE_COLORS);
 Object.freeze(APP_CONFIG.STATE_LABELS);
-
