@@ -4,6 +4,47 @@
 
 ---
 
+## Reinicio de escuela, confirmacion de medidas y preguntas edilicias - 2026-05-22 - v2.6.101
+
+### Objetivo
+- Permitir reiniciar completamente la carga de una escuela cuando fue registrada por error.
+- Hacer que la primera pregunta del `Registro guiado` confirme identificacion y ubicacion de la escuela.
+- Evitar que una medida modificada en el plano haga avanzar la guia sin confirmacion del encuestador.
+- Mantener visible por al menos un segundo la opcion marcada antes de pasar a la siguiente pregunta.
+- Agregar preguntas faltantes sobre pilares de bloque, techo/cubierta de aulas y tipo/calidad de piso.
+
+### Cambios implementados
+- `Registro guiado` agrega confirmacion editable de codigo, nombre, departamento, distrito, localidad, direccion y coordenadas antes de cargar infraestructura.
+- Se agrega `Reiniciar escuela`, que limpia borrador local, tiempos, bloques, pisos, aulas, sanitarios y exteriores, conservando la escuela seleccionada para volver a empezar.
+- Apps Script agrega `reiniciarRelevamientoEscuela`, que elimina borradores MEC de la escuela, suspende sesiones abiertas y vuelve el estado operativo a `pendiente`.
+- Las dimensiones de bloque, piso, aula, sanitario y exteriores se separan entre `detectadas` y `confirmadas`: si se estira en el plano, la tarjeta superior muestra la nueva medida y pide `Confirmar medidas`.
+- Las respuestas marcadas en tarjetas guiadas conservan el color fuerte al menos un segundo antes de refrescar la pregunta siguiente.
+- La ayuda de campo pasa debajo de los controles para que las opciones de respuesta ocupen el centro visible de la tarjeta.
+- `Escape` en el plano cancela seleccion/zoom enfocado sobre objetos pequenos.
+- La guia pregunta por pilares visibles del bloque y crea un pilar ubicable cuando corresponde.
+- Aulas/ambientes preguntan tipo y estado de techo, tipo de piso y estado/calidad del piso; esos campos tambien quedan editables desde la ficha.
+- Sanitarios preguntan tipo y estado/calidad del piso.
+- Version visible y cache del Service Worker actualizados a `v2.6.101`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar el Web App desde la cuenta propietaria/aceptada para activar `reiniciarRelevamientoEscuela`.
+- Pedir a usuarios `Actualizar app` para tomar `cialpa-app-v2.6.101`.
+- Probar en tablet: estirar bloque/aula/sanitario, confirmar medidas desde la guia, responder techo/piso/pilares y usar `Escape` para salir del zoom.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante `vm.Script`: OK.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `clasp.cmd push -f` desde `gas/`: bloqueado por permisos del sandbox sobre `C:\Users\Diego`; la escalacion no quedo disponible en este turno.
+- `git add ...`: bloqueado por permisos del sandbox sobre `.git/index.lock`; la escalacion no quedo disponible en este turno.
+
+---
+
 ## Preguntas visibles, botones neutros y pasillos automaticos - 2026-05-22 - v2.6.100
 
 ### Objetivo

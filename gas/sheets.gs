@@ -909,6 +909,100 @@ const SheetsService = (() => {
     };
   }
 
+  function reiniciarRelevamientoEscuela(params) {
+    const session = params._session || {};
+    const idEscuela = params.id_escuela || params.codigo_local || '';
+    const codigoLocalParam = params.codigo_local || idEscuela || '';
+    if (!idEscuela && !codigoLocalParam) {
+      return { status: 'error', message: 'Identificador de escuela requerido para reiniciar el relevamiento.' };
+    }
+    const now = _timestamp();
+    const escuelaResult = idEscuela ? getEscuela(idEscuela) : { status: 'error' };
+    const escuela = escuelaResult.status === 'ok'
+      ? escuelaResult.data
+      : { id_escuela: idEscuela, codigo_local: codigoLocalParam, encuestador_asignado: '' };
+    if (!_canOperateSchool_(session, escuela)) return _schoolAccessError_(escuela);
+
+    const removedDrafts = _deleteMecDraftRowsForSchool_(idEscuela, codigoLocalParam);
+    const resetId = escuela.id_escuela || idEscuela || codigoLocalParam;
+    if (resetId) {
+      _updateEscuelaOperational(resetId, {
+        estado_relevamiento: 'pendiente',
+        fecha_ultimo_evento: now,
+        ultimo_borrador_mec_id: '',
+        ultimo_borrador_mec_at: '',
+        ultimo_borrador_mec_usuario: '',
+        ultimo_cierre_id: '',
+        ultimo_cierre_at: '',
+        ultimo_cierre_pdf_url: '',
+        ultimo_cierre_metadata_url: '',
+        email_status: '',
+        email_error: '',
+        tiempo_real_min: '',
+        tiempo_aulas_min: '',
+        tiempo_aulas_promedio_min: '',
+        tiempo_sanitarios_min: '',
+        tiempo_sanitarios_promedio_min: '',
+        tiempo_exteriores_min: '',
+      });
+    }
+    const closedSessions = _suspendOpenSessionsForSchool_(resetId || idEscuela || codigoLocalParam, session.usuario, now);
+    AuditService.log('REINICIAR_RELEVAMIENTO_ESCUELA', session.usuario || 'sistema', `escuela: ${codigoLocalParam || idEscuela}, borradores_eliminados: ${removedDrafts}, sesiones_suspendidas: ${closedSessions}`);
+    return {
+      status: 'ok',
+      message: 'Relevamiento de escuela reiniciado.',
+      data: {
+        borradores_eliminados: removedDrafts,
+        sesiones_suspendidas: closedSessions,
+        updatedAt: now,
+      },
+    };
+  }
+
+  function _deleteMecDraftRowsForSchool_(idEscuela, codigoLocal) {
+    _ensureColumns(SHEET_NAMES.MEC_DRAFTS, _mecDraftHeaders());
+    const sheet = _getSheet(SHEET_NAMES.MEC_DRAFTS);
+    const headers = _headers(sheet);
+    let removed = 0;
+    for (let row = sheet.getLastRow(); row >= 2; row -= 1) {
+      const obj = _objectFromRow(sheet, row, headers);
+      const matches = _draftRowMatchesSchoolId_(obj, idEscuela)
+        || _draftRowMatchesSchoolId_(obj, codigoLocal)
+        || _same(obj.id_borrador, `MEC-DRAFT-${_safeKey(idEscuela || codigoLocal)}`)
+        || _same(obj.id_borrador, `MEC-DRAFT-${_safeKey(codigoLocal || idEscuela)}`);
+      if (!matches) continue;
+      sheet.deleteRow(row);
+      removed += 1;
+    }
+    return removed;
+  }
+
+  function _draftRowMatchesSchoolId_(obj, id) {
+    if (!_txt(id)) return false;
+    return _idMatch({ id_escuela: obj.id_escuela, codigo_local: obj.codigo_local }, id);
+  }
+
+  function _suspendOpenSessionsForSchool_(idEscuela, usuario, now) {
+    _ensureColumns(SHEET_NAMES.SESIONES, _sesionesHeaders());
+    const sheet = _getSheet(SHEET_NAMES.SESIONES);
+    const headers = _headers(sheet);
+    let count = 0;
+    for (let row = 2; row <= sheet.getLastRow(); row += 1) {
+      const obj = _objectFromRow(sheet, row, headers);
+      if (!_idMatch({ id_escuela: obj.id_escuela, codigo_local: obj.codigo_local }, idEscuela)) continue;
+      if (!_isOpenSession_(obj)) continue;
+      if (usuario && !_same(obj.usuario, usuario)) continue;
+      _setByHeader(sheet, row, headers, 'fecha_fin', _date(new Date()));
+      _setByHeader(sheet, row, headers, 'hora_fin', _time(new Date()));
+      _setByHeader(sheet, row, headers, 'fin_iso', new Date().toISOString());
+      _setByHeader(sheet, row, headers, 'estado', 'suspendida');
+      _setByHeader(sheet, row, headers, 'observacion_cierre', 'Sesion suspendida por reinicio completo del relevamiento de la escuela.');
+      _setByHeader(sheet, row, headers, 'actualizado_en', now);
+      count += 1;
+    }
+    return count;
+  }
+
   function guardarCierreCompleto(params) {
     const session = params._session || {};
     const deliveryId = _clientMutationId(params) || _genId('ENT');
@@ -2658,7 +2752,7 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, repararSesionesDuplicadasEnCurso, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence, guardarBorradorMec, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence, guardarBorradorMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };

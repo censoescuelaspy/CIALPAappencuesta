@@ -110,6 +110,7 @@ function _handleRequest(e) {
       'aprobarSolicitudRelevamiento',
       'uploadEvidence',
       'guardarBorradorMec',
+      'reiniciarRelevamientoEscuela',
       'guardarCierreCompleto',
       'resolverIncidencia',
       'setConfig',
@@ -157,6 +158,7 @@ function _handleRequest(e) {
       case 'aprobarSolicitudRelevamiento': return _respond(SheetsService.aprobarSolicitudRelevamiento(params));
       case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));
       case 'guardarBorradorMec': return _respond(SheetsService.guardarBorradorMec(params));
+      case 'reiniciarRelevamientoEscuela': return _respond(SheetsService.reiniciarRelevamientoEscuela(params));
       case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));
       case 'getIncidencias':  return _respond(SheetsService.getIncidencias(params));
       case 'resolverIncidencia': return _respond(SheetsService.resolverIncidencia(params));

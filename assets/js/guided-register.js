@@ -17,6 +17,21 @@ const GuidedRegisterModule = (() => {
   let _guidedHistory = [];
   let _timeRefreshTimer = null;
   let _planSyncTimer = null;
+  const ANSWER_FEEDBACK_DELAY_MS = 1050;
+  const ANSWER_FEEDBACK_ACTIONS = new Set([
+    'answerBlockField',
+    'answerFloorField',
+    'answerClassroomField',
+    'answerClassroomObjectField',
+    'answerSanitaryField',
+    'answerSanitaryObjectField',
+    'answerSiteElementField',
+    'markRoomElementAbsent',
+    'markSanitaryElementAbsent',
+    'markNoFloor',
+    'markNoSanitary',
+    'markNoSiteElements',
+  ]);
 
   function _schoolIdentityValues(school) {
     const values = [
@@ -287,6 +302,7 @@ const GuidedRegisterModule = (() => {
       }
       const actionButton = event.target.closest('[data-guided-action]');
       if (!actionButton) return;
+      _markGuidedActionFeedback(actionButton);
       _runAction(actionButton.dataset.guidedAction, actionButton.dataset.guidedValue || '');
     });
     root.addEventListener('pointerdown', event => {
@@ -320,6 +336,9 @@ const GuidedRegisterModule = (() => {
     if (action === 'prev') return previous();
     if (action === 'saveClassroomTarget') return _saveClassroomTarget();
     if (action === 'resetClassroomTarget') return _resetClassroomTarget();
+    if (action === 'saveSchoolIdentity') return _saveSchoolIdentity();
+    if (action === 'resetSchoolIdentity') return _resetSchoolIdentity();
+    if (action === 'resetSchoolData') return _resetSchoolData();
     if (action === 'markNoFloor') return _setScopedFlag('noFloor', true, 'Bloque registrado sin piso para esta ronda.');
     if (action === 'resetNoFloor') return _setScopedFlag('noFloor', false, 'Se volvera a pedir el piso del bloque.');
     if (action === 'saveBlockMeasures') return _saveBlockMeasures();
@@ -538,11 +557,11 @@ const GuidedRegisterModule = (() => {
     }
   }
 
-  function _refreshSoon() {
+  function _refreshSoon(delay = 220) {
     setTimeout(() => {
       _refreshPlan();
       _updateSnapshot();
-    }, 220);
+    }, Math.max(0, Number(delay) || 0));
   }
 
   function syncFromPlan() {
@@ -550,6 +569,23 @@ const GuidedRegisterModule = (() => {
     _planSyncTimer = setTimeout(() => {
       _updateSnapshot();
     }, 90);
+  }
+
+  function invalidateMeasureConfirmation(kind = '', id = '') {
+    const key = _measureConfirmKey(kind, id);
+    if (!key) return;
+    _setFlag(key, false);
+    _saveState();
+    syncFromPlan();
+  }
+
+  function _markGuidedActionFeedback(button) {
+    if (!button || !ANSWER_FEEDBACK_ACTIONS.has(button.dataset.guidedAction || '')) return;
+    const group = button.closest('.guided-next-card') || button.parentElement;
+    group?.querySelectorAll('[data-guided-action]').forEach(item => {
+      item.classList.toggle('btn-guided-selected', item === button);
+      item.setAttribute('aria-pressed', String(item === button));
+    });
   }
 
   function _refreshPlan() {
@@ -681,7 +717,27 @@ const GuidedRegisterModule = (() => {
       general.localidad || school.localidad,
     ].filter(Boolean).join(' / ');
     const meta = [code ? `Codigo ${code}` : '', location].filter(Boolean).join(' - ');
-    return { code, name, location, meta };
+    return {
+      code,
+      name,
+      location,
+      meta,
+      departamento: general.departamento || school.departamento || '',
+      distrito: general.distrito || school.distrito || '',
+      localidad: general.localidad || school.localidad || '',
+      direccion: general.direccion || _firstPresent(school, ['direccion', 'direccion_referencia', 'referencia']),
+      latitud: general.latitud || _firstPresent(school, ['latitud', 'lat', 'latitude']),
+      longitud: general.longitud || _firstPresent(school, ['longitud', 'lng', 'lon', 'longitude']),
+    };
+  }
+
+  function _schoolIdentityFlagKey(school = {}) {
+    const id = school.code || school.name || 'sin-escuela';
+    return ['flag', 'school', _slug(id), 'identityConfirmed'].join('::');
+  }
+
+  function _schoolIdentityConfirmedForSchool(school = {}) {
+    return Boolean((school.code || school.name) && _flagValue(_schoolIdentityFlagKey(school)));
   }
 
   function _firstPresent(source, keys = []) {
@@ -898,12 +954,13 @@ const GuidedRegisterModule = (() => {
     ));
     const incompleteBlockSiteElement = activeBlockSiteElements.find(item => !_siteElementConfigured(item));
     const activeFloorsReady = activeFloors.length
-      ? activeFloors.every(floor => _hasMeasures(floor, 'largo_m', 'ancho_m') && _hasPosition(floor))
+      ? activeFloors.every(floor => _floorReady(floor))
       : true;
     const blockReadyForRooms = Boolean(activeBlock && blockHasMeasures && blockPositioned && activeFloors.length && activeFloorsReady);
     const classroomTargetKey = _targetKeyParts(blockId, activeFloorLabel, 'classrooms');
     const savedAtText = _formatDate(saved.savedAt);
     const timeTracking = _timeTrackingSummary(values);
+    const schoolIdentityConfirmed = _schoolIdentityConfirmedForSchool(school);
     const completion = _completionStatus(values, savedAtText, school);
     return {
       values,
@@ -917,6 +974,7 @@ const GuidedRegisterModule = (() => {
       baseMapSaved: Boolean(values.__planBaseMap?.confirmed || values.__planBaseMap?.savedAt),
       savedAtText,
       school,
+      schoolIdentityConfirmed,
       completion,
       planTitle: activeBlock?.bloque_codigo || school.name || values.general?.nombre_institucion || 'Escuela en construccion',
       activeBlock,
@@ -956,6 +1014,7 @@ const GuidedRegisterModule = (() => {
     const flag = (blockId, floorLabel, name) => _flagValue(_flagKeyParts(blockId, floorLabel, name));
 
     if (!school.name && !school.code) add('Escuela', 'Identificar escuela', 'Falta codigo o nombre de la escuela.', 'module', 'mapa');
+    if ((school.name || school.code) && !_schoolIdentityConfirmedForSchool(school)) add('Escuela', 'Confirmar datos basicos', 'Revise codigo, nombre, territorio y coordenadas antes de cargar infraestructura.', 'resetSchoolIdentity');
     if (!savedAtText) add('Escuela', 'Guardar contexto inicial', 'Guarde datos generales, jornada o responsable de carga.', 'stage', 'general');
     if (!blocks.length) add('Bloques', 'Crear al menos un bloque', 'El relevamiento no tiene estructura arquitectonica.', 'guidedBlock');
 
@@ -1046,6 +1105,9 @@ const GuidedRegisterModule = (() => {
     if (!_hasAnswer(block.tipo_circulacion)) {
       pending.push({ title: 'Responder escalera/rampa', detail: 'Falta circulacion vertical del bloque.', action: 'answerBlockField', value: 'tipo_circulacion::No aplica' });
     }
+    if (!_hasAnswer(block.pilares_bloque)) {
+      pending.push({ title: 'Responder pilares del bloque', detail: 'Falta indicar si existen pilares visibles asociados al bloque.', action: 'answerBlockField', value: 'pilares_bloque::No verificable' });
+    }
     if (!_hasAnswer(block.acometida_tipo)) {
       pending.push({ title: 'Responder acometida electrica', detail: 'Falta indicar si existe acometida visible.', action: 'answerBlockField', value: 'acometida_tipo::No visible' });
       return pending;
@@ -1067,9 +1129,12 @@ const GuidedRegisterModule = (() => {
   }
 
   function _stepDone(id, snap) {
-    if (id === 'escuela') return Boolean(snap.savedAtText);
+    if (id === 'escuela') return Boolean(snap.schoolIdentityConfirmed && snap.savedAtText);
     if (id === 'predio') return snap.baseMapSaved;
-    if (id === 'bloques') return snap.blocks > 0 && snap.blockHasMeasures && snap.blockPositioned && (snap.noFloor || (snap.activeFloors.length && snap.activeFloorsReady));
+    if (id === 'bloques') return snap.blocks > 0 &&
+      _blockRequirementItems(snap.activeBlock).every(item => item.done || item.optional) &&
+      snap.blockPositioned &&
+      (snap.noFloor || (snap.activeFloors.length && snap.activeFloorsReady));
     if (id === 'ambientes') return _activeGuidedQuestion('ambientes', snap)?.done || false;
     if (id === 'sanitarios') return _activeGuidedQuestion('sanitarios', snap)?.done || false;
     if (id === 'exteriores') return _activeGuidedQuestion('exteriores', snap)?.done || false;
@@ -1171,6 +1236,22 @@ const GuidedRegisterModule = (() => {
         true
       );
     }
+    if (!snap.schoolIdentityConfirmed) {
+      return _question(
+        'Declaracion inicial',
+        'Confirme identificacion y ubicacion de la escuela',
+        'Revise y corrija codigo, nombre, departamento, distrito, localidad y coordenadas antes de dibujar. Esta confirmacion vincula todo el plano, fotos y cierre con la escuela correcta.',
+        [
+          { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
+          { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
+          { label: 'Reiniciar escuela', action: 'resetSchoolData' },
+        ],
+        false,
+        _schoolIdentityControl(snap),
+        'Esta debe ser siempre la primera validacion en campo. Si detecta que el relevamiento fue iniciado en una escuela equivocada, use Reiniciar escuela antes de seguir cargando bloques, aulas, sanitarios o evidencias.',
+        true
+      );
+    }
     if (!snap.savedAtText) {
       return _question(
         'Declaracion inicial',
@@ -1193,6 +1274,8 @@ const GuidedRegisterModule = (() => {
       'El contexto de la carga ya quedo disponible. Ahora prepare el predio base o avance a bloques si no necesita base de calles/coordenadas.',
       [
         { label: 'Siguiente', action: 'next', primary: true },
+        { label: 'Corregir datos escuela', action: 'resetSchoolIdentity' },
+        { label: 'Reiniciar escuela', action: 'resetSchoolData' },
         { label: 'Mapa', action: 'module', value: 'mapa' },
       ],
       true,
@@ -1246,7 +1329,7 @@ const GuidedRegisterModule = (() => {
     if (blockNext) {
       if (blockNext.field === 'medidas_bloque') {
         return _question('Paso 1', 'Bloque: medidas principales', 'Ingrese largo y ancho del bloque desde la guia. La ficha queda disponible solo para revisar o ampliar.', [
-          { label: 'Guardar medidas', action: 'saveBlockMeasures', primary: true },
+          { label: _hasMeasures(snap.activeBlock, 'largo_m', 'ancho_m') ? 'Confirmar medidas' : 'Guardar medidas', action: 'saveBlockMeasures', primary: true },
           { label: 'Editar ficha', action: 'blockFicha' },
         ], false, _measureControl('guided-block', 'Largo del bloque (m)', 'Ancho del bloque (m)', snap.activeBlock?.largo_m || '', snap.activeBlock?.ancho_m || ''), '', true);
       }
@@ -1282,7 +1365,7 @@ const GuidedRegisterModule = (() => {
       const floorValue = `${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Piso 1'}`;
       if (next?.title === 'Cargar dimensiones') {
         return _question('Paso 3', 'Piso: medidas principales', 'Ingrese largo y ancho del piso desde la guia. La ficha queda disponible solo para revisar o corregir.', [
-          { label: 'Guardar medidas', action: 'saveFloorMeasures', value: floorValue, primary: true },
+          { label: _hasMeasures(floor, 'largo_m', 'ancho_m') ? 'Confirmar medidas' : 'Guardar medidas', action: 'saveFloorMeasures', value: floorValue, primary: true },
           { label: 'Seleccionar piso', action: 'selectPlanItem', value: `floor::${floorValue}` },
           { label: 'Editar ficha', action: 'floorGuide' },
         ], false, _measureControl('guided-floor', 'Largo del piso (m)', 'Ancho del piso (m)', floor?.largo_m || '', floor?.ancho_m || ''), '', true);
@@ -1317,6 +1400,14 @@ const GuidedRegisterModule = (() => {
         { label: 'Rampa', action: 'answerBlockField', value: 'tipo_circulacion::Rampa', primary: true },
         { label: 'Ambas', action: 'answerBlockField', value: 'tipo_circulacion::Ambas' },
         { label: 'No aplica', action: 'answerBlockField', value: 'tipo_circulacion::No aplica' },
+      ]);
+    }
+    if (!_hasAnswer(block.pilares_bloque)) {
+      return _question('Pregunta obligatoria', 'Hay pilares visibles asociados al bloque?', 'Si existen pilares estructurales o aislados, la app puede agregarlos al plano para ubicarlos y cargar material, medidas y estado.', [
+        { label: 'Si, agregar pilar', action: 'answerBlockField', value: 'pilares_bloque::Si visible', primary: true },
+        { label: 'Si, sin ubicar aun', action: 'answerBlockField', value: 'pilares_bloque::Si, pendiente de ubicar' },
+        { label: 'No tiene', action: 'answerBlockField', value: 'pilares_bloque::No tiene' },
+        { label: 'No verificable', action: 'answerBlockField', value: 'pilares_bloque::No verificable' },
       ]);
     }
     if (!_hasAnswer(block.acometida_tipo)) {
@@ -1399,7 +1490,7 @@ const GuidedRegisterModule = (() => {
       const next = _firstPendingRequirement(pending);
       if (next?.title === 'Cargar dimensiones') {
         return _question('Aula pendiente', `${label}: medidas principales`, 'Ingrese largo y ancho desde la guia o estire el ambiente en el plano. Ambos caminos quedan sincronizados.', [
-          { label: 'Guardar medidas', action: 'saveClassroomMeasures', value: snap.incompleteClassroom.id, primary: true },
+          { label: _hasMeasures(snap.incompleteClassroom, 'length', 'width') ? 'Confirmar medidas' : 'Guardar medidas', action: 'saveClassroomMeasures', value: snap.incompleteClassroom.id, primary: true },
           { label: 'Seleccionar en plano', action: 'selectPlanItem', value: `room::${snap.incompleteClassroom.id}` },
           { label: 'Editar ficha', action: 'openClassroomFicha', value: snap.incompleteClassroom.id },
         ], false, _measureControl('guided-room', 'Largo del aula/ambiente (m)', 'Ancho del aula/ambiente (m)', snap.incompleteClassroom.length || '', snap.incompleteClassroom.width || ''), '', true);
@@ -1450,7 +1541,7 @@ const GuidedRegisterModule = (() => {
       const next = _firstPendingRequirement(pending);
       if (next?.title === 'Cargar dimensiones') {
         return _question('Sanitario pendiente', `${label}: medidas principales`, 'Ingrese largo y ancho desde la guia o estire el sanitario en el plano. Ambos caminos quedan sincronizados.', [
-          { label: 'Guardar medidas', action: 'saveSanitaryMeasures', value: snap.incompleteSanitary.id, primary: true },
+          { label: _hasMeasures(snap.incompleteSanitary, 'largo_m', 'ancho_m') ? 'Confirmar medidas' : 'Guardar medidas', action: 'saveSanitaryMeasures', value: snap.incompleteSanitary.id, primary: true },
           { label: 'Seleccionar en plano', action: 'selectPlanItem', value: `sanitary::${snap.incompleteSanitary.id}` },
           { label: 'Editar ficha', action: 'openSanitaryFicha', value: snap.incompleteSanitary.id },
         ], false, _measureControl('guided-sanitary', 'Largo del sanitario (m)', 'Ancho del sanitario (m)', snap.incompleteSanitary.largo_m || '', snap.incompleteSanitary.ancho_m || ''), '', true);
@@ -1480,6 +1571,30 @@ const GuidedRegisterModule = (() => {
     if (!_hasAnswer(room?.caracteristicas) && !_hasAnswer(room?.openings)) {
       return _question('Pregunta del aula', `${label}: uso o condicion`, 'Registre la caracteristica principal del ambiente antes de seguir con puertas, ventanas e instalaciones.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::caracteristicas`, ['Uso regular', 'Uso compartido', 'Sin uso', 'Clausurada', 'En obra', 'Necesita reparacion'], 'Uso regular'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    if (!_hasAnswer(room?.techo_tipo)) {
+      return _question('Pregunta del aula', `${label}: tipo de techo o cubierta`, 'Registre el material o tipo de cubierta observado antes de pasar a estado del techo.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::techo_tipo`, ['Chapa', 'Teja', 'Losa', 'Fibrocemento', 'Mixto', 'No verificable'], 'Chapa'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    if (!_hasAnswer(room?.techo_estado)) {
+      return _question('Pregunta del aula', `${label}: estado del techo`, 'Registre la calidad del techo: filtraciones, roturas, deformaciones o imposibilidad de verificar.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::techo_estado`, ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    if (!_hasAnswer(room?.piso_tipo)) {
+      return _question('Pregunta del aula', `${label}: tipo de piso`, 'Indique el material principal del piso del ambiente.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::piso_tipo`, ['Ceramico', 'Cemento alisado', 'Mosaico', 'Tierra', 'Madera', 'Otro', 'No verificable'], 'Ceramico'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    if (!_hasAnswer(room?.piso_estado)) {
+      return _question('Pregunta del aula', `${label}: estado/calidad del piso`, 'Registre si el piso esta en buen estado, presenta desgaste, roturas, humedad o desniveles.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Con roturas', 'Con humedad', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
@@ -1514,6 +1629,18 @@ const GuidedRegisterModule = (() => {
     if (!_hasAnswer(item?.agua)) {
       return _question('Pregunta del sanitario', `${label}: disponibilidad de agua`, 'Indique si el sanitario cuenta con agua durante la verificacion.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::agua`, ['Si', 'Intermitente', 'No', 'No verificable'], 'Si'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.piso_tipo)) {
+      return _question('Pregunta del sanitario', `${label}: tipo de piso`, 'Indique el material principal del piso sanitario.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::piso_tipo`, ['Ceramico', 'Cemento alisado', 'Mosaico', 'Tierra', 'Antideslizante', 'Otro', 'No verificable'], 'Ceramico'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.piso_estado)) {
+      return _question('Pregunta del sanitario', `${label}: estado/calidad del piso`, 'Registre si el piso sanitario esta completo, roto, resbaladizo, con humedad o no verificable.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Resbaladizo', 'Con humedad', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
@@ -1689,7 +1816,7 @@ const GuidedRegisterModule = (() => {
         `${label}: medidas principales`,
         'Cargue las medidas desde la guia. Tambien puede ajustar el tamano en el plano; la ficha queda como edicion secundaria.',
         [
-          { label: 'Guardar medidas', action: 'saveSiteMeasures', value: item.id, primary: true },
+          { label: _siteElementHasMeasures(item) ? 'Confirmar medidas' : 'Guardar medidas', action: 'saveSiteMeasures', value: item.id, primary: true },
           { label: 'Seleccionar en plano', action: 'selectPlanItem', value: `site::${item.id}` },
           { label: 'Editar ficha', action: 'openSiteFicha', value: item.id },
         ],
@@ -1776,9 +1903,9 @@ const GuidedRegisterModule = (() => {
     return [
       {
         title: 'Cargar dimensiones',
-        help: 'Complete largo y ancho del bloque. Estas medidas fijan la escala de pisos, aulas y sanitarios.',
-        doneText: `${block?.largo_m || '?'} x ${block?.ancho_m || '?'} m`,
-        done: _hasMeasures(block, 'largo_m', 'ancho_m'),
+        help: 'Complete largo y ancho del bloque. Si los ajusta estirando vertices en el plano, confirme la medida aqui antes de avanzar.',
+        doneText: `${block?.largo_m || '?'} x ${block?.ancho_m || '?'} m confirmados`,
+        done: _hasMeasures(block, 'largo_m', 'ancho_m') && _measureConfirmed('block', block?.id || 'active'),
         field: 'medidas_bloque',
       },
       {
@@ -1809,9 +1936,9 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Cargar dimensiones',
-        help: 'Complete largo y ancho del piso desde la ficha o estirando sus vertices en el plano.',
-        doneText: `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`,
-        done: _hasMeasures(floor, 'largo_m', 'ancho_m'),
+        help: 'Complete largo y ancho del piso desde la guia o estirando sus vertices en el plano. Luego confirme la medida.',
+        doneText: `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m confirmados`,
+        done: _hasMeasures(floor, 'largo_m', 'ancho_m') && _measureConfirmed('floor', floor?.id || _floorLabel(floor)),
       },
       {
         title: 'Condicion de calidad',
@@ -1840,9 +1967,9 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Cargar dimensiones',
-        help: 'Complete largo y ancho desde la guia superior o estirando el ambiente sobre el plano.',
-        doneText: `${room?.length || '?'} x ${room?.width || '?'} m`,
-        done: _hasMeasures(room, 'length', 'width'),
+        help: 'Complete largo y ancho desde la guia superior o estirando el ambiente sobre el plano. Luego confirme la medida.',
+        doneText: `${room?.length || '?'} x ${room?.width || '?'} m confirmados`,
+        done: _hasMeasures(room, 'length', 'width') && _measureConfirmed('room', room?.id),
       },
       {
         title: 'Condicion de calidad',
@@ -1855,6 +1982,18 @@ const GuidedRegisterModule = (() => {
         help: 'Registre uso o condicion principal desde la pregunta superior; la ficha queda para edicion rapida.',
         doneText: 'Caracteristicas registradas',
         done: _hasAnswer(room?.caracteristicas) || _hasAnswer(room?.openings),
+      },
+      {
+        title: 'Techo del ambiente',
+        help: 'Registre tipo y condicion del techo o cubierta desde preguntas superiores.',
+        doneText: [room?.techo_tipo, room?.techo_estado].filter(Boolean).join(' / ') || 'Techo registrado',
+        done: _hasAnswer(room?.techo_tipo) && _hasAnswer(room?.techo_estado),
+      },
+      {
+        title: 'Piso del ambiente',
+        help: 'Registre tipo de piso y calidad/estado desde preguntas superiores.',
+        doneText: [room?.piso_tipo, room?.piso_estado].filter(Boolean).join(' / ') || 'Piso registrado',
+        done: _hasAnswer(room?.piso_tipo) && _hasAnswer(room?.piso_estado),
       },
       {
         title: 'Responder elementos del aula',
@@ -1884,9 +2023,9 @@ const GuidedRegisterModule = (() => {
       },
       {
         title: 'Cargar dimensiones',
-        help: 'Complete largo y ancho desde la guia superior o estirando el sanitario sobre el plano.',
-        doneText: `${item?.largo_m || '?'} x ${item?.ancho_m || '?'} m`,
-        done: _hasMeasures(item, 'largo_m', 'ancho_m'),
+        help: 'Complete largo y ancho desde la guia superior o estirando el sanitario sobre el plano. Luego confirme la medida.',
+        doneText: `${item?.largo_m || '?'} x ${item?.ancho_m || '?'} m confirmados`,
+        done: _hasMeasures(item, 'largo_m', 'ancho_m') && _measureConfirmed('sanitary', item?.id),
       },
       {
         title: 'Condicion de calidad',
@@ -1899,6 +2038,12 @@ const GuidedRegisterModule = (() => {
         help: 'Complete uso principal, genero/destino y agua desde preguntas superiores sucesivas.',
         doneText: [item?.uso, item?.genero, item?.agua].filter(Boolean).join(' / ') || 'Caracteristicas cargadas',
         done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
+      },
+      {
+        title: 'Piso sanitario',
+        help: 'Registre tipo y estado/calidad del piso del sanitario.',
+        doneText: [item?.piso_tipo, item?.piso_estado].filter(Boolean).join(' / ') || 'Piso registrado',
+        done: _hasAnswer(item?.piso_tipo) && _hasAnswer(item?.piso_estado),
       },
       {
         title: 'Responder elementos del sanitario',
@@ -2158,6 +2303,27 @@ const GuidedRegisterModule = (() => {
     }[object.type] || 'elemento';
   }
 
+  function _guidedElementActionLabel(type = '') {
+    return {
+      door: 'Puerta',
+      window: 'Ventana',
+      outlet: 'Toma electrica',
+      switchboard: 'Tablero',
+      light: 'Luz',
+      fan: 'Ventilador',
+      ac: 'Aire acondicionado',
+      damage: 'Falla/grieta',
+      board: 'Pizarron',
+      stair: 'Escalera',
+      text: 'Nota',
+      stall: 'Cabina',
+      toilet: 'Inodoro',
+      sink: 'Lavamanos',
+      urinal: 'Urinario',
+      shower: 'Ducha',
+    }[type] || 'Elemento';
+  }
+
   function _siteElementRequirementItems(item) {
     const ficha = item?.ficha || {};
     return [
@@ -2171,8 +2337,8 @@ const GuidedRegisterModule = (() => {
       {
         title: 'Cargar dimensiones',
         help: 'Complete las medidas propias del elemento, o estire sus vertices para sincronizarlas con la ficha.',
-        doneText: _siteElementDimensionText(item),
-        done: _siteElementHasMeasures(item),
+        doneText: `${_siteElementDimensionText(item)} confirmadas`,
+        done: _siteElementHasMeasures(item) && _measureConfirmed('site', item?.id),
       },
       {
         title: 'Condicion de calidad',
@@ -2194,12 +2360,8 @@ const GuidedRegisterModule = (() => {
     return `
       <section class="guided-next-card guided-next-card--question ${question.done ? 'guided-next-card--done' : ''}" aria-label="Pregunta guiada">
         <span>${_escape(question.kicker)}</span>
-        <strong>${_escape(question.title)}</strong>
+        <strong>${_escape(_guidedQuestionTitle(question))}</strong>
         <p>${_escape(question.body)}</p>
-        <details class="guided-info-note">
-          <summary><span aria-hidden="true">i</span><strong>Ayuda de campo</strong></summary>
-          <p>${_escape(info)}</p>
-        </details>
         ${question.control || ''}
         <div>
           ${question.actions.map(action => `
@@ -2209,7 +2371,17 @@ const GuidedRegisterModule = (() => {
               ${_escape(action.label)}
             </button>`).join('')}
         </div>
+        <details class="guided-info-note">
+          <summary><span aria-hidden="true">i</span><strong>Ayuda de campo y verificacion</strong></summary>
+          <p>${_escape(info)}</p>
+        </details>
       </section>`;
+  }
+
+  function _guidedQuestionTitle(question = {}) {
+    const title = String(question.title || '').trim();
+    if (!title || question.done || title.startsWith('¿') || title.endsWith('?')) return title;
+    return `¿${title}?`;
   }
 
   function _guidedActionButtonClass(action = {}) {
@@ -2231,6 +2403,26 @@ const GuidedRegisterModule = (() => {
         <span>${_escape(label)}</span>
         <input class="form-control" type="number" min="${_escape(min)}" step="1" value="${_escape(value)}" data-${_escape(name)}>
       </label>`;
+  }
+
+  function _schoolIdentityControl(snap = {}) {
+    const school = snap.school || {};
+    const field = (name, label, value = '', type = 'text', attrs = '') => `
+      <label class="guided-school-field">
+        <span>${_escape(label)}</span>
+        <input class="form-control" type="${_escape(type)}" value="${_escape(value)}" data-guided-school-${_escape(name)} ${attrs}>
+      </label>`;
+    return `
+      <div class="guided-school-identity">
+        ${field('code', 'Codigo/local', school.code)}
+        ${field('name', 'Nombre de escuela', school.name)}
+        ${field('department', 'Departamento', school.departamento)}
+        ${field('district', 'Distrito', school.distrito)}
+        ${field('locality', 'Localidad', school.localidad)}
+        ${field('address', 'Direccion/referencia', school.direccion)}
+        ${field('lat', 'Latitud', school.latitud, 'number', 'step="0.000001"')}
+        ${field('lng', 'Longitud', school.longitud, 'number', 'step="0.000001"')}
+      </div>`;
   }
 
   function _measureControl(name, lengthLabel, widthLabel, lengthValue = '', widthValue = '') {
@@ -2263,6 +2455,67 @@ const GuidedRegisterModule = (() => {
     );
   }
 
+  function _readSchoolIdentityFields() {
+    const root = document.getElementById('guided-register-root') || document;
+    const value = key => root.querySelector(`[data-guided-school-${key}]`)?.value?.trim() || '';
+    return {
+      codigo_local: value('code'),
+      nombre: value('name'),
+      departamento: value('department'),
+      distrito: value('district'),
+      localidad: value('locality'),
+      direccion: value('address'),
+      latitud: value('lat'),
+      longitud: value('lng'),
+    };
+  }
+
+  function _saveSchoolIdentity() {
+    const fields = _readSchoolIdentityFields();
+    if (!fields.codigo_local && !fields.nombre) {
+      UI.showToast('Confirme al menos codigo o nombre de la escuela antes de continuar.', 'warning', 6200);
+      return;
+    }
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.updateGuidedSchoolIdentity) {
+      UI.showToast('No se pudo guardar la identificacion desde la guia.', 'warning');
+      return;
+    }
+    if (!mec.updateGuidedSchoolIdentity(fields, { render: false })) return;
+    const snap = _snapshot();
+    _setFlag(_schoolIdentityFlagKey({
+      code: fields.codigo_local || snap.school.code,
+      name: fields.nombre || snap.school.name,
+    }), true);
+    _saveState();
+    _refreshSoon();
+    UI.showToast('Datos basicos de escuela confirmados. Ahora continue con jornada y predio.', 'success', 5200);
+  }
+
+  function _resetSchoolIdentity() {
+    const snap = _snapshot();
+    _setFlag(_schoolIdentityFlagKey(snap.school), false);
+    _saveState();
+    _updateSnapshot();
+    UI.showToast('La identificacion de la escuela se pedira nuevamente.', 'info', 4200);
+  }
+
+  async function _resetSchoolData() {
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.resetSchoolRegistration) {
+      UI.showToast('No se pudo reiniciar la escuela desde esta version.', 'warning');
+      return;
+    }
+    const ok = await mec.resetSchoolRegistration({ remote: true });
+    if (!ok) return;
+    _guidedState = { targets: {}, flags: {} };
+    _guidedHistory = [];
+    _activeIndex = 0;
+    _saveState();
+    _updateSlide();
+    _updateSnapshot();
+  }
+
   function _saveBlockMeasures() {
     const lengthInput = document.querySelector('[data-guided-block-length]');
     const widthInput = document.querySelector('[data-guided-block-width]');
@@ -2280,6 +2533,8 @@ const GuidedRegisterModule = (() => {
     const okLength = mec.setGuidedBlockField('largo_m', String(length));
     const okWidth = mec.setGuidedBlockField('ancho_m', String(width));
     if (okLength && okWidth) {
+      _setMeasureConfirmed('block', _snapshot().activeBlock?.id || 'active', true);
+      _saveState();
       UI.showToast('Medidas del bloque registradas. Ahora complete su estado y ubiquelo en el plano.', 'success', 5200);
       _refreshSoon();
     }
@@ -2303,6 +2558,9 @@ const GuidedRegisterModule = (() => {
     const okLength = mec.setGuidedFloorField(blockId, floorId, 'largo_m', String(length));
     const okWidth = mec.setGuidedFloorField(blockId, floorId, 'ancho_m', String(width));
     if (okLength && okWidth) {
+      const floor = (_snapshot().activeFloors || []).find(item => String(item.id || item.label || '') === String(floorId || '')) || {};
+      _setMeasureConfirmed('floor', floor.id || floorId || _floorLabel(floor), true);
+      _saveState();
       UI.showToast('Medidas del piso registradas. Ahora complete su estado y ubicacion.', 'success', 5200);
       _refreshSoon();
     }
@@ -2325,6 +2583,8 @@ const GuidedRegisterModule = (() => {
     const okLength = mec.setGuidedClassroomField(roomId, 'length', String(length));
     const okWidth = mec.setGuidedClassroomField(roomId, 'width', String(width));
     if (okLength && okWidth) {
+      _setMeasureConfirmed('room', roomId, true);
+      _saveState();
       UI.showToast('Medidas del ambiente registradas. Ahora complete estado, uso y elementos.', 'success', 5200);
       _refreshSoon();
     }
@@ -2347,6 +2607,8 @@ const GuidedRegisterModule = (() => {
     const okLength = mec.setGuidedSanitaryField(sanitaryId, 'largo_m', String(length));
     const okWidth = mec.setGuidedSanitaryField(sanitaryId, 'ancho_m', String(width));
     if (okLength && okWidth) {
+      _setMeasureConfirmed('sanitary', sanitaryId, true);
+      _saveState();
       UI.showToast('Medidas del sanitario registradas. Ahora complete uso, estado, agua y artefactos.', 'success', 5200);
       _refreshSoon();
     }
@@ -2388,7 +2650,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta guiada.', 'warning');
       return;
     }
-    if (mec.setGuidedBlockField(fieldId, value)) _refreshSoon();
+    if (mec.setGuidedBlockField(fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _answerFloorField(payload) {
@@ -2399,7 +2661,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta del piso.', 'warning');
       return;
     }
-    if (mec.setGuidedFloorField(blockId, floorId, fieldId, value)) _refreshSoon();
+    if (mec.setGuidedFloorField(blockId, floorId, fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _saveSiteMeasures(siteId = '') {
@@ -2420,7 +2682,11 @@ const GuidedRegisterModule = (() => {
       const key = item.type === 'pillar' && String(item.ficha?.forma_pilar || '').toLowerCase().includes('cuadr')
         ? 'lado_m'
         : 'diametro_m';
-      if (mec.setGuidedSiteElementField(item.id, key, String(value))) _refreshSoon();
+      if (mec.setGuidedSiteElementField(item.id, key, String(value))) {
+        _setMeasureConfirmed('site', item.id, true);
+        _saveState();
+        _refreshSoon();
+      }
       return;
     }
     const lengthInput = document.querySelector('[data-guided-site-length]');
@@ -2433,7 +2699,11 @@ const GuidedRegisterModule = (() => {
     }
     const okLength = mec.setGuidedSiteElementField(item.id, item.type === 'walkway' ? 'longitud_m' : 'largo_m', String(length));
     const okWidth = mec.setGuidedSiteElementField(item.id, 'ancho_m', String(width));
-    if (okLength && okWidth) _refreshSoon();
+    if (okLength && okWidth) {
+      _setMeasureConfirmed('site', item.id, true);
+      _saveState();
+      _refreshSoon();
+    }
   }
 
   function _answerSiteElementField(payload) {
@@ -2444,7 +2714,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta exterior.', 'warning');
       return;
     }
-    if (mec.setGuidedSiteElementField(siteId, fieldId, value)) _refreshSoon();
+    if (mec.setGuidedSiteElementField(siteId, fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _answerClassroomField(payload) {
@@ -2455,7 +2725,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta del aula.', 'warning');
       return;
     }
-    if (mec.setGuidedClassroomField(roomId, fieldId, value)) _refreshSoon();
+    if (mec.setGuidedClassroomField(roomId, fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _answerClassroomObjectField(payload) {
@@ -2466,7 +2736,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta del elemento.', 'warning');
       return;
     }
-    if (mec.setGuidedClassroomObjectField(roomId, objectId, fieldId, value)) _refreshSoon();
+    if (mec.setGuidedClassroomObjectField(roomId, objectId, fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _answerSanitaryField(payload) {
@@ -2477,7 +2747,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta del sanitario.', 'warning');
       return;
     }
-    if (mec.setGuidedSanitaryField(sanitaryId, fieldId, value)) _refreshSoon();
+    if (mec.setGuidedSanitaryField(sanitaryId, fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _answerSanitaryObjectField(payload) {
@@ -2488,7 +2758,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('No se pudo registrar la respuesta del elemento sanitario.', 'warning');
       return;
     }
-    if (mec.setGuidedSanitaryObjectField(sanitaryId, objectId, fieldId, value)) _refreshSoon();
+    if (mec.setGuidedSanitaryObjectField(sanitaryId, objectId, fieldId, value)) _refreshSoon(ANSWER_FEEDBACK_DELAY_MS);
   }
 
   function _addGuidedRoomElement(payload) {
@@ -2500,6 +2770,7 @@ const GuidedRegisterModule = (() => {
     }
     mec.selectPlanItem(`room::${roomId}`);
     mec.addPlanClassroomElement(type, { guided: true });
+    mec.focusSelectedPlanItem?.(`${_guidedElementActionLabel(type)} insertado. Ubíquelo en el plano; al soltarlo, vuelva a la pregunta superior para completar sus datos.`);
     _refreshSoon();
   }
 
@@ -2510,7 +2781,7 @@ const GuidedRegisterModule = (() => {
     if (!room || !type) return;
     _setFlag(_roomElementDecisionKey(room, type), !exists);
     _saveState();
-    _updateSnapshot();
+    setTimeout(() => _updateSnapshot(), ANSWER_FEEDBACK_DELAY_MS);
     UI.showToast('Respuesta registrada. Continue con la siguiente pregunta.', 'success', 3200);
   }
 
@@ -2531,6 +2802,7 @@ const GuidedRegisterModule = (() => {
     } else if (mec.addPlanSanitaryElement) {
       mec.addPlanSanitaryElement(type, { guided: true });
     }
+    mec.focusSelectedPlanItem?.(`${_guidedElementActionLabel(type)} insertado. Ubíquelo en el plano; al soltarlo, vuelva a la pregunta superior para completar sus datos.`);
     _refreshSoon();
   }
 
@@ -2541,7 +2813,7 @@ const GuidedRegisterModule = (() => {
     if (!item || !type) return;
     _setFlag(_sanitaryElementDecisionKey(item, type), !exists);
     _saveState();
-    _updateSnapshot();
+    setTimeout(() => _updateSnapshot(), ANSWER_FEEDBACK_DELAY_MS);
     UI.showToast('Respuesta registrada. Continue con la siguiente pregunta.', 'success', 3200);
   }
 
@@ -2589,7 +2861,7 @@ const GuidedRegisterModule = (() => {
     const key = _flagKeyParts(blockId, floor, name);
     _setFlag(key, value);
     _saveState();
-    _updateSnapshot();
+    setTimeout(() => _updateSnapshot(), ANSWER_FEEDBACK_DELAY_MS);
     if (message) UI.showToast(message, value ? 'success' : 'info');
   }
 
@@ -3038,9 +3310,27 @@ const GuidedRegisterModule = (() => {
   }
 
   function _setFlag(key, value) {
+    if (!key) return;
     _guidedState.flags = _guidedState.flags || {};
     if (value) _guidedState.flags[key] = true;
     else delete _guidedState.flags[key];
+  }
+
+  function _measureConfirmKey(kind = '', id = '') {
+    const cleanKind = String(kind || '').trim();
+    const cleanId = String(id || '').trim();
+    if (!cleanKind || !cleanId) return '';
+    return ['measureConfirmed', cleanKind, cleanId].join('::');
+  }
+
+  function _measureConfirmed(kind = '', id = '') {
+    return _flagValue(_measureConfirmKey(kind, id));
+  }
+
+  function _setMeasureConfirmed(kind = '', id = '', value = true) {
+    const key = _measureConfirmKey(kind, id);
+    if (!key) return;
+    _setFlag(key, value);
   }
 
   function _countEvidence(value, seen = new Set()) {
@@ -3122,5 +3412,6 @@ const GuidedRegisterModule = (() => {
     next,
     previous,
     syncFromPlan,
+    invalidateMeasureConfirmation,
   };
 })();

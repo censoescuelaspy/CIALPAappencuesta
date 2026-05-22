@@ -4922,6 +4922,37 @@ textarea.form-control {
   width: min(100%, 520px);
 }
 
+.guided-school-identity {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: .38rem;
+  width: min(100%, 780px);
+}
+
+.guided-school-field {
+  display: grid;
+  gap: .16rem;
+  min-width: 0;
+}
+
+.guided-school-field:nth-child(2),
+.guided-school-field:nth-child(6) {
+  grid-column: span 2;
+}
+
+.guided-school-field span {
+  color: #334155;
+  font-size: .63rem;
+  font-weight: 850;
+  line-height: 1.12;
+}
+
+.guided-school-field .form-control {
+  min-height: 30px;
+  padding: .22rem .42rem;
+  font-size: .74rem;
+}
+
 .guided-question-control span {
   color: #334155;
   font-size: .64rem;
@@ -5063,6 +5094,13 @@ textarea.form-control {
   background: #e84c22;
   color: #ffffff;
   border-color: #e84c22;
+}
+
+@media (max-width: 760px) {
+  .guided-school-field:nth-child(2),
+  .guided-school-field:nth-child(6) {
+    grid-column: auto;
+  }
 }
 
 .guided-slide__footer {

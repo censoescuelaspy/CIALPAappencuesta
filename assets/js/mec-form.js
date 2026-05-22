@@ -242,6 +242,14 @@ const MecFormModule = (() => {
       id_escuela: school?.id_escuela || '',
       codigo_local: school?.codigo_local || school?.codigo || '',
       nombre: school?.nombre || school?.nombre_escuela || '',
+      nombre_escuela: school?.nombre_escuela || school?.nombre || '',
+      departamento: school?.departamento || '',
+      distrito: school?.distrito || '',
+      localidad: school?.localidad || school?.barrio || '',
+      direccion: school?.direccion || school?.direccion_referencia || school?.referencia || '',
+      latitud: school?.latitud || school?.lat || school?.latitude || '',
+      longitud: school?.longitud || school?.lng || school?.lon || school?.longitude || '',
+      zona: school?.zona || '',
       syncedAt: new Date().toISOString(),
     };
   }
@@ -5973,7 +5981,7 @@ const MecFormModule = (() => {
     UI.showToast(`${_sketchToolLabel(type)} agregado al sanitario. La guia pedira sus datos paso a paso.`, 'success');
   }
 
-  function setSanitaryObjectValue(sanitaryId, objectId, key, value, rerender = true) {
+  function setSanitaryObjectValue(sanitaryId, objectId, key, value, rerender = true, options = {}) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     const object = item?.objects?.find(child => child.id === objectId);
     if (!item || !object) return;
@@ -5990,7 +5998,7 @@ const MecFormModule = (() => {
       }
     }
     _selectedSanitaryObjectId = object.id;
-    _saveDraft(false);
+    _saveDraft(false, options);
     if (rerender) {
       _render();
       renderSchoolPlan();
@@ -6024,7 +6032,7 @@ const MecFormModule = (() => {
     UI.showToast('Foto asociada al objeto sanitario.', 'success');
   }
 
-  function setSanitaryValue(id, key, value, rerender = true) {
+  function setSanitaryValue(id, key, value, rerender = true, options = {}) {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === id);
     if (!item) return;
     if (!_assertSanitaryUnlocked(item, 'editar la ficha')) {
@@ -6040,7 +6048,7 @@ const MecFormModule = (() => {
     if (['largo_m', 'ancho_m'].includes(key)) _ensureSanitaryRoomObject(item, true);
     if (['bloque', 'planta'].includes(key)) _ensureSanitaryRoomObject(item);
     if (rerender && ['inodoros', 'estado'].includes(key)) _ensureSanitaryPlan(item, true);
-    _saveDraft(false);
+    _saveDraft(false, options);
     if (rerender) {
       _render();
       renderSchoolPlan();
@@ -11462,6 +11470,90 @@ const MecFormModule = (() => {
     UI.showToast('Borrador MEC limpiado.', 'success');
   }
 
+  function updateGuidedSchoolIdentity(fields = {}, options = {}) {
+    const current = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    const nextSchool = { ...current };
+    const general = { ...(_data.general || {}) };
+    const setText = (targetKey, value, aliases = []) => {
+      const text = String(value ?? '').trim();
+      general[targetKey] = text;
+      aliases.forEach(alias => { nextSchool[alias] = text; });
+    };
+    setText('codigo_local', fields.codigo_local, ['codigo_local', 'codigo']);
+    setText('nombre_establecimiento', fields.nombre, ['nombre', 'nombre_escuela']);
+    setText('departamento', fields.departamento, ['departamento']);
+    setText('distrito', fields.distrito, ['distrito']);
+    setText('localidad', fields.localidad, ['localidad']);
+    setText('direccion', fields.direccion, ['direccion', 'direccion_referencia']);
+    setText('latitud', fields.latitud, ['latitud', 'lat']);
+    setText('longitud', fields.longitud, ['longitud', 'lng']);
+    if (!nextSchool.id_escuela) nextSchool.id_escuela = current.id_escuela || current.id || '';
+    if (!nextSchool.codigo_local && nextSchool.id_escuela) nextSchool.codigo_local = nextSchool.id_escuela;
+    _data.general = general;
+    _data.__selectedSchool = _schoolSnapshot(nextSchool);
+    _ensureSchoolTimeLog();
+    _saveDraft(false, {
+      skipRemoteSync: Boolean(options.skipRemoteSync),
+      guidedReason: 'school-identity',
+    });
+    if (options.render && _initialized) _render();
+    return true;
+  }
+
+  async function resetSchoolRegistration(options = {}) {
+    const school = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    const schoolKey = _schoolDraftStorageKey(school);
+    const schoolName = school.nombre || school.nombre_escuela || school.codigo_local || school.id_escuela || 'esta escuela';
+    const confirmed = await UI.showConfirm(
+      'Reiniciar escuela',
+      `¿Confirma reiniciar completamente la carga local de ${schoolName}? Se borraran bloques, pisos, aulas, sanitarios, exteriores, tiempos y borrador local de esta escuela. Las fotos ya subidas a Drive no se eliminan automaticamente.`
+    );
+    if (!confirmed) return false;
+    clearTimeout(_draftSyncTimer);
+    _draftSyncTimer = null;
+    let remoteStatus = null;
+    if (options.remote !== false && typeof API !== 'undefined' && API.reiniciarRelevamientoEscuela) {
+      const idEscuela = school.id_escuela || school.codigo_local || school.codigo || '';
+      if (idEscuela) {
+        remoteStatus = await API.reiniciarRelevamientoEscuela({
+          id_escuela: school.id_escuela || '',
+          codigo_local: school.codigo_local || school.codigo || '',
+          motivo: 'reinicio_usuario',
+        }).catch(err => ({ status: 'error', message: err.message || String(err) }));
+      }
+    }
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      if (schoolKey) localStorage.removeItem(schoolKey);
+      localStorage.removeItem(_finalDeliveryStateKey({
+        code: school.codigo_local || school.id_escuela || '',
+        name: school.nombre || school.nombre_escuela || '',
+      }));
+    } catch {
+      /* storage can be unavailable in restricted browser modes */
+    }
+    _applyDraftValues({});
+    if (school && Object.keys(school).length) {
+      _data.__selectedSchool = _schoolSnapshot(school);
+      _prefillGeneralFromSelectedSchool(true, school);
+      delete _data.__registroTiempos;
+    }
+    _selectedPlanId = null;
+    _activePlanDrag = null;
+    _selectedSketchObjectId = null;
+    _selectedSanitaryObjectId = null;
+    _saveDraft(false, { skipRemoteSync: true, ensureSchoolTimer: false, guidedReason: 'school-reset' });
+    if (_initialized) _render();
+    if (remoteStatus && remoteStatus.status === 'error') {
+      UI.showToast(`Carga local reiniciada, pero el backend no pudo reiniciar Sheets: ${remoteStatus.message || 'error desconocido'}.`, 'warning', 8200);
+    } else if (remoteStatus) {
+      UI.showToast('Escuela reiniciada localmente y en Sheets. Vuelva a confirmar identificacion antes de cargar.', 'success', 7200);
+    } else {
+      UI.showToast('Escuela reiniciada localmente. Publique el backend nuevo para reiniciar tambien Sheets.', 'warning', 7200);
+    }
+    return true;
+  }
+
   function setSketchTool(tool) {
     if (!SKETCH_TOOLS.some(item => item.id === tool)) return;
     _sketchTool = tool;
@@ -11552,11 +11644,11 @@ const MecFormModule = (() => {
     _data.bloques = { ...(_data.bloques || {}), [fieldId]: value };
     block[fieldId] = value;
     if (fieldId === 'largo_m' || fieldId === 'ancho_m') _syncBlockPlanSizeFromMeasures(block, previousLength, previousWidth);
-    if (BLOCK_ELECTRIC_FIELDS.includes(fieldId) || fieldId === 'tipo_circulacion') {
+    if (BLOCK_ELECTRIC_FIELDS.includes(fieldId) || fieldId === 'tipo_circulacion' || fieldId === 'pilares_bloque') {
       _syncBlockDrivenPlanElements(fieldId, value);
     }
     _syncActiveBlock();
-    _saveDraft(false);
+    _saveDraft(false, { skipGuidedSync: true });
     renderSchoolPlan();
     UI.showToast('Respuesta registrada. Continue con la siguiente pregunta.', 'success', 3200);
     return true;
@@ -11580,7 +11672,7 @@ const MecFormModule = (() => {
     _setActiveFloor(_floorRecordLabel(floor));
     _selectedPlanId = _floorRecordPlanId(block, floor);
     _syncBlockFloorCountFromRecords(block);
-    _saveDraft(false);
+    _saveDraft(false, { skipGuidedSync: true });
     renderSchoolPlan();
     UI.showToast('Respuesta del piso registrada. Continue con la siguiente pregunta.', 'success', 3200);
     return true;
@@ -11599,7 +11691,7 @@ const MecFormModule = (() => {
     if (fieldId === 'length' || fieldId === 'width') _resizeActiveRoomGeometryFromDimensions();
     _syncActiveClassroomFromSketch();
     _selectedPlanId = `room::${room.id}`;
-    _saveDraft(false);
+    _saveDraft(false, { skipGuidedSync: true });
     _render();
     renderSchoolPlan();
     UI.showToast('Respuesta del aula registrada. Continue con la siguiente pregunta.', 'success', 3200);
@@ -11632,7 +11724,7 @@ const MecFormModule = (() => {
     _markGuidedObjectReviewed(object);
     _syncActiveClassroomFromSketch();
     _selectedPlanId = `${room.id}::${object.id}`;
-    _saveDraft(false);
+    _saveDraft(false, { skipGuidedSync: true });
     _redrawSketchCanvas();
     _updateSketchStatus();
     renderSchoolPlan();
@@ -11649,7 +11741,7 @@ const MecFormModule = (() => {
     }
     if (!_assertSanitaryUnlocked(item, 'responder esta pregunta')) return false;
     _selectedPlanId = `sanitary::${item.id}`;
-    setSanitaryValue(item.id, fieldId, clean, true);
+    setSanitaryValue(item.id, fieldId, clean, true, { skipGuidedSync: true });
     UI.showToast('Respuesta del sanitario registrada. Continue con la siguiente pregunta.', 'success', 3200);
     return true;
   }
@@ -11664,7 +11756,7 @@ const MecFormModule = (() => {
     }
     if (!_assertSanitaryUnlocked(item, 'responder esta pregunta')) return false;
     _selectedPlanId = `sanitary::${item.id}::${object.id}`;
-    setSanitaryObjectValue(item.id, object.id, fieldId, clean, true);
+    setSanitaryObjectValue(item.id, object.id, fieldId, clean, true, { skipGuidedSync: true });
     UI.showToast('Respuesta del elemento sanitario registrada. Continue con la siguiente pregunta.', 'success', 3200);
     return true;
   }
@@ -11686,7 +11778,7 @@ const MecFormModule = (() => {
     }
     _updateSiteElementDerivedFields(element);
     _selectedPlanId = `site::${element.id}`;
-    _saveDraft(false);
+    _saveDraft(false, { skipGuidedSync: true });
     renderSchoolPlan();
     UI.showToast('Respuesta exterior registrada. Continue con la siguiente pregunta.', 'success', 3200);
     return true;
@@ -11768,6 +11860,42 @@ const MecFormModule = (() => {
               <label>Caracteristicas / uso observado</label>
               <textarea class="form-control" rows="2"
                 onchange="MecFormModule.setSketchField('caracteristicas', this.value)" ${locked ? 'disabled' : ''}>${_escape(room.caracteristicas || '')}</textarea>
+            </div>
+            <div class="form-group form-group--wide">
+              <label>Tipo de techo / cubierta</label>
+              ${_buttonChoiceGroup(
+                ['Chapa', 'Teja', 'Losa', 'Fibrocemento', 'Mixto', 'No verificable'],
+                room.techo_tipo || '',
+                option => `MecFormModule.setSketchField('techo_tipo', '${_escape(option)}')`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+            <div class="form-group form-group--wide">
+              <label>Estado del techo</label>
+              ${_buttonChoiceGroup(
+                ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'],
+                room.techo_estado || '',
+                option => `MecFormModule.setSketchField('techo_estado', '${_escape(option)}')`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+            <div class="form-group form-group--wide">
+              <label>Tipo de piso</label>
+              ${_buttonChoiceGroup(
+                ['Ceramico', 'Cemento alisado', 'Mosaico', 'Tierra', 'Madera', 'Otro', 'No verificable'],
+                room.piso_tipo || '',
+                option => `MecFormModule.setSketchField('piso_tipo', '${_escape(option)}')`,
+                'mec-choice-buttons--compact'
+              )}
+            </div>
+            <div class="form-group form-group--wide">
+              <label>Estado del piso</label>
+              ${_buttonChoiceGroup(
+                ['Bueno', 'Regular', 'Malo', 'Con roturas', 'Con humedad', 'No verificable'],
+                room.piso_estado || '',
+                option => `MecFormModule.setSketchField('piso_estado', '${_escape(option)}')`,
+                'mec-choice-buttons--compact'
+              )}
             </div>
           </div>
           <div class="mec-object-note" role="note">
@@ -15889,6 +16017,40 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function focusSelectedPlanItem(message = '') {
+    const root = _activeSchoolPlanRoot();
+    const canvas = root?.querySelector?.('[data-school-plan-canvas]');
+    if (canvas?.scrollIntoView) {
+      canvas.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      try { canvas.focus({ preventScroll: true }); } catch { /* canvas focus is optional */ }
+    }
+    if (message) UI.showToast(message, 'info', 6200);
+  }
+
+  function _notifyGuidedPlanSync() {
+    if (typeof GuidedRegisterModule !== 'undefined' && GuidedRegisterModule.syncFromPlan) {
+      GuidedRegisterModule.syncFromPlan();
+    }
+  }
+
+  function _notifyGuidedMeasureChange(kind = '', id = '') {
+    if (typeof GuidedRegisterModule !== 'undefined' && GuidedRegisterModule.invalidateMeasureConfirmation) {
+      GuidedRegisterModule.invalidateMeasureConfirmation(kind, id);
+      return;
+    }
+    _notifyGuidedPlanSync();
+  }
+
+  function _notifyGuidedResizeDrag(drag = {}) {
+    if (!drag?.type) return;
+    if (drag.type === 'block') return _notifyGuidedMeasureChange('block', drag.blockId || '');
+    if (drag.type === 'floor') return _notifyGuidedMeasureChange('floor', drag.floorId || '');
+    if (drag.type === 'room') return _notifyGuidedMeasureChange('room', drag.roomId || '');
+    if (drag.type === 'sanitary') return _notifyGuidedMeasureChange('sanitary', drag.sanitaryId || '');
+    if (drag.type === 'site-element') return _notifyGuidedMeasureChange('site', drag.siteId || '');
+    return _notifyGuidedPlanSync();
+  }
+
   function openPlanSelection() {
     const raw = String(_selectedPlanId || '');
     if (!raw) {
@@ -16452,6 +16614,19 @@ const MecFormModule = (() => {
       }
       return specs;
     }
+    if (fieldId === 'pilares_bloque' && text.startsWith('si')) {
+      return [{
+        type: 'pillar',
+        reason: 'pilar visible declarado',
+        ficha: {
+          codigo: `Pil ${blockLabel}`,
+          subtipo: 'Pilar del bloque',
+          material: '',
+          forma_pilar: 'Cuadrado',
+          nota_i: `Creado automaticamente al registrar pilares visibles en ${blockLabel}.`,
+        },
+      }];
+    }
     if (fieldId === 'acometida_tipo' && !['no', 'no visible'].includes(text)) {
       return [{
         type: 'service_connection',
@@ -16543,6 +16718,7 @@ const MecFormModule = (() => {
       medidor_estado: { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y - h - gap },
       tablero_estado: { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y + 34 },
       puesta_tierra: { x: blockLayout.x - w - gap, y: blockLayout.y + blockLayout.h - h - 10 },
+      pilares_bloque: { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y + blockLayout.h - h - 10 },
     };
     const anchor = anchors[fieldId] || { x: blockLayout.x + blockLayout.w + gap, y: blockLayout.y + blockLayout.h / 2 - h / 2 };
     const resolved = _resolvePlanRectNoOverlap(
@@ -18518,6 +18694,7 @@ const MecFormModule = (() => {
   function _savePlanNudge(result) {
     if (!result) return false;
     _saveDraft(false);
+    _notifyGuidedPlanSync();
     return true;
   }
 
@@ -19053,6 +19230,7 @@ const MecFormModule = (() => {
         pointerStart = null;
         _saveDraft(false);
         renderSchoolPlan();
+        _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -19067,12 +19245,14 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
       }
       if (resizeDrag) {
         const selectedId = resizeDrag.selectedId;
+        const finishedResize = { ...resizeDrag };
         resizeDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -19081,6 +19261,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        _notifyGuidedResizeDrag(finishedResize);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -19099,6 +19280,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -19129,6 +19311,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
@@ -19210,6 +19393,11 @@ const MecFormModule = (() => {
     }, { passive: false });
     canvas.tabIndex = 0;
     canvas.addEventListener('keydown', event => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        resetPlanSelectionAndZoom(event);
+        return;
+      }
       if (!_selectedPlanId) return;
       const ARROWS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
       const dir = ARROWS[event.key];
@@ -20978,6 +21166,8 @@ const MecFormModule = (() => {
     setSelectedSchool,
     clearActiveSchoolContext,
     resetDraft,
+    updateGuidedSchoolIdentity,
+    resetSchoolRegistration,
     exportJson,
     toggleModule,
     setSketchTool,
@@ -21060,6 +21250,7 @@ const MecFormModule = (() => {
     editPlanClassroom,
     editPlanSanitary,
     selectPlanItem,
+    focusSelectedPlanItem,
     openPlanSelection,
     openPlanBlockFicha,
     closePlanBlockFicha,

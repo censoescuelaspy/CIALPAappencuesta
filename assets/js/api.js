@@ -756,6 +756,7 @@ const API = (() => {
   async function solicitarRelevamiento(datos) { return call('solicitarRelevamiento', 'POST', datos); }
   async function aprobarSolicitudRelevamiento(datos) { return call('aprobarSolicitudRelevamiento', 'POST', datos); }
   async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
+  async function reiniciarRelevamientoEscuela(datos) { return call('reiniciarRelevamientoEscuela', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
   async function getIncidencias(filters = {}) { return call('getIncidencias', 'GET', filters, { skipLoading: true }); }
@@ -792,6 +793,7 @@ const API = (() => {
     solicitarRelevamiento,
     aprobarSolicitudRelevamiento,
     guardarBorradorMec,
+    reiniciarRelevamientoEscuela,
     guardarCierreCompleto,
     uploadEvidence,
     getIncidencias,
