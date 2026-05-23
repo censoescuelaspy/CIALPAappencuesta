@@ -4,6 +4,47 @@
 
 ---
 
+## Vista Metodologia y resguardo formal de datos - 2026-05-23 - v2.6.131
+
+### Objetivo
+- Agregar a la app web una vista institucional de metodologia que explique como funciona CIALPA de punta a punta.
+- Madurar la estrategia para resguardar todas las respuestas en una base de datos formal con integridad, consistencia y trazabilidad.
+- Explicar en una pantalla navegable las herramientas usadas, su interconexion y el camino completo desde captura en campo hasta PostgreSQL.
+
+### Diagnostico
+- Existia un modulo `Arquitectura del proyecto`, pero no estaba visible en el menu principal y se quedaba corto para explicar gobernanza de datos.
+- La app ya tiene piezas de maduracion hacia base formal: `db_sync_queue`, documentacion de PostgreSQL, API relacional en `tools/database/` y esquema jerarquico escuela/institucion.
+- Faltaba presentar todo eso dentro de la app para supervisores, administradores y equipo tecnico, sin depender de documentos externos.
+
+### Cambios implementados
+- El modulo pasa a presentarse como `Metodologia de funcionamiento y datos`.
+- Se agrega acceso visible `Metodologia y datos` al menu lateral y boton `Metodologia` en Inicio.
+- La vista explica captura en campo, PWA, borrador local, backend Apps Script, Sheets/Drive, cola formal y base transaccional PostgreSQL.
+- Se agrega ciclo metodologico del dato: identificacion, captura guiada, autoguardado, sincronizacion, resguardo operativo, resguardo formal y uso institucional.
+- Se documenta que se guarda, donde queda hoy, cual es el destino formal y para que se usa operativamente.
+- Se explican herramientas y responsabilidades: GitHub Pages, Service Worker, JavaScript PWA, Apps Script, Sheets, Drive, PostgreSQL, Leaflet, OSM y Canvas.
+- Se agregan principios de integridad, consistencia y trazabilidad: `clientMutationId`, usuario, rol, fecha cliente/servidor, `school_key`, `institution_key`, logs, auditoria y no duplicacion por reintentos.
+- Se muestra el modelo formal recomendado: `users`, `assignments`, `survey_sessions`, `schools`, `school_institutions`, `mec_drafts`, `school_submissions`, `buildings`, `floors`, `rooms`, `room_objects`, `sanitary_groups`, `sanitary_objects`, `site_elements`, `evidence_files`, `sync_mutations` y `audit_log`.
+- Se incorporan estados del dato: `BORRADOR LOCAL`, `PENDIENTE_SYNC`, `RECIBIDO`, `EN_COLA_DB`, `SINCRONIZADO_DB`, `VALIDADO`, `OBSERVADO` y `ANULADO`.
+- Se actualizan estilos responsive para la nueva vista metodologica.
+- Version visible, cache y assets actualizados a `v2.6.131`.
+
+### Pendiente operativo
+- Pedir a supervisores/administradores `Actualizar app` para tomar `cialpa-app-v2.6.131`.
+- Revisar con el equipo si la base formal se activara primero como doble escritura `Sheets + PostgreSQL` o si se mantendra un periodo mas largo de cola `db_sync_queue`.
+- Definir proveedor final de PostgreSQL administrado: Cloud SQL, Supabase o AlloyDB.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check sw.js`.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- Playwright local escritorio: `Metodologia y datos` aparece en menu, abre `module-arquitectura`, muestra version `v2.6.131`, 7 etapas metodologicas, 8 bloques de esquema formal y 8 filas de tabla de resguardo, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: mismo flujo de metodologia, sin errores de consola y sin overflow horizontal.
+
 ## Saltos condicionales en cuestionario inicial R01 - 2026-05-23 - v2.6.130
 
 ### Objetivo

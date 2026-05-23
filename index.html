@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.130" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.131" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.130" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.131" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.130</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.131</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.130</strong>
+      Edición vigente<br><strong class="app-version">v2.6.131</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -283,6 +283,7 @@
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
               <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Cuestionario inicial</button>
               <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Planificación</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('arquitectura')">Metodologia</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
             </div>
           </div>
@@ -290,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.130</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.131</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -479,13 +480,13 @@
       </div>
 
       <!-- ======================================================
-           MODULE: ARQUITECTURA PROYECTO
+           MODULE: METODOLOGIA Y DATOS
            ====================================================== -->
       <div id="module-arquitectura" class="module-panel">
         <div class="page-header">
           <div>
-            <h2>Arquitectura del proyecto</h2>
-            <p class="text-muted">Mapa funcional de CIALPA: herramientas, datos, almacenamiento, sincronizacion, evidencias y seguridad operativa.</p>
+            <h2>Metodologia de funcionamiento y datos</h2>
+            <p class="text-muted">Como opera CIALPA de punta a punta: herramientas usadas, interconexion, captura offline, resguardo formal, integridad y trazabilidad.</p>
           </div>
           <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
             <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mec')">Abrir cuestionario</button>
@@ -494,122 +495,188 @@
           </div>
         </div>
         <div class="page-content architecture-page">
+          <section class="method-hero">
+            <div>
+              <span class="eyebrow">Modelo operativo CIALPA</span>
+              <h3>La app combina captura de campo, respaldo local, backend auditable y una ruta de base de datos transaccional.</h3>
+              <p>El flujo actual conserva la operacion simple con Google Sheets y Drive, pero ya deja preparada la maduracion hacia PostgreSQL mediante una cola idempotente y una API de sincronizacion. El objetivo es que cada respuesta tenga autor, momento, dispositivo, version del formulario, escuela, institucion, estado y evidencia relacionada.</p>
+            </div>
+            <div class="method-hero__metrics" aria-label="Criterios de gobierno de datos">
+              <article><strong>1</strong><span>dato capturado una vez, reutilizable para campo, gabinete y MEC.</span></article>
+              <article><strong>3</strong><span>niveles de resguardo: dispositivo, Sheets/Drive y base formal.</span></article>
+              <article><strong>100%</strong><span>de escrituras criticas con usuario, fecha, version y estado.</span></article>
+            </div>
+          </section>
+
           <section class="architecture-flow" aria-label="Diagrama funcional del sistema">
             <article class="architecture-node architecture-node--field">
               <span>1</span>
-              <h3>Campo</h3>
-              <p>Encuestador en tablet, celular o notebook. Levanta escuela, bloques, pisos, aulas, sanitarios, exteriores, fotos y tiempos.</p>
-              <small>Android, iPadOS, escritorio</small>
+              <h3>Captura en campo</h3>
+              <p>Encuestador, supervisor o director registra escuela, servicios, bloques, pisos, aulas, sanitarios, exteriores, fotos, GPS y tiempos.</p>
+              <small>Tablet, celular, notebook</small>
             </article>
             <i aria-hidden="true"></i>
             <article class="architecture-node architecture-node--app">
               <span>2</span>
-              <h3>PWA CIALPA</h3>
-              <p>Aplicacion web estatica publicada en GitHub Pages, con Service Worker para cache offline y actualizacion de version.</p>
+              <h3>App web PWA</h3>
+              <p>GitHub Pages entrega HTML, CSS y JS versionados. El Service Worker guarda el app shell para abrir la app aun con conectividad inestable.</p>
               <small>HTML, CSS, JS, Cache API</small>
             </article>
             <i aria-hidden="true"></i>
             <article class="architecture-node architecture-node--capture">
               <span>3</span>
-              <h3>Registro arquitectonico</h3>
-              <p>Motor MEC, plano por bloque, editor de ambientes, sanitarios, exteriores, base de calles, PDF, DXF, SVG, PNG y JSON.</p>
-              <small>Canvas, Leaflet, OSM HOT</small>
+              <h3>Borrador local</h3>
+              <p>La ficha MEC, el plano, evidencias y cola offline se guardan en el navegador antes de depender del servidor.</p>
+              <small>localStorage, IndexedDB</small>
             </article>
             <i aria-hidden="true"></i>
             <article class="architecture-node architecture-node--local">
               <span>4</span>
-              <h3>Persistencia local</h3>
-              <p>Autoguardado del borrador y cola offline. Permite seguir cargando aunque la conexion sea intermitente.</p>
-              <small>localStorage, IndexedDB</small>
+              <h3>Backend auditable</h3>
+              <p>Google Apps Script valida usuario, rol, escuela asignada, estructura del paquete y registra logs, errores y sesiones.</p>
+              <small>GAS Web App, HTTPS</small>
             </article>
             <i aria-hidden="true"></i>
             <article class="architecture-node architecture-node--sync">
               <span>5</span>
-              <h3>Sincronizacion</h3>
-              <p>La capa API envia sesiones, escuelas, incidencias, evidencias y estados al backend Google Apps Script.</p>
-              <small>HTTPS, GAS Web App</small>
+              <h3>Repositorio operativo</h3>
+              <p>Sheets conserva datos tabulares y Drive organiza fotos, anexos, JSON y paquetes de sincronizacion.</p>
+              <small>Sheets, Drive, LOG</small>
             </article>
             <i aria-hidden="true"></i>
             <article class="architecture-node architecture-node--repo">
               <span>6</span>
-              <h3>Repositorios</h3>
-              <p>Datos tabulares en Google Sheets, evidencias en Google Drive y exportaciones tecnicas para gabinete.</p>
-              <small>Sheets, Drive, anexos</small>
+              <h3>Cola formal</h3>
+              <p>Cada guardado MEC deja una mutacion idempotente en <code>db_sync_queue</code> para reintentar, auditar y migrar sin perder datos.</p>
+              <small>clientMutationId, JSON</small>
             </article>
             <i aria-hidden="true"></i>
             <article class="architecture-node architecture-node--decision">
               <span>7</span>
-              <h3>Gestion y decision</h3>
-              <p>Mapa, planificacion, estadisticas, auditoria, jornadas, tiempos por escuela y futura capa BigQuery para escala nacional.</p>
-              <small>6000 escuelas, supervision</small>
+              <h3>Base transaccional</h3>
+              <p>La ruta de maduracion normaliza escuelas, instituciones, bloques, ambientes, sanitarios, evidencias y auditoria en PostgreSQL.</p>
+              <small>Cloud SQL, Supabase o AlloyDB</small>
             </article>
           </section>
 
           <section class="architecture-grid">
             <article class="architecture-panel architecture-panel--wide">
-              <h3>Que se guarda y donde</h3>
+              <h3>Ciclo metodologico del dato</h3>
+              <div class="method-timeline">
+                <div><strong>1. Identificacion</strong><span>Se selecciona escuela/local escolar desde padron, asignacion o enlace publico. Se fijan codigo local, nombre, departamento, distrito, localidad, usuario y version de app.</span></div>
+                <div><strong>2. Captura guiada</strong><span>El Registro guiado pregunta por etapas: ubicacion base, perimetro, bloques, pisos, aulas, sanitarios, exteriores, servicios, electricidad, evidencias y revision final.</span></div>
+                <div><strong>3. Autoguardado</strong><span>Cada avance actualiza el borrador local. Si no hay conexion, el registro queda en cola local y se sincroniza al volver Internet.</span></div>
+                <div><strong>4. Sincronizacion</strong><span>La capa API envia el paquete al Web App de Apps Script. El backend valida token, permisos, columnas y estado antes de escribir.</span></div>
+                <div><strong>5. Resguardo operativo</strong><span>Sheets recibe filas consultables; Drive recibe fotos y JSON; LOG/ERRORES registran eventos, fallas y trazabilidad tecnica.</span></div>
+                <div><strong>6. Resguardo formal</strong><span>El mismo paquete queda en cola para PostgreSQL. La API relacional aplica transaccion, evita duplicados y normaliza entidades.</span></div>
+                <div><strong>7. Uso institucional</strong><span>Mapa, tableros, planificacion, auditoria, reportes y exportaciones consultan datos con filtros por territorio, escuela, institucion, fecha, usuario y estado.</span></div>
+              </div>
+            </article>
+
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Que se guarda, donde y con que finalidad</h3>
               <div class="architecture-table-wrap">
                 <table class="architecture-table">
                   <thead>
-                    <tr><th>Dato</th><th>Ubicacion actual</th><th>Destino sincronizado</th><th>Uso operativo</th></tr>
+                    <tr><th>Dato</th><th>Captura o clave tecnica</th><th>Destino actual</th><th>Destino formal</th><th>Uso operativo</th></tr>
                   </thead>
                   <tbody>
-                    <tr><td>Sesion de usuario</td><td><code>sessionStorage: cialpa_session</code></td><td>Validacion contra Apps Script</td><td>Login, rol, token y expiracion de 8 horas.</td></tr>
-                    <tr><td>Borrador MEC y plano</td><td><code>localStorage: cialpa_mec_form_draft_v1</code></td><td>Paquete CIALPA / futura migracion</td><td>General, servicios, bloques, aulas, sanitarios, exteriores y plano.</td></tr>
-                    <tr><td>Tiempos de carga</td><td><code>__registroTiempos</code> dentro del borrador</td><td>Panel de planificacion</td><td>Duracion por bloque, ambiente, sanitario y exterior.</td></tr>
-                    <tr><td>Cache y cola offline</td><td><code>IndexedDB: cialpa_offline_store</code></td><td>Reintento cuando vuelve conexion</td><td>Cache API, cola <code>queue</code> y cache <code>cache</code>.</td></tr>
-                    <tr><td>Fotos y evidencias</td><td>Vista previa local en ficha y referencias de evidencia</td><td>Google Drive, carpeta configurada</td><td>Fotos por puerta, ventana, dano, sanitario, exterior y observaciones.</td></tr>
-                    <tr><td>Escuelas, sesiones, incidencias</td><td>API cacheada localmente</td><td>Google Sheets via Apps Script</td><td>Seguimiento de estado, asignaciones, jornada y auditoria.</td></tr>
-                    <tr><td>Planos y anexos</td><td>Generados en navegador</td><td>Descarga local / expediente</td><td>PDF, DXF, SVG, PNG y JSON para revision tecnica.</td></tr>
+                    <tr><td>Sesion de usuario</td><td><code>sessionStorage: cialpa_session</code>, usuario, rol, token y expiracion</td><td>Validacion por Apps Script</td><td><code>users</code>, <code>survey_sessions</code>, <code>audit_log</code></td><td>Autenticacion, permisos y responsabilidad de cada accion.</td></tr>
+                    <tr><td>Escuela/local e institucion</td><td><code>codigo_local</code>, <code>id_escuela</code>, nombre, territorio y muestra</td><td><code>escuelas_seleccionadas</code>, padron oficial</td><td><code>schools</code>, <code>school_institutions</code>, <code>assignments</code></td><td>Unidad territorial y edilicia para todos los cruces.</td></tr>
+                    <tr><td>Borrador MEC y plano</td><td><code>cialpa_mec_form_draft_v1</code>, bloques, pisos, aulas, sanitarios, exteriores y geometria</td><td><code>mec_borradores</code>, JSON de Drive</td><td><code>mec_drafts</code> JSONB + tablas normalizadas</td><td>Continuidad de carga, revision tecnica y recuperacion.</td></tr>
+                    <tr><td>Respuestas del cuestionario inicial</td><td>Token publico, escuela, contacto, agua, sanitarios, Internet, CCTV, energia y adjuntos</td><td><code>r01_cuestionario_inicial</code>, <code>r01_envios_cuestionario</code></td><td><code>previsit_surveys</code>, <code>evidence_files</code></td><td>Preparar visita y contrastar respuestas con relevamiento in situ.</td></tr>
+                    <tr><td>Evidencias y anexos</td><td>Foto, PDF, croquis, entidad vinculada, usuario y contexto escolar</td><td>Google Drive + hoja <code>evidencias</code></td><td><code>evidence_files</code> con URL, hash, entidad y version</td><td>Soporte fotografico y documental verificable.</td></tr>
+                    <tr><td>Tiempos logisticos</td><td><code>timeTracking</code>, inicio, cierre, minutos por escuela/aula/sanitario/exterior</td><td><code>mec_borradores</code> y planificacion</td><td><code>time_tracking_items</code>, columnas resumen en <code>mec_drafts</code></td><td>Calcular productividad, rutas, cargas de trabajo y costos.</td></tr>
+                    <tr><td>Cola offline y reintentos</td><td><code>IndexedDB: cialpa_offline_store</code>, endpoint, payload, intentos y ultimo error</td><td>Reintento desde la app al volver conexion</td><td><code>sync_mutations</code> con idempotencia</td><td>No perder respuestas por cortes de Internet.</td></tr>
+                    <tr><td>Auditoria</td><td>login, guardado, cierre, error, exportacion, cambio de usuario o configuracion</td><td>Hojas <code>LOG</code> y <code>ERRORES</code></td><td><code>audit_log</code> inmutable</td><td>Reconstruir quien hizo que, cuando, desde donde y con que version.</td></tr>
                   </tbody>
                 </table>
               </div>
             </article>
 
             <article class="architecture-panel">
-              <h3>Herramientas vinculadas</h3>
+              <h3>Herramientas y responsabilidades</h3>
               <ul class="architecture-list">
-                <li><strong>GitHub Pages:</strong> publicacion de la app web.</li>
-                <li><strong>Service Worker:</strong> app shell offline y cache de version.</li>
-                <li><strong>Google Apps Script:</strong> API de login, escuelas, sesiones, incidencias y evidencias.</li>
-                <li><strong>Google Sheets:</strong> repositorio tabular operativo.</li>
-                <li><strong>Google Drive:</strong> repositorio de fotos y anexos.</li>
-                <li><strong>Leaflet + OSM:</strong> mapa general y base de calles del plano.</li>
-                <li><strong>Canvas/SVG/DXF/PDF:</strong> produccion tecnica del plano escolar.</li>
+                <li><strong>GitHub Pages:</strong> publica la app estatica y permite cache-busting por version.</li>
+                <li><strong>Service Worker:</strong> conserva app shell, evita pantalla en blanco y renueva cache con <code>Actualizar app</code>.</li>
+                <li><strong>JavaScript PWA:</strong> coordina login, mapa, formularios, plano, tableros, cola offline y sincronizacion.</li>
+                <li><strong>Google Apps Script:</strong> funciona como API auditable y puente de integracion con Sheets, Drive y la base formal.</li>
+                <li><strong>Google Sheets:</strong> base operativa visible para administracion, control rapido y contingencia.</li>
+                <li><strong>Google Drive:</strong> resguarda fotos, anexos, PDFs, JSON completos y payloads de sincronizacion.</li>
+                <li><strong>PostgreSQL:</strong> destino formal para integridad referencial, auditoria, consultas y escalamiento.</li>
+                <li><strong>Leaflet, OSM y Canvas:</strong> mapa territorial, base mapa de escuela y plano tecnico editable.</li>
               </ul>
             </article>
 
             <article class="architecture-panel">
-              <h3>Seguridad y controles</h3>
+              <h3>Integridad, consistencia y trazabilidad</h3>
               <ul class="architecture-list architecture-list--checks">
-                <li>Acceso por usuario, contrasena y token de sesion.</li>
-                <li>Expiracion local de sesion despues de 8 horas.</li>
-                <li>Roles: encuestador, supervisor y admin.</li>
-                <li>Lista blanca adicional para administradores reales.</li>
-                <li>HTTPS en GitHub Pages y Google Apps Script.</li>
-                <li>La UI oculta funciones, pero el backend debe validar permisos.</li>
-                <li>Los datos locales del navegador dependen de la seguridad del dispositivo.</li>
+                <li>Cada registro debe tener <code>id_registro</code>, <code>app_version</code>, usuario, rol, fecha cliente y fecha servidor.</li>
+                <li>Cada sincronizacion debe usar <code>clientMutationId</code> para que un reintento no duplique filas.</li>
+                <li>El backend valida permisos por rol y escuela asignada; la interfaz solo ayuda, no es la autoridad.</li>
+                <li>Las entidades se relacionan por <code>school_key</code>, <code>institution_key</code>, bloque, piso, ambiente, sanitario y evidencia.</li>
+                <li>Los cambios sensibles quedan en LOG/ERRORES y, al migrar, en <code>audit_log</code> inmutable.</li>
+                <li>Los cierres finales no deben degradarse a borrador por autoguardados posteriores.</li>
+                <li>Las fotos quedan vinculadas a escuela y entidad tecnica; no se guardan como archivos sueltos sin contexto.</li>
               </ul>
             </article>
 
             <article class="architecture-panel architecture-panel--wide">
-              <h3>Escalamiento recomendado para 6000 escuelas</h3>
+              <h3>Modelo de base de datos formal propuesto</h3>
+              <div class="method-schema">
+                <div><strong>Identidad y acceso</strong><span><code>users</code>, <code>roles</code>, <code>assignments</code>, <code>survey_sessions</code></span></div>
+                <div><strong>Territorio escolar</strong><span><code>schools</code>, <code>school_institutions</code>, <code>school_samples</code></span></div>
+                <div><strong>Captura MEC</strong><span><code>mec_drafts</code>, <code>school_submissions</code>, <code>buildings</code>, <code>floors</code>, <code>rooms</code></span></div>
+                <div><strong>Objetos y servicios</strong><span><code>room_objects</code>, <code>sanitary_groups</code>, <code>sanitary_objects</code>, <code>site_elements</code></span></div>
+                <div><strong>Evidencias</strong><span><code>evidence_files</code> con URL, hash, entidad, usuario y version</span></div>
+                <div><strong>Sincronizacion</strong><span><code>sync_mutations</code>, estado, intentos, error y payload resumido</span></div>
+                <div><strong>Auditoria</strong><span><code>audit_log</code> para accion, usuario, rol, IP/dispositivo, modulo y detalle</span></div>
+                <div><strong>Analitica</strong><span>vistas materializadas o consultas para tableros, tiempos, avance, calidad y fallas</span></div>
+              </div>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Estados del dato</h3>
+              <ul class="architecture-list">
+                <li><strong>BORRADOR LOCAL:</strong> existe solo en el dispositivo y puede editarse.</li>
+                <li><strong>PENDIENTE_SYNC:</strong> ficha completa o parcial esta en cola por falta de conexion.</li>
+                <li><strong>RECIBIDO:</strong> Apps Script confirmo escritura en Sheets/Drive.</li>
+                <li><strong>EN_COLA_DB:</strong> el paquete quedo registrado para base formal.</li>
+                <li><strong>SINCRONIZADO_DB:</strong> PostgreSQL aplico transaccion e idempotencia.</li>
+                <li><strong>VALIDADO / OBSERVADO / ANULADO:</strong> supervision institucional decide calidad y vigencia.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Controles de calidad</h3>
+              <ul class="architecture-list">
+                <li>Validaciones frontend para campos obligatorios, formatos, coordenadas, montos, fechas y dependencias.</li>
+                <li>Validaciones backend para token, rol, escuela, encabezados, duplicados y estado permitido.</li>
+                <li>Reglas condicionales para no enviar campos ocultos cuando la respuesta base no corresponde.</li>
+                <li>Cache de catalogos y padron para evitar bloqueos si el backend no responde.</li>
+                <li>Revision por tableros: inconsistencias, alertas territoriales, evidencias, tiempos y cobertura.</li>
+                <li>Versionado de app y Service Worker para reproducir con que codigo fue levantado cada dato.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Ruta de maduracion hacia base formal</h3>
               <div class="architecture-roadmap">
                 <div>
-                  <strong>Ahora</strong>
-                  <span>GitHub Pages + Apps Script + Sheets/Drive + cache offline.</span>
+                  <strong>Fase 1 - Operacion actual</strong>
+                  <span>GitHub Pages + Apps Script + Sheets/Drive + offline local, con LOG y evidencias.</span>
                 </div>
                 <div>
-                  <strong>Siguiente</strong>
-                  <span>Sincronizacion robusta de paquetes CIALPA, bitacora por entidad y tablero de tiempos.</span>
+                  <strong>Fase 2 - Doble escritura</strong>
+                  <span>Guardar en Sheets y en <code>db_sync_queue</code>; reenviar a API PostgreSQL sin bloquear campo.</span>
                 </div>
                 <div>
-                  <strong>Escala nacional</strong>
-                  <span>BigQuery como repositorio analitico, Drive/Cloud Storage para fotos, politicas de retencion y backups.</span>
+                  <strong>Fase 3 - Fuente oficial</strong>
+                  <span>PostgreSQL pasa a fuente primaria; Sheets queda como exportacion y control operativo.</span>
                 </div>
                 <div>
-                  <strong>Gobernanza</strong>
-                  <span>Catalogo de datos, trazabilidad por usuario, version de formulario, auditoria y control de calidad.</span>
+                  <strong>Fase 4 - Gobierno nacional</strong>
+                  <span>Backups, retencion, vistas analiticas, catalogo de datos, auditoria completa y reportes MEC.</span>
                 </div>
               </div>
             </article>
@@ -1380,20 +1447,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.130"></script>
-<script src="assets/js/local-store.js?v=2.6.130"></script>
-<script src="assets/js/api.js?v=2.6.130"></script>
-<script src="assets/js/auth.js?v=2.6.130"></script>
-<script src="assets/js/map.js?v=2.6.130"></script>
-<script src="assets/js/survey.js?v=2.6.130"></script>
-<script src="assets/js/stats.js?v=2.6.130"></script>
-<script src="assets/js/location-audit.js?v=2.6.130"></script>
-<script src="assets/js/planning.js?v=2.6.130"></script>
-<script src="assets/js/admin.js?v=2.6.130"></script>
-<script src="assets/js/jornada.js?v=2.6.130"></script>
-<script src="assets/js/manual.js?v=2.6.130"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.130"></script>
-<script src="assets/js/app.js?v=2.6.130"></script>
+<script src="assets/js/config.js?v=2.6.131"></script>
+<script src="assets/js/local-store.js?v=2.6.131"></script>
+<script src="assets/js/api.js?v=2.6.131"></script>
+<script src="assets/js/auth.js?v=2.6.131"></script>
+<script src="assets/js/map.js?v=2.6.131"></script>
+<script src="assets/js/survey.js?v=2.6.131"></script>
+<script src="assets/js/stats.js?v=2.6.131"></script>
+<script src="assets/js/location-audit.js?v=2.6.131"></script>
+<script src="assets/js/planning.js?v=2.6.131"></script>
+<script src="assets/js/admin.js?v=2.6.131"></script>
+<script src="assets/js/jornada.js?v=2.6.131"></script>
+<script src="assets/js/manual.js?v=2.6.131"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.131"></script>
+<script src="assets/js/app.js?v=2.6.131"></script>
 
 <script>
   // Set today's date in Inicio module
