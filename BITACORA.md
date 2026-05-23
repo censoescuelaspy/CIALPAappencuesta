@@ -48,6 +48,7 @@
 - Verificacion HTTP de GitHub Pages para `assets/js/initial-questionnaire.js`: contiene `listarEscuelasCuestionarioInicial` e `initial-school-search`.
 - Verificacion HTTP de GitHub Pages para `cuestionario_inicial/`: responde HTTP 200 y carga assets `v2.6.126`.
 - Playwright remoto sobre GitHub Pages: lista simulada carga, completa departamento/distrito, boton marcado queda verde `rgb(11, 93, 59)`, sin errores de consola y sin overflow horizontal.
+- Prueba HTTP contra Web App publicado para `listarEscuelasCuestionarioInicial`: responde `Token invalido o expirado`, confirmando que falta actualizar el deployment propietario para activar el endpoint publico.
 
 ## Cuestionario inicial publico R01 y envio a directores - 2026-05-23 - v2.6.125
 
