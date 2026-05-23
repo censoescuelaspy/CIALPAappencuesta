@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.115
+ * Version: 2.6.116
  */
 
 const GuidedRegisterModule = (() => {
@@ -59,6 +59,14 @@ const GuidedRegisterModule = (() => {
 
   function _digits(value) {
     return String(value ?? '').replace(/\D+/g, '');
+  }
+
+  function _normalizeText(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   }
 
   function _slug(value) {

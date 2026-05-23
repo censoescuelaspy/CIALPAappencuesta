@@ -4,6 +4,37 @@
 
 ---
 
+## Auxiliar de normalizacion en Registro guiado - 2026-05-22 - v2.6.116
+
+### Objetivo
+- Corregir el error JavaScript `ReferenceError: _normalizeText is not defined` que cortaba el render de `Registro guiado`.
+
+### Diagnostico
+- `GuidedRegisterModule._normalizeFloorLabel()` llamaba a `_normalizeText()` para reconocer `PB`, `Planta baja` y pisos normalizados.
+- Esa funcion auxiliar no existia dentro del closure de `guided-register.js`.
+- La misma referencia tambien existia en `mec-form.js`, por lo que podia fallar despues en el motor MEC al normalizar pisos.
+
+### Cambios implementados
+- Se agrega `_normalizeText()` en `guided-register.js`.
+- Se agrega `_normalizeText()` en `mec-form.js`.
+- Version visible y cache del Service Worker actualizados a `v2.6.116`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.116`.
+- Probar nuevamente `Mapa > Iniciar/continuar registro` y confirmar que no aparece `ReferenceError` en consola.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Revision estatica: `_normalizeText()` existe en `guided-register.js` y `mec-form.js`, y no quedan referencias activas a `2.6.115` en assets de publicacion.
+
+---
+
 ## Escuela seleccionada priorizada en Registro guiado - 2026-05-22 - v2.6.115
 
 ### Objetivo

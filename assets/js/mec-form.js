@@ -218,6 +218,14 @@ const MecFormModule = (() => {
     return String(value ?? '').replace(/\D+/g, '');
   }
 
+  function _normalizeText(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
   function _schoolIdentityValues(school) {
     const values = [
       school?.id_escuela,
