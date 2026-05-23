@@ -42,6 +42,16 @@
 - Playwright local escritorio: `Infraestructura MEC` carga el tablero nuevo, muestra 5 filtros, selecciona `CENTRAL`, renderiza mapa y tabla territorial, sin errores de consola y sin overflow horizontal.
 - Playwright local movil `390x844`: muestra tablero, filtros, mapa y tabla sin errores de consola y sin overflow horizontal.
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `709b511 feat: renovar tablero infraestructura MEC v2.6.129`.
+- `git push origin main`: publica la renovacion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.129`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.129`.
+- Verificacion HTTP de GitHub Pages para `assets/js/stats.js`: contiene `Centro de inteligencia edilicia`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene estilos `mec-intel-filters`.
+- Verificacion HTTP de GitHub Pages para `assets/data/demo-infraestructura-mec.json`: contiene `territorios`, `niveles_educativos`, `tipos_bloque` y `fallas_segmentos`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `Inteligencia de infraestructura escolar`.
+- Playwright remoto sobre GitHub Pages: version visible `v2.6.129`, 5 filtros, seleccion `CENTRAL`, 2 filas territoriales, mapa renderizado, sin errores de consola y sin overflow horizontal.
+- Playwright remoto movil `390x844`: version visible `v2.6.129`, tablero, filtros, mapa y tabla sin errores de consola y sin overflow horizontal.
 
 ## Preguntas visibles para grupos de opciones R01 - 2026-05-23 - v2.6.128
 
