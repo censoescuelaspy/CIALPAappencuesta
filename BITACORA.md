@@ -42,6 +42,15 @@
 - Playwright local escritorio: con backend publicado fallando por token, el cuestionario carga fallback, muestra 5462 opciones, selecciona `1701006`, completa departamento `ALTO PARAGUAY` y distrito `BAHIA NEGRA`, sin errores de consola y sin overflow horizontal.
 - Playwright local movil `390x844`: 7 bloques, sin errores de consola y sin overflow horizontal.
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `1f1132c fix: agregar respaldo escuelas cuestionario inicial v2.6.127`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.127`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.127`.
+- Verificacion HTTP de GitHub Pages para `assets/js/initial-questionnaire.js`: contiene `r01-schools-public.json`.
+- Verificacion HTTP de GitHub Pages para `assets/data/r01-schools-public.json`: responde HTTP 200, `total: 5462`, primera escuela `1701006`.
+- Verificacion HTTP de GitHub Pages para `cuestionario_inicial/`: responde HTTP 200 y carga assets `v2.6.127`.
+- Playwright remoto sobre GitHub Pages: con backend publicado fallando por token, el cuestionario carga fallback, muestra 5462 opciones, selecciona `1701006`, completa departamento `ALTO PARAGUAY` y distrito `BAHIA NEGRA`, sin errores de consola y sin overflow horizontal.
+- Playwright remoto movil `390x844`: 7 bloques, fallback con 5462 escuelas, sin errores de consola y sin overflow horizontal.
 
 ## Codigo local buscable y territorio oficial - 2026-05-23 - v2.6.126
 
