@@ -1,6 +1,6 @@
 /**
  * CIALPA - Cuestionario inicial R01
- * Version: 2.6.129
+ * Version: 2.6.130
  */
 
 const InitialQuestionnaire = (() => {
@@ -104,32 +104,40 @@ const InitialQuestionnaire = (() => {
 
         ${_section('agua', 'Servicio de agua', 'Indique si existe abastecimiento de agua y de donde proviene principalmente.', `
           ${_yesNo('agua_tiene', 'El local escolar cuenta con servicio de abastecimiento de agua?', true)}
-          ${_checkboxGrid('agua_fuentes', WATER_SOURCES, 'Fuente(s) de abastecimiento de agua utilizadas por la escuela', 'Marque una o mas opciones segun corresponda.')}
-          <div class="initial-grid initial-grid--compact">
-            ${_field('bomba_hp', 'Potencia de bomba, si corresponde', '', 'text', 'Ej.: 1 HP, 2 HP')}
-            ${_textarea('agua_observacion', 'Observacion sobre agua', 'Cortes frecuentes, baja presion, tanque, necesidad de reparacion, etc.')}
-          </div>
+          ${_dependent('agua_tiene', 'Si', `
+            ${_checkboxGrid('agua_fuentes', WATER_SOURCES, 'Fuente(s) de abastecimiento de agua utilizadas por la escuela', 'Marque una o mas opciones segun corresponda.')}
+            <div class="initial-grid initial-grid--compact">
+              ${_field('bomba_hp', 'Potencia de bomba, si corresponde', '', 'text', 'Ej.: 1 HP, 2 HP')}
+            </div>
+          `)}
+          ${_textarea('agua_observacion', 'Observacion sobre agua', 'Cortes frecuentes, baja presion, tanque, necesidad de reparacion, o aclaracion si no cuenta con agua.')}
         `)}
 
         ${_section('sanitario', 'Servicio sanitario', 'Datos generales sobre banos y sistema de desague.', `
           ${_yesNo('bano_tiene', 'El local escolar cuenta con bano?', true)}
-          ${_radioGrid('desague_tipo', DRAINS, 'Tipo principal de desague o disposicion sanitaria')}
+          ${_dependent('bano_tiene', 'Si', `
+            ${_radioGrid('desague_tipo', DRAINS, 'Tipo principal de desague o disposicion sanitaria')}
+          `)}
           ${_textarea('sanitario_observacion', 'Observacion sobre sanitarios', 'Estado general, banos clausurados, falta de agua, accesibilidad, etc.')}
         `)}
 
         ${_section('internet', 'Internet y conectividad', 'Ayuda a prever si el equipo de campo podra sincronizar datos durante la visita.', `
           ${_yesNo('internet_tiene', 'La escuela cuenta con Internet?', true)}
-          ${_checkboxGrid('internet_tipo', INTERNET_TYPES, 'Tipo(s) de conexion a Internet disponibles', 'Marque una o mas opciones solo si la escuela cuenta con Internet.')}
-          ${_radioGrid('internet_calidad', INTERNET_QUALITY, 'Calidad de la senal de Internet durante la ultima semana')}
-          ${_textarea('internet_observacion', 'Observacion sobre conectividad', 'Proveedor, zonas sin senal, contrasena disponible para la visita, etc.')}
+          ${_dependent('internet_tiene', 'Si', `
+            ${_checkboxGrid('internet_tipo', INTERNET_TYPES, 'Tipo(s) de conexion a Internet disponibles', 'Marque una o mas opciones.')}
+            ${_radioGrid('internet_calidad', INTERNET_QUALITY, 'Calidad de la senal de Internet durante la ultima semana')}
+          `, 'Estas preguntas aparecen solo cuando la escuela informa que cuenta con Internet.')}
+          ${_textarea('internet_observacion', 'Observacion sobre conectividad', 'Proveedor, zonas sin senal, contrasena disponible para la visita, o aclaracion si no cuenta con Internet.')}
         `)}
 
         ${_section('seguridad', 'CCTV y prevencion contra incendios', 'Informacion basica para orientar la verificacion de seguridad del local.', `
           ${_yesNo('cctv_tiene', 'Cuenta con sistema de vigilancia CCTV?', false)}
-          <div class="initial-grid initial-grid--compact">
-            ${_field('cctv_funcionando', 'Cantidad de camaras en funcionamiento', '', 'number', '0')}
-            ${_field('cctv_danadas', 'Cantidad de camaras danadas', '', 'number', '0')}
-          </div>
+          ${_dependent('cctv_tiene', 'Si', `
+            <div class="initial-grid initial-grid--compact">
+              ${_field('cctv_funcionando', 'Cantidad de camaras en funcionamiento', '', 'number', '0')}
+              ${_field('cctv_danadas', 'Cantidad de camaras danadas', '', 'number', '0')}
+            </div>
+          `)}
           ${_choiceBlock('Elementos de prevencion contra incendios disponibles', '<div class="initial-fire-grid">' + FIRE_ITEMS.map(([key, label]) => _fireItem(key, label)).join('') + '</div>', 'Responda cada elemento por separado.')}
           <div class="initial-grid initial-grid--compact">
             ${_field('motobomba_hp', 'Motobomba HP, si existe', '', 'text', 'Ej.: 3 HP')}
@@ -139,8 +147,10 @@ const InitialQuestionnaire = (() => {
 
         ${_section('electricidad', 'Instalacion electrica', 'Datos de provision y continuidad del servicio electrico.', `
           ${_yesNo('energia_tiene', 'Cuenta con energia electrica?', true)}
-          ${_radioGrid('energia_proveedor', ENERGY_PROVIDERS, 'Proveedor principal de energia')}
-          ${_radioGrid('energia_cortes', ENERGY_CUTS, 'Frecuencia de cortes durante el ultimo ano')}
+          ${_dependent('energia_tiene', 'Si', `
+            ${_radioGrid('energia_proveedor', ENERGY_PROVIDERS, 'Proveedor principal de energia')}
+            ${_radioGrid('energia_cortes', ENERGY_CUTS, 'Frecuencia de cortes durante el ultimo ano')}
+          `)}
           ${_textarea('energia_observacion', 'Observacion sobre electricidad', 'Tablero, medidor, proteccion diferencial, puesta a tierra, circuitos o problemas frecuentes.')}
         `)}
 
@@ -157,7 +167,7 @@ const InitialQuestionnaire = (() => {
         `)}
 
         <input type="hidden" name="token" value="${_escape(params.token || params.t || '')}" />
-        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.129')}" />
+        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.130')}" />
 
         <div class="initial-submit">
           <button type="submit" class="btn btn-primary btn-lg">Enviar cuestionario inicial</button>
@@ -264,6 +274,14 @@ const InitialQuestionnaire = (() => {
       </div>`;
   }
 
+  function _dependent(name, value, body, hint = '') {
+    return `
+      <div class="initial-dependent" data-dependent-name="${_escape(name)}" data-dependent-value="${_escape(value)}">
+        ${hint ? `<div class="initial-skip-note">${_escape(hint)}</div>` : ''}
+        ${body}
+      </div>`;
+  }
+
   function _radioChoice(name, value, required) {
     return `
       <label class="initial-choice">
@@ -292,9 +310,15 @@ const InitialQuestionnaire = (() => {
 
     form.addEventListener('change', event => {
       if (event.target && /^(radio|checkbox)$/i.test(event.target.type)) _refreshChoiceState(form);
+      _refreshDependentState(form);
     });
     form.addEventListener('click', event => {
-      if (event.target?.closest?.('.initial-choice')) setTimeout(() => _refreshChoiceState(form), 0);
+      if (event.target?.closest?.('.initial-choice')) {
+        setTimeout(() => {
+          _refreshChoiceState(form);
+          _refreshDependentState(form);
+        }, 0);
+      }
     });
     _bindSchoolLookup(root, params);
 
@@ -347,6 +371,7 @@ const InitialQuestionnaire = (() => {
 
         form.reset();
         _refreshChoiceState(form);
+        _refreshDependentState(form);
         if (uploadStatus) uploadStatus.textContent = 'Sin archivo seleccionado.';
         message.className = 'initial-message initial-message--success';
         message.innerHTML = `
@@ -362,7 +387,10 @@ const InitialQuestionnaire = (() => {
       }
     });
 
-    setTimeout(() => _refreshChoiceState(form), 0);
+    setTimeout(() => {
+      _refreshChoiceState(form);
+      _refreshDependentState(form);
+    }, 0);
     _loadOfficialSchools(root, params);
   }
 
@@ -942,6 +970,26 @@ const InitialQuestionnaire = (() => {
       const input = label.querySelector('input');
       label.classList.toggle('is-checked', !!input?.checked);
     });
+  }
+
+  function _refreshDependentState(form) {
+    form.querySelectorAll('[data-dependent-name]').forEach(block => {
+      const name = block.dataset.dependentName || '';
+      const expected = block.dataset.dependentValue || '';
+      const selected = Array.from(form.querySelectorAll('input[type="radio"], input[type="checkbox"]'))
+        .find(input => input.name === name && input.checked)?.value || '';
+      const active = selected === expected;
+      block.classList.toggle('is-hidden', !active);
+      block.setAttribute('aria-hidden', active ? 'false' : 'true');
+      block.querySelectorAll('input, select, textarea').forEach(input => {
+        input.disabled = !active;
+        if (!active) {
+          if (/^(radio|checkbox)$/i.test(input.type)) input.checked = false;
+          else input.value = '';
+        }
+      });
+    });
+    _refreshChoiceState(form);
   }
 
   function _readQuery() {

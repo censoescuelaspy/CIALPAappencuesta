@@ -6116,6 +6116,27 @@ textarea.form-control {
   line-height: 1.35;
 }
 
+.initial-skip-note {
+  margin: 0 0 .75rem;
+  border: 1px solid #d8e4df;
+  border-radius: 8px;
+  background: #f7fbf9;
+  color: #475569;
+  padding: .65rem .8rem;
+  font-size: .86rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.initial-dependent {
+  display: grid;
+  gap: .8rem;
+}
+
+.initial-dependent.is-hidden {
+  display: none !important;
+}
+
 .initial-field input,
 .initial-field textarea,
 .initial-field select,

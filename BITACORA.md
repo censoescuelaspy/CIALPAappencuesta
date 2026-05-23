@@ -4,6 +4,46 @@
 
 ---
 
+## Saltos condicionales en cuestionario inicial R01 - 2026-05-23 - v2.6.130
+
+### Objetivo
+- Evitar que el cuestionario para directores pregunte detalles que no corresponden segun la respuesta base.
+- En particular, si la escuela no cuenta con Internet, no mostrar ni enviar tipo de conexion ni calidad de senal.
+- Asegurar que los saltos necesarios funcionen sin dejar campos ocultos activos ni datos inconsistentes en el envio.
+
+### Diagnostico
+- El bloque `Internet y conectividad` ya tenia pregunta principal, pero aunque se respondiera `No`, seguian visibles `Tipo(s) de conexion` y `Calidad de la senal`.
+- El mismo riesgo existia en otros bloques: fuentes de agua si no habia agua, desague si no habia bano, camaras si no habia CCTV y proveedor/cortes si no habia energia.
+- Si un director marcaba primero opciones dependientes y luego cambiaba la respuesta base a `No`, esos valores podian quedar marcados y viajar en el payload.
+
+### Cambios implementados
+- Se agrega helper `_dependent()` para agrupar preguntas dependientes de una respuesta base.
+- Los dependientes se ocultan, se deshabilitan y se limpian automaticamente cuando la respuesta base no es `Si`.
+- `internet_tipo` e `internet_calidad` aparecen solo cuando `internet_tiene = Si`.
+- `agua_fuentes` y `bomba_hp` aparecen solo cuando `agua_tiene = Si`.
+- `desague_tipo` aparece solo cuando `bano_tiene = Si`.
+- Las cantidades de CCTV aparecen solo cuando `cctv_tiene = Si`.
+- `energia_proveedor` y `energia_cortes` aparecen solo cuando `energia_tiene = Si`.
+- Las observaciones quedan visibles para explicar cortes, ausencia del servicio o aclaraciones.
+- Version visible, cache y assets actualizados a `v2.6.130`.
+
+### Pendiente operativo
+- Pedir a directores/operadores `Actualizar app` o abrir el cuestionario con cache nuevo para tomar `cialpa-app-v2.6.130`.
+- Revisar con el equipo si otros bloques requieren saltos adicionales por reglas operativas mas especificas.
+
+### Validaciones ejecutadas
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/stats.js`.
+- `node --check sw.js`.
+- Validacion JSON/encoding: `package.json`, `r01-schools-public.json`, `config.js`, `initial-questionnaire.js`, `index.html` y `cuestionario_inicial/index.html`: OK, sin caracteres de reemplazo.
+- Playwright local escritorio: Internet dependiente nace oculto, aparece al marcar `Si`, se oculta al marcar `No`, queda deshabilitado y el payload no envia `internet_tipo` ni `internet_calidad`.
+- Playwright local movil `390x844`: mismo flujo de Internet, sin errores de consola y sin overflow horizontal.
+- Playwright local de dependencias: agua, bano, Internet, CCTV y energia nacen ocultos, aparecen con `Si`, se ocultan con `No` y quedan deshabilitados.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+
 ## Tablero ejecutivo Infraestructura MEC segmentable - 2026-05-23 - v2.6.129
 
 ### Objetivo

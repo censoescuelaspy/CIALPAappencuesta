@@ -1,11 +1,11 @@
 /**
- * CIALPA — Relevamiento Escolar
- * config.js — Central application configuration
- * Version: 2.6.129
+ * CIALPA - Relevamiento Escolar
+ * config.js - Central application configuration
+ * Version: 2.6.130
  */
 
 const APP_CONFIG = {
-  // Google Apps Script Web App URL — fill after deploying GAS
+  // Google Apps Script Web App URL - fill after deploying GAS
   GAS_URL: 'https://script.google.com/macros/s/AKfycbyt-THSOSgFwvH8Oxl8ojpfJR_8gNhezYA1N7JPmgG0L2RyEtfHq9E58BgfcG33yD2voA/exec',
 
   // External survey application defaults. These values can be overridden from Google Sheets CONFIG.
@@ -16,9 +16,9 @@ const APP_CONFIG = {
   FORM_FALLBACK_SECONDS: 2,
 
   // App metadata
-  APP_NAME: 'CIALPA — Relevamiento Escolar',
-  VERSION: '2.6.129',
-  EDITION_LABEL: 'Edición vigente v2.6.129',
+  APP_NAME: 'CIALPA - Relevamiento Escolar',
+  VERSION: '2.6.130',
+  EDITION_LABEL: 'EdiciÃ³n vigente v2.6.130',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -105,7 +105,7 @@ const APP_CONFIG = {
     'Acceso bloqueado',
     'Director/a ausente',
     'Formulario incompleto',
-    'Problema técnico',
+    'Problema tecnico',
     'Seguridad / riesgo',
     'Otra',
   ],
@@ -122,10 +122,10 @@ const APP_CONFIG = {
 
   // Departamentos Paraguay
   DEPARTAMENTOS: [
-    'Concepción', 'San Pedro', 'Cordillera', 'Guairá', 'Caaguazú',
-    'Caazapá', 'Itapúa', 'Misiones', 'Paraguarí', 'Alto Paraná',
-    'Central', 'Ñeembucú', 'Amambay', 'Canindeyú', 'Presidente Hayes',
-    'Boquerón', 'Alto Paraguay', 'Asunción',
+    'Concepcion', 'San Pedro', 'Cordillera', 'Guaira', 'Caaguazu',
+    'Caazapa', 'Itapua', 'Misiones', 'Paraguari', 'Alto Parana',
+    'Central', 'Neembucu', 'Amambay', 'Canindeyu', 'Presidente Hayes',
+    'Boqueron', 'Alto Paraguay', 'Asuncion',
   ],
 };
 
