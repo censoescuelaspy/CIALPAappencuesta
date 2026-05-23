@@ -1,6 +1,6 @@
 /**
  * CIALPA - Cuestionario inicial R01
- * Version: 2.6.127
+ * Version: 2.6.128
  */
 
 const InitialQuestionnaire = (() => {
@@ -104,7 +104,7 @@ const InitialQuestionnaire = (() => {
 
         ${_section('agua', 'Servicio de agua', 'Indique si existe abastecimiento de agua y de donde proviene principalmente.', `
           ${_yesNo('agua_tiene', 'El local escolar cuenta con servicio de abastecimiento de agua?', true)}
-          ${_checkboxGrid('agua_fuentes', WATER_SOURCES)}
+          ${_checkboxGrid('agua_fuentes', WATER_SOURCES, 'Fuente(s) de abastecimiento de agua utilizadas por la escuela', 'Marque una o mas opciones segun corresponda.')}
           <div class="initial-grid initial-grid--compact">
             ${_field('bomba_hp', 'Potencia de bomba, si corresponde', '', 'text', 'Ej.: 1 HP, 2 HP')}
             ${_textarea('agua_observacion', 'Observacion sobre agua', 'Cortes frecuentes, baja presion, tanque, necesidad de reparacion, etc.')}
@@ -119,8 +119,8 @@ const InitialQuestionnaire = (() => {
 
         ${_section('internet', 'Internet y conectividad', 'Ayuda a prever si el equipo de campo podra sincronizar datos durante la visita.', `
           ${_yesNo('internet_tiene', 'La escuela cuenta con Internet?', true)}
-          ${_checkboxGrid('internet_tipo', INTERNET_TYPES)}
-          ${_radioGrid('internet_calidad', INTERNET_QUALITY, 'Calidad de la senal durante la ultima semana')}
+          ${_checkboxGrid('internet_tipo', INTERNET_TYPES, 'Tipo(s) de conexion a Internet disponibles', 'Marque una o mas opciones solo si la escuela cuenta con Internet.')}
+          ${_radioGrid('internet_calidad', INTERNET_QUALITY, 'Calidad de la senal de Internet durante la ultima semana')}
           ${_textarea('internet_observacion', 'Observacion sobre conectividad', 'Proveedor, zonas sin senal, contrasena disponible para la visita, etc.')}
         `)}
 
@@ -130,9 +130,7 @@ const InitialQuestionnaire = (() => {
             ${_field('cctv_funcionando', 'Cantidad de camaras en funcionamiento', '', 'number', '0')}
             ${_field('cctv_danadas', 'Cantidad de camaras danadas', '', 'number', '0')}
           </div>
-          <div class="initial-fire-grid">
-            ${FIRE_ITEMS.map(([key, label]) => _fireItem(key, label)).join('')}
-          </div>
+          ${_choiceBlock('Elementos de prevencion contra incendios disponibles', '<div class="initial-fire-grid">' + FIRE_ITEMS.map(([key, label]) => _fireItem(key, label)).join('') + '</div>', 'Responda cada elemento por separado.')}
           <div class="initial-grid initial-grid--compact">
             ${_field('motobomba_hp', 'Motobomba HP, si existe', '', 'text', 'Ej.: 3 HP')}
             ${_field('reserva_tanque_litros', 'Reserva de tanque contra incendio (litros)', '', 'number', 'Ej.: 5000')}
@@ -159,7 +157,7 @@ const InitialQuestionnaire = (() => {
         `)}
 
         <input type="hidden" name="token" value="${_escape(params.token || params.t || '')}" />
-        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.127')}" />
+        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.128')}" />
 
         <div class="initial-submit">
           <button type="submit" class="btn btn-primary btn-lg">Enviar cuestionario inicial</button>
@@ -243,20 +241,26 @@ const InitialQuestionnaire = (() => {
 
   function _radioGrid(name, options, label) {
     return `
-      <div class="initial-question">
-        <div class="initial-question__label">${label}</div>
-        <div class="initial-option-grid">${options.map(opt => _radioChoice(name, opt, false)).join('')}</div>
-      </div>`;
+      ${_choiceBlock(label, `<div class="initial-option-grid">${options.map(opt => _radioChoice(name, opt, false)).join('')}</div>`)}`;
   }
 
-  function _checkboxGrid(name, options) {
+  function _checkboxGrid(name, options, label, hint = '') {
     return `
-      <div class="initial-option-grid initial-option-grid--check">
+      ${_choiceBlock(label, `<div class="initial-option-grid initial-option-grid--check">
         ${options.map(opt => `
           <label class="initial-choice">
             <input type="checkbox" name="${name}" value="${_escape(opt)}" />
             <span>${_escape(opt)}</span>
           </label>`).join('')}
+      </div>`, hint)}`;
+  }
+
+  function _choiceBlock(label, body, hint = '') {
+    return `
+      <div class="initial-question">
+        <div class="initial-question__label">${_escape(label)}</div>
+        ${hint ? `<div class="initial-question__hint">${_escape(hint)}</div>` : ''}
+        ${body}
       </div>`;
   }
 

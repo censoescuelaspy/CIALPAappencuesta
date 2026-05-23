@@ -5826,6 +5826,32 @@ textarea.form-control {
   color: #17352a;
 }
 
+.initial-question__label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 1.35rem;
+  font-size: .98rem;
+  line-height: 1.25;
+}
+
+.initial-question__label::before {
+  content: '';
+  width: .55rem;
+  height: .55rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #0b5d3b;
+  box-shadow: 0 0 0 4px rgba(11, 93, 59, .12);
+}
+
+.initial-question__hint {
+  margin-top: -.25rem;
+  color: #64748b;
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
 .initial-field input,
 .initial-field textarea,
 .initial-field select,
@@ -5860,6 +5886,10 @@ textarea.form-control {
 .initial-question {
   display: grid;
   gap: .65rem;
+  border: 1px solid #dbe6df;
+  border-radius: 8px;
+  padding: .85rem;
+  background: #fbfdfc;
 }
 
 .initial-choice-row,

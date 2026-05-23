@@ -4,6 +4,36 @@
 
 ---
 
+## Preguntas visibles para grupos de opciones R01 - 2026-05-23 - v2.6.128
+
+### Objetivo
+- Corregir grupos de respuestas que aparecian sin una pregunta clara asociada en el cuestionario inicial publico.
+- Hacer que bloques como Internet, agua y prevencion contra incendios queden visualmente ordenados y sin opciones sueltas.
+
+### Diagnostico
+- En `Internet y conectividad`, las opciones `Fibra optica`, `Coaxil`, `Satelital` y `Otro` se mostraban inmediatamente despues de la pregunta `La escuela cuenta con Internet?`, pero sin titulo propio.
+- El mismo patron existia en fuentes de agua: las opciones multiples se renderizaban con `_checkboxGrid()` sin label visible.
+- En prevencion contra incendios, cada elemento tenia texto, pero faltaba un encabezado de grupo que explicara que esas respuestas pertenecen a elementos de incendio.
+
+### Cambios implementados
+- `_checkboxGrid()` ahora exige y muestra una pregunta/titulo de grupo.
+- Se agrega el bloque `Tipo(s) de conexion a Internet disponibles` con ayuda `Marque una o mas opciones solo si la escuela cuenta con Internet`.
+- Se agrega el bloque `Fuente(s) de abastecimiento de agua utilizadas por la escuela`.
+- El grupo de incendio ahora queda bajo `Elementos de prevencion contra incendios disponibles`.
+- Los grupos de pregunta tienen borde liviano, fondo propio, punto de referencia visual y texto auxiliar cuando corresponde.
+- Version visible, cache y assets actualizados a `v2.6.128`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion JSON de `r01-schools-public.json` y `package.json`: OK.
+- Playwright local escritorio: `Internet y conectividad` muestra labels para pregunta principal, tipo de conexion y calidad de senal; fallback carga escuelas; sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: 7 bloques, labels de Internet visibles, sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+
 ## Respaldo publicado para lista de escuelas R01 - 2026-05-23 - v2.6.127
 
 ### Objetivo
