@@ -43,6 +43,14 @@
 - Revision estatica: no quedan referencias activas a `2.6.122` en assets de publicacion.
 - Revision estatica: existe `PROPERTY_BOUNDARY_SCALE_VERSION = meters-v2.6.123`.
 - Revision estatica: `_planBlockLayout()` toma `propertyScale` desde `_propertyBoundaryPlanMetrics()` cuando predio y bloque estan medidos.
+- `git commit`: `bc4865d fix: alinear escala de predio y bloques v2.6.123`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.123`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.123`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.123`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `PROPERTY_BOUNDARY_SCALE_VERSION`, `_propertyBoundaryPlanMetrics` y `propertyScale`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `Version: 2.6.123` y texto de escala comun.
+- Verificacion HTTP de GitHub Pages para `assets/js/app.js`: contiene `Version: 2.6.123`.
 
 ---
 
