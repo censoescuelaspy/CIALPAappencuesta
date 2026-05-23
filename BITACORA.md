@@ -44,6 +44,15 @@
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
 - Playwright local escritorio: `Metodologia y datos` aparece en menu, abre `module-arquitectura`, muestra version `v2.6.131`, 7 etapas metodologicas, 8 bloques de esquema formal y 8 filas de tabla de resguardo, sin errores de consola y sin overflow horizontal.
 - Playwright local movil `390x844`: mismo flujo de metodologia, sin errores de consola y sin overflow horizontal.
+- `git commit`: `b713738 feat: agregar metodologia de datos v2.6.131`.
+- `git push origin main`: publica la vista en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.131`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.131`.
+- Verificacion HTTP de GitHub Pages para `assets/js/app.js`: contiene `Metodologia y datos`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene estilos `method-hero`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene assets `v2.6.131` y `Metodologia de funcionamiento y datos`.
+- Playwright remoto escritorio: `Metodologia y datos` visible en menu, version `v2.6.131`, 7 etapas, 8 bloques de esquema, 8 filas de tabla, sin errores de consola y sin overflow horizontal.
+- Playwright remoto movil `390x844`: misma vista metodologica, sin errores de consola y sin overflow horizontal.
 
 ## Saltos condicionales en cuestionario inicial R01 - 2026-05-23 - v2.6.130
 
