@@ -42,6 +42,13 @@
 - Revision estatica: no quedan referencias activas a `2.6.119` en assets de publicacion.
 - Revision estatica: el perimetro conserva `planShape`, expone `site-vertex` y usa `_defaultPropertyBoundaryRectShape()` para rectangulo editable.
 - Revision estatica: `Registro guiado` expone `propertyBoundaryAddVertex`, `propertyBoundaryRemoveVertex` y no repite acciones de georreferencia dentro del paso predio.
+- `git commit`: `ac8753a fix: aclarar perimetro guiado v2.6.120`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.120`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.120`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.120`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `_defaultPropertyBoundaryRectShape` y `propertyPolygonActive`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `propertyBoundaryAddVertex` y `Cierre primero la ubicacion base`.
 
 ---
 
