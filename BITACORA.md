@@ -32,6 +32,12 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
 - Revision estatica: no quedan referencias activas a `2.6.114` en assets de publicacion.
+- `git commit`: `a3f4434 fix: priorizar escuela activa en registro v2.6.115`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.115`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.115`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `_sameSchoolIdentity` y prioridad de escuela activa.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene cache-busting `2.6.115` y no conserva `2.6.114`.
 
 ---
 
