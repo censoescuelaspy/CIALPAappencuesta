@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.114
+ * Version: 2.6.115
  */
 
 const GuidedRegisterModule = (() => {
@@ -49,6 +49,12 @@ const GuidedRegisterModule = (() => {
     return values
       .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
       .map(value => String(value).trim());
+  }
+
+  function _sameSchoolIdentity(left, right) {
+    const leftValues = _schoolIdentityValues(left);
+    const rightValues = _schoolIdentityValues(right);
+    return leftValues.length > 0 && rightValues.length > 0 && leftValues.some(value => rightValues.includes(value));
   }
 
   function _digits(value) {
@@ -948,9 +954,12 @@ const GuidedRegisterModule = (() => {
     }
     const values = saved.values || saved || {};
     const currentSchool = _currentSchoolForState();
-    const valuesForSchool = values.__selectedSchool || !currentSchool
-      ? values
-      : { ...values, __selectedSchool: currentSchool };
+    const useCurrentSchool = currentSchool && !_sameSchoolIdentity(values.__selectedSchool, currentSchool);
+    const valuesForSchool = useCurrentSchool
+      ? { ...values, __selectedSchool: currentSchool }
+      : ((values.__selectedSchool || !currentSchool)
+        ? values
+        : { ...values, __selectedSchool: currentSchool });
     const school = _schoolContext(valuesForSchool);
     const rooms = Array.isArray(values.__classrooms) ? values.__classrooms : [];
     const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];

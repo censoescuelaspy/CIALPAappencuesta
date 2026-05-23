@@ -4,6 +4,37 @@
 
 ---
 
+## Escuela seleccionada priorizada en Registro guiado - 2026-05-22 - v2.6.115
+
+### Objetivo
+- Corregir que `Mapa > Iniciar/continuar registro` ya navegara a la vista de relevamiento pero no mostrara los datos de la escuela seleccionada.
+
+### Diagnostico
+- `Registro guiado` construia el encabezado desde el borrador local global.
+- Si ese borrador tenia un `__selectedSchool` viejo, vacio o de otra escuela, ese dato ganaba sobre la escuela activa recien elegida en el mapa.
+- Por eso la vista podia abrir, pero con identidad de escuela incorrecta o sin escuela visible.
+
+### Cambios implementados
+- `GuidedRegisterModule._snapshot()` compara la escuela guardada en borrador con la escuela activa de `SurveyModule`/`MapModule`.
+- Si no coinciden, la escuela activa del mapa se usa como fuente principal para el encabezado y metadatos del registro guiado.
+- Se agrega comparacion robusta por `id_escuela`, `codigo_local`, `codigo`, `id`, `code` y digitos normalizados.
+- Version visible y cache del Service Worker actualizados a `v2.6.115`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.115`.
+- Probar con una escuela distinta a la ultima usada: el encabezado del registro debe cambiar inmediatamente al codigo/nombre seleccionado en el mapa.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Revision estatica: no quedan referencias activas a `2.6.114` en assets de publicacion.
+
+---
+
 ## Boton verde de mapa sin accion por escuela previa nula - 2026-05-22 - v2.6.114
 
 ### Objetivo
