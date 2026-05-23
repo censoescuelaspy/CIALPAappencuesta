@@ -77,6 +77,7 @@ const MecFormModule = (() => {
   const PROPERTY_BOUNDARY_MAX_HEIGHT_RATIO = .82;
   const PROPERTY_BOUNDARY_FALLBACK_PX_PER_METER = 12;
   const PROPERTY_BOUNDARY_SCALE_VERSION = 'meters-v2.6.123';
+  const PLAN_OBJECT_SCALE_VERSION = 'objects-v2.6.124';
   const EVIDENCE_IMAGE_MAX_DIMENSION = 1600;
   const EVIDENCE_THUMB_MAX_DIMENSION = 720;
   const EVIDENCE_IMAGE_QUALITY = 0.78;
@@ -363,6 +364,7 @@ const MecFormModule = (() => {
     _data.__activeClassroomId = _activeClassroomId || _data.__classroomSketch?.id || '';
     _data.__activeSanitaryId = _activeSanitaryId || '';
     _normalizeNumberedNames();
+    _normalizePlanMeasureHierarchy();
     _compactUploadedEvidenceInDraft();
     const savedAt = new Date().toISOString();
     try {
@@ -418,6 +420,7 @@ const MecFormModule = (() => {
   function _buildDraftSyncPayload(reason = 'manual') {
     if (_data.__classroomSketch && _data.__classrooms && (_activeClassroomId || _data.__classroomSketch.id)) _syncActiveClassroomFromSketch();
     _syncActiveBlock();
+    _normalizePlanMeasureHierarchy();
     const school = _draftSyncSchoolInfo();
     const id = school.id_escuela || school.codigo_local || school.code || '';
     const counts = _finalDeliveryCounts();
@@ -3030,8 +3033,9 @@ const MecFormModule = (() => {
 
   function _roomSizeFromDimensions(length, width) {
     const block = _activeClassroomBlock();
-    const blockLength = Number(block?.largo_m || 0);
-    const blockWidth = Number(block?.ancho_m || 0);
+    const floor = _blockFloorRecord(block, _data.__classroomSketch?.floor || _activeFloor());
+    const blockLength = Number(floor?.largo_m || block?.largo_m || 0);
+    const blockWidth = Number(floor?.ancho_m || block?.ancho_m || 0);
     const blockRect = _sketchBlockRect();
     if (blockLength && blockWidth && length && width) {
       return {
@@ -5042,9 +5046,10 @@ const MecFormModule = (() => {
     return (item?.objects || []).find(object => object.type === 'sanitary-room' || object.type === 'room') || null;
   }
 
-  function _roomSizeFromDimensionsForBlock(block, length, width) {
-    const blockLength = Number(block?.largo_m || 0);
-    const blockWidth = Number(block?.ancho_m || 0);
+  function _roomSizeFromDimensionsForBlock(block, length, width, floorLabel = '') {
+    const floor = _blockFloorRecord(block, floorLabel || _activeFloor());
+    const blockLength = Number(floor?.largo_m || block?.largo_m || 0);
+    const blockWidth = Number(floor?.ancho_m || block?.ancho_m || 0);
     const blockRect = _sketchBlockRect();
     if (blockLength && blockWidth && length && width) {
       return {
@@ -5057,8 +5062,9 @@ const MecFormModule = (() => {
 
   function _sanitaryDimensionsFromObject(item, object) {
     const block = _blockForSanitary(item);
-    const blockLength = Number(block?.largo_m || 0);
-    const blockWidth = Number(block?.ancho_m || 0);
+    const floor = _blockFloorRecord(block, _normalizeFloor(item?.planta || _activeFloor()));
+    const blockLength = Number(floor?.largo_m || block?.largo_m || 0);
+    const blockWidth = Number(floor?.ancho_m || block?.ancho_m || 0);
     const blockRect = _sketchBlockRect();
     if (!object || !blockLength || !blockWidth) return '';
     const length = (object.w / blockRect.w) * blockLength;
@@ -5068,8 +5074,9 @@ const MecFormModule = (() => {
 
   function _syncSanitaryDimensionsFromObject(item, object) {
     const block = _blockForSanitary(item);
-    const blockLength = Number(block?.largo_m || 0);
-    const blockWidth = Number(block?.ancho_m || 0);
+    const floor = _blockFloorRecord(block, _normalizeFloor(item?.planta || _activeFloor()));
+    const blockLength = Number(floor?.largo_m || block?.largo_m || 0);
+    const blockWidth = Number(floor?.ancho_m || block?.ancho_m || 0);
     const blockRect = _sketchBlockRect();
     if (!item || !object || !blockLength || !blockWidth) return;
     item.largo_m = ((object.w / blockRect.w) * blockLength).toFixed(2);
@@ -5137,7 +5144,7 @@ const MecFormModule = (() => {
     const block = _blockForSanitary(item);
     const length = Number(item.largo_m || 3);
     const width = Number(item.ancho_m || 2);
-    const size = _roomSizeFromDimensionsForBlock(block, length, width);
+    const size = _roomSizeFromDimensionsForBlock(block, length, width, item.planta || _activeFloor());
     let object = _sanitaryRoomObject(item);
     if (!object) {
       const rect = _suggestSanitaryRect(item, size);
@@ -12439,6 +12446,7 @@ const MecFormModule = (() => {
     _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
     _data.__sanitaries = Array.isArray(_data.__sanitaries) ? _data.__sanitaries : [];
     _ensureSiteElements();
+    _normalizePlanMeasureHierarchy();
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
     const canvasId = root.id === 'mec-school-plan-root' ? 'mec-school-plan-canvas' : PLAN_CANVAS_ID;
@@ -14598,6 +14606,125 @@ const MecFormModule = (() => {
     if (blockWidth && floorWidth) floorRecord.hRatio = Math.max(.04, Math.min(1, floorWidth / blockWidth));
     if (!Number.isFinite(Number(floorRecord.xRatio))) floorRecord.xRatio = 0;
     if (!Number.isFinite(Number(floorRecord.yRatio))) floorRecord.yRatio = 0;
+  }
+
+  function _planScaleRatio(value, fallback = 1) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number <= 0) return fallback;
+    return Math.max(.04, Math.min(1, number));
+  }
+
+  function _setPlanMeasureValue(record, key, value, minimum = .2) {
+    if (!record || !key || !Number.isFinite(value) || value <= 0) return false;
+    const next = Math.max(minimum, value).toFixed(2);
+    const current = Number(record[key] || 0);
+    if (String(record[key] || '') === next || Math.abs(current - Number(next)) < .01) {
+      record[key] = next;
+      return false;
+    }
+    record[key] = next;
+    return true;
+  }
+
+  function _normalizeFloorMeasuresToBlock(block, floorRecord) {
+    if (!block || !floorRecord || floorRecord.virtual) return false;
+    const blockLength = _positivePlanMeasure(block.largo_m);
+    const blockWidth = _positivePlanMeasure(block.ancho_m);
+    let changed = false;
+    const wRatio = _planScaleRatio(floorRecord.wRatio, 1);
+    const hRatio = _planScaleRatio(floorRecord.hRatio, 1);
+    if (Number(floorRecord.wRatio) !== wRatio) {
+      floorRecord.wRatio = wRatio;
+      changed = true;
+    }
+    if (Number(floorRecord.hRatio) !== hRatio) {
+      floorRecord.hRatio = hRatio;
+      changed = true;
+    }
+    if (!Number.isFinite(Number(floorRecord.xRatio))) {
+      floorRecord.xRatio = 0;
+      changed = true;
+    }
+    if (!Number.isFinite(Number(floorRecord.yRatio))) {
+      floorRecord.yRatio = 0;
+      changed = true;
+    }
+    if (blockLength) changed = _setPlanMeasureValue(floorRecord, 'largo_m', blockLength * wRatio) || changed;
+    if (blockWidth) changed = _setPlanMeasureValue(floorRecord, 'ancho_m', blockWidth * hRatio) || changed;
+    return changed;
+  }
+
+  function _floorMeasureSourceForRoom(room) {
+    const block = _blockById(room?.blockId || _data.__activeBlockId);
+    const floor = _blockFloorRecord(block, _normalizeFloor(room?.floor || _activeFloor()));
+    return {
+      length: _positivePlanMeasure(floor?.largo_m || block?.largo_m),
+      width: _positivePlanMeasure(floor?.ancho_m || block?.ancho_m),
+    };
+  }
+
+  function _normalizeRoomMeasuresToFloor(room) {
+    if (!room) return false;
+    const object = _roomObjectForClassroom(room);
+    const source = _sketchBlockRect();
+    const measures = _floorMeasureSourceForRoom(room);
+    let changed = false;
+    if (object?.w && source.w && measures.length) {
+      changed = _setPlanMeasureValue(room, 'length', measures.length * (object.w / source.w)) || changed;
+    } else if (_positivePlanMeasure(room.length) > measures.length && measures.length) {
+      changed = _setPlanMeasureValue(room, 'length', measures.length) || changed;
+    }
+    if (object?.h && source.h && measures.width) {
+      changed = _setPlanMeasureValue(room, 'width', measures.width * (object.h / source.h)) || changed;
+    } else if (_positivePlanMeasure(room.width) > measures.width && measures.width) {
+      changed = _setPlanMeasureValue(room, 'width', measures.width) || changed;
+    }
+    if (object?.type === 'room') delete object.label;
+    if (changed && _data.__classroomSketch?.id === room.id) {
+      _data.__classroomSketch.length = room.length;
+      _data.__classroomSketch.width = room.width;
+      _data.__classroomSketch.objects = JSON.parse(JSON.stringify(room.objects || []));
+    }
+    return changed;
+  }
+
+  function _normalizeSanitaryMeasuresToFloor(item) {
+    if (!item) return false;
+    const object = _sanitaryRoomObject(item);
+    const block = _blockForSanitary(item);
+    const floor = _blockFloorRecord(block, _normalizeFloor(item.planta || _activeFloor()));
+    const source = _sketchBlockRect();
+    const length = _positivePlanMeasure(floor?.largo_m || block?.largo_m);
+    const width = _positivePlanMeasure(floor?.ancho_m || block?.ancho_m);
+    let changed = false;
+    if (object?.w && source.w && length) {
+      changed = _setPlanMeasureValue(item, 'largo_m', length * (object.w / source.w)) || changed;
+    } else if (_positivePlanMeasure(item.largo_m) > length && length) {
+      changed = _setPlanMeasureValue(item, 'largo_m', length) || changed;
+    }
+    if (object?.h && source.h && width) {
+      changed = _setPlanMeasureValue(item, 'ancho_m', width * (object.h / source.h)) || changed;
+    } else if (_positivePlanMeasure(item.ancho_m) > width && width) {
+      changed = _setPlanMeasureValue(item, 'ancho_m', width) || changed;
+    }
+    return changed;
+  }
+
+  function _normalizePlanMeasureHierarchy() {
+    let changed = false;
+    (_data.__blocks || []).forEach(block => {
+      (_ensureBlockFloors(block) || []).forEach(floor => {
+        changed = _normalizeFloorMeasuresToBlock(block, floor) || changed;
+      });
+    });
+    (_data.__classrooms || []).forEach(room => {
+      changed = _normalizeRoomMeasuresToFloor(room) || changed;
+    });
+    (_data.__sanitaries || []).forEach(item => {
+      changed = _normalizeSanitaryMeasuresToFloor(item) || changed;
+    });
+    if (changed) _data.__planMeasureScaleVersion = PLAN_OBJECT_SCALE_VERSION;
+    return changed;
   }
 
   function _drawPlanBlockFloorResidue(ctx, block, floors = [], blockRect = null) {
@@ -18538,6 +18665,7 @@ const MecFormModule = (() => {
     };
     block.planPosition = { ...(block.planPosition || block.plano_general || {}), ...position };
     block.plano_general = { ...(block.plano_general || {}), ...position, rotacion_grados: String(_blockRotationDeg(block)) };
+    _normalizePlanMeasureHierarchy();
     _activePlanDrag = { id: `block::${block.id}`, blockId: block.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
     _drawSchoolPlan();
     return clamped;
@@ -18570,13 +18698,8 @@ const MecFormModule = (() => {
     };
     const clamped = _clampRectToBounds(rect, bounds);
     _saveFloorRectToRecord(block, floor, clamped, blockRect);
-    const startRect = drag?.rect || clamped;
-    const startLength = Number(drag?.startLength || floor.largo_m || 0);
-    const startWidth = Number(drag?.startWidth || floor.ancho_m || 0);
-    if (startLength && startRect.w) floor.largo_m = Math.max(.5, startLength * (clamped.w / startRect.w)).toFixed(2);
-    else if (block.largo_m) floor.largo_m = Math.max(.5, Number(block.largo_m) * (clamped.w / blockRect.w)).toFixed(2);
-    if (startWidth && startRect.h) floor.ancho_m = Math.max(.5, startWidth * (clamped.h / startRect.h)).toFixed(2);
-    else if (block.ancho_m) floor.ancho_m = Math.max(.5, Number(block.ancho_m) * (clamped.h / blockRect.h)).toFixed(2);
+    _normalizeFloorMeasuresToBlock(block, floor);
+    _normalizePlanMeasureHierarchy();
     _activePlanDrag = { id: _floorRecordPlanId(block, floor), blockId: block.id, floorId: floor.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
     _drawSchoolPlan();
     return clamped;

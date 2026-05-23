@@ -4,6 +4,48 @@
 
 ---
 
+## Escala jerarquica de objetos del plano - 2026-05-23 - v2.6.124
+
+### Objetivo
+- Corregir medidas imposibles en pisos, aulas y sanitarios cuando el bloque ya estaba dentro de un predio medido.
+- Evitar que un piso o aula herede escalas viejas y termine mostrando cientos de miles de metros.
+
+### Diagnostico
+- La captura observada mostraba un bloque con medida razonable, pero `Planta baja` y `Aula 1` aparecian con largos enormes.
+- El resumen del plano calculaba el area desde `room.length * room.width`, por eso un largo corrupto del aula inflaba el KPI de area.
+- Las aulas y sanitarios recalculaban sus metros desde la geometria del piso, pero el piso podia conservar un `largo_m/ancho_m` viejo, independiente del bloque visual que lo contiene.
+- Al redimensionar un piso, el codigo multiplicaba por la medida previa del propio piso; si esa medida ya estaba corrupta, el error se propagaba.
+
+### Cambios implementados
+- Se agrega normalizacion interna `objects-v2.6.124` para jerarquia de escala: bloque -> piso -> aula/sanitario.
+- Los pisos recalculan `largo_m/ancho_m` desde el bloque y sus `wRatio/hRatio`, por lo que nunca quedan mas grandes que el bloque que los contiene.
+- Aulas y sanitarios recalculan sus medidas desde el piso activo y la geometria de su rectangulo, no desde una escala vieja del bloque.
+- Al renderizar, guardar o sincronizar el borrador, la app corrige medidas fuera de escala antes de calcular resumen, PDF/JSON o guardado remoto.
+- Al redimensionar un piso, sus metros se derivan del bloque y del tamano visual resultante, evitando multiplicar errores anteriores.
+- La creacion/redimensionamiento desde medidas de aula y sanitario usa el piso como referencia cuando existe, manteniendo coherencia con el plano general.
+- Version visible, cache y assets actualizados a `v2.6.124`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.124`.
+- Probar en tablet con el caso de la imagen: abrir el mismo borrador, seleccionar bloque/piso/aula y confirmar que desaparecen valores como `311232 m` o `229309 m`.
+- Probar predio medido, bloque medido, piso y aula: el area del resumen debe quedar acorde a las medidas reales cargadas.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: existe `PLAN_OBJECT_SCALE_VERSION = objects-v2.6.124`.
+- Revision estatica: `_normalizePlanMeasureHierarchy()` corrige bloque -> piso -> aula/sanitario antes de render, guardado y sync.
+- Revision estatica: `_resizePlanFloor()` ya no multiplica por medidas previas corruptas; deriva metros desde el bloque y el ratio visual.
+- Revision estatica: version visible, cache y assets en `v2.6.124`; se conserva `meters-v2.6.123` solo como etiqueta interna del arreglo previo del predio.
+
+---
+
 ## Escala comun entre predio y bloques - 2026-05-23 - v2.6.123
 
 ### Objetivo

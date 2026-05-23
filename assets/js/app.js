@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.123
+ * Version: 2.6.124
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
