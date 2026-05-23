@@ -49,6 +49,13 @@
 - Playwright local movil `390x844`: sin errores de consola y sin overflow horizontal.
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
 - `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `git commit`: `5873194 feat: agregar cuestionario inicial publico v2.6.125`.
+- `git push origin main`: publica la ruta publica y assets en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.125`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.125` y precache de `cuestionario_inicial`.
+- Verificacion HTTP de GitHub Pages para `assets/js/initial-questionnaire.js`: contiene `Cuestionario inicial R01` y `guardarCuestionarioInicial`.
+- Verificacion HTTP de GitHub Pages para `cuestionario_inicial/`: responde HTTP 200, contiene `initial-questionnaire-root` y assets `v2.6.125`.
+- Playwright remoto sobre GitHub Pages: `cuestionario_inicial/` renderiza 7 bloques, sin errores de consola y sin overflow horizontal.
 
 ---
 
