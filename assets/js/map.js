@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.113
+ * Version: 2.6.114
  */
 
 const MapModule = (() => {
@@ -49,7 +49,8 @@ const MapModule = (() => {
   }
 
   function _schoolPrimaryId(school = {}) {
-    return String(school.id_escuela || school.codigo_local || school.codigo || school.id || school.code || '').trim();
+    const item = school || {};
+    return String(item.id_escuela || item.codigo_local || item.codigo || item.id || item.code || '').trim();
   }
 
   function _safeState(value) {
@@ -655,17 +656,18 @@ const MapModule = (() => {
   }
 
   function _schoolIdentityKeys(school = {}) {
+    const item = school || {};
     return [
-      school.id_escuela,
-      school.codigo_local,
-      school.codigo,
-      school.id,
-      school.code,
-      _digits(school.id_escuela),
-      _digits(school.codigo_local),
-      _digits(school.codigo),
-      _digits(school.id),
-      _digits(school.code),
+      item.id_escuela,
+      item.codigo_local,
+      item.codigo,
+      item.id,
+      item.code,
+      _digits(item.id_escuela),
+      _digits(item.codigo_local),
+      _digits(item.codigo),
+      _digits(item.id),
+      _digits(item.code),
     ]
       .map(value => String(value ?? '').trim())
       .filter(Boolean);
@@ -729,18 +731,20 @@ const MapModule = (() => {
     _selectedEscuela = escuela;
     _highlightListItem(_schoolPrimaryId(escuela));
     _hideInfoPanel();
-    const ready = typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function'
-      ? SurveyModule.setCurrentEscuela(escuela)
-      : true;
-    if (!ready) return;
-    await Promise.resolve(AppController.showModule('registro'));
     try {
+      const ready = typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function'
+        ? SurveyModule.setCurrentEscuela(escuela)
+        : true;
+      if (!ready) return;
+      await Promise.resolve(AppController.showModule('registro'));
       if (typeof MecFormModule !== 'undefined' && MecFormModule.setSelectedSchool) {
         MecFormModule.setSelectedSchool(escuela, { render: false, force: true });
       }
       if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
     } catch (err) {
       console.warn('[Mapa] No se pudo reforzar la escuela activa en Registro guiado:', err);
+      UI.showToast(`No se pudo abrir Registro guiado: ${err.message || err}`, 'error', 8000);
+      return;
     }
     UI.showToast(`Escuela activa: ${escuela.nombre || escuela.codigo_local || escuela.id_escuela}.`, 'success', 4200);
   }

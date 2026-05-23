@@ -4,6 +4,39 @@
 
 ---
 
+## Boton verde de mapa sin accion por escuela previa nula - 2026-05-22 - v2.6.114
+
+### Objetivo
+- Corregir que `Mapa > Iniciar/continuar registro` no llevara a ningun lado despues de la correccion de identidad robusta.
+
+### Diagnostico
+- Al primer clic no existe todavia una escuela activa previa en `SurveyModule`.
+- `SurveyModule.setCurrentEscuela()` intentaba calcular el identificador primario de `_currentEscuela` aunque fuera `null`.
+- Ese error JavaScript cortaba la accion antes de ejecutar `AppController.showModule('registro')`, por eso el boton verde parecia no responder.
+
+### Cambios implementados
+- `_schoolPrimaryId()` y `_schoolIdentityKeys()` ahora toleran `null` tanto en `SurveyModule` como en `MapModule`.
+- `MapModule.startGuidedRegister()` envuelve la sincronizacion de escuela y apertura de `Registro guiado` en `try/catch`.
+- Si vuelve a fallar la transicion, la app mostrara un toast visible con el detalle en vez de fallar silenciosamente.
+- Version visible y cache del Service Worker actualizados a `v2.6.114`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.114`.
+- Probar desde una sesion sin escuela activa previa: `Mapa > escuela asignada > Iniciar/continuar registro`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- Revision estatica: no quedan referencias activas a `2.6.113` en assets de publicacion.
+
+---
+
 ## Identidad robusta de escuela mapa-registro - 2026-05-22 - v2.6.113
 
 ### Objetivo
