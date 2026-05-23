@@ -42,6 +42,13 @@
 - Revision estatica: no quedan referencias activas a `2.6.118` en assets de publicacion.
 - Revision estatica: `property_boundary` crea `planShape`, expone `site-vertex` y acciones de vertices.
 - Revision estatica: movimiento/redimensionamiento de bloques pasa por `_clampBlockRectToPropertyBoundary()`.
+- `git commit`: `c5d168d fix: perimetro poligonal y bloques dentro del predio v2.6.119`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.119`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.119`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.119`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `_defaultPropertyBoundaryShape`, `site-vertex` y `_clampBlockRectToPropertyBoundary`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene instrucciones de vertices del perimetro.
 
 ---
 
