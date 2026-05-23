@@ -4,6 +4,47 @@
 
 ---
 
+## Perimetro poligonal y bloques contenidos en predio - 2026-05-23 - v2.6.119
+
+### Objetivo
+- Hacer que el `Perimetro del predio escolar` nazca como poligono editable por vertices, no como rectangulo rigido.
+- Mantener los bloques implantados dentro del predio y permitir moverlos/redimensionarlos sin salirse del contorno.
+
+### Diagnostico
+- `property_boundary` se dibujaba con `strokeRect()` y solo exponia manijas de rectangulo/rotacion.
+- El arrastre y redimensionamiento de bloques usaba como limite el canvas completo del plano, sin considerar el predio ya delineado.
+- Si el predio cambiaba de forma despues de ubicar bloques, las posiciones visuales podian quedar fuera de la envolvente real.
+
+### Cambios implementados
+- El perimetro se crea con `planShape` poligonal por defecto y muestra vertices numerados editables como aulas/sanitarios.
+- Se agregan acciones `Poligono`, `+ Vertice`, `- Vertice` y `Rect.` para el perimetro desde cinta, panel y arbol del plano.
+- El dibujo del predio usa el poligono real, con relleno liviano y linea punteada; el rectangulo queda solo como modo opcional.
+- El predio se dibuja por debajo de los bloques para que funcione como envolvente de implantacion.
+- La ubicacion, movimiento y redimensionamiento de bloques se recortan contra el poligono/borde del predio.
+- Al editar vertices o mover el predio, los bloques existentes se reacomodan dentro de la nueva envolvente.
+- Los textos del `Registro guiado` ahora indican mover vertices del perimetro.
+- Version visible, cache y assets actualizados a `v2.6.119`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.119`.
+- Probar en tablet: dibujar perimetro, arrastrar vertices, crear bloque y confirmar que queda dentro del predio.
+- Probar mover/redimensionar bloque contra los bordes del predio y verificar que no se salga.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.118` en assets de publicacion.
+- Revision estatica: `property_boundary` crea `planShape`, expone `site-vertex` y acciones de vertices.
+- Revision estatica: movimiento/redimensionamiento de bloques pasa por `_clampBlockRectToPropertyBoundary()`.
+
+---
+
 ## Navegacion anterior/siguiente y zoom de seleccion - 2026-05-23 - v2.6.118
 
 ### Objetivo
