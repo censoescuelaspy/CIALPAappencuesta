@@ -475,6 +475,11 @@ const MecFormModule = (() => {
       if (manual) UI.showToast('Ya hay un guardado remoto en curso. Espere unos segundos y revise el aviso de confirmacion.', 'info', 5200);
       return null;
     }
+    if (manual || force) {
+      await _syncPendingEvidenceUploads({ silent: true }).catch(err =>
+        console.warn('[MEC] No se pudieron sincronizar evidencias antes de guardar:', err)
+      );
+    }
     const payload = _buildDraftSyncPayload(reason);
     if (!payload.id_escuela && !payload.codigo_local) {
       if (manual) UI.showToast('Seleccione una escuela antes de guardar el borrador en Sheets.', 'warning', 6200);
@@ -744,13 +749,25 @@ const MecFormModule = (() => {
     }
   }
 
-  async function _syncPendingEvidenceUploads() {
-    if (_evidenceSyncRunning) return;
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
-    if (!_evidenceFolderId()) return;
+  async function _syncPendingEvidenceUploads(options = {}) {
+    const manual = options.manual === true || options.silent === false;
+    if (_evidenceSyncRunning) {
+      if (manual) UI.showToast('Ya hay una sincronizacion de fotos en curso.', 'info', 4200);
+      return { status: 'running', uploaded: 0, pending: 0, errors: 0 };
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      if (manual) UI.showToast('Sin conexion: las fotos quedan pendientes para Drive.', 'warning', 6200);
+      return { status: 'offline', uploaded: 0, pending: _countPendingEvidenceUploads(), errors: 0 };
+    }
+    if (!_evidenceFolderId()) {
+      if (manual) UI.showToast('La carpeta de evidencias de Drive no esta configurada.', 'warning', 6200);
+      return { status: 'not_configured', uploaded: 0, pending: _countPendingEvidenceUploads(), errors: 0 };
+    }
     _evidenceSyncRunning = true;
     let changed = false;
     let uploaded = 0;
+    let errors = 0;
+    let firstError = '';
 
     const syncPhoto = async (photo, fallbackContext = {}) => {
       if (!photo?.dataUrl || photo.driveFileId || photo.driveStatus === 'uploaded' || photo.driveStatus === 'demo') return photo;
@@ -764,6 +781,10 @@ const MecFormModule = (() => {
         changed = true;
       }
       if (!previousId && updated.driveFileId) uploaded += 1;
+      if (!updated.driveFileId && updated.uploadError) {
+        errors += 1;
+        if (!firstError) firstError = updated.uploadError;
+      }
       return updated;
     };
 
@@ -806,10 +827,35 @@ const MecFormModule = (() => {
         ));
       }
       if (changed) _saveDraft(false);
-      if (uploaded) UI.showToast(`${uploaded} evidencia(s) sincronizada(s) con Drive.`, 'success', 4500);
+      const pending = _countPendingEvidenceUploads();
+      if (uploaded && options.silent !== true) UI.showToast(`${uploaded} evidencia(s) sincronizada(s) con Drive.`, 'success', 4500);
+      else if (manual && pending) UI.showToast(`${pending} foto(s) siguen pendientes de Drive.${firstError ? ` Detalle: ${firstError}` : ' Revise conexion, sesion o permisos del deployment.'}`, 'warning', 9000);
+      else if (manual) UI.showToast('No hay fotos pendientes para subir a Drive.', 'info', 4200);
+      return { status: pending ? 'pending' : 'ok', uploaded, pending, errors, firstError };
     } finally {
       _evidenceSyncRunning = false;
     }
+  }
+
+  function _countPendingEvidenceUploads() {
+    let count = 0;
+    const visit = photos => {
+      (photos || []).forEach(photo => {
+        if (photo?.dataUrl && !photo.driveFileId && photo.driveStatus !== 'uploaded' && photo.driveStatus !== 'demo') count += 1;
+      });
+    };
+    Object.values(_data.__evidence || {}).forEach(visit);
+    (_data.__classrooms || []).forEach(room => {
+      visit(room.evidencias_techo);
+      visit(room.evidencias_piso);
+      (room.objects || []).forEach(object => visit(object.ficha?.evidencias));
+    });
+    (_data.__sanitaries || []).forEach(item => {
+      visit(item.evidencias);
+      (item.objects || []).forEach(object => visit(object.ficha?.evidencias));
+    });
+    (_data.__siteElements || []).forEach(element => visit(element.ficha?.evidencias));
+    return count;
   }
 
   function _normalizeEvidenceContext(context = {}) {
@@ -21714,6 +21760,7 @@ const MecFormModule = (() => {
     savePlanFloorFicha,
     addClassroomObjectEvidence,
     addClassroomSectionEvidence,
+    syncPendingEvidenceUploads: _syncPendingEvidenceUploads,
     addPlanClassroomElement,
     setPlanClassroomShape,
     addPlanClassroomVertex,

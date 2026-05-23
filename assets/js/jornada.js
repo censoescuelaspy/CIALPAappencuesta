@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * jornada.js — Personal dashboard (Mi Jornada)
- * Version: 2.6.106
+ * Version: 2.6.110
  */
 
 const JornadaModule = (() => {
@@ -169,6 +169,7 @@ const JornadaModule = (() => {
       duracion:      s.duracion_minutos || '',
       estado:        s.estado        || 'en_curso',
       observacion:   s.observacion_cierre || '',
+      usuario:       s.usuario || '',
     }));
 
     const seenIds = new Set(_sessions.map(s => s.id_escuela));
@@ -257,11 +258,9 @@ const JornadaModule = (() => {
         ? `<span title="${obsTitle}">${_escape(r.observacion.slice(0, 40))}${r.observacion.length > 40 ? '…' : ''}</span>`
         : '<span class="text-muted">—</span>';
 
-      const idEsc = _escape(r.id_escuela);
-      let btnLabel = 'Abrir';
-      let btnClass = 'btn-outline';
-      if (r.estado === 'pendiente') { btnLabel = 'Iniciar'; btnClass = 'btn-primary'; }
-      else if (r.estado === 'en_curso') { btnLabel = 'Continuar'; btnClass = 'btn-warning'; }
+      const idEsc = _escape(r.id_escuela || r.codigo_local);
+      const primaryAction = _primaryActionForState(r.estado);
+      const secondaryAction = _secondaryActionForState(r.estado);
 
       return `<tr style="cursor:default;">
         <td>
@@ -274,9 +273,13 @@ const JornadaModule = (() => {
         <td style="white-space:nowrap;">${dur}</td>
         <td><span class="badge" style="background:${_escape(color)};white-space:nowrap;">${_escape(label)}</span></td>
         <td style="max-width:200px;">${obs}</td>
-        <td>
+        <td style="min-width:168px;">
           ${idEsc
-            ? `<button class="btn ${btnClass} btn-sm" onclick="JornadaModule.openEscuela('${idEsc}')">${btnLabel}</button>`
+            ? `<div class="jornada-actions" style="display:flex;gap:.35rem;flex-wrap:wrap;">
+                <button class="btn ${primaryAction.className} btn-sm" onclick="JornadaModule.openGuided('${idEsc}')">${_escape(primaryAction.label)}</button>
+                ${secondaryAction ? `<button class="btn ${secondaryAction.className} btn-sm" onclick="JornadaModule.${secondaryAction.handler}('${idEsc}')">${_escape(secondaryAction.label)}</button>` : ''}
+                <button class="btn btn-outline btn-sm" onclick="JornadaModule.openMap('${idEsc}')">Mapa</button>
+              </div>`
             : ''}
         </td>
       </tr>`;
@@ -285,13 +288,51 @@ const JornadaModule = (() => {
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  function openEscuela(id) {
-    if (!id) return;
-    if (typeof SurveyModule !== 'undefined' && SurveyModule.selectEscuela) {
-      SurveyModule.selectEscuela(id);
-    } else {
-      UI.showToast('No se pudo abrir el formulario de la escuela.', 'warning');
+  async function openGuided(id) {
+    const escuela = await _resolveEscuela(id);
+    if (!escuela) {
+      UI.showToast('No se encontro la escuela para abrir el registro guiado.', 'warning');
+      return;
     }
+    const ready = typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function'
+      ? SurveyModule.setCurrentEscuela(escuela, { render: false })
+      : true;
+    if (!ready) return;
+    if (typeof AppController !== 'undefined' && AppController.showModule) {
+      AppController.showModule('registro');
+      setTimeout(() => {
+        try { if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init(); } catch (_) {}
+      }, 160);
+      UI.showToast(`Registro guiado activo: ${escuela.nombre || escuela.nombre_escuela || escuela.codigo_local || escuela.id_escuela}.`, 'success', 4200);
+      return;
+    }
+    UI.showToast('No se pudo abrir Registro guiado desde Mi Jornada.', 'warning');
+  }
+
+  async function retomarEscuela(id) {
+    const row = _findRowById(id);
+    if (_isClosedState(row?.estado)) {
+      const ok = await UI.showConfirm(
+        'Editar relevamiento cerrado',
+        'Se abrira el Registro guiado para revisar o corregir la escuela ya finalizada. Si guarda cambios, vuelva a finalizar para actualizar el cierre.'
+      );
+      if (!ok) return;
+    }
+    return openGuided(id);
+  }
+
+  function openMap(id) {
+    if (!id) return;
+    if (typeof AppController !== 'undefined' && AppController.showModule) AppController.showModule('mapa');
+    setTimeout(() => {
+      try {
+        if (typeof MapModule !== 'undefined' && MapModule.flyTo) MapModule.flyTo(id);
+      } catch (_) {}
+    }, 450);
+  }
+
+  function openEscuela(id) {
+    return openGuided(id);
   }
 
   // ── Incidencias ───────────────────────────────────────────────────────────
@@ -337,10 +378,78 @@ const JornadaModule = (() => {
     return String(value || '').replace(/[^a-z0-9_-]/gi, '') || 'media';
   }
 
+  function _primaryActionForState(estado) {
+    if (estado === 'pendiente') return { label: 'Iniciar', className: 'btn-primary' };
+    if (estado === 'en_curso') return { label: 'Continuar', className: 'btn-warning' };
+    if (_isClosedState(estado)) return { label: 'Editar', className: 'btn-primary' };
+    return { label: 'Abrir', className: 'btn-outline' };
+  }
+
+  function _secondaryActionForState(estado) {
+    if (_isClosedState(estado)) return { label: 'Retomar', className: 'btn-outline', handler: 'retomarEscuela' };
+    if (estado === 'en_curso') return { label: 'Retomar', className: 'btn-outline', handler: 'retomarEscuela' };
+    return null;
+  }
+
+  function _isClosedState(estado) {
+    return ['finalizada', 'cerrada', 'completada', 'entregada'].includes(String(estado || '').toLowerCase());
+  }
+
+  function _digits(value) {
+    return String(value ?? '').replace(/\D+/g, '');
+  }
+
+  function _identityKeys(item = {}) {
+    return [
+      item.id_escuela,
+      item.codigo_local,
+      item.codigo,
+      item.id,
+      _digits(item.id_escuela),
+      _digits(item.codigo_local),
+    ].map(value => String(value || '').trim()).filter(Boolean);
+  }
+
+  function _findRowById(id) {
+    const keys = [String(id || '').trim(), _digits(id)].filter(Boolean);
+    return _buildRows().find(row => _identityKeys(row).some(key => keys.includes(key))) || null;
+  }
+
+  async function _resolveEscuela(id) {
+    const keys = [String(id || '').trim(), _digits(id)].filter(Boolean);
+    let escuela = _escuelas.find(item => _identityKeys(item).some(key => keys.includes(key)));
+    if (escuela) return escuela;
+    const row = _findRowById(id);
+    if (row) {
+      escuela = _escuelas.find(item => _identityKeys(item).some(key => _identityKeys(row).includes(key)));
+      if (escuela) return escuela;
+    }
+    if (typeof API !== 'undefined' && API.getEscuela && keys[0]) {
+      try {
+        const result = await API.getEscuela(keys[0]);
+        if (result?.status === 'ok' && result.data) return result.data;
+      } catch (_) {}
+    }
+    const session = typeof Auth !== 'undefined' && Auth.getSession ? Auth.getSession() : {};
+    const assigned = row?.usuario || session?.usuario || `${session?.nombres || ''} ${session?.apellidos || ''}`.trim();
+    return row ? {
+      id_escuela: row.id_escuela || row.codigo_local || keys[0],
+      codigo_local: row.codigo_local || row.id_escuela || keys[0],
+      nombre: row.nombre_escuela || '',
+      nombre_escuela: row.nombre_escuela || '',
+      estado_relevamiento: row.estado || '',
+      encuestador_asignado: assigned || '',
+      usuario_asignado: assigned || '',
+    } : null;
+  }
+
   return {
     init,
     loadMisSesiones,
     openEscuela,
+    openGuided,
+    retomarEscuela,
+    openMap,
     sortBy,
     _onSearchInput,
     _onEstadoChange,

@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.86
+ * Version: 2.6.110
  */
 
 const API = (() => {
@@ -410,6 +410,7 @@ const API = (() => {
           url: APP_CONFIG.EVIDENCE_FOLDER_URL || '',
           name: data.filename || 'evidencia-demo.jpg',
           folderId: APP_CONFIG.EVIDENCE_FOLDER_ID || '',
+          subFolderId: APP_CONFIG.EVIDENCE_FOLDER_ID || '',
           uploadedAt: new Date().toISOString(),
           demo: true,
         },

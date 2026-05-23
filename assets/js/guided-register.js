@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.74
+ * Version: 2.6.110
  */
 
 const GuidedRegisterModule = (() => {
@@ -86,7 +86,7 @@ const GuidedRegisterModule = (() => {
       number: '01',
       title: 'Escuela y jornada',
       kicker: 'Inicio ordenado',
-      summary: 'Seleccionar la escuela, revisar ubicacion y dejar abierta la carga tecnica.',
+      summary: 'Seleccionar la escuela, revisar ubicacion y dejar abierta la carga tecnica segun Excel MEC VF 24-03-26.',
       checks: ['Escuela seleccionada', 'Ubicacion revisada', 'Jornada activa'],
       actions: [
         { label: 'Mapa', icon: 'MAP', action: 'module', value: 'mapa' },
@@ -366,6 +366,7 @@ const GuidedRegisterModule = (() => {
     if (action === 'answerSiteElementField') return _answerSiteElementField(value);
     if (action === 'goClosure') return _goClosure();
     if (action === 'syncSheets') return _syncDraftToSheets();
+    if (action === 'syncEvidence') return _syncEvidenceToDrive();
     if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
     if (action === 'finalizePartial') return _finalizeCompleteRegistration({ allowPending: true });
     if (action === 'workbook') return (typeof AppController !== 'undefined' && AppController.openWorkbook) ? AppController.openWorkbook() : null;
@@ -1239,7 +1240,7 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Declaracion inicial',
         'Seleccione o identifique la escuela',
-        'Antes de dibujar, confirme cual es la escuela del relevamiento. Ese dato identifica el plano, las fotos, los bloques, las aulas y la salida PDF.',
+        'Antes de dibujar, confirme cual es la escuela del relevamiento. Ese dato identifica el plano, las fotos, los bloques, las aulas y la salida PDF. La secuencia usa como fuente el Excel MEC VF 24-03-26.',
         [
           { label: 'Elegir en mapa', action: 'module', value: 'mapa', primary: true },
           { label: 'Datos generales', action: 'stage', value: 'general' },
@@ -1255,7 +1256,7 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Declaracion inicial',
         'Confirme identificacion y ubicacion de la escuela',
-        'Revise y corrija codigo, nombre, departamento, distrito, localidad y coordenadas antes de dibujar. Esta confirmacion vincula todo el plano, fotos y cierre con la escuela correcta.',
+        'Revise y corrija codigo, nombre, departamento, distrito, localidad y coordenadas antes de dibujar. Esta confirmacion vincula todo el plano, fotos y cierre con la escuela correcta, siguiendo la hoja Gral. del Excel MEC VF 24-03-26.',
         [
           { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
@@ -1606,6 +1607,18 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)) + _guidedRoomSectionPhotoHtml(room, 'techo'));
     }
+    if (!_hasAnswer(room?.pared_material)) {
+      return _question('Pregunta del aula', `${label}: material predominante de pared`, 'Pregunta MEC VF 24-03-26: registre el material principal de las paredes antes de evaluar daños visibles.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::pared_material`, ['Ladrillo/mamposteria', 'Madera', 'Chapa', 'Mixto', 'Otro', 'No verificable'], 'Ladrillo/mamposteria'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
+    if (!_hasAnswer(room?.pared_estado)) {
+      return _question('Pregunta del aula', `${label}: estado de paredes`, 'Registre fisuras, grietas, deformidad, revoque desprendido, humedad o madera rota si corresponde.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::pared_estado`, ['Bueno', 'Regular', 'Fisuras/grietas', 'Humedad', 'Desprendimiento', 'Malo', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
+    }
     if (!_hasAnswer(room?.piso_tipo)) {
       return _question('Pregunta del aula', `${label}: tipo de piso`, 'Indique el material principal del piso del ambiente.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::piso_tipo`, ['Ceramico', 'Cemento alisado', 'Mosaico', 'Tierra', 'Madera', 'Otro', 'No verificable'], 'Ceramico'),
@@ -1617,6 +1630,12 @@ const GuidedRegisterModule = (() => {
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Con roturas', 'Con humedad', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)) + _guidedRoomSectionPhotoHtml(room, 'piso'));
+    }
+    if (!_hasAnswer(room?.requiere_intervencion)) {
+      return _question('Pregunta del aula', `${label}: requiere intervencion inmediata?`, 'Pregunta MEC VF 24-03-26: marque si el ambiente requiere intervencion y deje la ficha solo para ampliar observaciones.', [
+        ..._fieldAnswerActions('answerClassroomField', `${room.id}::requiere_intervencion`, ['No', 'Si, programada', 'Si, inmediata', 'No verificable'], 'No'),
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
     const object = _guidedPendingObjects(room?.objects || [])[0];
     if (object) return _roomObjectDirectQuestion(room, object);
@@ -1652,6 +1671,30 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
+    if (!_hasAnswer(item?.techo_tipo)) {
+      return _question('Pregunta del sanitario', `${label}: material predominante del techo`, 'Pregunta MEC VF 24-03-26: registre techo del sanitario antes de piso, paredes y artefactos.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::techo_tipo`, ['Chapa', 'Teja', 'Losa', 'Fibrocemento', 'Mixto', 'No verificable'], 'Chapa'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.techo_estado)) {
+      return _question('Pregunta del sanitario', `${label}: estado del techo`, 'Registre goteras, humedad, chapas rotas, corrosiones o defectos estructurales visibles.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::techo_estado`, ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.pared_material)) {
+      return _question('Pregunta del sanitario', `${label}: material predominante de pared`, 'Registre el material principal de las paredes del sanitario.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::pared_material`, ['Ladrillo/mamposteria', 'Madera', 'Chapa', 'Mixto', 'Otro', 'No verificable'], 'Ladrillo/mamposteria'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.pared_estado)) {
+      return _question('Pregunta del sanitario', `${label}: estado de paredes`, 'Registre fisuras, grietas, humedad, desprendimiento de revoque o deformidad visible.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::pared_estado`, ['Bueno', 'Regular', 'Fisuras/grietas', 'Humedad', 'Desprendimiento', 'Malo', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
     if (!_hasAnswer(item?.piso_tipo)) {
       return _question('Pregunta del sanitario', `${label}: tipo de piso`, 'Indique el material principal del piso sanitario.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::piso_tipo`, ['Ceramico', 'Cemento alisado', 'Mosaico', 'Tierra', 'Antideslizante', 'Otro', 'No verificable'], 'Ceramico'),
@@ -1661,6 +1704,12 @@ const GuidedRegisterModule = (() => {
     if (!_hasAnswer(item?.piso_estado)) {
       return _question('Pregunta del sanitario', `${label}: estado/calidad del piso`, 'Registre si el piso sanitario esta completo, roto, resbaladizo, con humedad o no verificable.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Resbaladizo', 'Con humedad', 'No verificable'], 'Bueno'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
+    if (!_hasAnswer(item?.requiere_intervencion)) {
+      return _question('Pregunta del sanitario', `${label}: requiere intervencion inmediata?`, 'Pregunta MEC VF 24-03-26: deje registrada la prioridad de intervencion del sanitario.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::requiere_intervencion`, ['No', 'Si, programada', 'Si, inmediata', 'No verificable'], 'No'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
@@ -1774,6 +1823,7 @@ const GuidedRegisterModule = (() => {
           { label: 'Finalizar con pendientes', action: 'finalizePartial', variant: 'warning' },
           { label: 'Validar', action: 'validate' },
           { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
+          { label: 'Subir fotos Drive', action: 'syncEvidence' },
           { label: 'Datos en Sheets', action: 'workbook' },
         ].filter(Boolean),
         false,
@@ -1789,6 +1839,7 @@ const GuidedRegisterModule = (() => {
       [
         { label: 'Finalizar escuela', action: 'finalizeComplete', variant: 'success', primary: true },
         { label: 'Guardar en Sheets ahora', action: 'syncSheets' },
+        { label: 'Subir fotos Drive', action: 'syncEvidence' },
         { label: 'Ver PDF', action: 'pdf' },
         { label: 'Datos en Sheets', action: 'workbook' },
       ],
@@ -1841,6 +1892,7 @@ const GuidedRegisterModule = (() => {
         <span><b>Dispositivo</b> borrador local por escuela para continuar sin perder carga.</span>
         <span><b>Google Sheets</b> mec_borradores guarda lo cargado; escuelas_seleccionadas muestra estado; evidencias fotos; entregas_cierre cierre final.</span>
         <span><b>Drive / correo</b> PDF final y metadatos enviados a ${_escape(typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.FINAL_REPORT_EMAIL || '' : '')}.</span>
+        <button class="btn btn-outline btn-sm" type="button" data-guided-action="syncEvidence">Subir fotos pendientes a Drive</button>
       </div>`;
   }
 
@@ -2044,10 +2096,22 @@ const GuidedRegisterModule = (() => {
         done: _hasAnswer(room?.techo_tipo) && _hasAnswer(room?.techo_estado),
       },
       {
+        title: 'Paredes del ambiente',
+        help: 'Registre material predominante y condicion de paredes segun Excel MEC VF 24-03-26.',
+        doneText: [room?.pared_material, room?.pared_estado].filter(Boolean).join(' / ') || 'Paredes registradas',
+        done: _hasAnswer(room?.pared_material) && _hasAnswer(room?.pared_estado),
+      },
+      {
         title: 'Piso del ambiente',
         help: 'Registre tipo de piso y calidad/estado desde preguntas superiores.',
         doneText: [room?.piso_tipo, room?.piso_estado].filter(Boolean).join(' / ') || 'Piso registrado',
         done: _hasAnswer(room?.piso_tipo) && _hasAnswer(room?.piso_estado),
+      },
+      {
+        title: 'Intervencion del ambiente',
+        help: 'Declare si requiere intervencion inmediata o programada.',
+        doneText: room?.requiere_intervencion || 'Intervencion registrada',
+        done: _hasAnswer(room?.requiere_intervencion),
       },
       {
         title: 'Responder elementos del aula',
@@ -2094,10 +2158,28 @@ const GuidedRegisterModule = (() => {
         done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
       },
       {
+        title: 'Techo sanitario',
+        help: 'Registre material y condicion del techo del sanitario.',
+        doneText: [item?.techo_tipo, item?.techo_estado].filter(Boolean).join(' / ') || 'Techo registrado',
+        done: _hasAnswer(item?.techo_tipo) && _hasAnswer(item?.techo_estado),
+      },
+      {
+        title: 'Paredes sanitarias',
+        help: 'Registre material predominante y condicion de paredes del sanitario.',
+        doneText: [item?.pared_material, item?.pared_estado].filter(Boolean).join(' / ') || 'Paredes registradas',
+        done: _hasAnswer(item?.pared_material) && _hasAnswer(item?.pared_estado),
+      },
+      {
         title: 'Piso sanitario',
         help: 'Registre tipo y estado/calidad del piso del sanitario.',
         doneText: [item?.piso_tipo, item?.piso_estado].filter(Boolean).join(' / ') || 'Piso registrado',
         done: _hasAnswer(item?.piso_tipo) && _hasAnswer(item?.piso_estado),
+      },
+      {
+        title: 'Intervencion sanitaria',
+        help: 'Declare si el sanitario requiere intervencion inmediata o programada.',
+        doneText: item?.requiere_intervencion || 'Intervencion registrada',
+        done: _hasAnswer(item?.requiere_intervencion),
       },
       {
         title: 'Responder elementos del sanitario',
@@ -3125,6 +3207,18 @@ const GuidedRegisterModule = (() => {
       return;
     }
     await mec.syncDraftToSheets('manual', { silent: false }).catch(() => null);
+  }
+
+  async function _syncEvidenceToDrive() {
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.syncPendingEvidenceUploads) {
+      UI.showToast('La sincronizacion de fotos no esta disponible en esta version.', 'warning', 5200);
+      return;
+    }
+    await mec.syncPendingEvidenceUploads({ manual: true, silent: false }).catch(err => {
+      UI.showToast(`No se pudieron subir las fotos: ${err.message}`, 'warning', 7200);
+    });
+    _refreshSoon();
   }
 
   function _finalDeliveryPayload(snap, packageData) {

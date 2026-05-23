@@ -7,8 +7,21 @@ const MEC_ACOMETIDA_PRESENTE = ['Aerea', 'Subterranea', 'Compartida con otro blo
 const MEC_TABLERO_PRESENTE = ['Bueno', 'Regular', 'Malo'];
 
 const MEC_SCHEMA = {
-  version: '0.1.3',
-  source: 'manual/MANUAL_ENCUESTADOR_CIALPA.md',
+  version: '0.1.4',
+  source: 'PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx',
+  reviewedWorkbook: {
+    file: 'PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx',
+    date: '2026-03-24',
+    sheets: ['Gral.', 'Servicios', 'Electricidad', 'Bloque&Nivel', 'Area Rec.', 'Aula (1)', 'Dependencia', 'Laboratorio', 'Taller', 'Sanitario (1)'],
+    sequencedCoverage: [
+      'Identificacion y ubicacion de escuela',
+      'Bloques, pisos, galerias, rampas y electricidad de bloque',
+      'Aulas, dependencias, laboratorios y talleres como ambientes guiados',
+      'Techo, pared, piso, aberturas, instalacion electrica e intervencion por ambiente',
+      'Sanitarios con dimensiones, uso, accesibilidad, divisorias, artefactos, techo, pared, piso y electricidad',
+      'Areas de recreacion, exteriores, evidencias fotograficas y tiempos',
+    ],
+  },
   modules: [
     {
       id: 'general',

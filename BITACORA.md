@@ -4,6 +4,47 @@
 
 ---
 
+## Mi Jornada, fotos Drive y cobertura MEC validada - 2026-05-22 - v2.6.110
+
+### Objetivo
+- Permitir desde `Mi Jornada` continuar, retomar o editar una escuela ya cerrada usando el `Registro guiado`.
+- Hacer mas verificable la subida de fotos a la carpeta Drive de evidencias.
+- Dejar visible que la secuencia guiada se contrasta con el Excel MEC validado `VF 24-03-26`.
+
+### Cambios implementados
+- `Mi Jornada` reemplaza el boton unico `Abrir` por acciones segun estado: `Iniciar`, `Continuar`, `Editar`, `Retomar` y `Mapa`.
+- Las acciones de jornada abren directamente `Registro guiado`, fijando la escuela activa en `SurveyModule/MecFormModule`, incluso para relevamientos finalizados que deban corregirse.
+- Si la fila de jornada viene solo desde `sesiones_relevamiento`, la app conserva la identidad del usuario como asignacion operativa para no bloquear la reapertura.
+- Las fotos pendientes ahora pueden sincronizarse manualmente desde `Registro guiado` con `Subir fotos Drive`.
+- Antes de guardar en Sheets o cerrar una escuela, el motor intenta subir evidencias pendientes a Drive y luego arma el indice de evidencias.
+- Si la subida de fotos falla, el aviso manual muestra el primer detalle tecnico recibido para diagnosticar permisos, sesion o deployment.
+- El modo demo devuelve tambien `subFolderId`, alineado con el guardado real por subcarpeta de escuela.
+- El esquema MEC declara como fuente vigente `PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx`.
+- Se agrega metadata de cobertura del Excel revisado: `Gral.`, `Servicios`, `Electricidad`, `Bloque&Nivel`, `Area Rec.`, `Aula (1)`, `Dependencia`, `Laboratorio`, `Taller` y `Sanitario (1)`.
+- El registro guiado muestra la referencia `Excel MEC VF 24-03-26` en la etapa inicial.
+- La secuencia guiada suma preguntas de paredes e intervencion para ambientes y sanitarios, ademas de techo y piso.
+- Version visible, assets y cache actualizados a `v2.6.110`.
+
+### Pendiente operativo
+- Publicar frontend en GitHub Pages y pedir `Actualizar app` para tomar `cialpa-app-v2.6.110`.
+- Probar con usuario real: abrir `Mi Jornada`, editar una escuela finalizada y confirmar que vuelve al `Registro guiado`.
+- Probar una foto real: sacar foto desde una pregunta/elemento, tocar `Subir fotos Drive` y verificar subcarpeta `{codigo_local} - {nombre_escuela}` en Drive.
+- Si el boton informa permisos de Drive, redeploy/autorizar Apps Script desde la cuenta propietaria del Web App.
+
+### Validaciones ejecutadas
+- Lectura del Excel MEC validado en `H:\Mi unidad\PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx`: hojas detectadas `Gral.`, `Servicios`, `Electricidad`, `Bloque&Nivel`, `Area Rec.`, `Aula (1)`, `Dependencia`, `Laboratorio`, `Taller`, `Sanitario (1)`.
+- `node --check assets/js/jornada.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de `CIALPA_USER`/`CIALPA_PASSWORD`.
+
+---
+
 ## Integracion de ubicacion real en la app - 2026-05-22 - v2.6.109
 
 ### Objetivo
