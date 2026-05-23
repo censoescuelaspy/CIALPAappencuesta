@@ -16,6 +16,7 @@ const GuidedRegisterModule = (() => {
   let _guidedState = { targets: {}, flags: {} };
   let _guidedHistory = [];
   let _guidedQuestionHistory = [];
+  let _guidedReviewQuestion = null;
   let _timeRefreshTimer = null;
   let _planSyncTimer = null;
   const GUIDED_QUESTION_HISTORY_LIMIT = 40;
@@ -324,6 +325,7 @@ const GuidedRegisterModule = (() => {
       const stepButton = event.target.closest('[data-guided-step]');
       if (stepButton) {
         const targetIndex = Number(stepButton.dataset.guidedStep || 0);
+        if (_guidedReviewQuestion && targetIndex !== _activeIndex) _guidedReviewQuestion = null;
         if (!_canMoveToStep(targetIndex)) return;
         if (targetIndex !== _activeIndex) _rememberCurrentQuestion('step', String(targetIndex));
         goTo(targetIndex);
@@ -362,6 +364,7 @@ const GuidedRegisterModule = (() => {
 
   function _runAction(action, value) {
     if (_shouldRememberBeforeAction(action)) _rememberCurrentQuestion(action, value);
+    if (_guidedReviewQuestion && _shouldClearReviewForAction(action)) _guidedReviewQuestion = null;
     if (action === 'next') return next();
     if (action === 'prev') return previous();
     if (action === 'saveClassroomTarget') return _saveClassroomTarget();
@@ -633,6 +636,11 @@ const GuidedRegisterModule = (() => {
   }
 
   function next() {
+    if (_guidedReviewQuestion) {
+      _guidedReviewQuestion = null;
+      _updateSnapshot();
+      return;
+    }
     const target = Math.min(STEPS.length - 1, _activeIndex + 1);
     if (!_canMoveToStep(target)) return;
     if (target !== _activeIndex) _rememberCurrentQuestion('next');
@@ -698,6 +706,22 @@ const GuidedRegisterModule = (() => {
     ].includes(String(action || ''));
   }
 
+  function _shouldClearReviewForAction(action = '') {
+    return ![
+      'prev',
+      'next',
+      'selectPlanItem',
+      'openClassroomFicha',
+      'openClassroomObjectFicha',
+      'openSanitaryFicha',
+      'openSanitaryObjectFicha',
+      'openSiteFicha',
+      'zoomIn',
+      'zoomOut',
+      'fullscreen',
+    ].includes(String(action || ''));
+  }
+
   function _rememberCurrentQuestion(reason = '', value = '') {
     const entry = _currentQuestionHistoryEntry(reason, value);
     if (!entry) return;
@@ -714,6 +738,9 @@ const GuidedRegisterModule = (() => {
     while (_guidedQuestionHistory.length) {
       const entry = _guidedQuestionHistory.pop();
       if (current?.key && entry.key === current.key) continue;
+      _guidedReviewQuestion = entry.question
+        ? { stepId: entry.stepId, question: entry.question }
+        : null;
       goTo(entry.stepIndex, { skipHistory: true });
       setTimeout(() => {
         if (entry.focusValue) _selectPlanItem(entry.focusValue);
@@ -738,9 +765,24 @@ const GuidedRegisterModule = (() => {
       key: _questionHistoryKey(step.id, question, focusValue),
       title,
       focusValue,
+      question: _questionHistorySnapshot(question),
       reason: String(reason || ''),
       value: String(value || '').slice(0, 180),
       at: new Date().toISOString(),
+    };
+  }
+
+  function _questionHistorySnapshot(question = {}) {
+    return {
+      kicker: question.kicker || '',
+      title: question.title || '',
+      body: question.body || '',
+      actions: (question.actions || []).map(action => ({ ...action })),
+      done: false,
+      control: question.control || '',
+      info: question.info || '',
+      blocking: false,
+      review: true,
     };
   }
 
@@ -1416,6 +1458,9 @@ const GuidedRegisterModule = (() => {
   }
 
   function _activeGuidedQuestion(stepId, snap = _snapshot()) {
+    if (_guidedReviewQuestion?.stepId === stepId && _guidedReviewQuestion.question) {
+      return _guidedReviewQuestion.question;
+    }
     if (stepId === 'escuela') return _schoolQuestion(snap);
     if (stepId === 'predio') return _predioQuestion(snap);
     if (stepId === 'bloques') return _blockQuestion(snap);
@@ -2920,6 +2965,7 @@ const GuidedRegisterModule = (() => {
     _guidedState = { targets: {}, flags: {} };
     _guidedHistory = [];
     _guidedQuestionHistory = [];
+    _guidedReviewQuestion = null;
     _activeIndex = 0;
     _saveState();
     _updateSlide();
@@ -3897,11 +3943,13 @@ const GuidedRegisterModule = (() => {
       };
       _guidedHistory = [];
       _guidedQuestionHistory = [];
+      _guidedReviewQuestion = null;
     } catch {
       _activeIndex = 0;
       _guidedState = { targets: {}, flags: {} };
       _guidedHistory = [];
       _guidedQuestionHistory = [];
+      _guidedReviewQuestion = null;
     }
   }
 

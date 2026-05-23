@@ -19,6 +19,7 @@
 - Se agrega historial de preguntas guiadas en memoria de sesion (`_guidedQuestionHistory`).
 - Antes de acciones que cambian respuesta, item o etapa, la guia guarda la pregunta activa con su foco de plano cuando existe.
 - `Anterior` intenta restaurar primero la pregunta/item inmediatamente anterior; si no hay historial de preguntas, vuelve a la etapa anterior.
+- La pregunta anterior vuelve como tarjeta de revision editable, sin borrar la respuesta ya cargada; `Siguiente` desde esa revision retorna al flujo actual.
 - El historial de etapas deja de persistirse en `localStorage`, evitando saltos viejos al retomar la app.
 - Se elimina `_focusSchoolPlanArea()` y su helper, dejando la seleccion del plano sin cambio automatico de zoom.
 - Version visible, cache y assets actualizados a `v2.6.118`.
@@ -38,6 +39,7 @@
 - `git diff --check`.
 - `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
 - Revision estatica: no quedan referencias activas a `2.6.117` en assets de publicacion.
+- Revision estatica: `Anterior` usa `_guidedQuestionHistory` y `_guidedReviewQuestion` antes de caer al historial de etapas.
 - Revision estatica de zoom: no existe `_focusSchoolPlanArea`; `selectArea()` y `focusSelectedPlanItem()` no llaman a `_setSchoolPlanZoomValue`.
 - `git commit`: `9f8e8e0 fix: corregir navegacion guiada v2.6.118`.
 - `git push origin main`: publica la correccion en GitHub Pages.
