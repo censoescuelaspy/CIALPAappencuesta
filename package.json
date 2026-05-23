@@ -8,6 +8,7 @@
     "simulate:ui": "playwright test --config=tools/simulation/playwright.config.mjs",
     "metrics:web": "node tools/simulation/cialpa_web_metrics.mjs",
     "audit:locations": "node tools/location-audit/verify_school_locations.mjs",
+    "build:r01-schools": "node tools/simulation/build_r01_public_schools.mjs",
     "embed:schools": "node tools/simulation/embed_schools_csv.mjs",
     "db:api": "node tools/database/cialpa_db_api.mjs",
     "db:check": "node --check tools/database/cialpa_db_api.mjs",

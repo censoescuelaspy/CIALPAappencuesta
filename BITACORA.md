@@ -4,6 +4,45 @@
 
 ---
 
+## Respaldo publicado para lista de escuelas R01 - 2026-05-23 - v2.6.127
+
+### Objetivo
+- Resolver que el cuestionario inicial publico muestre `No se pudo cargar la lista oficial ahora` cuando el Web App publicado aun no tiene activo `listarEscuelasCuestionarioInicial`.
+- Mantener el buscador de escuelas operativo aunque Apps Script quede pendiente de redeploy desde la cuenta propietaria.
+
+### Diagnostico
+- La URL publicada de Apps Script responde `diagnosticoPadron` correctamente con `source: official_sheet`, `total: 5462`, `muestra_piloto: 86` y `filas_operativas: 109`.
+- La misma URL responde a `listarEscuelasCuestionarioInicial` con `Token invalido o expirado`, confirmando que el deployment activo sigue tratando ese endpoint como privado.
+- El deployment `@HEAD` no es usable publicamente desde esta sesion: responde HTML de permiso de Google.
+
+### Cambios implementados
+- Se agrega `assets/data/r01-schools-public.json`, indice publico minimo con 5462 escuelas y solo campos de busqueda: codigo, nombre, departamento, distrito y localidad.
+- El archivo no incluye responsables, telefonos ni correos.
+- `initial-questionnaire.js` conserva como fuente principal el endpoint `listarEscuelasCuestionarioInicial`, pero si falla carga automaticamente el indice publicado desde GitHub Pages.
+- El mensaje del formulario pasa a indicar que hay 5462 escuelas disponibles desde la copia publicada y mantiene el buscador por codigo, nombre o distrito.
+- Se agrega el script reproducible `npm run build:r01-schools`.
+- Version visible, cache y assets actualizados a `v2.6.127`.
+
+### Pendiente operativo
+- Publicar/actualizar el Web App de Apps Script desde la cuenta propietaria para que `listarEscuelasCuestionarioInicial` vuelva a ser la fuente principal real.
+- Luego de publicar, repetir prueba HTTP contra `listarEscuelasCuestionarioInicial` y confirmar `status: ok`.
+
+### Validaciones ejecutadas
+- Prueba HTTP contra Web App publicado: `diagnosticoPadron` responde `official_sheet`, `total: 5462`, `muestra_piloto: 86`.
+- Prueba HTTP contra Web App publicado: `listarEscuelasCuestionarioInicial` responde `Token invalido o expirado`.
+- `npm.cmd run build:r01-schools`: genera 5462 escuelas en `assets/data/r01-schools-public.json`.
+- Validacion JSON: `r01-schools-public.json` parsea OK y no contiene `@`, `responsable local` ni telefonos tipo `(09xx)`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check tools/simulation/build_r01_public_schools.mjs`.
+- `node -e "JSON.parse(...r01-schools-public.json...); JSON.parse(...package.json...)"`: OK.
+- Playwright local escritorio: con backend publicado fallando por token, el cuestionario carga fallback, muestra 5462 opciones, selecciona `1701006`, completa departamento `ALTO PARAGUAY` y distrito `BAHIA NEGRA`, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: 7 bloques, sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+
 ## Codigo local buscable y territorio oficial - 2026-05-23 - v2.6.126
 
 ### Objetivo

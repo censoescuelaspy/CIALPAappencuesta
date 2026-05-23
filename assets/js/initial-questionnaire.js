@@ -1,6 +1,6 @@
 /**
  * CIALPA - Cuestionario inicial R01
- * Version: 2.6.126
+ * Version: 2.6.127
  */
 
 const InitialQuestionnaire = (() => {
@@ -10,6 +10,7 @@ const InitialQuestionnaire = (() => {
   const SUPPORT_EMAIL = 'censoescuelaspy@gmail.com';
   const MAX_ATTACHMENT_BYTES = 8 * 1024 * 1024;
   const XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  const SCHOOL_FALLBACK_ASSET = 'assets/data/r01-schools-public.json';
 
   const WATER_SOURCES = [
     'ESSAP',
@@ -158,7 +159,7 @@ const InitialQuestionnaire = (() => {
         `)}
 
         <input type="hidden" name="token" value="${_escape(params.token || params.t || '')}" />
-        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.126')}" />
+        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.127')}" />
 
         <div class="initial-submit">
           <button type="submit" class="btn btn-primary btn-lg">Enviar cuestionario inicial</button>
@@ -453,11 +454,75 @@ const InitialQuestionnaire = (() => {
       if (selected) _applySchoolSelection(root, selected, { force: !params.nombre && !params.escuela });
       if (hint) hint.textContent = `${_schoolOptions.length} escuelas disponibles. Busque por codigo local, nombre o distrito.`;
     } catch (err) {
-      _schoolOptions = [];
-      _territoryMeta = _buildTerritoryMeta([]);
-      _populateTerritoryControls(root, params);
-      if (hint) hint.textContent = 'No se pudo cargar la lista oficial ahora. Puede escribir el codigo o nombre manualmente.';
+      try {
+        const fallback = await _loadPublishedSchoolFallback();
+        _schoolOptions = Array.isArray(fallback.data) ? fallback.data : [];
+        _territoryMeta = fallback.meta || _buildTerritoryMeta(_schoolOptions);
+        _populateSchoolDatalist(root);
+        _populateTerritoryControls(root, params);
+        const selected = _findSchoolByCode(params.codigo_local || params.codigo || params.id_escuela)
+          || _findSchoolBySearch(root.querySelector('[data-school-search]')?.value || '');
+        if (selected) _applySchoolSelection(root, selected, { force: !params.nombre && !params.escuela });
+        if (hint) {
+          hint.textContent = `${_schoolOptions.length} escuelas disponibles desde la copia publicada. Busque por codigo local, nombre o distrito.`;
+        }
+      } catch (fallbackErr) {
+        _schoolOptions = [];
+        _territoryMeta = _buildTerritoryMeta([]);
+        _populateTerritoryControls(root, params);
+        if (hint) hint.textContent = 'No se pudo cargar la lista oficial ahora. Puede escribir el codigo o nombre manualmente.';
+      }
     }
+  }
+
+  async function _loadPublishedSchoolFallback() {
+    const url = _assetUrl(SCHOOL_FALLBACK_ASSET);
+    const version = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || Date.now();
+    const requestUrl = `${url}${url.includes('?') ? '&' : '?'}v=${encodeURIComponent(version)}`;
+    const response = await fetch(requestUrl, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const rows = Array.isArray(payload.schools) ? payload.schools : (Array.isArray(payload.data) ? payload.data : []);
+    const data = rows.map(_normalizePublishedSchool).filter(row => row.codigo_local || row.id_escuela || row.nombre);
+    return {
+      status: 'ok',
+      data,
+      meta: {
+        ..._buildTerritoryMeta(data),
+        ...(payload.meta || {}),
+        source: 'github_pages_asset',
+      },
+    };
+  }
+
+  function _normalizePublishedSchool(row) {
+    if (Array.isArray(row)) {
+      return {
+        codigo_local: String(row[0] || '').trim(),
+        id_escuela: String(row[5] || row[0] || '').trim(),
+        nombre: String(row[1] || '').trim(),
+        departamento: String(row[2] || '').trim(),
+        distrito: String(row[3] || '').trim(),
+        localidad: String(row[4] || '').trim(),
+      };
+    }
+    row = row || {};
+    return {
+      codigo_local: String(row.codigo_local || row.codigo || row.code || '').trim(),
+      id_escuela: String(row.id_escuela || row.id || row.codigo_local || row.codigo || '').trim(),
+      nombre: String(row.nombre || row.nombre_escuela || row.escuela || '').trim(),
+      departamento: String(row.departamento || '').trim(),
+      distrito: String(row.distrito || '').trim(),
+      localidad: String(row.localidad || '').trim(),
+    };
+  }
+
+  function _assetUrl(path) {
+    const current = new URL(window.location.href);
+    const base = /\/cuestionario_inicial\/?/i.test(current.pathname)
+      ? new URL('../', current.href)
+      : new URL('./', current.href);
+    return new URL(path, base.href).toString();
   }
 
   function _populateSchoolDatalist(root) {
