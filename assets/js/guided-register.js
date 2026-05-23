@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.116
+ * Version: 2.6.118
  */
 
 const GuidedRegisterModule = (() => {
@@ -15,8 +15,10 @@ const GuidedRegisterModule = (() => {
   let _touchStartY = 0;
   let _guidedState = { targets: {}, flags: {} };
   let _guidedHistory = [];
+  let _guidedQuestionHistory = [];
   let _timeRefreshTimer = null;
   let _planSyncTimer = null;
+  const GUIDED_QUESTION_HISTORY_LIMIT = 40;
   const ANSWER_FEEDBACK_DELAY_MS = 1050;
   const ANSWER_FEEDBACK_ACTIONS = new Set([
     'answerBlockField',
@@ -110,28 +112,28 @@ const GuidedRegisterModule = (() => {
     {
       id: 'escuela',
       number: '01',
-      title: 'Escuela y jornada',
-      kicker: 'Inicio ordenado',
-      summary: 'Seleccionar la escuela, revisar ubicacion y dejar abierta la carga tecnica segun Excel MEC VF 24-03-26.',
-      checks: ['Escuela seleccionada', 'Ubicacion revisada', 'Jornada activa'],
+      title: 'Ubicacion escuela',
+      kicker: 'Primer control',
+      summary: 'Identificar la escuela, posicionarla sobre la base mapa y guardar las coordenadas corregidas antes de dibujar.',
+      checks: ['Escuela identificada', 'Ubicacion posicionada', 'Georreferencia guardada'],
       actions: [
         { label: 'Mapa', icon: 'MAP', action: 'module', value: 'mapa' },
-        { label: 'Ejemplo', icon: 'DEMO', action: 'demo' },
-        { label: 'General', icon: 'GEN', action: 'stage', value: 'general' },
-        { label: 'Jornada', icon: 'TIME', action: 'module', value: 'jornada' },
+        { label: 'Calles', icon: 'MAP', action: 'basemap' },
+        { label: 'Usar coords', icon: 'GPS', action: 'coords' },
+        { label: 'Guardar base', icon: 'OK', action: 'saveBasemap' },
       ],
     },
     {
       id: 'predio',
       number: '02',
-      title: 'Predio base',
-      kicker: 'Plano de partida',
-      summary: 'Preparar el tablero unico donde luego se implantan bloques, patios, tanques y espacios.',
-      checks: ['Base mapa opcional', 'Coordenadas revisadas', 'Escala inicial lista'],
+      title: 'Perimetro predio',
+      kicker: 'Bordes aproximados',
+      summary: 'Delinear los bordes aproximados de la propiedad escolar sobre la referencia guardada.',
+      checks: ['Base mapa guardada', 'Perimetro dibujado', 'Predio confirmado'],
       actions: [
         { label: 'Calles', icon: 'MAP', action: 'basemap' },
-        { label: 'Usar coords', icon: 'GPS', action: 'coords' },
-        { label: 'Guardar base', icon: 'OK', action: 'saveBasemap' },
+        { label: 'Perimetro', icon: 'PRD', action: 'addPropertyBoundary', primary: true },
+        { label: 'Confirmar', icon: 'OK', action: 'confirmPropertyBoundary' },
         { label: 'Mover plano', icon: 'MOVE', action: 'moveMode' },
       ],
     },
@@ -323,6 +325,7 @@ const GuidedRegisterModule = (() => {
       if (stepButton) {
         const targetIndex = Number(stepButton.dataset.guidedStep || 0);
         if (!_canMoveToStep(targetIndex)) return;
+        if (targetIndex !== _activeIndex) _rememberCurrentQuestion('step', String(targetIndex));
         goTo(targetIndex);
         return;
       }
@@ -358,6 +361,7 @@ const GuidedRegisterModule = (() => {
   }
 
   function _runAction(action, value) {
+    if (_shouldRememberBeforeAction(action)) _rememberCurrentQuestion(action, value);
     if (action === 'next') return next();
     if (action === 'prev') return previous();
     if (action === 'saveClassroomTarget') return _saveClassroomTarget();
@@ -365,6 +369,10 @@ const GuidedRegisterModule = (() => {
     if (action === 'saveSchoolIdentity') return _saveSchoolIdentity();
     if (action === 'resetSchoolIdentity') return _resetSchoolIdentity();
     if (action === 'resetSchoolData') return _resetSchoolData();
+    if (action === 'addPropertyBoundary') return _addPropertyBoundary();
+    if (action === 'confirmPropertyBoundary') return _confirmPropertyBoundary();
+    if (action === 'rectClassroom') return _setClassroomRect(value);
+    if (action === 'rectSanitary') return _setSanitaryRect(value);
     if (action === 'markNoFloor') return _setScopedFlag('noFloor', true, 'Bloque registrado sin piso para esta ronda.');
     if (action === 'resetNoFloor') return _setScopedFlag('noFloor', false, 'Se volvera a pedir el piso del bloque.');
     if (action === 'saveBlockMeasures') return _saveBlockMeasures();
@@ -627,10 +635,12 @@ const GuidedRegisterModule = (() => {
   function next() {
     const target = Math.min(STEPS.length - 1, _activeIndex + 1);
     if (!_canMoveToStep(target)) return;
+    if (target !== _activeIndex) _rememberCurrentQuestion('next');
     goTo(target);
   }
 
   function previous() {
+    if (_restorePreviousQuestion()) return;
     const previousIndex = _guidedHistory.length ? _guidedHistory.pop() : Math.max(0, _activeIndex - 1);
     goTo(previousIndex, { skipHistory: true });
   }
@@ -659,6 +669,144 @@ const GuidedRegisterModule = (() => {
       return false;
     }
     return true;
+  }
+
+  function _shouldRememberBeforeAction(action = '') {
+    return ![
+      'prev',
+      'next',
+      'selectPlanItem',
+      'openClassroomFicha',
+      'openClassroomObjectFicha',
+      'openSanitaryFicha',
+      'openSanitaryObjectFicha',
+      'openSiteFicha',
+      'module',
+      'stage',
+      'demo',
+      'basemap',
+      'coords',
+      'moveMode',
+      'zoomIn',
+      'zoomOut',
+      'fullscreen',
+      'workbook',
+      'validate',
+      'pdf',
+      'dxf',
+      'json',
+    ].includes(String(action || ''));
+  }
+
+  function _rememberCurrentQuestion(reason = '', value = '') {
+    const entry = _currentQuestionHistoryEntry(reason, value);
+    if (!entry) return;
+    const last = _guidedQuestionHistory[_guidedQuestionHistory.length - 1];
+    if (last?.key === entry.key) return;
+    _guidedQuestionHistory.push(entry);
+    if (_guidedQuestionHistory.length > GUIDED_QUESTION_HISTORY_LIMIT) {
+      _guidedQuestionHistory = _guidedQuestionHistory.slice(-GUIDED_QUESTION_HISTORY_LIMIT);
+    }
+  }
+
+  function _restorePreviousQuestion() {
+    const current = _currentQuestionHistoryEntry('current');
+    while (_guidedQuestionHistory.length) {
+      const entry = _guidedQuestionHistory.pop();
+      if (current?.key && entry.key === current.key) continue;
+      goTo(entry.stepIndex, { skipHistory: true });
+      setTimeout(() => {
+        if (entry.focusValue) _selectPlanItem(entry.focusValue);
+        else _updateSnapshot();
+      }, 80);
+      if (entry.title) UI.showToast(`Volviendo a: ${entry.title}`, 'info', 3600);
+      return true;
+    }
+    return false;
+  }
+
+  function _currentQuestionHistoryEntry(reason = '', value = '') {
+    const step = STEPS[_activeIndex];
+    if (!step) return null;
+    const question = _activeGuidedQuestion(step.id, _snapshot());
+    if (!question) return null;
+    const focusValue = _questionFocusValue(question);
+    const title = _guidedQuestionTitle(question) || question.title || step.title;
+    return {
+      stepIndex: _activeIndex,
+      stepId: step.id,
+      key: _questionHistoryKey(step.id, question, focusValue),
+      title,
+      focusValue,
+      reason: String(reason || ''),
+      value: String(value || '').slice(0, 180),
+      at: new Date().toISOString(),
+    };
+  }
+
+  function _questionHistoryKey(stepId = '', question = {}, focusValue = '') {
+    const actions = (question.actions || [])
+      .map(action => `${action.action || ''}:${action.value || ''}`)
+      .join('|');
+    return [
+      stepId,
+      question.kicker || '',
+      question.title || '',
+      focusValue || '',
+      actions,
+    ].map(part => String(part || '').trim()).join('::').slice(0, 1200);
+  }
+
+  function _questionFocusValue(question = {}) {
+    const actions = question.actions || [];
+    for (const action of actions) {
+      const value = _planValueFromQuestionAction(action);
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function _planValueFromQuestionAction(action = {}) {
+    const raw = String(action.value || '').trim();
+    const parts = raw.split('::');
+    switch (action.action) {
+      case 'selectPlanItem':
+      case 'openClassroomObjectFicha':
+      case 'openSanitaryObjectFicha':
+        return raw;
+      case 'openClassroomFicha':
+      case 'saveClassroomMeasures':
+      case 'confirmClassroomConfigured':
+        return raw ? `room::${raw}` : '';
+      case 'openSanitaryFicha':
+      case 'saveSanitaryMeasures':
+      case 'confirmSanitaryConfigured':
+        return raw ? `sanitary::${raw}` : '';
+      case 'openSiteFicha':
+      case 'saveSiteMeasures':
+      case 'confirmSiteConfigured':
+        return raw ? `site::${raw}` : '';
+      case 'answerBlockField':
+        return '';
+      case 'answerFloorField':
+        return parts[0] && parts[1] ? `floor::${parts[0]}::${parts[1]}` : '';
+      case 'answerClassroomField':
+      case 'addGuidedRoomElement':
+      case 'markRoomElementAbsent':
+        return parts[0] ? `room::${parts[0]}` : '';
+      case 'answerClassroomObjectField':
+        return parts[0] && parts[1] ? `${parts[0]}::${parts[1]}` : '';
+      case 'answerSanitaryField':
+      case 'addGuidedSanitaryElement':
+      case 'markSanitaryElementAbsent':
+        return parts[0] ? `sanitary::${parts[0]}` : '';
+      case 'answerSanitaryObjectField':
+        return parts[0] && parts[1] ? `sanitary::${parts[0]}::${parts[1]}` : '';
+      case 'answerSiteElementField':
+        return parts[0] ? `site::${parts[0]}` : '';
+      default:
+        return '';
+    }
   }
 
   function _updateSlide() {
@@ -971,6 +1119,8 @@ const GuidedRegisterModule = (() => {
     const school = _schoolContext(valuesForSchool);
     const rooms = Array.isArray(values.__classrooms) ? values.__classrooms : [];
     const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];
+    const propertyBoundary = _propertyBoundaryElement(siteElements);
+    const operationalSiteElements = siteElements.filter(item => !_isPropertyBoundaryElement(item));
     const blocks = Array.isArray(values.__blocks) ? values.__blocks : [];
     const sanitaries = Array.isArray(values.__sanitaries) ? values.__sanitaries : [];
     const classrooms = rooms.filter(room => !room.spaceKind || room.spaceKind === 'classroom').length;
@@ -992,12 +1142,12 @@ const GuidedRegisterModule = (() => {
     ));
     const incompleteClassroom = activeClassrooms.find(room => !_roomConfigured(room));
     const incompleteSanitary = activeSanitaries.find(item => !_sanitaryConfigured(item));
-    const incompleteSiteElement = siteElements.find(item => !_siteElementConfigured(item));
+    const incompleteSiteElement = operationalSiteElements.find(item => !_siteElementConfigured(item));
     const blockHasMeasures = _hasMeasures(activeBlock, 'largo_m', 'ancho_m');
     const blockPositioned = _hasPosition(activeBlock?.planPosition || activeBlock?.plano_general);
     const noFloor = _flagValue(_flagKeyParts(blockId, activeFloorLabel, 'noFloor'));
     const incompleteFloor = activeFloors.find(floor => !_floorReady(floor));
-    const activeBlockSiteElements = siteElements.filter(item => (
+    const activeBlockSiteElements = operationalSiteElements.filter(item => (
       item?.autoSource?.module === 'bloques' &&
       (!blockId || item.autoSource.blockId === blockId)
     ));
@@ -1018,12 +1168,14 @@ const GuidedRegisterModule = (() => {
       classrooms,
       otherSpaces,
       sanitaries: sanitaries.length,
-      siteElements: siteElements.length,
+      siteElements: operationalSiteElements.length,
       evidence: _countEvidence(values),
       baseMapSaved: Boolean(values.__planBaseMap?.confirmed || values.__planBaseMap?.savedAt),
       savedAtText,
       school,
       schoolIdentityConfirmed,
+      propertyBoundary,
+      propertyBoundaryConfirmed: _propertyBoundaryConfirmed(propertyBoundary),
       completion,
       planTitle: activeBlock?.bloque_codigo || school.name || values.general?.nombre_institucion || 'Escuela en construccion',
       activeBlock,
@@ -1033,7 +1185,7 @@ const GuidedRegisterModule = (() => {
       activeClassrooms,
       activeOtherSpaces,
       activeSanitaries,
-      activeSiteElements: siteElements,
+      activeSiteElements: operationalSiteElements,
       incompleteClassroom,
       incompleteSanitary,
       incompleteSiteElement,
@@ -1054,6 +1206,9 @@ const GuidedRegisterModule = (() => {
     const rooms = Array.isArray(values.__classrooms) ? values.__classrooms : [];
     const sanitaries = Array.isArray(values.__sanitaries) ? values.__sanitaries : [];
     const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];
+    const propertyBoundary = _propertyBoundaryElement(siteElements);
+    const operationalSiteElements = siteElements.filter(item => !_isPropertyBoundaryElement(item));
+    const baseMapSaved = Boolean(values.__planBaseMap?.confirmed || values.__planBaseMap?.savedAt);
     const pending = [];
     const add = (scope, title, detail = '', action = '', value = '') => {
       pending.push({ scope, title, detail, action, value });
@@ -1064,6 +1219,9 @@ const GuidedRegisterModule = (() => {
 
     if (!school.name && !school.code) add('Escuela', 'Identificar escuela', 'Falta codigo o nombre de la escuela.', 'module', 'mapa');
     if ((school.name || school.code) && !_schoolIdentityConfirmedForSchool(school)) add('Escuela', 'Confirmar datos basicos', 'Revise codigo, nombre, territorio y coordenadas antes de cargar infraestructura.', 'resetSchoolIdentity');
+    if ((school.name || school.code) && !baseMapSaved) add('Escuela', 'Guardar georreferencia corregida', 'Posicione la escuela en la base mapa, ajuste coordenadas si corresponde y guarde antes de dibujar.', 'saveBasemap');
+    if (baseMapSaved && !propertyBoundary) add('Predio', 'Delinear perimetro del predio', 'Dibuje los bordes aproximados de la propiedad escolar antes de crear bloques.', 'addPropertyBoundary');
+    if (baseMapSaved && propertyBoundary && !_propertyBoundaryConfirmed(propertyBoundary)) add('Predio', 'Confirmar perimetro aproximado', 'Ajuste el rectangulo/poligono del predio y confirme que representa los bordes de la escuela.', 'confirmPropertyBoundary', propertyBoundary.id);
     if (!savedAtText) add('Escuela', 'Guardar contexto inicial', 'Guarde datos generales, jornada o responsable de carga.', 'stage', 'general');
     if (!blocks.length) add('Bloques', 'Crear al menos un bloque', 'El relevamiento no tiene estructura arquitectonica.', 'guidedBlock');
 
@@ -1121,7 +1279,7 @@ const GuidedRegisterModule = (() => {
       if (_sanitaryReady(item) && !_sanitaryConfigured(item)) add(scope, 'Confirmar configuracion', 'Pulse Confirmar configuracion para cerrar el sanitario.', 'confirmSanitaryConfigured', item.id);
     });
 
-    siteElements.forEach(item => {
+    operationalSiteElements.forEach(item => {
       const scope = item?.ficha?.codigo || _siteElementTypeLabel(item?.type) || 'Exterior';
       _siteElementRequirementItems(item)
         .filter(req => !req.done && !req.optional)
@@ -1131,7 +1289,7 @@ const GuidedRegisterModule = (() => {
 
     const anyNoSiteFlag = Object.entries(_guidedState.flags || {})
       .some(([key, value]) => value && key.endsWith('::noSiteElements'));
-    if (!siteElements.length && !anyNoSiteFlag) {
+    if (!operationalSiteElements.length && !anyNoSiteFlag) {
       add('Exteriores', 'Responder si hay exteriores', 'Agregue elementos exteriores/tecnicos o marque que no hay.', 'site', 'water_tank');
     }
 
@@ -1143,7 +1301,7 @@ const GuidedRegisterModule = (() => {
         blocks: blocks.length,
         rooms: rooms.length,
         sanitaries: sanitaries.length,
-        siteElements: siteElements.length,
+        siteElements: operationalSiteElements.length,
         evidence: _countEvidence(values),
       },
     };
@@ -1178,8 +1336,8 @@ const GuidedRegisterModule = (() => {
   }
 
   function _stepDone(id, snap) {
-    if (id === 'escuela') return Boolean(snap.schoolIdentityConfirmed && snap.savedAtText);
-    if (id === 'predio') return snap.baseMapSaved;
+    if (id === 'escuela') return Boolean(snap.schoolIdentityConfirmed && snap.baseMapSaved);
+    if (id === 'predio') return Boolean(snap.baseMapSaved && snap.propertyBoundaryConfirmed);
     if (id === 'bloques') return snap.blocks > 0 &&
       _blockRequirementItems(snap.activeBlock).every(item => item.done || item.optional) &&
       snap.blockPositioned &&
@@ -1271,9 +1429,9 @@ const GuidedRegisterModule = (() => {
   function _schoolQuestion(snap) {
     if (!snap.school.name) {
       return _question(
-        'Declaracion inicial',
+        'Ubicacion inicial',
         'Seleccione o identifique la escuela',
-        'Antes de dibujar, confirme cual es la escuela del relevamiento. Ese dato identifica el plano, las fotos, los bloques, las aulas y la salida PDF. La secuencia usa como fuente el Excel MEC VF 24-03-26.',
+        'Antes de dibujar, confirme cual es la escuela del relevamiento. Ese dato identifica el plano, las fotos, los bloques, las aulas y la salida PDF.',
         [
           { label: 'Elegir en mapa', action: 'module', value: 'mapa', primary: true },
           { label: 'Datos generales', action: 'stage', value: 'general' },
@@ -1287,11 +1445,13 @@ const GuidedRegisterModule = (() => {
     }
     if (!snap.schoolIdentityConfirmed) {
       return _question(
-        'Declaracion inicial',
+        'Ubicacion inicial',
         'Confirme identificacion y ubicacion de la escuela',
-        'Revise y corrija codigo, nombre, departamento, distrito, localidad y coordenadas antes de dibujar. Esta confirmacion vincula todo el plano, fotos y cierre con la escuela correcta, siguiendo la hoja Gral. del Excel MEC VF 24-03-26.',
+        'Revise y corrija codigo, nombre, departamento, distrito, localidad y coordenadas antes de dibujar. Esta confirmacion vincula todo el plano, fotos y cierre con la escuela correcta.',
         [
           { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
+          { label: 'Usar coordenadas', action: 'coords' },
+          { label: 'Base mapa', action: 'basemap' },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
           { label: 'Reiniciar escuela', action: 'resetSchoolData' },
         ],
@@ -1301,31 +1461,32 @@ const GuidedRegisterModule = (() => {
         true
       );
     }
-    if (!snap.savedAtText) {
+    if (!snap.baseMapSaved) {
       return _question(
-        'Declaracion inicial',
-        'Declare jornada y responsable de carga',
-        'Complete o revise datos generales y jornada antes de medir. La escuela ya esta identificada, pero falta dejar guardado el contexto operativo.',
+        'Ubicacion inicial',
+        'Posicione la escuela en el plano base',
+        'Use las coordenadas de la escuela, ajuste la base de calles si hace falta y guarde la georreferencia corregida antes de delinear el predio.',
         [
-          { label: 'Datos generales', action: 'stage', value: 'general', primary: true },
-          { label: 'Mi jornada', action: 'module', value: 'jornada' },
-          { label: 'Siguiente', action: 'next' },
+          { label: 'Usar coordenadas', action: 'coords', primary: true },
+          { label: 'Calles/lineas', action: 'basemap' },
+          { label: 'Guardar georef.', action: 'saveBasemap' },
+          { label: 'Corregir datos', action: 'resetSchoolIdentity' },
         ],
         false,
         '',
-        'Registre fecha de visita, turno o jornada, responsable/encuestador y cualquier observacion inicial de acceso. Estos datos ayudan a reconstruir tiempos, saber quien cargo el relevamiento y vincular evidencia fotografica con la escuela correcta.',
-        false
+        'Este es el primer control operativo del relevamiento: si la ubicacion oficial esta corrida, ajuste la referencia ahora para que bloques, fotos y cierre queden asociados al punto correcto. Si no hay internet, use las coordenadas disponibles y guarde igualmente la base.',
+        true
       );
     }
     return _question(
       'Listo',
-      'Escuela y jornada identificadas',
-      'El contexto de la carga ya quedo disponible. Ahora prepare el predio base o avance a bloques si no necesita base de calles/coordenadas.',
+      'Escuela ubicada y georreferencia guardada',
+      'La escuela ya tiene identidad y posicion de partida. Ahora corresponde delinear los bordes aproximados de la propiedad escolar.',
       [
         { label: 'Siguiente', action: 'next', primary: true },
+        { label: 'Revisar base', action: 'basemap' },
         { label: 'Corregir datos escuela', action: 'resetSchoolIdentity' },
         { label: 'Reiniciar escuela', action: 'resetSchoolData' },
-        { label: 'Mapa', action: 'module', value: 'mapa' },
       ],
       true,
       '',
@@ -1338,33 +1499,82 @@ const GuidedRegisterModule = (() => {
     if (!snap.baseMapSaved) {
       return _question(
         'Plano de partida',
-        'Declare la referencia del predio',
-        'Defina si usara calles/coordenadas como ayuda visual. No es obligatorio, pero mejora la ubicacion de bloques, accesos, patios, tanques y exteriores.',
+        'Guarde primero la ubicacion de la escuela',
+        'Antes de delinear la propiedad, la escuela debe quedar posicionada y guardada sobre la base mapa.',
         [
-          { label: 'Calles/lineas', action: 'basemap', primary: true },
+          { label: 'Volver a ubicacion', action: 'prev', primary: true },
           { label: 'Usar coordenadas', action: 'coords' },
-          { label: 'Guardar base', action: 'saveBasemap' },
-          { label: 'Siguiente', action: 'next' },
+          { label: 'Guardar georef.', action: 'saveBasemap' },
         ],
         false,
         '',
-        'Use la base solo como referencia: el plano tecnico final lo construye con medidas reales. Si la escuela tiene coordenadas, pulse Usar coordenadas, ajuste la base si hace falta y luego Guardar base. Si no hay internet o la imagen no ayuda, continue sin base y dibuje bloques a escala con las medidas relevadas.',
-        false
+        'La propiedad debe apoyarse en una georreferencia confirmada. Esto evita que el predio se dibuje sobre una escuela equivocada o en una posicion heredada de otro relevamiento.',
+        true
+      );
+    }
+    if (!snap.propertyBoundary) {
+      return _question(
+        'Bordes del predio',
+        'Delinee los bordes aproximados de la propiedad escolar',
+        'Agregue el perimetro del predio y estirelo sobre la base de calles o imagen de referencia. No necesita precision catastral: debe orientar los bloques dentro de la propiedad visitada.',
+        [
+          { label: 'Dibujar perimetro', action: 'addPropertyBoundary', primary: true },
+          { label: 'Revisar base', action: 'basemap' },
+          { label: 'Mover plano', action: 'moveMode' },
+        ],
+        false,
+        '',
+        'Use el perimetro para indicar los bordes aproximados del local escolar: frente, fondo, laterales y accesos principales si se reconocen. Despues de confirmarlo, la guia pasara a bloques.',
+        true
+      );
+    }
+    if (!snap.propertyBoundaryConfirmed) {
+      return _question(
+        'Bordes del predio',
+        'Ajuste y confirme el perimetro del predio',
+        'Seleccione el perimetro, estire sus bordes hasta cubrir la propiedad escolar aproximada y confirme cuando represente la ubicacion real de campo.',
+        [
+          { label: 'Confirmar perimetro', action: 'confirmPropertyBoundary', value: snap.propertyBoundary.id, primary: true },
+          { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
+          { label: 'Editar ficha', action: 'openSiteFicha', value: snap.propertyBoundary.id },
+          { label: 'Revisar base', action: 'basemap' },
+        ],
+        false,
+        _guidedRequirementList(_siteElementRequirementItems(snap.propertyBoundary)),
+        'Si el predio no es rectangular, use el perimetro como envolvente aproximada. Los detalles finos pueden completarse luego con exteriores, galerias, camineros y observaciones.',
+        true
       );
     }
     return _question(
       'Listo',
-      'Predio base confirmado',
-      'La referencia del predio quedo guardada. Ya puede implantar bloques y exteriores con mas seguridad.',
+      'Perimetro del predio confirmado',
+      'La ubicacion de la escuela y los bordes aproximados del predio ya estan guardados. Ahora puede pasar a bloques.',
       [
         { label: 'Siguiente', action: 'next', primary: true },
+        { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
         { label: 'Revisar base', action: 'basemap' },
       ],
       true,
       '',
-      'La base guardada permite volver a la misma referencia despues de cerrar o actualizar la app. Revise que el norte visual, calles y ubicacion general sean coherentes antes de cargar muchos objetos.',
+      'El perimetro sirve como referencia de implantacion, no como plano catastral. Los bloques se dibujan dentro de esa envolvente con sus medidas reales.',
       false
     );
+  }
+
+  function _isPropertyBoundaryElement(item = {}) {
+    return item?.type === 'property_boundary';
+  }
+
+  function _propertyBoundaryElement(siteElements = []) {
+    return (siteElements || []).find(item => _isPropertyBoundaryElement(item)) || null;
+  }
+
+  function _propertyBoundaryFlagKey(item = {}) {
+    return _flagKeyParts('predio', 'perimetro', `propertyBoundary:${item?.id || 'predio'}`);
+  }
+
+  function _propertyBoundaryConfirmed(item) {
+    return Boolean(item?.id && _flagValue(_propertyBoundaryFlagKey(item)));
   }
 
   function _blockQuestion(snap) {
@@ -1755,6 +1965,14 @@ const GuidedRegisterModule = (() => {
 
   function _roomElementDecisionQuestion(room, spec) {
     const label = room?.name || 'Aula pendiente';
+    if (_isOpeningElementType(spec?.type) && _hasIrregularPlanShape(room)) {
+      return _question('Pregunta del aula', `${label}: ${spec.question}`, 'Puertas y ventanas solo se ubican sobre paredes regulares. El aula tiene forma irregular, por eso primero debe convertirla a Rectangular o registrar que esa abertura no corresponde.', [
+        { label: 'Poner aula rectangular', action: 'rectClassroom', value: room.id, primary: true },
+        { label: spec.noLabel || `No tiene ${spec.label}`, action: 'markRoomElementAbsent', value: `${room.id}::${spec.type}` },
+        { label: 'Seleccionar aula', action: 'selectPlanItem', value: `room::${room.id}` },
+        { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
+      ], false, _guidedRequirementList(_roomRequirementItems(room)), 'Las aberturas se ajustan a una pared recta del ambiente. Si necesita conservar una forma en L, registre la puerta/ventana en la pared regular disponible despues de volver el aula rectangular o marque la respuesta negativa y deje la aclaracion en ficha.');
+    }
     return _question('Pregunta del aula', `${label}: ${spec.question}`, spec.help || 'La guia decide primero si el elemento existe; si existe, se agrega al plano y luego se preguntan sus caracteristicas.', [
       { label: spec.yesLabel || `Si, agregar ${spec.label}`, action: 'addGuidedRoomElement', value: `${room.id}::${spec.type}`, primary: true },
       { label: spec.noLabel || `No tiene ${spec.label}`, action: 'markRoomElementAbsent', value: `${room.id}::${spec.type}` },
@@ -1764,6 +1982,14 @@ const GuidedRegisterModule = (() => {
 
   function _sanitaryElementDecisionQuestion(item, spec) {
     const label = item?.codigo || 'Sanitario pendiente';
+    if (_isOpeningElementType(spec?.type) && _hasIrregularPlanShape(item)) {
+      return _question('Pregunta del sanitario', `${label}: ${spec.question}`, 'Puertas y ventanas solo se ubican sobre paredes regulares. El sanitario tiene forma irregular, por eso primero debe convertirlo a Rectangular o registrar que esa abertura no corresponde.', [
+        { label: 'Poner sanitario rectangular', action: 'rectSanitary', value: item.id, primary: true },
+        { label: spec.noLabel || `No tiene ${spec.label}`, action: 'markSanitaryElementAbsent', value: `${item.id}::${spec.type}` },
+        { label: 'Seleccionar sanitario', action: 'selectPlanItem', value: `sanitary::${item.id}` },
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)), 'Las aberturas se ajustan a una pared recta del sanitario. En formas irregulares, primero regularice el contorno o registre que la abertura no corresponde.');
+    }
     return _question('Pregunta del sanitario', `${label}: ${spec.question}`, spec.help || 'La guia decide primero si el elemento existe; si existe, se agrega al plano y luego se preguntan sus caracteristicas.', [
       { label: spec.yesLabel || `Si, agregar ${spec.label}`, action: 'addGuidedSanitaryElement', value: `${item.id}::${spec.type}`, primary: true },
       { label: spec.noLabel || `No tiene ${spec.label}`, action: 'markSanitaryElementAbsent', value: `${item.id}::${spec.type}` },
@@ -2364,6 +2590,14 @@ const GuidedRegisterModule = (() => {
     return (objects || []).some(object => object?.type === type);
   }
 
+  function _isOpeningElementType(type = '') {
+    return ['door', 'window'].includes(type);
+  }
+
+  function _hasIrregularPlanShape(record = {}) {
+    return Array.isArray(record?.planShape?.points) && record.planShape.points.length >= 3;
+  }
+
   function _roomElementDecisionKey(room, type) {
     return _flagKeyParts(`room:${room?.id || ''}`, _normalizeFloorLabel(room?.floor || 'Piso 1'), `elementAbsent:${type}`);
   }
@@ -2496,6 +2730,8 @@ const GuidedRegisterModule = (() => {
   function _siteElementRequirementItems(item) {
     const ficha = item?.ficha || {};
     const isPillar = item?.type === 'pillar';
+    const isPropertyBoundary = _isPropertyBoundaryElement(item);
+    const isNonBlockingReference = isPillar || isPropertyBoundary;
     return [
       {
         title: 'Ubicar en plano',
@@ -2509,21 +2745,21 @@ const GuidedRegisterModule = (() => {
         help: 'Complete las medidas propias del elemento, o estire sus vertices para sincronizarlas con la ficha.',
         doneText: `${_siteElementDimensionText(item)} confirmadas`,
         done: _siteElementHasMeasures(item) && _measureConfirmed('site', item?.id),
-        optional: isPillar,
+        optional: isNonBlockingReference,
       },
       {
         title: 'Condicion de calidad',
         help: 'Registre el estado general observado.',
         doneText: ficha.estado || 'Estado cargado',
         done: _hasAnswer(ficha.estado),
-        optional: isPillar,
+        optional: isNonBlockingReference,
       },
       {
         title: 'Caracteristicas tecnicas',
         help: 'Complete el campo tecnico principal que corresponde a este tipo de elemento.',
         doneText: _siteElementCharacteristicText(item),
         done: _siteElementHasCharacteristic(item),
-        optional: isPillar,
+        optional: isNonBlockingReference,
       },
     ];
   }
@@ -2662,7 +2898,7 @@ const GuidedRegisterModule = (() => {
     }), true);
     _saveState();
     _refreshSoon();
-    UI.showToast('Datos basicos de escuela confirmados. Ahora continue con jornada y predio.', 'success', 5200);
+    UI.showToast('Datos basicos de escuela confirmados. Ahora posicione la ubicacion y guarde la georreferencia.', 'success', 5200);
   }
 
   function _resetSchoolIdentity() {
@@ -2683,10 +2919,69 @@ const GuidedRegisterModule = (() => {
     if (!ok) return;
     _guidedState = { targets: {}, flags: {} };
     _guidedHistory = [];
+    _guidedQuestionHistory = [];
     _activeIndex = 0;
     _saveState();
     _updateSlide();
     _updateSnapshot();
+  }
+
+  function _addPropertyBoundary() {
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.ensurePropertyBoundary) {
+      UI.showToast('No se pudo crear el perimetro del predio desde esta version.', 'warning');
+      return;
+    }
+    const element = mec.ensurePropertyBoundary({ guided: true });
+    if (!element?.id) {
+      UI.showToast('No se pudo ubicar el perimetro del predio.', 'warning');
+      return;
+    }
+    _setFlag(_propertyBoundaryFlagKey(element), false);
+    _saveState();
+    mec.focusSelectedPlanItem?.('Ajuste el perimetro aproximado del predio escolar y luego confirme desde la pregunta superior.');
+    _refreshSoon();
+    UI.showToast('Perimetro del predio agregado. Estirelo sobre la base y confirme cuando represente los bordes aproximados.', 'success', 6200);
+  }
+
+  function _confirmPropertyBoundary() {
+    const snap = _snapshot();
+    const item = snap.propertyBoundary || _propertyBoundaryElement(snap.values?.__siteElements || []);
+    if (!item?.id) {
+      UI.showToast('Primero dibuje el perimetro del predio.', 'warning', 5200);
+      return;
+    }
+    if (!_siteElementHasPlanRect(item)) {
+      _selectPlanItem(`site::${item.id}`);
+      UI.showToast('Ajuste el perimetro en el plano antes de confirmarlo.', 'warning', 5200);
+      return;
+    }
+    _setFlag(_propertyBoundaryFlagKey(item), true);
+    _saveState();
+    _refreshSoon(400);
+    UI.showToast('Perimetro aproximado del predio confirmado. Ahora continue con bloques.', 'success', 5200);
+  }
+
+  function _setClassroomRect(roomId) {
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!roomId || !mec?.setPlanClassroomShape) {
+      UI.showToast('No se pudo regularizar la forma del aula.', 'warning');
+      return;
+    }
+    mec.setPlanClassroomShape(roomId, 'rect');
+    _refreshSoon();
+    UI.showToast('Aula convertida a forma rectangular. Ahora puede agregar puertas o ventanas sobre paredes regulares.', 'success', 5200);
+  }
+
+  function _setSanitaryRect(sanitaryId) {
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!sanitaryId || !mec?.setPlanSanitaryShape) {
+      UI.showToast('No se pudo regularizar la forma del sanitario.', 'warning');
+      return;
+    }
+    mec.setPlanSanitaryShape(sanitaryId, 'rect');
+    _refreshSoon();
+    UI.showToast('Sanitario convertido a forma rectangular. Ahora puede agregar puertas o ventanas sobre paredes regulares.', 'success', 5200);
   }
 
   function _saveBlockMeasures() {
@@ -2967,7 +3262,11 @@ const GuidedRegisterModule = (() => {
       return;
     }
     mec.selectPlanItem(`room::${roomId}`);
-    mec.addPlanClassroomElement(type, { guided: true });
+    const added = mec.addPlanClassroomElement(type, { guided: true });
+    if (added === false || added === null) {
+      _refreshSoon();
+      return;
+    }
     mec.focusSelectedPlanItem?.(`${_guidedElementActionLabel(type)} insertado. Ubíquelo en el plano; al soltarlo, vuelva a la pregunta superior para completar sus datos.`);
     _refreshSoon();
   }
@@ -2991,14 +3290,19 @@ const GuidedRegisterModule = (() => {
       return;
     }
     mec.selectPlanItem(`sanitary::${sanitaryId}`);
+    let added = null;
     if (type === 'stall' && mec.addPlanSanitaryStall) {
-      mec.addPlanSanitaryStall({ guided: true });
+      added = mec.addPlanSanitaryStall({ guided: true });
     } else if (['toilet', 'sink', 'urinal', 'shower'].includes(type) && mec.addPlanSanitaryFixture) {
-      mec.addPlanSanitaryFixture(type, { guided: true });
+      added = mec.addPlanSanitaryFixture(type, { guided: true });
     } else if (['door', 'window'].includes(type) && mec.addPlanSanitaryOpening) {
-      mec.addPlanSanitaryOpening(type, { guided: true });
+      added = mec.addPlanSanitaryOpening(type, { guided: true });
     } else if (mec.addPlanSanitaryElement) {
-      mec.addPlanSanitaryElement(type, { guided: true });
+      added = mec.addPlanSanitaryElement(type, { guided: true });
+    }
+    if (added === false) {
+      _refreshSoon();
+      return;
     }
     mec.focusSelectedPlanItem?.(`${_guidedElementActionLabel(type)} insertado. Ubíquelo en el plano; al soltarlo, vuelva a la pregunta superior para completar sus datos.`);
     _refreshSoon();
@@ -3350,6 +3654,7 @@ const GuidedRegisterModule = (() => {
   }
 
   function _siteElementConfigured(item) {
+    if (_isPropertyBoundaryElement(item)) return _propertyBoundaryConfirmed(item);
     if (!_siteElementReady(item)) return false;
     if (item?.autoSource?.fieldId === 'pilares_bloque') return true;
     return _flagValue(_flagKeyParts('predio', 'exteriores', `siteConfigured:${item.id}`));
@@ -3400,6 +3705,7 @@ const GuidedRegisterModule = (() => {
       gallery: 'ubicacion_relativa',
       walkway: 'superficie',
       open_space: 'uso',
+      property_boundary: 'fuente',
       pillar: 'material',
       stair: 'material',
       ramp: 'material',
@@ -3418,6 +3724,7 @@ const GuidedRegisterModule = (() => {
       gallery: ['Frente', 'Lateral', 'Posterior', 'Entre bloques', 'Perimetral'],
       walkway: ['Hormigon', 'Tierra', 'Adoquin', 'Pasto', 'Mixto'],
       open_space: ['Patio', 'Circulacion', 'Deposito temporal', 'Area verde', 'Sin uso'],
+      property_boundary: ['Verificacion en campo', 'Imagen/base mapa', 'Dato institucional', 'Estimado por encuestador', 'No verificable'],
       pillar: ['Hormigon', 'Metalico', 'Madera', 'Mamposteria', 'Otro'],
       stair: ['Hormigon', 'Metalica', 'Madera', 'Mixta', 'No verificable'],
       ramp: ['Hormigon', 'Metalica', 'Madera', 'Mixta', 'No verificable'],
@@ -3448,6 +3755,7 @@ const GuidedRegisterModule = (() => {
       gallery: 'Galeria',
       walkway: 'Caminero',
       open_space: 'Espacio libre',
+      property_boundary: 'Perimetro del predio',
       pillar: 'Pilar',
       stair: 'Escalera de bloque',
       ramp: 'Rampa de bloque',
@@ -3587,13 +3895,13 @@ const GuidedRegisterModule = (() => {
         targets: saved.targets && typeof saved.targets === 'object' ? saved.targets : {},
         flags: saved.flags && typeof saved.flags === 'object' ? saved.flags : {},
       };
-      _guidedHistory = Array.isArray(saved.history)
-        ? saved.history.map(Number).filter(Number.isFinite).slice(-20)
-        : [];
+      _guidedHistory = [];
+      _guidedQuestionHistory = [];
     } catch {
       _activeIndex = 0;
       _guidedState = { targets: {}, flags: {} };
       _guidedHistory = [];
+      _guidedQuestionHistory = [];
     }
   }
 
@@ -3602,7 +3910,6 @@ const GuidedRegisterModule = (() => {
       activeIndex: _activeIndex,
       targets: _guidedState.targets || {},
       flags: _guidedState.flags || {},
-      history: _guidedHistory.slice(-20),
       updatedAt: new Date().toISOString(),
     });
     localStorage.setItem(STATE_KEY, payload);

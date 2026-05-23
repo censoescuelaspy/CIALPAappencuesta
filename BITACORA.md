@@ -4,6 +4,86 @@
 
 ---
 
+## Navegacion anterior/siguiente y zoom de seleccion - 2026-05-23 - v2.6.118
+
+### Objetivo
+- Corregir los botones `Anterior` y `Siguiente` del `Registro guiado`, especialmente para volver al item o pregunta inmediatamente anterior.
+- Verificar y cerrar cualquier camino de zoom automatico al seleccionar objetos del plano.
+
+### Diagnostico
+- `Anterior` usaba solo historial de etapas (`_guidedHistory`), por lo que dentro de una misma etapa secuencial no podia volver al ultimo item respondido.
+- Ese historial se guardaba en `localStorage`, por lo que podia quedar viejo entre sesiones y provocar saltos inesperados.
+- El plano general ya no aplicaba zoom al seleccionar, pero quedaba una funcion interna vieja `_focusSchoolPlanArea()` capaz de reintroducir ese comportamiento si se reutilizaba despues.
+
+### Cambios implementados
+- Se agrega historial de preguntas guiadas en memoria de sesion (`_guidedQuestionHistory`).
+- Antes de acciones que cambian respuesta, item o etapa, la guia guarda la pregunta activa con su foco de plano cuando existe.
+- `Anterior` intenta restaurar primero la pregunta/item inmediatamente anterior; si no hay historial de preguntas, vuelve a la etapa anterior.
+- El historial de etapas deja de persistirse en `localStorage`, evitando saltos viejos al retomar la app.
+- Se elimina `_focusSchoolPlanArea()` y su helper, dejando la seleccion del plano sin cambio automatico de zoom.
+- Version visible, cache y assets actualizados a `v2.6.118`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.118`.
+- Probar en tablet: responder una pregunta de aula/sanitario, tocar `Anterior` y confirmar que vuelve al item inmediato anterior.
+- Seleccionar objetos del plano y confirmar que el zoom no cambia salvo gesto manual, rueda con Ctrl o botones de acercar/alejar.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.117` en assets de publicacion.
+- Revision estatica de zoom: no existe `_focusSchoolPlanArea`; `selectArea()` y `focusSelectedPlanItem()` no llaman a `_setSchoolPlanZoomValue`.
+
+---
+
+## Georreferencia, perimetro y destrabe de paredes - 2026-05-23 - v2.6.117
+
+### Objetivo
+- Resolver el cuelgue en `Aula 1: material predominante de pared`.
+- Ordenar el inicio del `Registro guiado`: primero identificar escuela, posicionar ubicacion en base mapa y guardar georreferencia corregida; luego delinear perimetro aproximado del predio; despues iniciar bloques.
+- Evitar que puertas o ventanas se inserten en aulas/sanitarios con poligono irregular.
+
+### Diagnostico
+- `setGuidedClassroomField()` guardaba `pared_material`, `pared_estado` y `requiere_intervencion` en el sketch activo.
+- `_cloneClassroom()` no preservaba esos campos al sincronizar el aula, por eso la guia volvia a la misma pregunta.
+- El paso `Predio base` permitia avanzar sin georreferencia guardada y no tenia un objeto explicito para bordes del predio.
+- Las aberturas usan anclaje a pared regular; sobre un poligono irregular la geometria de puerta/ventana podia quedar mal resuelta.
+
+### Cambios implementados
+- `_cloneClassroom()` preserva `pared_material`, `pared_estado` y `requiere_intervencion`.
+- `Registro guiado` exige `Ubicacion escuela` con identidad confirmada y base mapa guardada antes de avanzar.
+- `savePlanBaseMap()` copia latitud/longitud corregidas a `general` y `__selectedSchool` del borrador.
+- Se agrega el elemento `property_boundary` / `Perimetro del predio escolar` al plano general.
+- El paso `Perimetro predio` crea, selecciona y confirma el borde aproximado del predio antes de pasar a bloques.
+- El perimetro queda fuera del conteo normal de `Exteriores`, para que no bloquee ni reemplace la pregunta de elementos exteriores.
+- Puertas y ventanas se bloquean en aulas/sanitarios con `planShape` irregular; la guia ofrece pasar a `Rectangular` o registrar que no corresponde.
+- Version visible, cache y assets actualizados a `v2.6.117`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.117`.
+- Probar en tablet: escuela seleccionada -> guardar base mapa -> dibujar/confirmar perimetro -> crear bloque -> aula -> responder paredes.
+- Probar aula con forma L: la guia debe bloquear puerta/ventana hasta convertir a rectangular o marcar que no tiene abertura.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.116` ni `v2.6.103` en assets de publicacion.
+- Revision estatica por script: todos los campos `answerClassroomField` existen en `_cloneClassroom()`.
+
+---
+
 ## Auxiliar de normalizacion en Registro guiado - 2026-05-22 - v2.6.116
 
 ### Objetivo
