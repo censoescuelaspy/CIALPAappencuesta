@@ -48,6 +48,8 @@
 - Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.118`.
 - Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `_guidedQuestionHistory`.
 - Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: no contiene `_focusSchoolPlanArea` ni `_planAreaFocusPoint`.
+- Refuerzo posterior `git commit`: `9c12054 fix: restaurar pregunta anterior guiada v2.6.118`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `_guidedReviewQuestion` y `_questionHistorySnapshot`.
 
 ---
 
