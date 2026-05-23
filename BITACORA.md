@@ -4,6 +4,36 @@
 
 ---
 
+## Traspaso de escuela desde mapa a registro guiado - 2026-05-22 - v2.6.112
+
+### Objetivo
+- Corregir que al seleccionar una escuela en `Mapa` y tocar `Iniciar/continuar registro`, la vista `Registro guiado` se abriera sin conservar la escuela activa.
+
+### Diagnostico
+- El flujo `Mapa > Registro guiado` podia cambiar de vista mientras los assets diferidos del motor MEC seguian cargando.
+- Si `MecFormModule` todavia no estaba listo, la escuela quedaba solo en `SurveyModule` y el registro podia renderizar desde un borrador global sin `__selectedSchool`.
+
+### Cambios implementados
+- `AppController.showModule()` ahora devuelve la promesa de inicializacion del modulo, permitiendo esperar la carga real de `mec-form.js` y `guided-register.js`.
+- `MapModule.startGuidedRegister()` ahora espera a que `Registro guiado` termine de inicializarse.
+- Despues de la carga, la app vuelve a fijar explicitamente la escuela activa en `MecFormModule.setSelectedSchool(..., force: true)`.
+- `GuidedRegisterModule.init()` se ejecuta nuevamente luego de reforzar la escuela para que el encabezado, preguntas y plano tomen el contexto correcto.
+- Version visible y cache del Service Worker actualizados a `v2.6.112`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.112`.
+- Probar en tablet: abrir `Mapa`, seleccionar escuela asignada, tocar `Iniciar/continuar registro` y confirmar que el encabezado muestra nombre/codigo de la escuela.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Planta baja como huella de bloque y redimensionamiento de pisos - 2026-05-22 - v2.6.111
 
 ### Objetivo

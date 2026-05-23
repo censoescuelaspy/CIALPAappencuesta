@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.76
+ * Version: 2.6.112
  */
 
 const MapModule = (() => {
@@ -689,7 +689,7 @@ const MapModule = (() => {
     return 2 * earthKm * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
-  function startGuidedRegister(id) {
+  async function startGuidedRegister(id) {
     if (!Auth.requireAuth()) return;
     const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
     if (!escuela) {
@@ -707,12 +707,15 @@ const MapModule = (() => {
       ? SurveyModule.setCurrentEscuela(escuela)
       : true;
     if (!ready) return;
-    AppController.showModule('registro');
-    setTimeout(() => {
-      try {
-        if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
-      } catch { /* non-fatal */ }
-    }, 160);
+    await Promise.resolve(AppController.showModule('registro'));
+    try {
+      if (typeof MecFormModule !== 'undefined' && MecFormModule.setSelectedSchool) {
+        MecFormModule.setSelectedSchool(escuela, { render: false, force: true });
+      }
+      if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
+    } catch (err) {
+      console.warn('[Mapa] No se pudo reforzar la escuela activa en Registro guiado:', err);
+    }
     UI.showToast(`Escuela activa: ${escuela.nombre || escuela.codigo_local || escuela.id_escuela}.`, 'success', 4200);
   }
 

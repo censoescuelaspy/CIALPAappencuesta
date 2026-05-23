@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.91
+ * Version: 2.6.112
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -1106,12 +1106,13 @@ const AppController = (() => {
     document.getElementById('sidebar')?.classList.remove('sidebar--open');
 
     // Module-specific init
-    _initModule(targetModuleId);
+    const initPromise = _initModule(targetModuleId);
     _currentModule = targetModuleId;
 
     // Update page title
     const mod = MODULES[targetModuleId];
     if (mod) document.title = `${mod.label} — ${APP_CONFIG.APP_NAME}`;
+    return initPromise;
   }
 
   function _ensureVisibleModule(moduleId = 'inicio', force = false) {
