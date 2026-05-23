@@ -4,6 +4,44 @@
 
 ---
 
+## Codigo local buscable y territorio oficial - 2026-05-23 - v2.6.126
+
+### Objetivo
+- Hacer que el codigo de local del cuestionario inicial sea una lista buscable por codigo, nombre de escuela o distrito.
+- Asegurar que departamento y distrito se carguen desde el padron oficial disponible.
+- Corregir el estado visual de botones de opcion para que se vea claramente la respuesta marcada.
+
+### Diagnostico
+- El formulario publico mostraba `Codigo de local` como texto libre, obligando al director a escribirlo sin ayuda.
+- `Departamento` y `Distrito` tambien estaban como texto libre, sin relacion con la lista oficial de escuelas.
+- Los botones marcados solo cambiaban con un estilo muy suave y en algunos navegadores no quedaba evidente que la opcion habia sido seleccionada.
+
+### Cambios implementados
+- Se agrega endpoint publico `listarEscuelasCuestionarioInicial`, sin autenticacion, con datos minimos del padron: codigo, id, nombre, departamento, distrito y localidad.
+- El campo `Codigo de local / escuela` pasa a buscador con `datalist`, permitiendo localizar por codigo, nombre o distrito.
+- Al seleccionar una escuela, el formulario completa codigo local, id de escuela, nombre, departamento, distrito y localidad cuando corresponde.
+- `Departamento` y `Distrito` pasan a listas desplegables; los distritos se filtran segun el departamento seleccionado.
+- Los botones de opciones y checks ahora usan verde pleno cuando estan marcados, con respaldo CSS `:has(input:checked)` y refresco por click/cambio.
+- Version visible, cache y assets actualizados a `v2.6.126`.
+
+### Pendiente operativo
+- Publicar/actualizar el Web App de Apps Script desde la cuenta propietaria para que el nuevo endpoint publico quede activo en produccion.
+- Probar en el cuestionario publicado la busqueda de una escuela real por codigo local, nombre y distrito.
+
+### Validaciones ejecutadas
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante `vm.Script`: OK.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Playwright local escritorio: lista de escuelas simulada carga 2 opciones, selecciona codigo `1001`, completa departamento `Central` y distrito `Luque`, boton marcado queda en verde `rgb(11, 93, 59)`, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: 7 bloques, sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+
 ## Cuestionario inicial publico R01 y envio a directores - 2026-05-23 - v2.6.125
 
 ### Objetivo

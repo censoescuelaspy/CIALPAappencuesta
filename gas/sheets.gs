@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.125
+ * Version 2.6.126
  */
 
 const SheetsService = (() => {
@@ -833,6 +833,43 @@ const SheetsService = (() => {
         uploadedAt: now,
         evidenceId,
       }
+    };
+  }
+
+  function listarEscuelasCuestionarioInicial(params) {
+    params = params || {};
+    const source = _escuelasRawRows_();
+    const allRows = source.rows
+      .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || r.__official_sheet_row || idx + 2))
+      .filter(r => r.codigo_local || r.id_escuela || r.nombre);
+    let rows = allRows.slice();
+    if (params.departamento) rows = rows.filter(r => _same(r.departamento, params.departamento));
+    if (params.distrito) rows = rows.filter(r => _same(r.distrito, params.distrito));
+    if (params.q) {
+      const q = _r01SearchKey_(params.q);
+      rows = rows.filter(r => _r01SearchKey_(`${r.codigo_local} ${r.id_escuela} ${r.nombre} ${r.departamento} ${r.distrito} ${r.localidad}`).indexOf(q) !== -1);
+    }
+    rows = rows.slice().sort((a, b) => {
+      const ad = _txt(a.departamento).localeCompare(_txt(b.departamento));
+      if (ad) return ad;
+      const dd = _txt(a.distrito).localeCompare(_txt(b.distrito));
+      if (dd) return dd;
+      return _txt(a.codigo_local || a.id_escuela).localeCompare(_txt(b.codigo_local || b.id_escuela));
+    });
+    const limit = Math.min(Math.max(_num(params.limit) || rows.length, 1), 10000);
+    const data = rows.slice(0, limit).map(_r01PublicSchool_);
+    return {
+      status: 'ok',
+      data,
+      meta: {
+        total: data.length,
+        total_padron: allRows.length,
+        source: source.source,
+        embedded_updated_at: source.embeddedUpdatedAt || '',
+        departamentos: _uniqueSorted_(allRows.map(r => r.departamento)),
+        distritos: _uniqueSorted_(allRows.map(r => r.distrito)),
+        distritos_por_departamento: _districtsByDepartment_(allRows),
+      },
     };
   }
 
@@ -2746,6 +2783,61 @@ const SheetsService = (() => {
     return role === 'admin' || role === 'supervisor';
   }
 
+  function _r01PublicSchool_(row) {
+    row = row || {};
+    return {
+      id_escuela: _txt(row.id_escuela),
+      codigo_local: _txt(row.codigo_local),
+      nombre: _txt(row.nombre),
+      departamento: _txt(row.departamento),
+      distrito: _txt(row.distrito),
+      localidad: _txt(row.localidad),
+    };
+  }
+
+  function _r01SearchKey_(value) {
+    return _txt(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '');
+  }
+
+  function _uniqueSorted_(values) {
+    const seen = {};
+    (values || []).forEach(function(value) {
+      const text = _txt(value);
+      if (text) seen[text] = true;
+    });
+    return Object.keys(seen).sort(function(a, b) { return a.localeCompare(b); });
+  }
+
+  function _districtsByDepartment_(rows) {
+    const grouped = {};
+    (rows || []).forEach(function(row) {
+      const departamento = _txt(row.departamento);
+      const distrito = _txt(row.distrito);
+      if (!departamento || !distrito) return;
+      const key = _r01TerritoryKey_(departamento);
+      if (!grouped[departamento]) grouped[departamento] = [];
+      if (!grouped[key]) grouped[key] = [];
+      if (grouped[departamento].indexOf(distrito) === -1) grouped[departamento].push(distrito);
+      if (grouped[key].indexOf(distrito) === -1) grouped[key].push(distrito);
+    });
+    Object.keys(grouped).forEach(function(key) {
+      grouped[key] = _uniqueSorted_(grouped[key]);
+    });
+    return grouped;
+  }
+
+  function _r01TerritoryKey_(value) {
+    return _txt(value)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  }
+
   function _r01NormalizeContact_(row) {
     row = row || {};
     return {
@@ -3112,7 +3204,7 @@ const SheetsService = (() => {
   }
 
   return {
-    getEscuelas, getEscuela, diagnosticoPadron, updateEscuelaEstado, asignarEscuela,
+    getEscuelas, getEscuela, diagnosticoPadron, listarEscuelasCuestionarioInicial, updateEscuelaEstado, asignarEscuela,
     iniciarSesion, cerrarSesion, repararSesionesDuplicadasEnCurso, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,

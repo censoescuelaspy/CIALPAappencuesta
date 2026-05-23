@@ -5851,6 +5851,12 @@ textarea.form-control {
   border-color: #0b5d3b;
 }
 
+.initial-school-hint {
+  color: #64748b;
+  font-size: .84rem;
+  line-height: 1.35;
+}
+
 .initial-question {
   display: grid;
   gap: .65rem;
@@ -5894,12 +5900,19 @@ textarea.form-control {
   font-weight: 750;
 }
 
-.initial-choice:hover,
-.initial-choice.is-checked {
+.initial-choice:hover {
   border-color: #0b5d3b;
-  background: #e8f3ee;
+  background: #f3faf6;
   color: #073b28;
   box-shadow: 0 0 0 3px rgba(11, 93, 59, .10);
+}
+
+.initial-choice.is-checked,
+.initial-choice:has(input:checked) {
+  border-color: #073b28;
+  background: #0b5d3b;
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(11, 93, 59, .18);
 }
 
 .initial-choice-row--small .initial-choice {

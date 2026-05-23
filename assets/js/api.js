@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.125
+ * Version: 2.6.126
  */
 
 const API = (() => {
@@ -9,7 +9,7 @@ const API = (() => {
 
   const _IS_DEMO = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
   const EXAMPLE_SCHOOL_ID = 'ESC_DEMO_CIALPA';
-  const PUBLIC_ACCOUNT_ENDPOINTS = new Set(['registrarUsuario', 'recuperarPassword', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto']);
+  const PUBLIC_ACCOUNT_ENDPOINTS = new Set(['registrarUsuario', 'recuperarPassword', 'listarEscuelasCuestionarioInicial', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto']);
 
   function _exampleMecDraft() {
     return {
@@ -344,6 +344,19 @@ const API = (() => {
       }
       case 'logout': return { status: 'ok' };
       case 'getEscuelas': return { status: 'ok', data: _DEMO_ESCUELAS };
+      case 'listarEscuelasCuestionarioInicial': {
+        const rows = _DEMO_ESCUELAS.map(({ id_escuela, codigo_local, nombre, departamento, distrito, localidad }) => ({ id_escuela, codigo_local, nombre, departamento, distrito, localidad }));
+        const departamentos = [...new Set(rows.map(row => row.departamento).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        const distritos = [...new Set(rows.map(row => row.distrito).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+        const distritos_por_departamento = {};
+        rows.forEach(row => {
+          if (!row.departamento || !row.distrito) return;
+          if (!distritos_por_departamento[row.departamento]) distritos_por_departamento[row.departamento] = [];
+          if (!distritos_por_departamento[row.departamento].includes(row.distrito)) distritos_por_departamento[row.departamento].push(row.distrito);
+        });
+        Object.keys(distritos_por_departamento).forEach(key => distritos_por_departamento[key].sort((a, b) => a.localeCompare(b)));
+        return { status: 'ok', data: rows, meta: { total: rows.length, departamentos, distritos, distritos_por_departamento, source: 'demo' } };
+      }
       case 'getEscuela': return { status: 'ok', data: _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || null };
       case 'updateEscuelaEstado': {
         const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela);
@@ -650,7 +663,9 @@ const API = (() => {
     if (code !== '401' && !/token/i.test(message)) return json;
     const label = endpoint === 'recuperarPassword'
       ? 'La recuperacion de contrasena'
-      : 'El registro publico de usuarios';
+      : endpoint === 'listarEscuelasCuestionarioInicial'
+        ? 'La lista publica de escuelas'
+        : 'El registro publico de usuarios';
     return {
       ...json,
       backendNeedsPublish: true,
@@ -799,6 +814,7 @@ const API = (() => {
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
   async function guardarCuestionarioInicial(datos) { return call('guardarCuestionarioInicial', 'POST', datos, { skipAuth: true, skipLoading: true, skipQueue: true, retries: 1 }); }
   async function guardarCuestionarioInicialAdjunto(datos) { return call('guardarCuestionarioInicialAdjunto', 'POST', datos, { skipAuth: true, skipLoading: true, skipQueue: true, retries: 1 }); }
+  async function listarEscuelasCuestionarioInicial(filters = {}) { return call('listarEscuelasCuestionarioInicial', 'GET', filters, { skipAuth: true, skipLoading: true, skipQueue: true, retries: 1, timeoutMs: 75000 }); }
   async function importarContactosCuestionarioInicial(datos) { return call('importarContactosCuestionarioInicial', 'POST', datos, { skipQueue: true }); }
   async function listarContactosCuestionarioInicial(filters = {}) { return call('listarContactosCuestionarioInicial', 'GET', filters, { skipLoading: true }); }
   async function enviarCuestionarioInicial(datos) { return call('enviarCuestionarioInicial', 'POST', datos, { skipQueue: true }); }
@@ -841,6 +857,7 @@ const API = (() => {
     uploadEvidence,
     guardarCuestionarioInicial,
     guardarCuestionarioInicialAdjunto,
+    listarEscuelasCuestionarioInicial,
     importarContactosCuestionarioInicial,
     listarContactosCuestionarioInicial,
     enviarCuestionarioInicial,

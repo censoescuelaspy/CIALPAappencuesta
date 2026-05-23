@@ -1,6 +1,6 @@
 /**
  * CIALPA - Cuestionario inicial R01
- * Version: 2.6.125
+ * Version: 2.6.126
  */
 
 const InitialQuestionnaire = (() => {
@@ -51,6 +51,8 @@ const InitialQuestionnaire = (() => {
 
   let _contacts = [];
   let _adminLoaded = false;
+  let _schoolOptions = [];
+  let _territoryMeta = { departamentos: [], distritos: [], distritos_por_departamento: {} };
 
   function publicUrl(extra = {}) {
     const base = new URL(PUBLIC_PATH + '/', window.location.origin + window.location.pathname.replace(/(?:index\.html)?$/, ''));
@@ -88,10 +90,10 @@ const InitialQuestionnaire = (() => {
       <form id="initial-questionnaire-form" class="initial-form" novalidate>
         ${_section('identificacion', 'Identificacion y contacto', 'Datos basicos para asociar la respuesta con la escuela correcta.', `
           <div class="initial-grid">
-            ${_field('codigo_local', 'Codigo de local', params.codigo_local || params.codigo || '', 'text', 'Opcional si no lo tiene a mano')}
+            ${_schoolSearchField(params)}
             ${_field('nombre_escuela', 'Nombre de la escuela', params.nombre || params.escuela || '', 'text', 'Nombre oficial o conocido', true)}
-            ${_field('departamento', 'Departamento', params.departamento || '')}
-            ${_field('distrito', 'Distrito', params.distrito || '')}
+            ${_selectField('departamento', 'Departamento', params.departamento || '', [], 'Seleccione departamento')}
+            ${_selectField('distrito', 'Distrito', params.distrito || '', [], 'Seleccione distrito')}
             ${_field('localidad', 'Localidad / compania / barrio', params.localidad || '')}
             ${_field('director_nombre', 'Nombre de quien responde', params.director || '', 'text', 'Director/a o responsable', true)}
             ${_field('director_correo', 'Correo de contacto', params.correo || params.email || '', 'email', 'correo@ejemplo.com')}
@@ -156,8 +158,7 @@ const InitialQuestionnaire = (() => {
         `)}
 
         <input type="hidden" name="token" value="${_escape(params.token || params.t || '')}" />
-        <input type="hidden" name="id_escuela" value="${_escape(params.id_escuela || '')}" />
-        <input type="hidden" name="app_version" value="${_escape((window.APP_CONFIG && APP_CONFIG.VERSION) || '2.6.125')}" />
+        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.126')}" />
 
         <div class="initial-submit">
           <button type="submit" class="btn btn-primary btn-lg">Enviar cuestionario inicial</button>
@@ -184,6 +185,38 @@ const InitialQuestionnaire = (() => {
       <label class="initial-field">
         <span>${label}${required ? ' *' : ''}</span>
         <input name="${name}" type="${type}" value="${_escape(value)}" placeholder="${_escape(placeholder)}" ${required ? 'required' : ''} />
+      </label>`;
+  }
+
+  function _selectField(name, label, value = '', options = [], placeholder = 'Seleccione') {
+    const selectedValue = String(value || '');
+    const htmlOptions = [
+      `<option value="">${_escape(placeholder)}</option>`,
+      ...options.map(option => {
+        const selected = String(option) === selectedValue ? ' selected' : '';
+        return `<option value="${_escape(option)}"${selected}>${_escape(option)}</option>`;
+      }),
+    ].join('');
+    return `
+      <label class="initial-field">
+        <span>${label}</span>
+        <select name="${name}" data-territory="${name}" data-selected="${_escape(selectedValue)}">${htmlOptions}</select>
+      </label>`;
+  }
+
+  function _schoolSearchField(params) {
+    const code = params.codigo_local || params.codigo || '';
+    const id = params.id_escuela || '';
+    const school = params.nombre || params.escuela || '';
+    const display = [code, school].filter(Boolean).join(' - ');
+    return `
+      <label class="initial-field initial-field--wide initial-school-search">
+        <span>Codigo de local / escuela</span>
+        <input id="initial-school-search" type="search" value="${_escape(display)}" placeholder="Busque por codigo, nombre de escuela o distrito" list="initial-school-options" autocomplete="off" data-school-search />
+        <datalist id="initial-school-options"></datalist>
+        <input type="hidden" name="codigo_local" value="${_escape(code)}" data-school-code />
+        <input type="hidden" name="id_escuela" value="${_escape(id)}" data-school-id />
+        <small id="initial-school-hint" class="initial-school-hint">Cargando lista oficial de escuelas...</small>
       </label>`;
   }
 
@@ -255,6 +288,10 @@ const InitialQuestionnaire = (() => {
     form.addEventListener('change', event => {
       if (event.target && /^(radio|checkbox)$/i.test(event.target.type)) _refreshChoiceState(form);
     });
+    form.addEventListener('click', event => {
+      if (event.target?.closest?.('.initial-choice')) setTimeout(() => _refreshChoiceState(form), 0);
+    });
+    _bindSchoolLookup(root, params);
 
     fileInput?.addEventListener('change', () => {
       const file = fileInput.files && fileInput.files[0];
@@ -321,6 +358,7 @@ const InitialQuestionnaire = (() => {
     });
 
     setTimeout(() => _refreshChoiceState(form), 0);
+    _loadOfficialSchools(root, params);
   }
 
   function _formPayload(form) {
@@ -337,14 +375,28 @@ const InitialQuestionnaire = (() => {
     Object.keys(payload).forEach(key => {
       if (Array.isArray(payload[key])) payload[key] = payload[key].join(' | ');
     });
+    const schoolSearch = form.querySelector('[data-school-search]');
+    const selectedSchool = _findSchoolBySearch(schoolSearch?.value || '');
+    if (selectedSchool) {
+      payload.codigo_local = payload.codigo_local || selectedSchool.codigo_local || '';
+      payload.id_escuela = payload.id_escuela || selectedSchool.id_escuela || '';
+      payload.nombre_escuela = payload.nombre_escuela || selectedSchool.nombre || '';
+      payload.departamento = payload.departamento || selectedSchool.departamento || '';
+      payload.distrito = payload.distrito || selectedSchool.distrito || '';
+      payload.localidad = payload.localidad || selectedSchool.localidad || '';
+    } else if (!payload.codigo_local && schoolSearch?.value) {
+      payload.codigo_local = _extractSchoolCode(schoolSearch.value);
+    }
     return payload;
   }
 
   async function _publicApi(action, data) {
-    if (!window.APP_CONFIG || !APP_CONFIG.GAS_URL) {
+    const config = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG : null;
+    if (!config || !config.GAS_URL) {
+      if (action === 'listarEscuelasCuestionarioInicial') return _demoSchoolList();
       return { status: 'ok', data: { id_respuesta: `R01_DEMO_${Date.now()}` }, demo: true };
     }
-    const response = await fetch(APP_CONFIG.GAS_URL, {
+    const response = await fetch(config.GAS_URL, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
@@ -356,6 +408,171 @@ const InitialQuestionnaire = (() => {
     } catch {
       throw new Error('El servidor no devolvio una respuesta valida. Intente nuevamente.');
     }
+  }
+
+  function _bindSchoolLookup(root, params) {
+    const search = root.querySelector('[data-school-search]');
+    const dept = root.querySelector('[data-territory="departamento"]');
+    const district = root.querySelector('[data-territory="distrito"]');
+
+    search?.addEventListener('input', () => {
+      const school = _findSchoolBySearch(search.value);
+      if (school) {
+        _applySchoolSelection(root, school, { force: false });
+        return;
+      }
+      const code = root.querySelector('[data-school-code]');
+      const id = root.querySelector('[data-school-id]');
+      if (code) code.value = _extractSchoolCode(search.value);
+      if (id) id.value = '';
+    });
+    search?.addEventListener('change', () => {
+      const school = _findSchoolBySearch(search.value);
+      if (school) _applySchoolSelection(root, school, { force: true });
+    });
+    dept?.addEventListener('change', () => {
+      if (district) {
+        district.value = '';
+        district.dataset.selected = '';
+      }
+      _populateDistrictSelect(root, dept.value, '');
+    });
+  }
+
+  async function _loadOfficialSchools(root, params) {
+    const hint = root.querySelector('#initial-school-hint');
+    try {
+      const result = await _publicApi('listarEscuelasCuestionarioInicial', {});
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo cargar la lista oficial.');
+      _schoolOptions = Array.isArray(result.data) ? result.data : [];
+      _territoryMeta = result.meta || _buildTerritoryMeta(_schoolOptions);
+      _populateSchoolDatalist(root);
+      _populateTerritoryControls(root, params);
+      const selected = _findSchoolByCode(params.codigo_local || params.codigo || params.id_escuela)
+        || _findSchoolBySearch(root.querySelector('[data-school-search]')?.value || '');
+      if (selected) _applySchoolSelection(root, selected, { force: !params.nombre && !params.escuela });
+      if (hint) hint.textContent = `${_schoolOptions.length} escuelas disponibles. Busque por codigo local, nombre o distrito.`;
+    } catch (err) {
+      _schoolOptions = [];
+      _territoryMeta = _buildTerritoryMeta([]);
+      _populateTerritoryControls(root, params);
+      if (hint) hint.textContent = 'No se pudo cargar la lista oficial ahora. Puede escribir el codigo o nombre manualmente.';
+    }
+  }
+
+  function _populateSchoolDatalist(root) {
+    const datalist = root.querySelector('#initial-school-options');
+    if (!datalist) return;
+    datalist.innerHTML = _schoolOptions.map(row => `<option value="${_escape(_schoolLabel(row))}"></option>`).join('');
+  }
+
+  function _populateTerritoryControls(root, params = {}) {
+    const dept = root.querySelector('[data-territory="departamento"]');
+    const selectedDept = dept?.value || params.departamento || dept?.dataset.selected || '';
+    _setSelectOptions(dept, _territoryMeta.departamentos || [], 'Seleccione departamento', selectedDept);
+    _populateDistrictSelect(root, selectedDept, params.distrito || '');
+  }
+
+  function _populateDistrictSelect(root, departamento = '', selected = '') {
+    const district = root.querySelector('[data-territory="distrito"]');
+    if (!district) return;
+    const options = _districtsForDepartamento(departamento);
+    const current = selected || district.value || district.dataset.selected || '';
+    _setSelectOptions(district, options, 'Seleccione distrito', current);
+  }
+
+  function _setSelectOptions(select, options, placeholder, selected) {
+    if (!select) return;
+    const normalized = String(selected || '');
+    select.innerHTML = [`<option value="">${_escape(placeholder)}</option>`]
+      .concat((options || []).map(option => {
+        const isSelected = String(option) === normalized ? ' selected' : '';
+        return `<option value="${_escape(option)}"${isSelected}>${_escape(option)}</option>`;
+      }))
+      .join('');
+    if (normalized && !(options || []).includes(normalized)) {
+      select.insertAdjacentHTML('beforeend', `<option value="${_escape(normalized)}" selected>${_escape(normalized)}</option>`);
+    }
+  }
+
+  function _districtsForDepartamento(departamento) {
+    if (!departamento) return _territoryMeta.distritos || [];
+    const byDept = _territoryMeta.distritos_por_departamento || {};
+    return byDept[departamento] || byDept[_territoryKey(departamento)] || [];
+  }
+
+  function _applySchoolSelection(root, school, { force = false } = {}) {
+    if (!school) return;
+    const search = root.querySelector('[data-school-search]');
+    const code = root.querySelector('[data-school-code]');
+    const id = root.querySelector('[data-school-id]');
+    const name = root.querySelector('[name="nombre_escuela"]');
+    const locality = root.querySelector('[name="localidad"]');
+    const dept = root.querySelector('[data-territory="departamento"]');
+    const district = root.querySelector('[data-territory="distrito"]');
+    if (search && force) search.value = _schoolLabel(school);
+    if (code) code.value = school.codigo_local || '';
+    if (id) id.value = school.id_escuela || '';
+    if (name && (force || !name.value)) name.value = school.nombre || '';
+    if (locality && (force || !locality.value)) locality.value = school.localidad || '';
+    if (dept) {
+      _setSelectOptions(dept, _territoryMeta.departamentos || [], 'Seleccione departamento', school.departamento || dept.value);
+      dept.value = school.departamento || dept.value;
+    }
+    _populateDistrictSelect(root, school.departamento || dept?.value || '', school.distrito || district?.value || '');
+  }
+
+  function _findSchoolBySearch(value) {
+    const text = String(value || '').trim();
+    if (!text) return null;
+    const normalized = _norm(text);
+    return _schoolOptions.find(row => {
+      return _norm(_schoolLabel(row)) === normalized
+        || _norm(row.codigo_local) === normalized
+        || _norm(row.id_escuela) === normalized;
+    }) || null;
+  }
+
+  function _findSchoolByCode(value) {
+    const normalized = _norm(value);
+    if (!normalized) return null;
+    return _schoolOptions.find(row => _norm(row.codigo_local) === normalized || _norm(row.id_escuela) === normalized) || null;
+  }
+
+  function _extractSchoolCode(value) {
+    const text = String(value || '').trim();
+    const match = text.match(/^([A-Za-z0-9._-]+)/);
+    return match ? match[1] : text;
+  }
+
+  function _schoolLabel(row) {
+    return [row.codigo_local || row.id_escuela || '', row.nombre || row.nombre_escuela || '', row.distrito || '']
+      .filter(Boolean)
+      .join(' - ');
+  }
+
+  function _buildTerritoryMeta(rows) {
+    const departamentos = [...new Set((rows || []).map(row => row.departamento).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const distritos = [...new Set((rows || []).map(row => row.distrito).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+    const distritos_por_departamento = {};
+    (rows || []).forEach(row => {
+      if (!row.departamento || !row.distrito) return;
+      const key = _territoryKey(row.departamento);
+      if (!distritos_por_departamento[row.departamento]) distritos_por_departamento[row.departamento] = [];
+      if (!distritos_por_departamento[key]) distritos_por_departamento[key] = [];
+      if (!distritos_por_departamento[row.departamento].includes(row.distrito)) distritos_por_departamento[row.departamento].push(row.distrito);
+      if (!distritos_por_departamento[key].includes(row.distrito)) distritos_por_departamento[key].push(row.distrito);
+    });
+    Object.keys(distritos_por_departamento).forEach(key => distritos_por_departamento[key].sort((a, b) => a.localeCompare(b)));
+    return { departamentos, distritos, distritos_por_departamento };
+  }
+
+  function _demoSchoolList() {
+    const rows = [
+      { id_escuela: 'ESC_DEMO_1', codigo_local: '9000001', nombre: 'Escuela Demo R01 01', departamento: 'Central', distrito: 'Luque', localidad: 'Localidad demo' },
+      { id_escuela: 'ESC_DEMO_2', codigo_local: '9000002', nombre: 'Escuela Demo R01 02', departamento: 'Central', distrito: 'San Lorenzo', localidad: 'Localidad demo' },
+    ];
+    return { status: 'ok', data: rows, meta: _buildTerritoryMeta(rows), demo: true };
   }
 
   function _fileToPayload(file) {
@@ -671,6 +888,10 @@ const InitialQuestionnaire = (() => {
 
   function _norm(value) {
     return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '');
+  }
+
+  function _territoryKey(value) {
+    return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   }
 
   function _escape(value) {

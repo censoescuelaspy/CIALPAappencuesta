@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.125
+ * Version: 2.6.126
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -79,7 +79,7 @@ function _handleRequest(e) {
     const action = params.action || '';
 
     // Public endpoints (no auth required)
-    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto'];
+    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron', 'listarEscuelasCuestionarioInicial', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto'];
     const token = params.token || '';
 
     if (!publicActions.includes(action)) {
@@ -136,6 +136,7 @@ function _handleRequest(e) {
 
       // Escuelas
       case 'diagnosticoPadron': return _respond(SheetsService.diagnosticoPadron());
+      case 'listarEscuelasCuestionarioInicial': return _respond(SheetsService.listarEscuelasCuestionarioInicial(params));
       case 'getEscuelas':     return _respond(SheetsService.getEscuelas(params));
       case 'getEscuela':      return _respond(SheetsService.getEscuela(params.id_escuela));
       case 'updateEscuelaEstado': return _respond(SheetsService.updateEscuelaEstado(params));
