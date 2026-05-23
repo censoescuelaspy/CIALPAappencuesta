@@ -39,6 +39,13 @@
 - `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
 - Revision estatica: no quedan referencias activas a `2.6.117` en assets de publicacion.
 - Revision estatica de zoom: no existe `_focusSchoolPlanArea`; `selectArea()` y `focusSelectedPlanItem()` no llaman a `_setSchoolPlanZoomValue`.
+- `git commit`: `9f8e8e0 fix: corregir navegacion guiada v2.6.118`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.118`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.118`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.118`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `_guidedQuestionHistory`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: no contiene `_focusSchoolPlanArea` ni `_planAreaFocusPoint`.
 
 ---
 
