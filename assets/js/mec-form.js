@@ -214,12 +214,22 @@ const MecFormModule = (() => {
     }, 90);
   }
 
+  function _digits(value) {
+    return String(value ?? '').replace(/\D+/g, '');
+  }
+
   function _schoolIdentityValues(school) {
     const values = [
       school?.id_escuela,
       school?.codigo_local,
       school?.codigo,
       school?.id,
+      school?.code,
+      _digits(school?.id_escuela),
+      _digits(school?.codigo_local),
+      _digits(school?.codigo),
+      _digits(school?.id),
+      _digits(school?.code),
     ];
     return values
       .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
@@ -238,11 +248,17 @@ const MecFormModule = (() => {
   }
 
   function _schoolSnapshot(school) {
+    const code = school?.codigo_local || school?.codigo || school?.codigo_establecimiento || school?.id_escuela || school?.id || school?.code || '';
+    const name = school?.nombre || school?.nombre_escuela || school?.nombre_establecimiento || school?.institucion || school?.name || '';
     return {
-      id_escuela: school?.id_escuela || '',
-      codigo_local: school?.codigo_local || school?.codigo || '',
-      nombre: school?.nombre || school?.nombre_escuela || '',
-      nombre_escuela: school?.nombre_escuela || school?.nombre || '',
+      id_escuela: school?.id_escuela || school?.id || school?.code || '',
+      codigo_local: code,
+      codigo: school?.codigo || code,
+      id: school?.id || '',
+      code,
+      nombre: name,
+      nombre_escuela: school?.nombre_escuela || school?.nombre || school?.nombre_establecimiento || school?.institucion || school?.name || '',
+      nombre_establecimiento: school?.nombre_establecimiento || name,
       departamento: school?.departamento || '',
       distrito: school?.distrito || '',
       localidad: school?.localidad || school?.barrio || '',

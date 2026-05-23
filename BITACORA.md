@@ -4,6 +4,43 @@
 
 ---
 
+## Identidad robusta de escuela mapa-registro - 2026-05-22 - v2.6.113
+
+### Objetivo
+- Resolver que `Mapa > Iniciar/continuar registro` siguiera abriendo `Registro guiado` sin conservar la escuela en algunos casos.
+
+### Diagnostico
+- La primera correccion esperaba la carga del modulo, pero los botones del mapa seguian enviando principalmente `id_escuela`.
+- En filas del padron oficial o mezclas con hoja operativa, la identidad confiable puede venir por `codigo_local`, `codigo`, `id` o digitos normalizados.
+- Si el identificador enviado era vacio o no coincidia, la app podia no recuperar exactamente la escuela seleccionada antes de abrir el registro.
+
+### Cambios implementados
+- `MapModule` ahora genera acciones con un identificador primario robusto: `id_escuela`, `codigo_local`, `codigo`, `id` o `code`.
+- La busqueda de escuela del mapa compara tambien digitos normalizados.
+- Los marcadores y filas de lista quedan indexados por todas las claves disponibles de la escuela.
+- `SurveyModule.selectEscuela()` tambien resuelve escuela por `id_escuela`, `codigo_local`, `codigo`, `id`, `code` y digitos normalizados.
+- `MecFormModule` guarda el snapshot de escuela con `code`, `codigo`, `id` y nombres alternativos, evitando perder identidad cuando la fila proviene del padron oficial.
+- `Registro guiado` toma como respaldo inmediato la escuela activa de `SurveyModule` o `MapModule` si el borrador local aun no termino de escribirse.
+- Se mantiene el refuerzo de `MecFormModule.setSelectedSchool(..., force: true)` despues de cargar `Registro guiado`.
+- Version visible y cache del Service Worker actualizados a `v2.6.113`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.113`.
+- Probar con una escuela del padron que tenga `codigo_local` visible: el encabezado de `Registro guiado` debe mostrar codigo/nombre inmediatamente despues de tocar `Iniciar/continuar registro`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/survey.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+
+---
+
 ## Traspaso de escuela desde mapa a registro guiado - 2026-05-22 - v2.6.112
 
 ### Objetivo

@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.111
+ * Version: 2.6.113
  */
 
 const GuidedRegisterModule = (() => {
@@ -39,10 +39,20 @@ const GuidedRegisterModule = (() => {
       school?.codigo_local,
       school?.codigo,
       school?.id,
+      school?.code,
+      _digits(school?.id_escuela),
+      _digits(school?.codigo_local),
+      _digits(school?.codigo),
+      _digits(school?.id),
+      _digits(school?.code),
     ];
     return values
       .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
       .map(value => String(value).trim());
+  }
+
+  function _digits(value) {
+    return String(value ?? '').replace(/\D+/g, '');
   }
 
   function _slug(value) {
@@ -63,6 +73,8 @@ const GuidedRegisterModule = (() => {
   function _currentSchoolForState() {
     const surveySchool = typeof SurveyModule !== 'undefined' && SurveyModule.getCurrentEscuela?.();
     if (surveySchool) return surveySchool;
+    const mapSchool = typeof MapModule !== 'undefined' && MapModule.getSelectedEscuela?.();
+    if (mapSchool) return mapSchool;
     try {
       const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {};
       return (saved.values || saved || {}).__selectedSchool || null;
@@ -723,9 +735,9 @@ const GuidedRegisterModule = (() => {
   function _schoolContext(values = {}) {
     const school = values.__selectedSchool || {};
     const general = values.general || {};
-    const code = _firstPresent(school, ['codigo_establecimiento', 'codigo_local', 'codigo', 'id_escuela', 'id']) ||
+    const code = _firstPresent(school, ['codigo_establecimiento', 'codigo_local', 'codigo', 'id_escuela', 'id', 'code']) ||
       general.codigo_establecimiento || general.codigo_local || '';
-    const name = _firstPresent(school, ['nombre', 'nombre_escuela', 'nombre_establecimiento', 'institucion']) ||
+    const name = _firstPresent(school, ['nombre', 'nombre_escuela', 'nombre_establecimiento', 'institucion', 'name']) ||
       general.nombre_institucion || general.nombre_establecimiento || '';
     const location = [
       general.departamento || school.departamento,
@@ -935,7 +947,11 @@ const GuidedRegisterModule = (() => {
       saved = {};
     }
     const values = saved.values || saved || {};
-    const school = _schoolContext(values);
+    const currentSchool = _currentSchoolForState();
+    const valuesForSchool = values.__selectedSchool || !currentSchool
+      ? values
+      : { ...values, __selectedSchool: currentSchool };
+    const school = _schoolContext(valuesForSchool);
     const rooms = Array.isArray(values.__classrooms) ? values.__classrooms : [];
     const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];
     const blocks = Array.isArray(values.__blocks) ? values.__blocks : [];

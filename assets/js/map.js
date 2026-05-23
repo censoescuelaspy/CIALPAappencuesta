@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.112
+ * Version: 2.6.113
  */
 
 const MapModule = (() => {
@@ -42,6 +42,14 @@ const MapModule = (() => {
 
   function _jsString(value) {
     return JSON.stringify(String(value ?? '')).replace(/</g, '\\u003c');
+  }
+
+  function _digits(value) {
+    return String(value ?? '').replace(/\D+/g, '');
+  }
+
+  function _schoolPrimaryId(school = {}) {
+    return String(school.id_escuela || school.codigo_local || school.codigo || school.id || school.code || '').trim();
   }
 
   function _safeState(value) {
@@ -124,7 +132,7 @@ const MapModule = (() => {
     const canSurvey = Auth.canAccess('encuestador');
     const canOperate = canSurvey && Auth.canOperateSchool(e);
     const canRequest = _canRequestSurvey(e) && !canOperate;
-    const idArg = _jsString(e.id_escuela);
+    const idArg = _jsString(_schoolPrimaryId(e));
     const location = [e.distrito, e.localidad].filter(Boolean).join(' - ');
 
     return `
@@ -259,15 +267,16 @@ const MapModule = (() => {
 
       const marker = L.marker([lat, lng], { icon: _getIcon(e) });
       marker.bindPopup(_buildPopup(e), { maxWidth: 245 });
-      marker.escuelaId = e.id_escuela;
+      const primaryId = _schoolPrimaryId(e);
+      marker.escuelaId = primaryId;
 
       marker.on('click', () => {
         _selectedEscuela = e;
-        _highlightListItem(e.id_escuela);
+        _highlightListItem(primaryId);
         _hideInfoPanel();
       });
 
-      _markers[e.id_escuela] = marker;
+      _schoolIdentityKeys(e).forEach(key => { _markers[key] = marker; });
       toAdd.push(marker);
     });
     if (_markerCluster && toAdd.length) _markerCluster.addLayers(toAdd);
@@ -295,7 +304,7 @@ const MapModule = (() => {
       if (_isTrueish(filters.piloto) && !_isPilotSchool(e)) return false;
       if (filters.q) {
         const q = _normalizeFilterValue(filters.q);
-        const haystack = _normalizeFilterValue(`${e.nombre} ${e.codigo_local} ${e.departamento} ${e.distrito} ${e.localidad}`);
+        const haystack = _normalizeFilterValue(`${e.nombre} ${e.nombre_escuela} ${e.codigo_local} ${e.codigo} ${e.id_escuela} ${e.id} ${e.code} ${e.departamento} ${e.distrito} ${e.localidad}`);
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -303,10 +312,16 @@ const MapModule = (() => {
 
     // Toggle marker visibility via cluster — bulk addLayers is much faster than per-marker addLayer
     if (_markerCluster) _markerCluster.clearLayers();
-    const filteredIds = new Set(_filteredEscuelas.map(e => e.id_escuela));
+    const filteredIds = new Set(_filteredEscuelas.flatMap(e => _schoolIdentityKeys(e)));
+    const seenMarkers = new Set();
     const filteredMarkers = Object.entries(_markers)
       .filter(([id]) => filteredIds.has(id))
-      .map(([, marker]) => marker);
+      .map(([, marker]) => marker)
+      .filter(marker => {
+        if (seenMarkers.has(marker)) return false;
+        seenMarkers.add(marker);
+        return true;
+      });
     if (_markerCluster && filteredMarkers.length) _markerCluster.addLayers(filteredMarkers);
 
     _renderList(_filteredEscuelas);
@@ -335,9 +350,10 @@ const MapModule = (() => {
       const estadoColor = _surveyorColor(_surveyorName(e));
       const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
       const strength = _isClosed(e) ? 'cerrada' : 'pendiente';
-      const idArg = _jsString(e.id_escuela);
+      const primaryId = _schoolPrimaryId(e);
+      const idArg = _jsString(primaryId);
       return `
-        <div class="map-list-item" data-id="${_escape(e.id_escuela)}" onclick='MapModule.flyTo(${idArg})'>
+        <div class="map-list-item" data-id="${_escape(primaryId)}" onclick='MapModule.flyTo(${idArg})'>
           <span class="map-list-item__dot map-list-item__dot--${strength}" style="background:${_escape(estadoColor)}"></span>
           <div class="map-list-item__info">
             <strong>${_escape(e.nombre)}</strong>
@@ -363,7 +379,7 @@ const MapModule = (() => {
     const panel = document.getElementById('map-info-panel');
     if (!panel) return;
     const state = _safeState(e.estado_relevamiento);
-    const idArg = _jsString(e.id_escuela);
+    const idArg = _jsString(_schoolPrimaryId(e));
     const canSurvey = Auth.canAccess('encuestador');
     const canOperate = canSurvey && Auth.canOperateSchool(e);
     panel.innerHTML = `
@@ -416,7 +432,7 @@ const MapModule = (() => {
   function _locationReviewActions(e, block = false) {
     const point = _validPoint(e);
     if (!point) return '<p class="map-location-review map-location-review--empty">Sin coordenadas para revisar ubicacion.</p>';
-    const idArg = _jsString(e.id_escuela || e.codigo_local || '');
+    const idArg = _jsString(_schoolPrimaryId(e));
     const cls = block ? 'map-location-review map-location-review--block' : 'map-location-review';
     return `
       <div class="${cls}">
@@ -447,7 +463,12 @@ const MapModule = (() => {
 
   function _findSchoolById(id) {
     const key = String(id || '').trim();
-    return _escuelas.find(e => String(e.id_escuela || '').trim() === key || String(e.codigo_local || '').trim() === key) || null;
+    const keyDigits = _digits(key);
+    if (!key && _selectedEscuela) return _selectedEscuela;
+    return _escuelas.find(e => {
+      const keys = _schoolIdentityKeys(e);
+      return keys.includes(key) || (keyDigits && keys.includes(keyDigits));
+    }) || null;
   }
 
   function openLocationReview(id, type = 'maps') {
@@ -577,8 +598,8 @@ const MapModule = (() => {
 
   function flyTo(id) {
     const targetSchool = _findSchoolById(id);
-    const marker = _markers[id] || (targetSchool ? _markers[targetSchool.id_escuela] : null);
-    const highlightId = targetSchool?.id_escuela || id;
+    const marker = _markers[id] || (targetSchool ? _markers[_schoolPrimaryId(targetSchool)] : null);
+    const highlightId = targetSchool ? _schoolPrimaryId(targetSchool) : id;
     if (!marker || !_map) {
       _highlightListItem(highlightId);
       const escuela = targetSchool;
@@ -617,8 +638,8 @@ const MapModule = (() => {
         _renderList(_filteredEscuelas.length ? _filteredEscuelas : _escuelas);
         _updateSummaryBadges(_filteredEscuelas.length ? _filteredEscuelas : _escuelas);
       }
-      if (next?.id_escuela) {
-        flyTo(next.id_escuela);
+      if (next) {
+        flyTo(_schoolPrimaryId(next));
         UI.showToast(`Siguiente escuela sugerida: ${next.nombre || next.codigo_local || next.id_escuela}.`, 'success', 9000);
       } else {
         UI.showToast('Escuela finalizada. No quedan escuelas pendientes asignadas visibles para este usuario.', 'success', 9000);
@@ -640,6 +661,11 @@ const MapModule = (() => {
       school.codigo,
       school.id,
       school.code,
+      _digits(school.id_escuela),
+      _digits(school.codigo_local),
+      _digits(school.codigo),
+      _digits(school.id),
+      _digits(school.code),
     ]
       .map(value => String(value ?? '').trim())
       .filter(Boolean);
@@ -691,7 +717,7 @@ const MapModule = (() => {
 
   async function startGuidedRegister(id) {
     if (!Auth.requireAuth()) return;
-    const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
+    const escuela = _findSchoolById(id);
     if (!escuela) {
       UI.showToast('No se encontro la escuela seleccionada en el mapa.', 'warning');
       return;
@@ -701,7 +727,7 @@ const MapModule = (() => {
       return;
     }
     _selectedEscuela = escuela;
-    _highlightListItem(escuela.id_escuela);
+    _highlightListItem(_schoolPrimaryId(escuela));
     _hideInfoPanel();
     const ready = typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function'
       ? SurveyModule.setCurrentEscuela(escuela)
@@ -721,7 +747,7 @@ const MapModule = (() => {
 
   async function solicitarRelevamiento(id) {
     if (!Auth.requireAuth()) return;
-    const escuela = _escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
+    const escuela = _findSchoolById(id);
     if (!escuela) {
       UI.showToast('No se encontro la escuela seleccionada.', 'warning');
       return;
@@ -752,7 +778,8 @@ const MapModule = (() => {
         emailFailed ? 'warning' : 'success',
         emailFailed ? 9000 : 6500
       );
-      if (_markers[escuela.id_escuela]) _markers[escuela.id_escuela].closePopup();
+      const marker = _markers[_schoolPrimaryId(escuela)];
+      if (marker) marker.closePopup();
     } catch (err) {
       UI.showToast('Error al enviar solicitud: ' + err.message, 'error', 7000);
     }

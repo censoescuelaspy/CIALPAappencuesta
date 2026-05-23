@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * survey.js, control operativo de aplicación externa y medición de tiempos
- * Version: 2.6.72
+ * Version: 2.6.113
  */
 
 const SurveyModule = (() => {
@@ -83,14 +83,31 @@ const SurveyModule = (() => {
     return String(value ?? '').replace(/\D+/g, '');
   }
 
+  function _schoolPrimaryId(school = {}) {
+    return String(school.id_escuela || school.codigo_local || school.codigo || school.id || school.code || '').trim();
+  }
+
+  function _schoolIdentityKeys(school = {}) {
+    return [
+      school.id_escuela,
+      school.codigo_local,
+      school.codigo,
+      school.id,
+      school.code,
+      _digits(school.id_escuela),
+      _digits(school.codigo_local),
+      _digits(school.codigo),
+      _digits(school.id),
+      _digits(school.code),
+    ]
+      .map(value => String(value ?? '').trim())
+      .filter(Boolean);
+  }
+
   function _sameSchoolSession(session, school) {
     if (!session || !school) return false;
-    const sessionKeys = [session.id_escuela, session.codigo_local, _digits(session.id_escuela), _digits(session.codigo_local)]
-      .map(v => String(v || '').trim())
-      .filter(Boolean);
-    const schoolKeys = [school.id_escuela, school.codigo_local, _digits(school.id_escuela), _digits(school.codigo_local)]
-      .map(v => String(v || '').trim())
-      .filter(Boolean);
+    const sessionKeys = _schoolIdentityKeys(session);
+    const schoolKeys = _schoolIdentityKeys(school);
     return sessionKeys.some(key => schoolKeys.includes(key));
   }
 
@@ -167,7 +184,12 @@ const SurveyModule = (() => {
     }
 
     const escuelas = MapModule.getEscuelas();
-    const escuela = escuelas.find(e => e.id_escuela === id || e.codigo_local === id);
+    const key = String(id || '').trim();
+    const keyDigits = _digits(key);
+    const escuela = escuelas.find(e => {
+      const keys = _schoolIdentityKeys(e);
+      return keys.includes(key) || (keyDigits && keys.includes(keyDigits));
+    });
     if (escuela) {
       if (!setCurrentEscuela(escuela)) return;
       AppController.showModule('encuesta');
@@ -192,14 +214,14 @@ const SurveyModule = (() => {
       UI.showAlert('Escuela no asignada', `Puede verla en el mapa, pero solo puede cargar escuelas asignadas a su usuario. Asignada a: ${assigned}.`, 'warning');
       return false;
     }
-    const incomingId = String(escuela.id_escuela || escuela.codigo_local || '');
-    const currentId = String(_currentEscuela?.id_escuela || _currentEscuela?.codigo_local || '');
-    if (_state === STATE.IN_PROGRESS && currentId && incomingId && currentId !== incomingId) {
+    const incomingId = _schoolPrimaryId(escuela);
+    const currentId = _schoolPrimaryId(_currentEscuela);
+    if (_state === STATE.IN_PROGRESS && currentId && incomingId && !_sameSchoolSession(_currentEscuela, escuela)) {
       UI.showAlert('Sesion activa', `Ya existe una sesion activa en "${_currentEscuela?.nombre}". Debe cerrarse antes de iniciar otra.`, 'warning');
       AppController.showModule('encuesta');
       return false;
     }
-    if (incomingId !== currentId) {
+    if (incomingId !== currentId && !_sameSchoolSession(_currentEscuela, escuela)) {
       _stopTimer();
       _currentSession = null;
       _moduleLogs = [];
