@@ -43,6 +43,15 @@
 - Revision estatica: `_normalizePlanMeasureHierarchy()` corrige bloque -> piso -> aula/sanitario antes de render, guardado y sync.
 - Revision estatica: `_resizePlanFloor()` ya no multiplica por medidas previas corruptas; deriva metros desde el bloque y el ratio visual.
 - Revision estatica: version visible, cache y assets en `v2.6.124`; se conserva `meters-v2.6.123` solo como etiqueta interna del arreglo previo del predio.
+- `git commit`: `f2f17e2 fix: corregir escala de objetos del plano v2.6.124`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.124`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.124`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.124`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `PLAN_OBJECT_SCALE_VERSION`, `_normalizePlanMeasureHierarchy`, `_normalizeFloorMeasuresToBlock` y `objects-v2.6.124`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `Version: 2.6.124`.
+- Verificacion HTTP de GitHub Pages para `assets/js/app.js`: contiene `Version: 2.6.124`.
+- `npm.cmd run metrics:web -- --cache-bust`: 21 requests por vista, 0 fallidas, 0 HTTP 4xx/5xx y 0 errores/advertencias de consola.
 
 ---
 
