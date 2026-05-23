@@ -41,6 +41,13 @@
 - Revision estatica: el perimetro poligonal seleccionado dibuja `_drawPlanResizeHandles()` y vertices `site-vertex`.
 - Revision estatica: `siteAreaFromPoint()` puede excluir `property_boundary` cuando hay bloque/piso/aula/sanitario debajo.
 - Revision estatica: el paso `Perimetro predio` indica usar esquinas para tamano y puntos numerados para forma.
+- `git commit`: `c1dbe96 fix: redimensionar perimetro sin bloquear bloques v2.6.121`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.121`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.121`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.121`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `includePropertyBoundary`, `isPropertyBoundaryArea` y `propertyPolygonActive`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene instrucciones de esquinas para tamano del perimetro.
 
 ---
 
