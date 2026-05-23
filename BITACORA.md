@@ -43,6 +43,16 @@
 - Playwright local movil `390x844`: mismo flujo de Internet, sin errores de consola y sin overflow horizontal.
 - Playwright local de dependencias: agua, bano, Internet, CCTV y energia nacen ocultos, aparecen con `Si`, se ocultan con `No` y quedan deshabilitados.
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `ff8a8e7 fix: aplicar saltos condicionales cuestionario inicial v2.6.130`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.130`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.130`.
+- Verificacion HTTP de GitHub Pages para `assets/js/initial-questionnaire.js`: contiene `data-dependent-name`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene `initial-dependent.is-hidden`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene assets `v2.6.130`.
+- Verificacion HTTP de GitHub Pages para `cuestionario_inicial/`: responde HTTP 200.
+- Playwright remoto escritorio: version `2.6.130`, Internet dependiente nace oculto, aparece con `Si`, se oculta con `No`, queda deshabilitado, y el payload no envia `internet_tipo` ni `internet_calidad`.
+- Playwright remoto movil `390x844`: mismo flujo de Internet, sin errores de consola y sin overflow horizontal.
 
 ## Tablero ejecutivo Infraestructura MEC segmentable - 2026-05-23 - v2.6.129
 
