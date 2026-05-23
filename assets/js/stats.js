@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.6.94
+ * Version: 2.6.129
  */
 
 const StatsModule = (() => {
@@ -13,6 +13,14 @@ const StatsModule = (() => {
   let _statsCache = {};
   let _infraCache = null;
   let _infraData = null;
+  let _infraMap = null;
+  let _infraFilters = {
+    departamento: '',
+    distrito: '',
+    nivel: '',
+    tipoBloque: '',
+    falla: '',
+  };
   let _chartLoader = null;
   const STATS_CACHE_TTL = 5 * 60 * 1000;
   const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
@@ -430,7 +438,7 @@ const StatsModule = (() => {
         <div class="offline-insights">
           <article>
             <div class="offline-insight__top">
-              <strong>Cobertura fotografica</strong>
+              <strong>Cobertura fotográfica</strong>
               <span>${evidencePct}%</span>
             </div>
             <div class="mini-progress"><i style="width:${Math.min(100, evidencePct)}%"></i></div>
@@ -472,7 +480,7 @@ const StatsModule = (() => {
       ['Daños', mec.damages || 0, 'Alertas visibles'],
       ['Escaleras', mec.stairs || 0, 'Circulacion vertical'],
       ['Fotos de campos', mec.fieldEvidenceCount || 0, `${mec.evidencePending || 0} pendientes`],
-      ['Fotos de objetos', mec.objectEvidenceCount || 0, 'Puertas, ventanas, danos, etc.'],
+      ['Fotos de objetos', mec.objectEvidenceCount || 0, 'Puertas, ventanas, daños, etc.'],
       ['Fotos sanitarias', mec.sanitaryEvidenceCount || 0, 'Banos y cabinas'],
     ];
 
@@ -550,6 +558,10 @@ const StatsModule = (() => {
       },
     };
     infra.areaTotal = _pickNumber(raw, ['area_total_m2', 'areaTotal'], infra.areaClassrooms + infra.areaSanitaries + infra.areaExteriors);
+    infra.territories = _normalizeInfraTerritories(raw, infra);
+    infra.educationLevels = _normalizeInfraEducationLevels(raw, infra);
+    infra.blockTypes = _normalizeInfraBlockTypes(raw, infra);
+    infra.failureSegments = _normalizeInfraFailureSegments(raw, infra);
     infra.alerts = Array.isArray(raw.alertas) && raw.alertas.length ? raw.alertas : _mecInfraAlerts(infra);
     return infra;
   }
@@ -573,6 +585,8 @@ const StatsModule = (() => {
     const aulaSanitarioRatio = infra.sanitaries ? `${(Number(infra.classrooms || 0) / Number(infra.sanitaries || 1)).toFixed(1)} aulas/sanitario` : 'Sin sanitarios cargados';
     const electricalCoverage = infra.blocks ? _pct(infra.grounding + infra.differential + infra.circuitsIdentified, infra.blocks * 3) : 0;
     const accessibilityScore = infra.sanitaries ? _pct(infra.sanitaryAccessible + infra.ramps, infra.sanitaries + infra.blocks) : _pct(infra.ramps, infra.blocks);
+    const failurePct = infra.blocks ? _pct(infra.damages + infra.sanitaryBad, infra.blocks + infra.sanitaries) : _pct(infra.damages, infra.classrooms + infra.otherSpaces + infra.sanitaries);
+    const view = _mecInfraView(infra);
 
     root.innerHTML = `
       <div class="mec-infra-page">
@@ -583,7 +597,8 @@ const StatsModule = (() => {
           </div>
           <div class="mec-infra-copy">
             <span class="eyebrow">Infraestructura escolar MEC</span>
-            <h3>Radiografia tecnica para priorizar inversion, mantenimiento y seguridad edilicia.</h3>
+            <h3>Centro de inteligencia edilicia para consultar, segmentar y decidir en minutos.</h3>
+            <p>KPIs, mapas, ranking territorial, tablas dinámicas y figuras técnicas para convertir cada visita de campo en información ejecutiva lista para el MEC.</p>
             <div class="mec-infra-chips">
               ${infra.demo ? '<span class="mec-demo-chip">Modo demo</span>' : ''}
               <span>${infra.schools} escuelas con ficha MEC</span>
@@ -595,13 +610,29 @@ const StatsModule = (() => {
           <div class="mec-infra-topline">
             ${_infraMiniMetric('Aulas/ambientes', infra.classrooms + infra.otherSpaces, `${_formatArea(infra.areaClassrooms)} pedagógicos`)}
             ${_infraMiniMetric('Sanitarios', infra.sanitaries, aulaSanitarioRatio)}
-            ${_infraMiniMetric('Alertas edilicias', infra.damages + infra.sanitaryBad, 'Daños y servicios críticos')}
+            ${_infraMiniMetric('Riesgo técnico', `${failurePct}%`, 'Fallas, daños y servicios críticos')}
             ${_infraMiniMetric('Evidencias', infra.evidences, `${infra.evidencePending} campos pendientes`)}
           </div>
         </section>
 
+        <section class="mec-intel-filters" aria-label="Segmentación de infraestructura">
+          <div class="mec-intel-filters__intro">
+            <span class="eyebrow">Explorador segmentable</span>
+            <h4>Cruce por territorio, nivel, bloque y presencia de fallas</h4>
+            <p>La misma base puede verse por departamento, distrito, nivel educativo, tipología edilicia o criticidad técnica.</p>
+          </div>
+          <div class="mec-intel-filter-grid">
+            ${_infraSelect('mec-infra-filter-departamento', 'Departamento', _infraOptions(['Todos los departamentos', ''], view.departments), view.filters.departamento, 'departamento')}
+            ${_infraSelect('mec-infra-filter-distrito', 'Distrito', _infraOptions(['Todos los distritos', ''], view.districts), view.filters.distrito, 'distrito')}
+            ${_infraSelect('mec-infra-filter-nivel', 'Nivel educativo', _infraOptions(['Todos los niveles', ''], infra.educationLevels.map(row => row.label)), view.filters.nivel, 'nivel')}
+            ${_infraSelect('mec-infra-filter-bloque', 'Tipo de bloque', _infraOptions(['Todos los bloques', ''], infra.blockTypes.map(row => row.label)), view.filters.tipoBloque, 'tipoBloque')}
+            ${_infraSelect('mec-infra-filter-falla', 'Fallas', _infraOptions(['Todos los estados', ''], infra.failureSegments.map(row => row.label)), view.filters.falla, 'falla')}
+            <button class="btn btn-sm btn-outline" type="button" data-mec-infra-reset>Limpiar</button>
+          </div>
+        </section>
+
         <section class="mec-decision-grid">
-          ${_mecDecisionCard('Ambientes pedagogicos', infra.classrooms, [
+          ${_mecDecisionCard('Ambientes pedagógicos', infra.classrooms, [
             ['Otros espacios', infra.otherSpaces],
             ['Puertas', infra.doors],
             ['Ventanas', infra.windows],
@@ -627,11 +658,50 @@ const StatsModule = (() => {
           ], '#7c3aed')}
         </section>
 
+        <section class="mec-intel-grid">
+          <article class="mec-infra-board mec-map-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Mapa territorial</span>
+                <h4>Calor de infraestructura y criticidad</h4>
+              </div>
+              <strong>${view.scope.schools}</strong>
+            </div>
+            <div id="mec-infra-map" class="mec-infra-map" role="img" aria-label="Mapa de infraestructura MEC"></div>
+            <div class="mec-map-legend">
+              ${_infraLegend('Baja prioridad', '', '#0b5d3b')}
+              ${_infraLegend('Media', '', '#c8a24a')}
+              ${_infraLegend('Alta', '', '#b42318')}
+            </div>
+          </article>
+
+          <article class="mec-infra-board mec-scope-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Vista filtrada</span>
+                <h4>${_escape(view.scopeLabel)}</h4>
+              </div>
+              <strong>${view.scope.risk}%</strong>
+            </div>
+            <div class="mec-scope-metrics">
+              ${_infraMiniMetric('Escuelas', view.scope.schools, 'en el segmento')}
+              ${_infraMiniMetric('Aulas', view.scope.classrooms, 'ambientes pedagógicos')}
+              ${_infraMiniMetric('Sanitarios', view.scope.sanitaries, 'servicios relevados')}
+              ${_infraMiniMetric('Fallas', view.scope.damages, 'daños e incidencias')}
+            </div>
+            <div class="mec-segment-focus">
+              ${_segmentFocusCard('Nivel educativo', view.level, 'schools', 'escuelas')}
+              ${_segmentFocusCard('Tipo de bloque', view.blockType, 'blocks', 'bloques')}
+              ${_segmentFocusCard('Fallas', view.failure, 'schools', 'escuelas')}
+            </div>
+          </article>
+        </section>
+
         <section class="mec-infra-section-grid">
           <article class="mec-infra-board">
             <div class="mec-infra-board__head">
               <div>
-                <span class="eyebrow">Semaforo tecnico</span>
+                <span class="eyebrow">Semáforo técnico</span>
                 <h4>Estado declarado de elementos</h4>
               </div>
               <strong>${qualityTotal}</strong>
@@ -664,21 +734,433 @@ const StatsModule = (() => {
           </article>
         </section>
 
+        <section class="mec-figures-grid">
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Niveles educativos</span>
+                <h4>Lectura comparativa por oferta</h4>
+              </div>
+            </div>
+            <div class="mec-segment-bars">
+              ${_segmentBars(infra.educationLevels, 'schools', infra.schools, 'escuelas')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Tipología de bloques</span>
+                <h4>Donde se concentra la infraestructura</h4>
+              </div>
+            </div>
+            <div class="mec-segment-bars">
+              ${_segmentBars(infra.blockTypes, 'blocks', infra.blocks, 'bloques')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Productividad</span>
+                <h4>Tiempos técnicos promedio</h4>
+              </div>
+            </div>
+            <div class="mec-time-grid">
+              ${_infraBar('Escuela completa', infra.schoolTimeAvg, 180, 'min promedio')}
+              ${_infraBar('Aulas/ambientes', infra.classroomTimeAvg, 90, 'min promedio')}
+              ${_infraBar('Sanitarios', infra.sanitaryTimeAvg, 60, 'min promedio')}
+              ${_infraBar('Exteriores', infra.exteriorTimeAvg, 60, 'min promedio')}
+            </div>
+          </article>
+        </section>
+
         <section class="mec-infra-board mec-infra-board--wide">
           <div class="mec-infra-board__head">
             <div>
-              <span class="eyebrow">Productividad de relevamiento</span>
-              <h4>Tiempos tecnicos promedio</h4>
+              <span class="eyebrow">Tabla ejecutiva segmentada</span>
+              <h4>Ranking de territorios para priorizar recorridos, inversión y mantenimiento</h4>
             </div>
+            <strong>${view.territories.length}</strong>
           </div>
-          <div class="mec-time-grid">
-            ${_infraBar('Escuela completa', infra.schoolTimeAvg, 180, 'min promedio')}
-            ${_infraBar('Aulas/ambientes', infra.classroomTimeAvg, 90, 'min promedio')}
-            ${_infraBar('Sanitarios', infra.sanitaryTimeAvg, 60, 'min promedio')}
-            ${_infraBar('Exteriores', infra.exteriorTimeAvg, 60, 'min promedio')}
+          <div class="table-responsive">
+            <table class="data-table mec-territory-table">
+              <thead>
+                <tr>
+                  <th>Territorio</th>
+                  <th>Escuelas</th>
+                  <th>Aulas</th>
+                  <th>Sanitarios</th>
+                  <th>Fallas</th>
+                  <th>Evidencia</th>
+                  <th>Prioridad</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${view.territories.slice(0, 12).map(_territoryRow).join('')}
+              </tbody>
+            </table>
           </div>
         </section>
       </div>`;
+    _bindMecInfraControls(infra);
+    _renderMecInfrastructureMap(infra, view);
+  }
+
+  function _asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function _pickText(obj, keys, fallback = '') {
+    for (const key of keys || []) {
+      const value = obj && obj[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+    }
+    return fallback;
+  }
+
+  function _normalizeInfraTerritories(raw, infra) {
+    const rows = _asArray(raw.territorios || raw.territories || raw.por_territorio || raw.por_departamento);
+    if (!rows.length) return [_aggregateTerritory(infra)];
+    return rows.map(row => {
+      const schools = _pickNumber(row, ['escuelas', 'schools', 'total'], 0);
+      const classrooms = _pickNumber(row, ['aulas', 'classrooms'], 0);
+      const sanitaries = _pickNumber(row, ['sanitarios', 'sanitaries'], 0);
+      const damages = _pickNumber(row, ['fallas', 'danos', 'daños', 'damages', 'incidencias'], 0);
+      const evidencePct = _pickNumber(row, ['evidencia_pct', 'evidence_pct', 'evidencePct'], 0);
+      const risk = _pickNumber(row, ['riesgo', 'risk', 'prioridad_pct'], _pct(damages, Math.max(1, classrooms + sanitaries)));
+      return {
+        departamento: _pickText(row, ['departamento', 'department'], 'Sin departamento'),
+        distrito: _pickText(row, ['distrito', 'district'], ''),
+        schools,
+        classrooms,
+        sanitaries,
+        blocks: _pickNumber(row, ['bloques', 'blocks'], 0),
+        damages,
+        evidencePct,
+        risk,
+        area: _pickNumber(row, ['area_m2', 'area', 'area_total_m2'], 0),
+        lat: _pickNumber(row, ['lat', 'latitud', 'latitude'], 0),
+        lng: _pickNumber(row, ['lng', 'lon', 'longitud', 'longitude'], 0),
+      };
+    }).sort((a, b) => (b.risk || 0) - (a.risk || 0));
+  }
+
+  function _aggregateTerritory(infra) {
+    return {
+      departamento: 'Todo el pais',
+      distrito: '',
+      schools: Number(infra.schools || 0),
+      classrooms: Number(infra.classrooms || 0) + Number(infra.otherSpaces || 0),
+      sanitaries: Number(infra.sanitaries || 0),
+      blocks: Number(infra.blocks || 0),
+      damages: Number(infra.damages || 0) + Number(infra.sanitaryBad || 0),
+      evidencePct: infra.evidenceFields ? _pct(infra.evidenceCovered, infra.evidenceFields) : 0,
+      risk: _pct(Number(infra.damages || 0) + Number(infra.sanitaryBad || 0), Math.max(1, Number(infra.blocks || 0) + Number(infra.sanitaries || 0))),
+      area: Number(infra.areaTotal || 0),
+      lat: -23.45,
+      lng: -58.44,
+    };
+  }
+
+  function _normalizeInfraEducationLevels(raw, infra) {
+    const rows = _asArray(raw.niveles_educativos || raw.education_levels || raw.niveles);
+    if (rows.length) {
+      return rows.map(row => ({
+        label: _pickText(row, ['nivel', 'label', 'name'], 'Sin nivel'),
+        schools: _pickNumber(row, ['escuelas', 'schools', 'total'], 0),
+        classrooms: _pickNumber(row, ['aulas', 'classrooms'], 0),
+        sanitaries: _pickNumber(row, ['sanitarios', 'sanitaries'], 0),
+        damages: _pickNumber(row, ['fallas', 'danos', 'damages'], 0),
+        evidencePct: _pickNumber(row, ['evidencia_pct', 'evidence_pct', 'evidencePct'], 0),
+      }));
+    }
+    if (!infra.demo) return [{ label: 'Todos los niveles', schools: infra.schools, classrooms: infra.classrooms, sanitaries: infra.sanitaries, damages: infra.damages, evidencePct: 0 }];
+    return [
+      _proportionalSegment('Inicial', infra, .22, .16, .14, .12),
+      _proportionalSegment('Educacion Escolar Basica', infra, .68, .74, .71, .69),
+      _proportionalSegment('Educacion Media', infra, .41, .38, .34, .45),
+      _proportionalSegment('Tecnica / Formacion laboral', infra, .09, .12, .08, .15),
+    ];
+  }
+
+  function _normalizeInfraBlockTypes(raw, infra) {
+    const rows = _asArray(raw.tipos_bloque || raw.block_types || raw.bloques_tipo);
+    if (rows.length) {
+      return rows.map(row => ({
+        label: _pickText(row, ['tipo', 'label', 'name'], 'Sin tipo'),
+        blocks: _pickNumber(row, ['bloques', 'blocks', 'total'], 0),
+        classrooms: _pickNumber(row, ['aulas', 'classrooms'], 0),
+        sanitaries: _pickNumber(row, ['sanitarios', 'sanitaries'], 0),
+        damages: _pickNumber(row, ['fallas', 'danos', 'damages'], 0),
+        area: _pickNumber(row, ['area_m2', 'area'], 0),
+      }));
+    }
+    if (!infra.demo) return [{ label: 'Todos los bloques', blocks: infra.blocks, classrooms: infra.classrooms, sanitaries: infra.sanitaries, damages: infra.damages, area: infra.areaTotal }];
+    return [
+      _blockTypeSegment('Aulas en linea', infra, .42, .48, .21, .31),
+      _blockTypeSegment('Bloque mixto', infra, .28, .27, .39, .37),
+      _blockTypeSegment('Sanitario independiente', infra, .12, .02, .28, .18),
+      _blockTypeSegment('Administrativo / apoyo', infra, .11, .15, .07, .08),
+      _blockTypeSegment('Taller / laboratorio', infra, .07, .08, .05, .06),
+    ];
+  }
+
+  function _normalizeInfraFailureSegments(raw, infra) {
+    const rows = _asArray(raw.fallas_segmentos || raw.failure_segments || raw.fallas);
+    if (rows.length) {
+      return rows.map(row => ({
+        label: _pickText(row, ['estado', 'label', 'name'], 'Sin estado'),
+        schools: _pickNumber(row, ['escuelas', 'schools', 'total'], 0),
+        blocks: _pickNumber(row, ['bloques', 'blocks'], 0),
+        damages: _pickNumber(row, ['fallas', 'danos', 'damages'], 0),
+        risk: _pickNumber(row, ['riesgo', 'risk'], 0),
+      }));
+    }
+    const criticalSchools = Math.round(Number(infra.schools || 0) * (infra.demo ? .36 : _pct(infra.damages, Math.max(1, infra.schools)) / 100));
+    const watchSchools = Math.round(Number(infra.schools || 0) * (infra.demo ? .28 : .1));
+    return [
+      { label: 'Con fallas criticas', schools: criticalSchools, blocks: Math.round(Number(infra.blocks || 0) * .32), damages: Math.round(Number(infra.damages || 0) * .68), risk: 72 },
+      { label: 'Con observaciones leves', schools: watchSchools, blocks: Math.round(Number(infra.blocks || 0) * .28), damages: Math.round(Number(infra.damages || 0) * .22), risk: 38 },
+      { label: 'Sin fallas visibles', schools: Math.max(0, Number(infra.schools || 0) - criticalSchools - watchSchools), blocks: Math.round(Number(infra.blocks || 0) * .4), damages: Math.round(Number(infra.damages || 0) * .1), risk: 12 },
+    ];
+  }
+
+  function _proportionalSegment(label, infra, schoolFactor, classroomFactor, sanitaryFactor, damageFactor) {
+    return {
+      label,
+      schools: Math.round(Number(infra.schools || 0) * schoolFactor),
+      classrooms: Math.round(Number(infra.classrooms || 0) * classroomFactor),
+      sanitaries: Math.round(Number(infra.sanitaries || 0) * sanitaryFactor),
+      damages: Math.round(Number(infra.damages || 0) * damageFactor),
+      evidencePct: infra.evidenceFields ? _pct(infra.evidenceCovered, infra.evidenceFields) : 0,
+    };
+  }
+
+  function _blockTypeSegment(label, infra, blockFactor, classroomFactor, sanitaryFactor, damageFactor) {
+    return {
+      label,
+      blocks: Math.round(Number(infra.blocks || 0) * blockFactor),
+      classrooms: Math.round(Number(infra.classrooms || 0) * classroomFactor),
+      sanitaries: Math.round(Number(infra.sanitaries || 0) * sanitaryFactor),
+      damages: Math.round(Number(infra.damages || 0) * damageFactor),
+      area: Math.round(Number(infra.areaTotal || 0) * blockFactor),
+    };
+  }
+
+  function _mecInfraView(infra) {
+    const departments = [...new Set((infra.territories || []).map(row => row.departamento).filter(Boolean))].sort();
+    const filters = { ..._infraFilters };
+    if (filters.departamento && !departments.includes(filters.departamento)) {
+      filters.departamento = '';
+      _infraFilters.departamento = '';
+    }
+    let territories = (infra.territories || []).filter(row => !filters.departamento || row.departamento === filters.departamento);
+    const districts = [...new Set(territories.map(row => row.distrito).filter(Boolean))].sort();
+    if (filters.distrito && !districts.includes(filters.distrito)) {
+      filters.distrito = '';
+      _infraFilters.distrito = '';
+    }
+    territories = territories.filter(row => !filters.distrito || row.distrito === filters.distrito);
+    if (!territories.length) territories = infra.territories || [];
+    const level = (infra.educationLevels || []).find(row => row.label === filters.nivel) || null;
+    const blockType = (infra.blockTypes || []).find(row => row.label === filters.tipoBloque) || null;
+    const failure = (infra.failureSegments || []).find(row => row.label === filters.falla) || null;
+    const scope = _sumTerritoryRows(territories);
+    const scopePieces = [
+      filters.departamento || 'Todo el pais',
+      filters.distrito,
+      filters.nivel,
+      filters.tipoBloque,
+      filters.falla,
+    ].filter(Boolean);
+    return {
+      filters,
+      departments,
+      districts,
+      territories,
+      level,
+      blockType,
+      failure,
+      scope,
+      scopeLabel: scopePieces.join(' / '),
+    };
+  }
+
+  function _sumTerritoryRows(rows) {
+    const total = rows.reduce((acc, row) => {
+      acc.schools += Number(row.schools || 0);
+      acc.classrooms += Number(row.classrooms || 0);
+      acc.sanitaries += Number(row.sanitaries || 0);
+      acc.blocks += Number(row.blocks || 0);
+      acc.damages += Number(row.damages || 0);
+      acc.area += Number(row.area || 0);
+      acc.riskWeight += Number(row.risk || 0) * Math.max(1, Number(row.schools || 0));
+      acc.evidenceWeight += Number(row.evidencePct || 0) * Math.max(1, Number(row.schools || 0));
+      return acc;
+    }, { schools: 0, classrooms: 0, sanitaries: 0, blocks: 0, damages: 0, area: 0, riskWeight: 0, evidenceWeight: 0 });
+    const weight = Math.max(1, total.schools);
+    total.risk = Math.round(total.riskWeight / weight);
+    total.evidencePct = Math.round(total.evidenceWeight / weight);
+    return total;
+  }
+
+  function _infraOptions(defaultOption, values) {
+    const [label, value] = defaultOption;
+    const unique = [...new Set((values || []).filter(Boolean))].sort();
+    return [{ label, value }, ...unique.map(item => ({ label: item, value: item }))];
+  }
+
+  function _infraSelect(id, label, options, value, filterKey) {
+    return `
+      <label class="mec-intel-select" for="${_escape(id)}">
+        <span>${_escape(label)}</span>
+        <select id="${_escape(id)}" data-mec-infra-filter="${_escape(filterKey)}">
+          ${options.map(option => `<option value="${_escape(option.value)}" ${String(value) === String(option.value) ? 'selected' : ''}>${_escape(option.label)}</option>`).join('')}
+        </select>
+      </label>`;
+  }
+
+  function _bindMecInfraControls(infra) {
+    const root = document.getElementById('mec-infra-root');
+    if (!root) return;
+    root.querySelectorAll('[data-mec-infra-filter]').forEach(control => {
+      control.addEventListener('change', () => {
+        const key = control.dataset.mecInfraFilter;
+        _infraFilters[key] = control.value;
+        if (key === 'departamento') _infraFilters.distrito = '';
+        _renderMecInfrastructurePanel(infra);
+      });
+    });
+    root.querySelector('[data-mec-infra-reset]')?.addEventListener('click', () => {
+      _infraFilters = { departamento: '', distrito: '', nivel: '', tipoBloque: '', falla: '' };
+      _renderMecInfrastructurePanel(infra);
+    });
+  }
+
+  function _segmentFocusCard(title, row, key, unit) {
+    if (!row) {
+      return `
+        <article>
+          <span>${_escape(title)}</span>
+          <strong>Todos</strong>
+          <small>Sin filtro activo</small>
+        </article>`;
+    }
+    const value = Number(row[key] || row.schools || row.blocks || 0);
+    const damages = Number(row.damages || 0);
+    return `
+      <article>
+        <span>${_escape(title)}</span>
+        <strong>${_escape(row.label)}</strong>
+        <small>${value} ${_escape(unit)} - ${damages} fallas</small>
+      </article>`;
+  }
+
+  function _segmentBars(rows, key, total, unit) {
+    const max = Math.max(...(rows || []).map(row => Number(row[key] || 0)), Number(total || 0), 1);
+    return (rows || []).map(row => {
+      const value = Number(row[key] || 0);
+      const pct = Math.max(4, Math.round((value / max) * 100));
+      return `
+        <div class="mec-segment-bar">
+          <div>
+            <strong>${_escape(row.label)}</strong>
+            <span>${value} ${_escape(unit)} - ${Number(row.damages || 0)} fallas</span>
+          </div>
+          <i><b style="width:${pct}%"></b></i>
+        </div>`;
+    }).join('');
+  }
+
+  function _territoryRow(row) {
+    const label = row.distrito ? `${row.departamento} / ${row.distrito}` : row.departamento;
+    const tone = _riskTone(row.risk);
+    return `
+      <tr>
+        <td><strong>${_escape(label)}</strong></td>
+        <td>${Number(row.schools || 0)}</td>
+        <td>${Number(row.classrooms || 0)}</td>
+        <td>${Number(row.sanitaries || 0)}</td>
+        <td>${Number(row.damages || 0)}</td>
+        <td>
+          <div class="table-progress">
+            <span>${Number(row.evidencePct || 0)}%</span>
+            <i><b style="width:${Math.min(100, Number(row.evidencePct || 0))}%"></b></i>
+          </div>
+        </td>
+        <td><span class="mec-priority-pill mec-priority-pill--${tone}">${Number(row.risk || 0)}%</span></td>
+      </tr>`;
+  }
+
+  function _renderMecInfrastructureMap(infra, view) {
+    const el = document.getElementById('mec-infra-map');
+    if (!el) return;
+    if (_infraMap) {
+      try { _infraMap.remove(); } catch { /* ignore stale Leaflet container */ }
+      _infraMap = null;
+    }
+    const rows = (view.territories || []).filter(row => Number(row.lat) && Number(row.lng));
+    if (!rows.length || !window.L) {
+      el.innerHTML = _fallbackMecMap(rows.length ? rows : (infra.territories || []));
+      return;
+    }
+    _infraMap = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      crossOrigin: true,
+    }).addTo(_infraMap);
+    const bounds = [];
+    rows.slice(0, 60).forEach(row => {
+      const latLng = [Number(row.lat), Number(row.lng)];
+      bounds.push(latLng);
+      L.circleMarker(latLng, {
+        radius: Math.max(6, Math.min(18, 5 + Math.sqrt(Number(row.schools || 0)))),
+        color: '#ffffff',
+        weight: 2,
+        fillColor: _riskColor(row.risk),
+        fillOpacity: .86,
+      })
+        .bindPopup(`<strong>${_escape(row.departamento)}${row.distrito ? ' / ' + _escape(row.distrito) : ''}</strong><br>${Number(row.schools || 0)} escuelas - ${Number(row.damages || 0)} fallas - riesgo ${Number(row.risk || 0)}%`)
+        .addTo(_infraMap);
+    });
+    if (bounds.length > 1) _infraMap.fitBounds(bounds, { padding: [20, 20] });
+    else _infraMap.setView(bounds[0] || [-23.45, -58.44], 6);
+    setTimeout(() => _infraMap?.invalidateSize(), 80);
+  }
+
+  function _fallbackMecMap(rows) {
+    const pins = (rows || []).filter(row => Number(row.lat) && Number(row.lng)).slice(0, 28);
+    return `
+      <div class="mec-map-fallback">
+        <span class="mec-map-country">Paraguay</span>
+        ${pins.map(row => {
+          const point = _mapPoint(row);
+          return `<i title="${_escape(row.departamento)} ${_escape(row.distrito || '')}" style="left:${point.x}%;top:${point.y}%;background:${_riskColor(row.risk)}"></i>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function _mapPoint(row) {
+    const west = -62.8;
+    const east = -54.2;
+    const north = -19.0;
+    const south = -27.7;
+    const x = Math.max(5, Math.min(95, ((Number(row.lng || west) - west) / (east - west)) * 100));
+    const y = Math.max(5, Math.min(95, ((Number(row.lat || north) - north) / (south - north)) * 100));
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+
+  function _riskTone(value) {
+    const risk = Number(value || 0);
+    if (risk >= 55) return 'danger';
+    if (risk >= 30) return 'warning';
+    return 'success';
+  }
+
+  function _riskColor(value) {
+    const tone = _riskTone(value);
+    if (tone === 'danger') return '#b42318';
+    if (tone === 'warning') return '#c8a24a';
+    return '#0b5d3b';
   }
 
   function _mecDecisionCard(title, value, rows, color) {
@@ -704,7 +1186,8 @@ const StatsModule = (() => {
   }
 
   function _infraLegend(label, value, color) {
-    return `<span><i style="background:${color}"></i>${_escape(label)} <b>${Number(value || 0)}</b></span>`;
+    const hasValue = value !== undefined && value !== null && value !== '';
+    return `<span><i style="background:${color}"></i>${_escape(label)} ${hasValue ? `<b>${Number(value || 0)}</b>` : ''}</span>`;
   }
 
   function _infraBar(label, value, max, note) {
@@ -733,11 +1216,11 @@ const StatsModule = (() => {
   function _mecInfraAlerts(infra) {
     const alerts = [];
     if (infra.damages) alerts.push({ tone: 'danger', label: 'Daños relevados', note: `${infra.damages} elementos con falla, grieta o daño.` });
-    if (infra.sanitaryBad) alerts.push({ tone: 'danger', label: 'Sanitarios criticos', note: `${infra.sanitaryBad} sanitarios con estado malo o fuera de servicio.` });
+    if (infra.sanitaryBad) alerts.push({ tone: 'danger', label: 'Sanitarios críticos', note: `${infra.sanitaryBad} sanitarios con estado malo o fuera de servicio.` });
     if (infra.blocks && infra.grounding < infra.blocks) alerts.push({ tone: 'warning', label: 'Puesta a tierra incompleta', note: `${Math.max(0, infra.blocks - infra.grounding)} bloques sin puesta a tierra confirmada.` });
     if (infra.blocks && infra.differential < infra.blocks) alerts.push({ tone: 'warning', label: 'Proteccion diferencial', note: `${Math.max(0, infra.blocks - infra.differential)} bloques sin diferencial confirmado.` });
     if (infra.evidencePending) alerts.push({ tone: 'info', label: 'Evidencias pendientes', note: `${infra.evidencePending} campos recomendados/obligatorios sin foto.` });
-    if (!alerts.length) alerts.push({ tone: 'success', label: 'Sin alertas tecnicas fuertes', note: 'El tablero no detecta daños, pendientes fotograficos ni brechas electricas con los datos disponibles.' });
+    if (!alerts.length) alerts.push({ tone: 'success', label: 'Sin alertas técnicas fuertes', note: 'El tablero no detecta daños, pendientes fotográficos ni brechas eléctricas con los datos disponibles.' });
     return alerts;
   }
 

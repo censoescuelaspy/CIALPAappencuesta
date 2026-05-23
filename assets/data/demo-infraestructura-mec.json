@@ -58,5 +58,37 @@
       "label": "Cobertura fotografica demo",
       "note": "9944 evidencias sinteticas indexadas."
     }
+  ],
+  "territorios": [
+    { "departamento": "CENTRAL", "distrito": "LUQUE", "escuelas": 78, "bloques": 121, "aulas": 421, "sanitarios": 156, "fallas": 131, "evidencia_pct": 88, "riesgo": 42, "area_m2": 38240, "lat": -25.267, "lng": -57.488 },
+    { "departamento": "CENTRAL", "distrito": "SAN LORENZO", "escuelas": 66, "bloques": 96, "aulas": 342, "sanitarios": 128, "fallas": 97, "evidencia_pct": 91, "riesgo": 35, "area_m2": 30110, "lat": -25.339, "lng": -57.508 },
+    { "departamento": "CAPITAL", "distrito": "ASUNCION", "escuelas": 59, "bloques": 87, "aulas": 298, "sanitarios": 119, "fallas": 89, "evidencia_pct": 93, "riesgo": 33, "area_m2": 27880, "lat": -25.300, "lng": -57.635 },
+    { "departamento": "ALTO PARANA", "distrito": "CIUDAD DEL ESTE", "escuelas": 72, "bloques": 111, "aulas": 384, "sanitarios": 142, "fallas": 138, "evidencia_pct": 86, "riesgo": 46, "area_m2": 35800, "lat": -25.516, "lng": -54.616 },
+    { "departamento": "ITAPUA", "distrito": "ENCARNACION", "escuelas": 54, "bloques": 76, "aulas": 262, "sanitarios": 104, "fallas": 61, "evidencia_pct": 89, "riesgo": 29, "area_m2": 24420, "lat": -27.330, "lng": -55.866 },
+    { "departamento": "CAAGUAZU", "distrito": "CORONEL OVIEDO", "escuelas": 63, "bloques": 91, "aulas": 318, "sanitarios": 121, "fallas": 116, "evidencia_pct": 82, "riesgo": 44, "area_m2": 29270, "lat": -25.444, "lng": -56.440 },
+    { "departamento": "SAN PEDRO", "distrito": "SAN ESTANISLAO", "escuelas": 48, "bloques": 73, "aulas": 231, "sanitarios": 91, "fallas": 104, "evidencia_pct": 78, "riesgo": 55, "area_m2": 21820, "lat": -24.667, "lng": -56.440 },
+    { "departamento": "CONCEPCION", "distrito": "CONCEPCION", "escuelas": 41, "bloques": 58, "aulas": 201, "sanitarios": 80, "fallas": 83, "evidencia_pct": 81, "riesgo": 51, "area_m2": 18590, "lat": -23.406, "lng": -57.434 },
+    { "departamento": "GUAIRA", "distrito": "VILLARRICA", "escuelas": 37, "bloques": 52, "aulas": 178, "sanitarios": 68, "fallas": 43, "evidencia_pct": 90, "riesgo": 27, "area_m2": 16140, "lat": -25.782, "lng": -56.448 },
+    { "departamento": "CANINDEYU", "distrito": "CURUGUATY", "escuelas": 44, "bloques": 66, "aulas": 214, "sanitarios": 86, "fallas": 95, "evidencia_pct": 76, "riesgo": 53, "area_m2": 20110, "lat": -24.474, "lng": -55.692 },
+    { "departamento": "PRESIDENTE HAYES", "distrito": "VILLA HAYES", "escuelas": 31, "bloques": 47, "aulas": 149, "sanitarios": 58, "fallas": 73, "evidencia_pct": 74, "riesgo": 57, "area_m2": 14190, "lat": -25.093, "lng": -57.523 },
+    { "departamento": "ALTO PARAGUAY", "distrito": "BAHIA NEGRA", "escuelas": 16, "bloques": 22, "aulas": 73, "sanitarios": 29, "fallas": 42, "evidencia_pct": 69, "riesgo": 64, "area_m2": 6920, "lat": -20.225, "lng": -58.169 }
+  ],
+  "niveles_educativos": [
+    { "nivel": "Inicial", "escuelas": 220, "aulas": 788, "sanitarios": 277, "fallas": 171, "evidencia_pct": 86 },
+    { "nivel": "Educacion Escolar Basica", "escuelas": 680, "aulas": 3643, "sanitarios": 1405, "fallas": 986, "evidencia_pct": 84 },
+    { "nivel": "Educacion Media", "escuelas": 410, "aulas": 1870, "sanitarios": 673, "fallas": 644, "evidencia_pct": 82 },
+    { "nivel": "Tecnica / Formacion laboral", "escuelas": 90, "aulas": 591, "sanitarios": 158, "fallas": 214, "evidencia_pct": 79 }
+  ],
+  "tipos_bloque": [
+    { "tipo": "Aulas en linea", "bloques": 592, "aulas": 2360, "sanitarios": 416, "fallas": 443, "area_m2": 189800 },
+    { "tipo": "Bloque mixto", "bloques": 395, "aulas": 1329, "sanitarios": 772, "fallas": 529, "area_m2": 127600 },
+    { "tipo": "Sanitario independiente", "bloques": 169, "aulas": 98, "sanitarios": 554, "fallas": 257, "area_m2": 38600 },
+    { "tipo": "Administrativo / apoyo", "bloques": 155, "aulas": 738, "sanitarios": 138, "fallas": 114, "area_m2": 51300 },
+    { "tipo": "Taller / laboratorio", "bloques": 98, "aulas": 398, "sanitarios": 99, "fallas": 86, "area_m2": 48400 }
+  ],
+  "fallas_segmentos": [
+    { "estado": "Con fallas criticas", "escuelas": 362, "bloques": 451, "fallas": 972, "riesgo": 72 },
+    { "estado": "Con observaciones leves", "escuelas": 281, "bloques": 394, "fallas": 314, "riesgo": 38 },
+    { "estado": "Sin fallas visibles", "escuelas": 357, "bloques": 564, "fallas": 143, "riesgo": 12 }
   ]
 }

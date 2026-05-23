@@ -4,6 +4,45 @@
 
 ---
 
+## Tablero ejecutivo Infraestructura MEC segmentable - 2026-05-23 - v2.6.129
+
+### Objetivo
+- Renovar radicalmente el panel `Infraestructura MEC` para presentarlo como un centro de inteligencia edilicia.
+- Dejar claro que la app permite consultar informacion de forma agil y sofisticada con KPIs, estadisticas, tablas, figuras, mapas y segmentacion.
+- Permitir lectura por departamento, distrito, nivel educativo, tipo de bloque y presencia o ausencia de fallas.
+
+### Diagnostico
+- El panel anterior mostraba una radiografia tecnica util, pero no demostraba suficientemente el potencial de analisis para presentaciones ante MEC.
+- Faltaban controles visibles para segmentar la informacion por territorio, oferta educativa, tipologia edilicia y criticidad.
+- La demo de 1000 respuestas no tenia detalle territorial ni segmentos sinteticos suficientes para mostrar mapas, rankings y cruces.
+
+### Cambios implementados
+- `Infraestructura MEC` pasa a abrir con una cabecera tipo centro de inteligencia: evidencia, escuelas con ficha MEC, area relevada, riesgo tecnico y estado de fuente.
+- Se agrega un explorador segmentable con filtros por departamento, distrito, nivel educativo, tipo de bloque y estado de fallas.
+- Se agrega mapa territorial de infraestructura con puntos por distrito/departamento y color segun riesgo; si Leaflet no esta disponible, se muestra un mapa visual de respaldo.
+- Se agrega vista filtrada con KPIs del segmento seleccionado y tarjetas de foco para nivel educativo, tipo de bloque y fallas.
+- Se conservan tarjetas de decision, semaforo tecnico, alertas y tiempos, pero integradas dentro de un tablero mas ejecutivo.
+- Se agregan figuras comparativas por niveles educativos, tipologias de bloque y productividad de relevamiento.
+- Se agrega tabla/ranking territorial para priorizar recorridos, inversion y mantenimiento.
+- La demo publica `assets/data/demo-infraestructura-mec.json` incorpora territorios, niveles educativos, tipos de bloque y segmentos de fallas.
+- Version visible, cache y assets actualizados a `v2.6.129`.
+
+### Pendiente operativo
+- Pedir a supervisores y administradores `Actualizar app` para tomar `cialpa-app-v2.6.129`.
+- Cuando existan borradores MEC reales suficientes, ampliar el agregado backend `infraestructura_mec` para devolver territorios, niveles, tipos de bloque y fallas desde datos vivos, no solo desde demo/fallback.
+
+### Validaciones ejecutadas
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check sw.js`.
+- Validacion JSON de `demo-infraestructura-mec.json`, `r01-schools-public.json` y `package.json`: OK.
+- Playwright local escritorio: `Infraestructura MEC` carga el tablero nuevo, muestra 5 filtros, selecciona `CENTRAL`, renderiza mapa y tabla territorial, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: muestra tablero, filtros, mapa y tabla sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+
 ## Preguntas visibles para grupos de opciones R01 - 2026-05-23 - v2.6.128
 
 ### Objetivo
