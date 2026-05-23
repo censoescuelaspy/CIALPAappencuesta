@@ -38,6 +38,13 @@
 - `node --check sw.js`.
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - `git diff --check`.
+- `git commit`: `a4431ae fix: conservar escuela mapa registro v2.6.113`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.113`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.113`.
+- Verificacion HTTP de GitHub Pages para `assets/js/map.js`: contiene `_schoolPrimaryId` y `startGuidedRegister` con `_findSchoolById`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene respaldo `MapModule.getSelectedEscuela`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene snapshot de escuela con `code`.
 
 ---
 
