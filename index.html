@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.124" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.125" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.124" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.125" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.124</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.125</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.124</strong>
+      Edición vigente<br><strong class="app-version">v2.6.125</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -281,6 +281,7 @@
               <button class="btn btn-primary" onclick="AppController.showModule('registro')">Registro guiado</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Cuestionario inicial</button>
               <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Planificación</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
             </div>
@@ -289,7 +290,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.124</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.125</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -297,6 +298,7 @@
               <button class="btn btn-outline" onclick="AppController.openWorkbook()">Libro en línea</button>
               <button class="btn btn-outline" onclick="AppController.openEvidenceFolder()">Fotos y evidencias</button>
               <button class="btn btn-primary" onclick="AppController.showModule('registro')">Abrir registro guiado</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Gestionar cuestionario inicial</button>
               <button class="btn btn-outline" onclick="AppController.showModule('plano')">Ver plano escuela</button>
             </div>
           </div>
@@ -1059,6 +1061,27 @@
       </div>
 
       <!-- ======================================================
+           MODULE: CUESTIONARIO INICIAL R01 (supervisor/admin)
+           ====================================================== -->
+      <div id="module-cuestionario-inicial" class="module-panel" data-min-role="supervisor">
+        <div class="page-header">
+          <div>
+            <h2>Cuestionario inicial R01</h2>
+            <p class="text-muted">Envio previo a directores, carga de contactos y seguimiento de respuestas antes de la visita in situ.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <a class="btn btn-sm btn-outline" href="cuestionario_inicial/" target="_blank" rel="noopener">Ver formulario publico</a>
+            <button class="btn btn-sm btn-primary" onclick="InitialQuestionnaire.loadDemoContacts()">Simular 50 contactos</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="initial-questionnaire-admin-root">
+            <div class="loading-state">Preparando gestor del cuestionario inicial...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
            MODULE: PLANIFICACION OPERATIVA (supervisor/admin)
            ====================================================== -->
       <div id="module-planificacion" class="module-panel" data-min-role="supervisor">
@@ -1357,19 +1380,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.124"></script>
-<script src="assets/js/local-store.js?v=2.6.124"></script>
-<script src="assets/js/api.js?v=2.6.124"></script>
-<script src="assets/js/auth.js?v=2.6.124"></script>
-<script src="assets/js/map.js?v=2.6.124"></script>
-<script src="assets/js/survey.js?v=2.6.124"></script>
-<script src="assets/js/stats.js?v=2.6.124"></script>
-<script src="assets/js/location-audit.js?v=2.6.124"></script>
-<script src="assets/js/planning.js?v=2.6.124"></script>
-<script src="assets/js/admin.js?v=2.6.124"></script>
-<script src="assets/js/jornada.js?v=2.6.124"></script>
-<script src="assets/js/manual.js?v=2.6.124"></script>
-<script src="assets/js/app.js?v=2.6.124"></script>
+<script src="assets/js/config.js?v=2.6.125"></script>
+<script src="assets/js/local-store.js?v=2.6.125"></script>
+<script src="assets/js/api.js?v=2.6.125"></script>
+<script src="assets/js/auth.js?v=2.6.125"></script>
+<script src="assets/js/map.js?v=2.6.125"></script>
+<script src="assets/js/survey.js?v=2.6.125"></script>
+<script src="assets/js/stats.js?v=2.6.125"></script>
+<script src="assets/js/location-audit.js?v=2.6.125"></script>
+<script src="assets/js/planning.js?v=2.6.125"></script>
+<script src="assets/js/admin.js?v=2.6.125"></script>
+<script src="assets/js/jornada.js?v=2.6.125"></script>
+<script src="assets/js/manual.js?v=2.6.125"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.125"></script>
+<script src="assets/js/app.js?v=2.6.125"></script>
 
 <script>
   // Set today's date in Inicio module

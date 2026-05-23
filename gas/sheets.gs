@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.95
+ * Version 2.6.125
  */
 
 const SheetsService = (() => {
@@ -41,6 +41,34 @@ const SheetsService = (() => {
     ['seguridad_accesibilidad', 'Seguridad, accesibilidad y riesgos', 7],
     ['evidencias', 'Fotografías y evidencias', 8],
     ['revision_cierre', 'Revisión final y cierre', 9]
+  ];
+
+  const R01_PUBLIC_URL = 'https://censoescuelaspy.github.io/CIALPAappencuesta/cuestionario_inicial/';
+
+  const R01_CONTACT_HEADERS = [
+    'id_contacto','token','codigo_local','id_escuela','nombre_escuela','director_nombre',
+    'correo','celular','departamento','distrito','localidad','url_cuestionario',
+    'estado_envio','ultimo_envio','ultimo_error','cantidad_envios','fuente',
+    'respuesta_id','respuesta_fecha','creado_en','actualizado_en'
+  ];
+
+  const R01_RESPONSE_HEADERS = [
+    'id_respuesta','fecha_hora','token','id_escuela','codigo_local','nombre_escuela',
+    'departamento','distrito','localidad','director_nombre','director_correo','director_celular',
+    'agua_tiene','agua_fuentes','bomba_hp','agua_observacion',
+    'bano_tiene','desague_tipo','sanitario_observacion',
+    'internet_tiene','internet_tipo','internet_calidad','internet_observacion',
+    'cctv_tiene','cctv_funcionando','cctv_danadas',
+    'incendio_detectores','incendio_pulsadores_sirena','incendio_luces_emergencia',
+    'incendio_extintores','incendio_hidraulico','motobomba_hp','reserva_tanque_litros',
+    'energia_tiene','energia_proveedor','energia_cortes','energia_observacion',
+    'observacion_final','adjunto_url','public_url','app_version','payload_json'
+  ];
+
+  const R01_SEND_HEADERS = [
+    'id_envio','fecha_hora','usuario','modo','distrito','codigo_local','id_escuela',
+    'nombre_escuela','director_nombre','correo','celular','asunto','url_cuestionario',
+    'estado','error'
   ];
 
   function getEscuelas(filters) {
@@ -805,6 +833,222 @@ const SheetsService = (() => {
         uploadedAt: now,
         evidenceId,
       }
+    };
+  }
+
+  function guardarCuestionarioInicial(params) {
+    params = params || {};
+    _ensureColumns(SHEET_NAMES.R01_RESPUESTAS, R01_RESPONSE_HEADERS);
+    const now = _timestamp();
+    const responseId = _clientMutationId(params) || params.id_respuesta || _genId('R01');
+    const row = {};
+    R01_RESPONSE_HEADERS.forEach(function(header) {
+      row[header] = params[header] !== undefined ? params[header] : '';
+    });
+    row.id_respuesta = responseId;
+    row.fecha_hora = now;
+    row.codigo_local = _txt(row.codigo_local || params.codigo || params.codigoLocal);
+    row.id_escuela = _txt(row.id_escuela || params.id);
+    row.nombre_escuela = _txt(row.nombre_escuela || params.escuela || params.nombre);
+    row.payload_json = JSON.stringify(params).slice(0, 49000);
+    _appendObject(SHEET_NAMES.R01_RESPUESTAS, R01_RESPONSE_HEADERS, row);
+    _r01MarkAnswered_(params, responseId, now);
+    AuditService.log('R01_RESPUESTA_PUBLICA', row.codigo_local || row.id_escuela || 'sin_codigo', `respuesta: ${responseId}`);
+    return {
+      status: 'ok',
+      message: 'Cuestionario inicial recibido. Muchas gracias por colaborar con el relevamiento.',
+      data: { id_respuesta: responseId, sheet: SHEET_NAMES.R01_RESPUESTAS, savedAt: now },
+    };
+  }
+
+  function guardarCuestionarioInicialAdjunto(params) {
+    params = params || {};
+    const dataUrl = String(params.dataUrl || '');
+    const comma = dataUrl.indexOf(',');
+    const base64 = String(params.base64 || (comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl)).trim();
+    if (!base64) return { status: 'error', message: 'Archivo adjunto vacio.' };
+    const mimeType = String(params.mimeType || _mimeFromDataUrl(dataUrl) || 'application/octet-stream');
+    const filename = _safeEvidenceFilename(params.filename || params.name || `r01_adjunto_${Date.now()}`);
+    const bytes = Utilities.base64Decode(base64);
+    const root = DriveApp.getFolderById(EVIDENCE_FOLDER_ID);
+    const r01Folder = _getOrCreateFolder_(root, 'Cuestionario inicial R01');
+    const schoolCode = _txt(params.codigo_local || params.id_escuela || params.token);
+    const schoolName = _txt(params.nombre_escuela || params.escuela);
+    const schoolFolder = _getOrCreateFolder_(r01Folder, _safeEvidenceFolderName(schoolCode
+      ? (schoolName ? `${schoolCode} - ${schoolName}` : schoolCode)
+      : (schoolName || 'sin_escuela')));
+    const file = schoolFolder.createFile(Utilities.newBlob(bytes, mimeType, filename));
+    const now = _timestamp();
+    file.setDescription(JSON.stringify({
+      app: 'CIALPA',
+      origen: 'cuestionario_inicial_r01',
+      id_respuesta: params.id_respuesta || '',
+      codigo_local: params.codigo_local || '',
+      nombre_escuela: params.nombre_escuela || '',
+      uploadedAt: now,
+    }).slice(0, 5000));
+    _ensureColumns(SHEET_NAMES.EVIDENCIAS, [
+      'id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes',
+      'drive_file_id','drive_url','folder_id','subfolder_id','label','school_code','school_name',
+      'scope','block_label','floor_label','space_label','element_type','element_label',
+      'element_id','field_path'
+    ]);
+    const evidenceId = _genId('EVI');
+    _appendObject(SHEET_NAMES.EVIDENCIAS, [
+      'id_evidencia','fecha_hora','usuario','archivo_nombre','mime_type','tamano_bytes',
+      'drive_file_id','drive_url','folder_id','subfolder_id','label','school_code','school_name',
+      'scope','block_label','floor_label','space_label','element_type','element_label',
+      'element_id','field_path'
+    ], {
+      id_evidencia: evidenceId,
+      fecha_hora: now,
+      usuario: 'director_cuestionario',
+      archivo_nombre: filename,
+      mime_type: mimeType,
+      tamano_bytes: bytes.length,
+      drive_file_id: file.getId(),
+      drive_url: file.getUrl(),
+      folder_id: r01Folder.getId(),
+      subfolder_id: schoolFolder.getId(),
+      label: 'Cuestionario inicial R01',
+      school_code: schoolCode,
+      school_name: schoolName,
+      scope: 'cuestionario_inicial',
+      field_path: 'r01.adjunto'
+    });
+    _r01UpdateResponseAttachment_(params.id_respuesta, file.getUrl());
+    return {
+      status: 'ok',
+      message: 'Adjunto del cuestionario inicial guardado.',
+      data: { id_archivo: file.getId(), id_evidencia: evidenceId, url: file.getUrl(), uploadedAt: now },
+    };
+  }
+
+  function importarContactosCuestionarioInicial(params) {
+    const session = params._session || {};
+    if (!_r01CanManage_(session)) return { status: 'error', message: 'Acceso restringido a supervisores y administradores.' };
+    const contacts = Array.isArray(params.contacts) ? params.contacts : [];
+    _ensureColumns(SHEET_NAMES.R01_CONTACTOS, R01_CONTACT_HEADERS);
+    const sheet = _getSheet(SHEET_NAMES.R01_CONTACTOS);
+    const headers = _headers(sheet);
+    const now = _timestamp();
+    let processed = 0;
+    let skipped = 0;
+    contacts.forEach(function(input) {
+      const contact = _r01NormalizeContact_(input || {});
+      if (!contact.codigo_local && !contact.nombre_escuela && !contact.correo) {
+        skipped++;
+        return;
+      }
+      processed++;
+      contact.token = contact.token || _genId('R01T');
+      contact.url_cuestionario = _r01Url_(contact);
+      contact.fuente = params.source || contact.fuente || 'importacion';
+      contact.estado_envio = contact.estado_envio || 'pendiente';
+      contact.actualizado_en = now;
+      let rowIdx = _r01FindContactRow_(contact);
+      if (rowIdx === -1) {
+        contact.id_contacto = _genId('R01C');
+        contact.creado_en = now;
+        _appendObject(SHEET_NAMES.R01_CONTACTOS, R01_CONTACT_HEADERS, contact);
+      } else {
+        R01_CONTACT_HEADERS.forEach(function(col) {
+          if (contact[col] !== undefined && contact[col] !== '') _setByHeader(sheet, rowIdx, headers, col, contact[col]);
+        });
+      }
+    });
+    AuditService.log('R01_IMPORTAR_CONTACTOS', session.usuario, `procesados: ${processed}, omitidos: ${skipped}`);
+    return { status: 'ok', message: 'Contactos del cuestionario inicial importados.', data: { processed, skipped } };
+  }
+
+  function listarContactosCuestionarioInicial(params) {
+    const session = params._session || {};
+    if (!_r01CanManage_(session)) return { status: 'error', message: 'Acceso restringido a supervisores y administradores.' };
+    _ensureColumns(SHEET_NAMES.R01_CONTACTOS, R01_CONTACT_HEADERS);
+    let rows = _sheetToObjects(SHEET_NAMES.R01_CONTACTOS);
+    if (params && params.distrito) rows = rows.filter(function(row) { return _same(row.distrito, params.distrito); });
+    if (params && params.estado) rows = rows.filter(function(row) { return _same(row.estado_envio, params.estado); });
+    rows = rows.map(function(row) {
+      if (!row.url_cuestionario) row.url_cuestionario = _r01Url_(row);
+      return row;
+    });
+    return { status: 'ok', data: rows, meta: { total: rows.length } };
+  }
+
+  function enviarCuestionarioInicial(params) {
+    const session = params._session || {};
+    if (!_r01CanManage_(session)) return { status: 'error', message: 'Acceso restringido a supervisores y administradores.' };
+    _ensureColumns(SHEET_NAMES.R01_CONTACTOS, R01_CONTACT_HEADERS);
+    _ensureColumns(SHEET_NAMES.R01_ENVIOS, R01_SEND_HEADERS);
+    const sheet = _getSheet(SHEET_NAMES.R01_CONTACTOS);
+    const headers = _headers(sheet);
+    const contacts = _sheetToObjects(SHEET_NAMES.R01_CONTACTOS).map(function(row, index) {
+      return Object.assign({ __row_index: index + 2 }, row);
+    });
+    const distrito = _txt(params.distrito);
+    const limit = Math.max(1, Math.min(500, parseInt(params.limit || '50', 10) || 50));
+    const dryRun = String(params.dryRun) === 'true' || params.dryRun === true;
+    const subject = _txt(params.subject) || 'CIALPA - Cuestionario inicial previo a la visita escolar';
+    const now = _timestamp();
+    const targets = contacts
+      .filter(function(row) { return !distrito || _same(row.distrito, distrito); })
+      .filter(function(row) { return _txt(row.correo); })
+      .slice(0, limit);
+    let sent = 0;
+    let errors = 0;
+    const items = [];
+    targets.forEach(function(contact) {
+      const normalized = _r01NormalizeContact_(contact);
+      normalized.token = normalized.token || _genId('R01T');
+      normalized.url_cuestionario = normalized.url_cuestionario || _r01Url_(normalized);
+      let status = dryRun ? 'simulado' : 'enviado';
+      let error = '';
+      try {
+        if (!dryRun) {
+          MailApp.sendEmail({
+            to: normalized.correo,
+            subject: subject,
+            htmlBody: _r01EmailHtml_(normalized),
+            name: 'CIALPA Relevamiento Escolar',
+          });
+          sent++;
+        }
+      } catch (err) {
+        status = 'error';
+        error = err.message || String(err);
+        errors++;
+      }
+      _setByHeader(sheet, contact.__row_index, headers, 'token', normalized.token);
+      _setByHeader(sheet, contact.__row_index, headers, 'url_cuestionario', normalized.url_cuestionario);
+      _setByHeader(sheet, contact.__row_index, headers, 'estado_envio', status);
+      _setByHeader(sheet, contact.__row_index, headers, 'ultimo_envio', now);
+      _setByHeader(sheet, contact.__row_index, headers, 'ultimo_error', error);
+      _setByHeader(sheet, contact.__row_index, headers, 'cantidad_envios', (parseInt(contact.cantidad_envios || '0', 10) || 0) + 1);
+      _setByHeader(sheet, contact.__row_index, headers, 'actualizado_en', now);
+      _appendObject(SHEET_NAMES.R01_ENVIOS, R01_SEND_HEADERS, {
+        id_envio: _genId('R01E'),
+        fecha_hora: now,
+        usuario: session.usuario || '',
+        modo: dryRun ? 'simulacion' : 'real',
+        distrito: normalized.distrito,
+        codigo_local: normalized.codigo_local,
+        id_escuela: normalized.id_escuela,
+        nombre_escuela: normalized.nombre_escuela,
+        director_nombre: normalized.director_nombre,
+        correo: normalized.correo,
+        celular: normalized.celular,
+        asunto: subject,
+        url_cuestionario: normalized.url_cuestionario,
+        estado: status,
+        error: error
+      });
+      items.push({ correo: normalized.correo, codigo_local: normalized.codigo_local, estado: status, error: error });
+    });
+    AuditService.log('R01_ENVIAR_CUESTIONARIO', session.usuario, `modo: ${dryRun ? 'simulacion' : 'real'}, distrito: ${distrito || 'todos'}, procesados: ${targets.length}, errores: ${errors}`);
+    return {
+      status: 'ok',
+      message: dryRun ? 'Simulacion de envio completada.' : 'Envio de cuestionario inicial completado.',
+      data: { processed: targets.length, sent, errors, dryRun, distrito, items },
     };
   }
 
@@ -2497,6 +2741,126 @@ const SheetsService = (() => {
     return _txt(value).replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 70) || 'sin-escuela';
   }
 
+  function _r01CanManage_(session) {
+    const role = _txt(session && session.rol).toLowerCase();
+    return role === 'admin' || role === 'supervisor';
+  }
+
+  function _r01NormalizeContact_(row) {
+    row = row || {};
+    return {
+      id_contacto: _txt(row.id_contacto),
+      token: _txt(row.token),
+      codigo_local: _txt(row.codigo_local || row.codigo || row.cod_local || row.local),
+      id_escuela: _txt(row.id_escuela || row.id),
+      nombre_escuela: _txt(row.nombre_escuela || row.escuela || row.nombre || row.institucion),
+      director_nombre: _txt(row.director_nombre || row.director || row.directora || row.responsable || row.contacto),
+      correo: _txt(row.correo || row.email || row.mail),
+      celular: _txt(row.celular || row.telefono || row.whatsapp || row.numero),
+      departamento: _txt(row.departamento),
+      distrito: _txt(row.distrito),
+      localidad: _txt(row.localidad || row.barrio || row.compania),
+      url_cuestionario: _txt(row.url_cuestionario),
+      estado_envio: _txt(row.estado_envio || row.estado),
+      ultimo_envio: _txt(row.ultimo_envio || row.fecha_ultimo_envio),
+      ultimo_error: _txt(row.ultimo_error),
+      cantidad_envios: _txt(row.cantidad_envios),
+      fuente: _txt(row.fuente),
+      respuesta_id: _txt(row.respuesta_id),
+      respuesta_fecha: _txt(row.respuesta_fecha),
+    };
+  }
+
+  function _r01Url_(contact) {
+    contact = contact || {};
+    const qs = [
+      ['token', contact.token],
+      ['codigo_local', contact.codigo_local],
+      ['id_escuela', contact.id_escuela],
+      ['escuela', contact.nombre_escuela],
+      ['departamento', contact.departamento],
+      ['distrito', contact.distrito],
+      ['localidad', contact.localidad],
+      ['correo', contact.correo],
+    ]
+      .filter(function(pair) { return _txt(pair[1]); })
+      .map(function(pair) { return encodeURIComponent(pair[0]) + '=' + encodeURIComponent(pair[1]); })
+      .join('&');
+    return R01_PUBLIC_URL + (qs ? '?' + qs : '');
+  }
+
+  function _r01FindContactRow_(contact) {
+    _ensureColumns(SHEET_NAMES.R01_CONTACTOS, R01_CONTACT_HEADERS);
+    const rows = _sheetToObjects(SHEET_NAMES.R01_CONTACTOS);
+    const token = _txt(contact && contact.token);
+    const code = _txt(contact && contact.codigo_local);
+    const id = _txt(contact && contact.id_escuela);
+    const email = _txt(contact && contact.correo).toLowerCase();
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (token && _same(row.token, token)) return i + 2;
+      if (code && _same(row.codigo_local, code)) return i + 2;
+      if (id && _same(row.id_escuela, id)) return i + 2;
+      if (email && _txt(row.correo).toLowerCase() === email) return i + 2;
+    }
+    return -1;
+  }
+
+  function _r01MarkAnswered_(params, responseId, now) {
+    try {
+      _ensureColumns(SHEET_NAMES.R01_CONTACTOS, R01_CONTACT_HEADERS);
+      const contact = _r01NormalizeContact_(params);
+      contact.token = _txt(params.token || params.t);
+      const rowIdx = _r01FindContactRow_(contact);
+      if (rowIdx === -1) return;
+      const sheet = _getSheet(SHEET_NAMES.R01_CONTACTOS);
+      const headers = _headers(sheet);
+      _setByHeader(sheet, rowIdx, headers, 'estado_envio', 'respondido');
+      _setByHeader(sheet, rowIdx, headers, 'respuesta_id', responseId);
+      _setByHeader(sheet, rowIdx, headers, 'respuesta_fecha', now);
+      _setByHeader(sheet, rowIdx, headers, 'actualizado_en', now);
+    } catch (err) {
+      Logger.log('R01 mark answered error: ' + err);
+    }
+  }
+
+  function _r01UpdateResponseAttachment_(responseId, url) {
+    if (!responseId || !url) return;
+    try {
+      _ensureColumns(SHEET_NAMES.R01_RESPUESTAS, R01_RESPONSE_HEADERS);
+      const rowIdx = _findRowIndex(SHEET_NAMES.R01_RESPUESTAS, 'id_respuesta', responseId);
+      if (rowIdx === -1) return;
+      const sheet = _getSheet(SHEET_NAMES.R01_RESPUESTAS);
+      const headers = _headers(sheet);
+      _setByHeader(sheet, rowIdx, headers, 'adjunto_url', url);
+    } catch (err) {
+      Logger.log('R01 attachment link error: ' + err);
+    }
+  }
+
+  function _r01EmailHtml_(contact) {
+    const escuela = _htmlEscape_(contact.nombre_escuela || 'su escuela');
+    const director = _htmlEscape_(contact.director_nombre || 'Director/a');
+    const url = _htmlEscape_(contact.url_cuestionario || _r01Url_(contact));
+    return `
+      <div style="font-family:Arial,sans-serif;color:#17352a;line-height:1.5">
+        <h2 style="color:#0b5d3b;margin:0 0 12px">CIALPA - Cuestionario inicial R01</h2>
+        <p>Estimado/a ${director}:</p>
+        <p>Estamos preparando la visita tecnica a <strong>${escuela}</strong>. Para agilizar el trabajo en campo, solicitamos completar este cuestionario breve sobre servicios, conectividad, seguridad, electricidad y documentos disponibles.</p>
+        <p>No necesita usuario ni contrasena. El formulario se completa desde el siguiente enlace:</p>
+        <p><a href="${url}" style="display:inline-block;background:#0b5d3b;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:bold">Completar cuestionario inicial</a></p>
+        <p>Si cuenta con plano, croquis o una fotografia de fachada, puede adjuntarlo al final del formulario.</p>
+        <p>Por consultas, puede escribir a <a href="mailto:censoescuelaspy@gmail.com">censoescuelaspy@gmail.com</a>.</p>
+        <p>Muchas gracias por su colaboracion.</p>
+      </div>`;
+  }
+
+  function _getOrCreateFolder_(parent, name) {
+    const safeName = _safeEvidenceFolderName(name || 'sin_nombre');
+    const existing = parent.getFoldersByName(safeName);
+    return existing.hasNext() ? existing.next() : parent.createFolder(safeName);
+  }
+
   function _same(a, b) {
     return _txt(a).toLowerCase() === _txt(b).toLowerCase();
   }
@@ -2752,7 +3116,9 @@ const SheetsService = (() => {
     iniciarSesion, cerrarSesion, repararSesionesDuplicadasEnCurso, registrarEventoSesion, iniciarModulo, cerrarModulo, getModulosSesion,
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
-    saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence, guardarBorradorMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence,
+    guardarCuestionarioInicial, guardarCuestionarioInicialAdjunto, importarContactosCuestionarioInicial, listarContactosCuestionarioInicial, enviarCuestionarioInicial,
+    guardarBorradorMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };

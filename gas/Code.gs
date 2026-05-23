@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.82
+ * Version: 2.6.125
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -29,6 +29,9 @@ const SHEET_NAMES = {
   MEC_DRAFTS:   'mec_borradores',
   ENTREGAS:     'entregas_cierre',
   DB_SYNC_QUEUE: 'db_sync_queue',
+  R01_RESPUESTAS: 'r01_cuestionario_inicial',
+  R01_CONTACTOS:  'r01_contactos_directores',
+  R01_ENVIOS:     'r01_envios_cuestionario',
 };
 
 const ADMIN_USERS = ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'];
@@ -76,7 +79,7 @@ function _handleRequest(e) {
     const action = params.action || '';
 
     // Public endpoints (no auth required)
-    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron'];
+    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto'];
     const token = params.token || '';
 
     if (!publicActions.includes(action)) {
@@ -109,6 +112,10 @@ function _handleRequest(e) {
       'solicitarRelevamiento',
       'aprobarSolicitudRelevamiento',
       'uploadEvidence',
+      'guardarCuestionarioInicial',
+      'guardarCuestionarioInicialAdjunto',
+      'importarContactosCuestionarioInicial',
+      'enviarCuestionarioInicial',
       'guardarBorradorMec',
       'reiniciarRelevamientoEscuela',
       'guardarCierreCompleto',
@@ -157,6 +164,11 @@ function _handleRequest(e) {
       case 'solicitarRelevamiento': return _respond(SheetsService.solicitarRelevamiento(params));
       case 'aprobarSolicitudRelevamiento': return _respond(SheetsService.aprobarSolicitudRelevamiento(params));
       case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));
+      case 'guardarCuestionarioInicial': return _respond(SheetsService.guardarCuestionarioInicial(params));
+      case 'guardarCuestionarioInicialAdjunto': return _respond(SheetsService.guardarCuestionarioInicialAdjunto(params));
+      case 'importarContactosCuestionarioInicial': return _respond(SheetsService.importarContactosCuestionarioInicial(params));
+      case 'listarContactosCuestionarioInicial': return _respond(SheetsService.listarContactosCuestionarioInicial(params));
+      case 'enviarCuestionarioInicial': return _respond(SheetsService.enviarCuestionarioInicial(params));
       case 'guardarBorradorMec': return _respond(SheetsService.guardarBorradorMec(params));
       case 'reiniciarRelevamientoEscuela': return _respond(SheetsService.reiniciarRelevamientoEscuela(params));
       case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.124
+ * Version: 2.6.125
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -346,6 +346,7 @@ const AppController = (() => {
     jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
     estadisticas: { label: 'Resultados globales', icon: '📊', minRole: 'supervisor' },
     infraestructura: { label: 'Infraestructura MEC', icon: 'MEC', minRole: 'supervisor' },
+    'cuestionario-inicial': { label: 'Cuestionario inicial', icon: 'R01', minRole: 'supervisor' },
     ubicacion: { label: 'Ubicación real', icon: 'GPS', minRole: 'supervisor' },
     planificacion: { label: 'Planificación', icon: '⏱', minRole: 'supervisor' },
     configuracion: { label: 'Configuración', icon: '⚙️', minRole: 'admin' },
@@ -573,7 +574,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
+    const primaryModules = ['inicio', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'cuestionario-inicial', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])
@@ -1171,6 +1172,9 @@ const AppController = (() => {
           break;
         case 'infraestructura':
           StatsModule.initMecInfrastructure();
+          break;
+        case 'cuestionario-inicial':
+          if (typeof InitialQuestionnaire !== 'undefined') InitialQuestionnaire.adminInit();
           break;
         case 'ubicacion':
           LocationAuditModule.init();

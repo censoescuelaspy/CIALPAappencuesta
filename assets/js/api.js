@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.110
+ * Version: 2.6.125
  */
 
 const API = (() => {
@@ -9,7 +9,7 @@ const API = (() => {
 
   const _IS_DEMO = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
   const EXAMPLE_SCHOOL_ID = 'ESC_DEMO_CIALPA';
-  const PUBLIC_ACCOUNT_ENDPOINTS = new Set(['registrarUsuario', 'recuperarPassword']);
+  const PUBLIC_ACCOUNT_ENDPOINTS = new Set(['registrarUsuario', 'recuperarPassword', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto']);
 
   function _exampleMecDraft() {
     return {
@@ -263,6 +263,8 @@ const API = (() => {
     fecha_inicio: '2026-04-27',
     fecha_fin: '2026-08-31',
   };
+  const _DEMO_INITIAL_CONTACTS = [];
+  const _DEMO_INITIAL_RESPONSES = [];
 
   function _demoCall(endpoint, data) {
     return new Promise(resolve => setTimeout(() => resolve(_demoDispatch(endpoint, data || {})), 180));
@@ -415,6 +417,41 @@ const API = (() => {
           demo: true,
         },
       };
+      case 'guardarCuestionarioInicial': {
+        const row = { ...data, id_respuesta: data.id_respuesta || 'R01_RESP_DEMO_' + Date.now(), fecha_hora: new Date().toISOString() };
+        _DEMO_INITIAL_RESPONSES.push(row);
+        return { status: 'ok', message: 'Cuestionario inicial demo guardado.', data: row };
+      }
+      case 'guardarCuestionarioInicialAdjunto': return {
+        status: 'ok',
+        message: 'Adjunto demo recibido.',
+        data: { id_archivo: 'R01_FILE_DEMO_' + Date.now(), url: APP_CONFIG.EVIDENCE_FOLDER_URL || '', demo: true },
+      };
+      case 'importarContactosCuestionarioInicial': {
+        const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+        contacts.forEach(contact => {
+          const key = String(contact.codigo_local || contact.correo || '').toLowerCase();
+          const existing = _DEMO_INITIAL_CONTACTS.find(c => String(c.codigo_local || c.correo || '').toLowerCase() === key);
+          const row = { ...contact, token: contact.token || 'R01_DEMO_' + Math.random().toString(36).slice(2, 10), estado_envio: contact.estado_envio || 'pendiente' };
+          if (existing) Object.assign(existing, row);
+          else _DEMO_INITIAL_CONTACTS.push(row);
+        });
+        return { status: 'ok', message: 'Contactos demo importados.', data: { processed: contacts.length, total: _DEMO_INITIAL_CONTACTS.length } };
+      }
+      case 'listarContactosCuestionarioInicial': return { status: 'ok', data: _DEMO_INITIAL_CONTACTS };
+      case 'enviarCuestionarioInicial': {
+        const distrito = String(data.distrito || '');
+        const limit = parseInt(data.limit || '50', 10) || 50;
+        const rows = _DEMO_INITIAL_CONTACTS
+          .filter(c => !distrito || String(c.distrito || '') === distrito)
+          .filter(c => c.correo)
+          .slice(0, limit);
+        rows.forEach(c => {
+          c.estado_envio = data.dryRun ? 'simulado' : 'enviado';
+          c.ultimo_envio = new Date().toISOString();
+        });
+        return { status: 'ok', message: 'Envio demo procesado.', data: { processed: rows.length, sent: data.dryRun ? 0 : rows.length, dryRun: !!data.dryRun } };
+      }
       case 'guardarBorradorMec': return {
         status: 'ok',
         message: 'Borrador MEC demo guardado.',
@@ -760,6 +797,11 @@ const API = (() => {
   async function reiniciarRelevamientoEscuela(datos) { return call('reiniciarRelevamientoEscuela', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
+  async function guardarCuestionarioInicial(datos) { return call('guardarCuestionarioInicial', 'POST', datos, { skipAuth: true, skipLoading: true, skipQueue: true, retries: 1 }); }
+  async function guardarCuestionarioInicialAdjunto(datos) { return call('guardarCuestionarioInicialAdjunto', 'POST', datos, { skipAuth: true, skipLoading: true, skipQueue: true, retries: 1 }); }
+  async function importarContactosCuestionarioInicial(datos) { return call('importarContactosCuestionarioInicial', 'POST', datos, { skipQueue: true }); }
+  async function listarContactosCuestionarioInicial(filters = {}) { return call('listarContactosCuestionarioInicial', 'GET', filters, { skipLoading: true }); }
+  async function enviarCuestionarioInicial(datos) { return call('enviarCuestionarioInicial', 'POST', datos, { skipQueue: true }); }
   async function getIncidencias(filters = {}) { return call('getIncidencias', 'GET', filters, { skipLoading: true }); }
   async function resolverIncidencia(id, resolucion) { return call('resolverIncidencia', 'POST', { id_incidencia: id, resolucion }); }
 
@@ -797,6 +839,11 @@ const API = (() => {
     reiniciarRelevamientoEscuela,
     guardarCierreCompleto,
     uploadEvidence,
+    guardarCuestionarioInicial,
+    guardarCuestionarioInicialAdjunto,
+    importarContactosCuestionarioInicial,
+    listarContactosCuestionarioInicial,
+    enviarCuestionarioInicial,
     getIncidencias,
     resolverIncidencia,
     getConfig,

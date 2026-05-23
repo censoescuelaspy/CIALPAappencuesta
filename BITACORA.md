@@ -4,6 +4,54 @@
 
 ---
 
+## Cuestionario inicial publico R01 y envio a directores - 2026-05-23 - v2.6.125
+
+### Objetivo
+- Crear un cuestionario inicial publico, sin autenticacion, para enviar a directores antes de la visita in situ.
+- Tomar como base las preguntas del archivo `H:\Mi unidad\R01_CUESTIONARIO INICIAL.docx`.
+- Permitir cargar contactos desde Excel/CSV, simular destinatarios y enviar correos por grupos de distrito.
+
+### Diagnostico
+- El relevamiento in situ necesitaba llegar con datos previos sobre agua, sanitarios, Internet, CCTV, prevencion contra incendios e instalacion electrica.
+- La app no tenia una ruta publica para directores ni una bandeja operativa para manejar envios masivos.
+- El envio debia poder ensayarse con al menos 50 contactos antes de cargar correos reales.
+
+### Cambios implementados
+- Se agrega la ruta publica `cuestionario_inicial/`, preparada para GitHub Pages como `https://censoescuelaspy.github.io/CIALPAappencuesta/cuestionario_inicial`.
+- El formulario no pide usuario ni contrasena y puede recibir datos prellenados por URL: token, codigo local, escuela, distrito, localidad y correo.
+- El cuestionario queda dividido en bloques visuales: identificacion, agua, servicio sanitario, Internet, CCTV/incendios, electricidad y documentos finales.
+- Se agregan botones de seleccion grandes y visibles para respuestas tipo si/no, opciones y listas multiples.
+- El cierre del formulario muestra confirmacion clara, agradecimiento y correo de soporte `censoescuelaspy@gmail.com`.
+- El final del cuestionario permite adjuntar plano, croquis, PDF, Excel o fotografia de fachada, hasta 8 MB desde el frontend.
+- Se agrega modulo interno `Cuestionario inicial R01` para supervisores/admins con importacion de Excel/CSV, demo de 50 contactos, filtros por distrito, simulacion y envio real.
+- Apps Script agrega hojas nuevas: `r01_cuestionario_inicial`, `r01_contactos_directores` y `r01_envios_cuestionario`.
+- Apps Script agrega endpoints publicos `guardarCuestionarioInicial` y `guardarCuestionarioInicialAdjunto`.
+- Apps Script agrega endpoints operativos autenticados para importar contactos, listar contactos y enviar correos por grupo.
+- El correo masivo arma enlaces personalizados al cuestionario con token y datos de escuela.
+- Version visible, cache y assets actualizados a `v2.6.125`.
+
+### Pendiente operativo
+- Subir GAS a HEAD y publicar/actualizar el Web App desde la cuenta propietaria para activar los nuevos endpoints publicos y el envio con `MailApp`.
+- Cargar la lista real de directores con correo y celular desde Excel.
+- Probar un envio real pequeño desde `censoescuelaspy@gmail.com` o desde la cuenta propietaria del Web App antes de enviar por distrito.
+- Confirmar que las respuestas queden en `r01_cuestionario_inicial` y se usen luego como insumos del formulario de relevamiento.
+
+### Validaciones ejecutadas
+- Extraccion de preguntas desde `H:\Mi unidad\R01_CUESTIONARIO INICIAL.docx`: servicios de agua, banos/desague, Internet, CCTV, prevencion contra incendios e instalacion electrica.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion sintactica de `gas/*.gs` mediante `vm.Script`: OK.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Playwright local escritorio: `cuestionario_inicial/` renderiza 7 bloques, 66 botones de seleccion, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+
+---
+
 ## Escala jerarquica de objetos del plano - 2026-05-23 - v2.6.124
 
 ### Objetivo
