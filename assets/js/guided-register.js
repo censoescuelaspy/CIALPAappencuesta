@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.121
+ * Version: 2.6.122
  */
 
 const GuidedRegisterModule = (() => {
@@ -129,7 +129,7 @@ const GuidedRegisterModule = (() => {
       number: '02',
       title: 'Perimetro predio',
       kicker: 'Bordes aproximados',
-      summary: 'Dibujar solo el contorno del predio, usando vertices editables como en aulas y sanitarios.',
+      summary: 'Dibujar solo el contorno del predio con la misma logica de forma que usan aulas y sanitarios.',
       checks: ['Ubicacion base cerrada', 'Perimetro con vertices', 'Predio confirmado'],
       actions: [
         { label: 'Perimetro', icon: 'PRD', action: 'addPropertyBoundary', primary: true },
@@ -1526,7 +1526,7 @@ const GuidedRegisterModule = (() => {
         ],
         false,
         '',
-        'Este paso cierra la referencia inicial. El paso siguiente ya no pedira escuela ni georreferencia: solo dibujar el contorno del predio con vertices.',
+        'Este paso cierra la referencia inicial. El paso siguiente ya no pedira escuela ni georreferencia: solo dibujar el contorno del predio con la misma edicion de forma que las aulas.',
         true
       );
     }
@@ -1565,15 +1565,15 @@ const GuidedRegisterModule = (() => {
     if (!snap.propertyBoundary) {
       return _question(
         'Bordes del predio',
-        'Dibuje el perimetro con vertices editables',
-        'Agregue el perimetro del predio. Nacera como un contorno con puntos numerados, igual que las aulas o sanitarios con forma editable.',
+        'Dibuje el perimetro como un aula editable',
+        'Agregue el perimetro del predio. Se comportara como las aulas: puede pasar a Forma L, sumar vertices y arrastrar puntos numerados.',
         [
           { label: 'Dibujar perimetro', action: 'addPropertyBoundary', primary: true },
           { label: 'Volver a ubicacion base', action: 'prev' },
         ],
         false,
         '',
-        'No es un rectangulo rigido: despues de crearlo, use las esquinas para cambiar tamano y arrastre cada numero para ajustar el borde aproximado del local escolar.',
+        'No use un poligono especial: use la misma logica de aulas. Primero ubique el rectangulo base; luego use Forma L o + Vertice si necesita ajustar el contorno.',
         true
       );
     }
@@ -1581,7 +1581,7 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Bordes del predio',
         'Mueva los vertices del perimetro',
-        'Seleccione el perimetro. Use las esquinas para cambiar sus dimensiones y arrastre los puntos numerados para ajustar la forma; + Vertice y - Vertice funcionan como en aulas.',
+        'Seleccione el perimetro. Use Forma L o + Vertice igual que en aulas; despues arrastre los puntos numerados para ajustar la forma.',
         [
           { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}`, primary: true },
           { label: '+ Vertice', action: 'propertyBoundaryAddVertex', value: snap.propertyBoundary.id },
@@ -2989,9 +2989,9 @@ const GuidedRegisterModule = (() => {
     }
     _setFlag(_propertyBoundaryFlagKey(element), false);
     _saveState();
-    mec.focusSelectedPlanItem?.('Ajuste los vertices del perimetro aproximado del predio escolar y luego confirme desde la pregunta superior.');
+    mec.focusSelectedPlanItem?.('Ajuste el perimetro igual que un aula: Forma L, + Vertice y arrastre de puntos numerados. Luego confirme desde la pregunta superior.');
     _refreshSoon();
-    UI.showToast('Perimetro del predio agregado. Mueva sus vertices sobre la base y confirme cuando represente los bordes aproximados.', 'success', 6200);
+    UI.showToast('Perimetro agregado. Use la misma logica de aulas: Forma L, + Vertice y puntos arrastrables.', 'success', 6200);
   }
 
   function _currentPropertyBoundary(value = '') {

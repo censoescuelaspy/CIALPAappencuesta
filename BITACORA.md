@@ -4,6 +4,48 @@
 
 ---
 
+## Perimetro con logica de forma tipo aula - 2026-05-23 - v2.6.122
+
+### Objetivo
+- Abandonar el perimetro tipo hexagono/poligono especial.
+- Hacer que el `Perimetro del predio escolar` use la misma logica de forma que aulas/sanitarios: `Forma L`, `+ Vertice`, `- Vertice`, `Rect.` y arrastre de puntos numerados.
+
+### Diagnostico
+- El predio tenia una geometria propia `property-boundary` de seis puntos, distinta de `_defaultPlanShape()` usada por aulas y sanitarios.
+- `__siteElements` no preservaba `planShape` al normalizar elementos exteriores, por lo que la forma del perimetro podia perderse al refrescar/redibujar.
+- Varias acciones seguian rotuladas como `Poligono`, reforzando un flujo distinto al de aulas.
+
+### Cambios implementados
+- El predio nuevo ya no nace con hexagono propio: usa `_defaultPlanShape('l')`, la misma base de `Forma L` que aulas/sanitarios.
+- Se eliminan los generadores especiales `_defaultPropertyBoundaryShape()` y `_defaultPropertyBoundaryRectShape()` del flujo activo.
+- `setPlanSiteElementShape(..., 'rect')` ahora elimina `planShape`, igual que aulas/sanitarios en modo rectangular.
+- `+ Vertice` y `- Vertice` del perimetro pasan por `_insertPlanShapeVertex()` y `_removePlanShapeVertex()` sin modo especial.
+- `__siteElements` conserva `planShape`, evitando que los vertices del predio se pierdan al normalizar o redibujar.
+- Los controles visibles del perimetro cambian de `Poligono` a `Forma L`.
+- Los textos del `Registro guiado` explican usar la misma logica de aulas: `Forma L`, `+ Vertice` y puntos arrastrables.
+- Version visible, cache y assets actualizados a `v2.6.122`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.122`.
+- Probar en tablet: crear perimetro, tocar `Forma L`, usar `+ Vertice`, arrastrar puntos numerados y confirmar.
+- Probar `Rect.` y luego `+ Vertice`: debe comportarse como aulas/sanitarios, sin volver al hexagono.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.121` en assets de publicacion.
+- Revision estatica: no quedan `_defaultPropertyBoundaryShape()` ni `_defaultPropertyBoundaryRectShape()` activos.
+- Revision estatica: `__siteElements` conserva `planShape` y el predio nuevo usa `_defaultPlanShape('l')`.
+- Revision estatica: los controles del predio visibles usan `Forma L`, `+ Vertice`, `- Vertice` y `Rect.` como aulas/sanitarios.
+
+---
+
 ## Perimetro redimensionable y bloques seleccionables - 2026-05-23 - v2.6.121
 
 ### Objetivo

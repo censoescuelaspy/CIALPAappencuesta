@@ -3182,42 +3182,12 @@ const MecFormModule = (() => {
     };
   }
 
-  function _defaultPropertyBoundaryShape() {
-    return {
-      type: 'property-boundary',
-      points: [
-        { x: .06, y: .18 },
-        { x: .78, y: .08 },
-        { x: .94, y: .42 },
-        { x: .82, y: .88 },
-        { x: .18, y: .84 },
-        { x: .04, y: .52 },
-      ],
-    };
-  }
-
-  function _defaultPropertyBoundaryRectShape() {
-    return {
-      type: 'property-boundary',
-      points: [
-        { x: .06, y: .08 },
-        { x: .94, y: .08 },
-        { x: .94, y: .92 },
-        { x: .06, y: .92 },
-      ],
-    };
-  }
-
-  function _ensurePropertyBoundaryShape(element) {
-    if (!element || element.type !== 'property_boundary') return null;
-    const current = _clonePlanShape(element.planShape);
-    if (current) return current;
-    const shape = element.boundaryShapeMode === 'rect'
-      ? _defaultPropertyBoundaryRectShape()
-      : _defaultPropertyBoundaryShape();
-    element.planShape = shape;
-    element.boundaryShapeMode = 'polygon';
-    return shape;
+  function _normalizePropertyBoundaryShape(shape) {
+    const cloned = _clonePlanShape(shape);
+    if (!cloned) return null;
+    return cloned.type === 'property-boundary'
+      ? _defaultPlanShape('l')
+      : cloned;
   }
 
   function _planShapePoints(record, rect) {
@@ -3950,6 +3920,9 @@ const MecFormModule = (() => {
       const rotationDeg = _normalizeSiteRotation(item.rotationDeg ?? item.rotacion_grados ?? ficha.rotacion_grados);
       ficha.rotacion_grados = String(rotationDeg);
       const measuredSize = _siteElementSizeFromFicha(type, shape, ficha);
+      const planShape = type === 'property_boundary'
+        ? _normalizePropertyBoundaryShape(item.planShape)
+        : _clonePlanShape(item.planShape);
       return {
         id: item.id || `site_${Date.now()}_${index}`,
         type,
@@ -3966,6 +3939,7 @@ const MecFormModule = (() => {
         autoSource: item.autoSource || null,
         locked: Boolean(item.locked),
         lockedAt: item.lockedAt || '',
+        ...(planShape ? { planShape } : {}),
       };
     });
     return _data.__siteElements;
@@ -12776,7 +12750,7 @@ const MecFormModule = (() => {
       const _siteItem = _ensureSiteElements().find(item => item.id === _siteId);
       if (_siteItem?.type === 'property_boundary') {
         _formaGroupContent = [
-          _renderPlanRibbonButton({ icon: '&#x25B1;', label: 'Poligono', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'polygon')`, title: 'Usar perimetro poligonal editable' }),
+          _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'l')`, title: 'Cambiar a forma en L igual que un aula' }),
           _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Agregar vertice al perimetro' }),
           _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Eliminar vertice del perimetro' }),
           _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'rect')`, title: 'Restablecer perimetro rectangular' }),
@@ -13218,7 +13192,7 @@ const MecFormModule = (() => {
         actions: [
           { label: isPropertyBoundary ? 'Editar predio' : (isTank ? 'Editar tanque' : 'Editar espacio'), tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
           ...(isPropertyBoundary ? [
-            { label: 'Poligono', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(element.id)}', 'polygon')` },
+            { label: 'Forma L', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(element.id)}', 'l')` },
             { label: '+ Vertice', onClick: `MecFormModule.addPlanSiteElementVertex('${_escape(element.id)}')` },
             { label: '- Vertice', onClick: `MecFormModule.removePlanSiteElementVertex('${_escape(element.id)}')` },
             { label: 'Rectangular', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(element.id)}', 'rect')` },
@@ -13589,7 +13563,7 @@ const MecFormModule = (() => {
           <div class="school-plan-group__children school-plan-group__children--actions">
             <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')">${isPropertyBoundary ? 'Editar predio' : (isTank ? 'Editar tanque' : 'Editar espacio')}</button>
             ${isPropertyBoundary ? `
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setPlanSiteElementShape('${_escape(item.id)}', 'polygon')">Poligono</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setPlanSiteElementShape('${_escape(item.id)}', 'l')">Forma L</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addPlanSiteElementVertex('${_escape(item.id)}')">+ Vertice</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.removePlanSiteElementVertex('${_escape(item.id)}')">- Vertice</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setPlanSiteElementShape('${_escape(item.id)}', 'rect')">Rect.</button>` : ''}
@@ -14980,7 +14954,6 @@ const MecFormModule = (() => {
     ctx.fillStyle = selected ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.78)';
     ctx.lineWidth = selected ? 3 : 2;
     if (isPropertyBoundary) {
-      _ensurePropertyBoundaryShape(item);
       propertyBoundaryPoints = _planShapePoints(item, local);
       ctx.fillStyle = selected ? 'rgba(232,243,238,.18)' : 'rgba(11,93,59,.045)';
       ctx.strokeStyle = selected ? '#0b5d3b' : 'rgba(11,93,59,.86)';
@@ -15325,7 +15298,6 @@ const MecFormModule = (() => {
       const isPropertyBoundary = item.type === 'property_boundary';
       if (onlyPropertyBoundary && !isPropertyBoundary) return;
       if (excludePropertyBoundary && isPropertyBoundary) return;
-      if (isPropertyBoundary) _ensurePropertyBoundaryShape(item);
       const rect = _siteElementRect(item, logical.width, logical.height);
       const hitRect = _rotatedSiteElementBounds(rect, item);
       const selected = _selectedPlanId === `site::${item.id}`;
@@ -15535,7 +15507,6 @@ const MecFormModule = (() => {
     const element = _propertyBoundaryElement();
     if (!element) return null;
     const rect = _siteElementRect(element, logicalWidth, logicalHeight);
-    _ensurePropertyBoundaryShape(element);
     const points = _planShapePoints(element, rect) || _rectCorners(rect);
     const rotation = _siteElementRotationDeg(element);
     if (!rotation) return points;
@@ -17704,8 +17675,7 @@ const MecFormModule = (() => {
       ficha: _defaultSiteElementFicha(type, next, normalizedShape),
     };
     if (type === 'property_boundary') {
-      element.planShape = _defaultPropertyBoundaryShape();
-      element.boundaryShapeMode = 'polygon';
+      element.planShape = _defaultPlanShape('l');
     }
     if (guided) _prepareSiteElementForGuided(element);
     _updateSiteElementDerivedFields(element);
@@ -17790,11 +17760,12 @@ const MecFormModule = (() => {
     if (!element) {
       element = _createPlanSiteElement('property_boundary', 'plan', '', { guided: Boolean(options.guided) });
     } else {
-      _ensurePropertyBoundaryShape(element);
+      element.planShape = _normalizePropertyBoundaryShape(element.planShape) || element.planShape;
+      delete element.boundaryShapeMode;
       _selectedPlanId = `site::${element.id}`;
       _planLayers.exteriores = true;
       renderSchoolPlan();
-      UI.showToast('Perimetro del predio seleccionado. Mueva sus vertices hasta calzar los bordes antes de confirmar.', 'info', 6200);
+      UI.showToast('Perimetro del predio seleccionado. Use Forma L o + Vertice igual que en aulas y arrastre los puntos.', 'info', 6200);
     }
     return element || null;
   }
@@ -19267,19 +19238,16 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
-  function setPlanSiteElementShape(elementId, shape = 'polygon') {
+  function setPlanSiteElementShape(elementId, shape = 'l') {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') {
       UI.showToast('Seleccione el perimetro del predio para cambiar su forma.', 'warning');
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'cambiar su forma')) return;
-    if (shape === 'rect') {
-      element.planShape = _defaultPropertyBoundaryRectShape();
-    } else {
-      element.planShape = _clonePlanShape(element.planShape) || _defaultPropertyBoundaryShape();
-    }
-    element.boundaryShapeMode = 'polygon';
+    if (shape === 'rect') delete element.planShape;
+    else element.planShape = _defaultPlanShape(shape === 'polygon' ? 'l' : shape);
+    delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
     _saveDraft(false);
@@ -19290,9 +19258,8 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') return;
     if (!_assertSiteElementUnlocked(element, 'editar vertices')) return;
-    element.boundaryShapeMode = 'polygon';
-    _ensurePropertyBoundaryShape(element);
     _insertPlanShapeVertex(element);
+    delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
     _saveDraft(false);
@@ -19303,9 +19270,8 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') return;
     if (!_assertSiteElementUnlocked(element, 'editar vertices')) return;
-    element.boundaryShapeMode = 'polygon';
-    _ensurePropertyBoundaryShape(element);
     _removePlanShapeVertex(element);
+    delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
     _saveDraft(false);
