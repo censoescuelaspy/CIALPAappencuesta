@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.120
+ * Version: 2.6.121
  */
 
 const GuidedRegisterModule = (() => {
@@ -1573,7 +1573,7 @@ const GuidedRegisterModule = (() => {
         ],
         false,
         '',
-        'No es un rectangulo rigido: despues de crearlo, toque + Vertice si necesita mas puntos y arrastre cada numero hasta el borde aproximado del local escolar.',
+        'No es un rectangulo rigido: despues de crearlo, use las esquinas para cambiar tamano y arrastre cada numero para ajustar el borde aproximado del local escolar.',
         true
       );
     }
@@ -1581,7 +1581,7 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Bordes del predio',
         'Mueva los vertices del perimetro',
-        'Seleccione el perimetro y arrastre sus puntos numerados. Use + Vertice para sumar puntos como en aulas; use - Vertice si sobran.',
+        'Seleccione el perimetro. Use las esquinas para cambiar sus dimensiones y arrastre los puntos numerados para ajustar la forma; + Vertice y - Vertice funcionan como en aulas.',
         [
           { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}`, primary: true },
           { label: '+ Vertice', action: 'propertyBoundaryAddVertex', value: snap.propertyBoundary.id },

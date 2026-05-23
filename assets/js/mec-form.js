@@ -15374,20 +15374,19 @@ const MecFormModule = (() => {
             baseH: rect.h,
           });
         }
-        if (!propertyPolygonActive) {
-          _pushPlanResizeHitAreas({
-            id: `site::${item.id}`,
-            type: 'site-resize',
-            rect,
-            rotation: _siteElementRotationDeg(item),
-            siteId: item.id,
-          });
-        }
+        _pushPlanResizeHitAreas({
+          id: `site::${item.id}`,
+          type: 'site-resize',
+          rect,
+          rotation: _siteElementRotationDeg(item),
+          siteId: item.id,
+        });
       }
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
       if (selected) {
         const dims = _siteElementDimensionPair(item);
         _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
+        _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
         if (propertyPolygonActive) {
           ctx.save();
           const transform = _applyPlanCanvasRotation(ctx, rect, _siteElementRotationDeg(item));
@@ -15398,8 +15397,6 @@ const MecFormModule = (() => {
           });
           if (transform) _planTransformStack.pop();
           ctx.restore();
-        } else {
-          _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
         }
       }
     });
@@ -19636,15 +19633,18 @@ const MecFormModule = (() => {
       baseMap.confirmed = false;
       _refreshPlanBaseMapLayer(canvas, true);
     };
-    const siteAreaFromPoint = point => {
+    const siteAreaFromPoint = (point, options = {}) => {
       if (!_planLayers.exteriores) return null;
+      const includePropertyBoundary = options.includePropertyBoundary !== false;
       const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
       const handleHit = _findSiteResizeHandleAt(point, logical);
       if (handleHit) {
         // For small elements the handle hit-zone covers the whole body; prefer move over resize
         // when the click lands strictly inside the element rectangle.
         const siteEl = _ensureSiteElements().find(el => el.id === handleHit.siteId);
-        if (siteEl) {
+        if (!includePropertyBoundary && siteEl?.type === 'property_boundary') {
+          // Let blocks, floors and rooms inside the predio keep pointer priority.
+        } else if (siteEl) {
           const r = _siteElementRect(siteEl, logical.width, logical.height);
           if (Math.min(r.w, r.h) < 20 &&
               point.x >= r.x && point.x <= r.x + r.w &&
@@ -19659,6 +19659,7 @@ const MecFormModule = (() => {
       }
       const siteHit = _findSiteElementAt(point, logical);
       if (!siteHit?.item || !siteHit.rect) return null;
+      if (!includePropertyBoundary && siteHit.item.type === 'property_boundary') return null;
       return {
         id: `site::${siteHit.item.id}`,
         type: 'site-element',
@@ -19691,6 +19692,11 @@ const MecFormModule = (() => {
           point.x >= r.x && point.x <= r.x + r.w &&
           point.y >= r.y && point.y <= r.y + r.h;
       };
+      const siteElementForArea = candidate => {
+        const siteId = candidate?.siteId || String(candidate?.id || '').replace(/^site::/, '');
+        return siteId ? _ensureSiteElements().find(el => el.id === siteId) : null;
+      };
+      const isPropertyBoundaryArea = candidate => siteElementForArea(candidate)?.type === 'property_boundary';
       const touchControl = event.pointerType === 'touch'
         ? reversedAreas.find(candidate => {
           const type = String(candidate?.type || '');
@@ -19700,10 +19706,14 @@ const MecFormModule = (() => {
           return containsPoint(candidate, pad);
         })
         : null;
-      const area = touchControl || reversedAreas.find(candidate => containsPoint(candidate));
+      const directArea = touchControl || reversedAreas.find(candidate => containsPoint(candidate));
+      const structuralArea = reversedAreas.find(candidate =>
+        ['block', 'floor', 'room', 'sanitary'].includes(candidate?.type) && containsPoint(candidate)
+      );
+      const area = isPropertyBoundaryArea(directArea) && structuralArea ? structuralArea : directArea;
       if (siteResizeShouldPreferBody(area)) return siteAreaFromPoint(point) || area;
       if (area && !['block', 'floor', 'room', 'sanitary'].includes(area.type)) return area;
-      return siteAreaFromPoint(point) || area;
+      return siteAreaFromPoint(point, { includePropertyBoundary: !area }) || area;
     };
     const selectArea = area => {
       if (!area) return;

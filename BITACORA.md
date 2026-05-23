@@ -4,6 +4,46 @@
 
 ---
 
+## Perimetro redimensionable y bloques seleccionables - 2026-05-23 - v2.6.121
+
+### Objetivo
+- Permitir editar dimensiones del `Perimetro del predio escolar` aunque este en modo poligonal/hexagonal.
+- Evitar que el predio capture el clic o toque sobre bloques ubicados dentro, impidiendo moverlos o redimensionarlos.
+
+### Diagnostico
+- En `v2.6.120`, al priorizar vertices del predio se dejaron ocultas las manijas de redimensionamiento del perimetro poligonal.
+- El detector de areas del plano podia devolver `property_boundary` por su caja envolvente antes de permitir que el bloque/piso/aula/sanitario recibiera el gesto.
+- En tablet esto se percibia como un predio editable solo por puntos y como bloques internos bloqueados por el contorno.
+
+### Cambios implementados
+- El perimetro seleccionado muestra simultaneamente esquinas de redimensionamiento y vertices numerados.
+- El perimetro conserva el modo poligonal y ya no vuelve a caja rigida para cambiar dimensiones.
+- El hit-test del plano da prioridad a bloques, pisos, aulas y sanitarios cuando el toque cae dentro de ellos, aunque tambien esten dentro del predio.
+- El predio sigue seleccionable desde espacio libre del contorno o desde la accion guiada `Seleccionar perimetro`.
+- Los textos de `Perimetro predio` aclaran que las esquinas cambian tamano y los puntos numerados ajustan forma.
+- Version visible, cache y assets actualizados a `v2.6.121`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.121`.
+- Probar en tablet: seleccionar perimetro, arrastrar esquinas para cambiar tamano y arrastrar puntos numerados para ajustar forma.
+- Probar con bloque dentro del predio: seleccionar bloque, moverlo y redimensionarlo sin que el perimetro capture el toque.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.120` en assets de publicacion.
+- Revision estatica: el perimetro poligonal seleccionado dibuja `_drawPlanResizeHandles()` y vertices `site-vertex`.
+- Revision estatica: `siteAreaFromPoint()` puede excluir `property_boundary` cuando hay bloque/piso/aula/sanitario debajo.
+- Revision estatica: el paso `Perimetro predio` indica usar esquinas para tamano y puntos numerados para forma.
+
+---
+
 ## Perimetro con vertices tipo aula y flujo base mapa claro - 2026-05-23 - v2.6.120
 
 ### Objetivo
