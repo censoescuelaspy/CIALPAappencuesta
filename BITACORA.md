@@ -43,6 +43,13 @@
 - Revision estatica: no quedan `_defaultPropertyBoundaryShape()` ni `_defaultPropertyBoundaryRectShape()` activos.
 - Revision estatica: `__siteElements` conserva `planShape` y el predio nuevo usa `_defaultPlanShape('l')`.
 - Revision estatica: los controles del predio visibles usan `Forma L`, `+ Vertice`, `- Vertice` y `Rect.` como aulas/sanitarios.
+- `git commit`: `fd1e646 fix: usar forma tipo aula para perimetro v2.6.122`.
+- `git push origin main`: publica la correccion en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.122`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.122`.
+- Verificacion HTTP de GitHub Pages para `index.html`: assets `v2.6.122`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `_normalizePropertyBoundaryShape`, conserva `planShape` en `__siteElements` y no contiene `_defaultPropertyBoundaryShape`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `Dibuje el perimetro como un aula editable` y `Forma L, + Vertice`.
 
 ---
 
