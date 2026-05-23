@@ -33,6 +33,15 @@
 - Playwright local escritorio: `Internet y conectividad` muestra labels para pregunta principal, tipo de conexion y calidad de senal; fallback carga escuelas; sin errores de consola y sin overflow horizontal.
 - Playwright local movil `390x844`: 7 bloques, labels de Internet visibles, sin errores de consola y sin overflow horizontal.
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `a2a4a97 fix: aclarar grupos de respuestas R01 v2.6.128`.
+- `git push origin main`: publica la mejora en GitHub Pages.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.128`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.128` y precache de `r01-schools-public.json`.
+- Verificacion HTTP de GitHub Pages para `assets/js/initial-questionnaire.js`: contiene `Tipo(s) de conexion a Internet disponibles`.
+- Verificacion HTTP de GitHub Pages para `assets/css/app.css`: contiene estilos `initial-question__hint`.
+- Verificacion HTTP de GitHub Pages para `cuestionario_inicial/`: responde con assets `v2.6.128`.
+- Playwright remoto sobre GitHub Pages: `Internet y conectividad` muestra labels separados para pregunta principal, tipo de conexion y calidad de senal; fallback con 5462 escuelas; sin errores de consola y sin overflow horizontal.
+- Playwright remoto movil `390x844`: 7 bloques, labels de Internet visibles, fallback con 5462 escuelas, sin errores de consola y sin overflow horizontal.
 
 ## Respaldo publicado para lista de escuelas R01 - 2026-05-23 - v2.6.127
 
