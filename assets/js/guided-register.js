@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.119
+ * Version: 2.6.120
  */
 
 const GuidedRegisterModule = (() => {
@@ -129,13 +129,13 @@ const GuidedRegisterModule = (() => {
       number: '02',
       title: 'Perimetro predio',
       kicker: 'Bordes aproximados',
-      summary: 'Delinear los bordes aproximados de la propiedad escolar sobre la referencia guardada.',
-      checks: ['Base mapa guardada', 'Perimetro dibujado', 'Predio confirmado'],
+      summary: 'Dibujar solo el contorno del predio, usando vertices editables como en aulas y sanitarios.',
+      checks: ['Ubicacion base cerrada', 'Perimetro con vertices', 'Predio confirmado'],
       actions: [
-        { label: 'Calles', icon: 'MAP', action: 'basemap' },
         { label: 'Perimetro', icon: 'PRD', action: 'addPropertyBoundary', primary: true },
+        { label: 'Seleccionar', icon: 'SEL', action: 'selectPropertyBoundary' },
+        { label: '+ Vertice', icon: '+', action: 'propertyBoundaryAddVertex' },
         { label: 'Confirmar', icon: 'OK', action: 'confirmPropertyBoundary' },
-        { label: 'Mover plano', icon: 'MOVE', action: 'moveMode' },
       ],
     },
     {
@@ -373,6 +373,11 @@ const GuidedRegisterModule = (() => {
     if (action === 'resetSchoolIdentity') return _resetSchoolIdentity();
     if (action === 'resetSchoolData') return _resetSchoolData();
     if (action === 'addPropertyBoundary') return _addPropertyBoundary();
+    if (action === 'selectPropertyBoundary') return _selectPropertyBoundary();
+    if (action === 'propertyBoundaryPolygon') return _setPropertyBoundaryShape(value, 'polygon');
+    if (action === 'propertyBoundaryRect') return _setPropertyBoundaryShape(value, 'rect');
+    if (action === 'propertyBoundaryAddVertex') return _addPropertyBoundaryVertex(value);
+    if (action === 'propertyBoundaryRemoveVertex') return _removePropertyBoundaryVertex(value);
     if (action === 'confirmPropertyBoundary') return _confirmPropertyBoundary();
     if (action === 'rectClassroom') return _setClassroomRect(value);
     if (action === 'rectSanitary') return _setSanitaryRect(value);
@@ -684,6 +689,7 @@ const GuidedRegisterModule = (() => {
       'prev',
       'next',
       'selectPlanItem',
+      'selectPropertyBoundary',
       'openClassroomFicha',
       'openClassroomObjectFicha',
       'openSanitaryFicha',
@@ -711,6 +717,7 @@ const GuidedRegisterModule = (() => {
       'prev',
       'next',
       'selectPlanItem',
+      'selectPropertyBoundary',
       'openClassroomFicha',
       'openClassroomObjectFicha',
       'openSanitaryFicha',
@@ -1261,9 +1268,9 @@ const GuidedRegisterModule = (() => {
 
     if (!school.name && !school.code) add('Escuela', 'Identificar escuela', 'Falta codigo o nombre de la escuela.', 'module', 'mapa');
     if ((school.name || school.code) && !_schoolIdentityConfirmedForSchool(school)) add('Escuela', 'Confirmar datos basicos', 'Revise codigo, nombre, territorio y coordenadas antes de cargar infraestructura.', 'resetSchoolIdentity');
-    if ((school.name || school.code) && !baseMapSaved) add('Escuela', 'Guardar georreferencia corregida', 'Posicione la escuela en la base mapa, ajuste coordenadas si corresponde y guarde antes de dibujar.', 'saveBasemap');
-    if (baseMapSaved && !propertyBoundary) add('Predio', 'Delinear perimetro del predio', 'Dibuje los bordes aproximados de la propiedad escolar antes de crear bloques.', 'addPropertyBoundary');
-    if (baseMapSaved && propertyBoundary && !_propertyBoundaryConfirmed(propertyBoundary)) add('Predio', 'Confirmar perimetro aproximado', 'Mueva los vertices del predio y confirme que representan los bordes de la escuela.', 'confirmPropertyBoundary', propertyBoundary.id);
+    if ((school.name || school.code) && !baseMapSaved) add('Escuela', 'Guardar ubicacion base una vez', 'Cierre el Paso 1: posicionar escuela y tocar Guardar base antes de pedir predio.', 'saveBasemap');
+    if (baseMapSaved && !propertyBoundary) add('Predio', 'Dibujar perimetro con vertices', 'Cree el contorno editable del predio antes de crear bloques.', 'addPropertyBoundary');
+    if (baseMapSaved && propertyBoundary && !_propertyBoundaryConfirmed(propertyBoundary)) add('Predio', 'Ajustar y confirmar perimetro', 'Mueva los puntos numerados del predio y confirme cuando representen los bordes de la escuela.', 'confirmPropertyBoundary', propertyBoundary.id);
     if (!savedAtText) add('Escuela', 'Guardar contexto inicial', 'Guarde datos generales, jornada o responsable de carga.', 'stage', 'general');
     if (!blocks.length) add('Bloques', 'Crear al menos un bloque', 'El relevamiento no tiene estructura arquitectonica.', 'guidedBlock');
 
@@ -1508,9 +1515,9 @@ const GuidedRegisterModule = (() => {
     }
     if (!snap.baseMapSaved) {
       return _question(
-        'Ubicacion inicial',
-        'Posicione la escuela en el plano base',
-        'Use las coordenadas de la escuela, ajuste la base de calles si hace falta y guarde la georreferencia corregida antes de delinear el predio.',
+        'Paso 1: ubicacion base',
+        'Guarde una sola ubicacion de partida',
+        'Use las coordenadas de la escuela, ajuste la base de calles si hace falta y toque Guardar georef. Despues la guia pasara al perimetro del predio.',
         [
           { label: 'Usar coordenadas', action: 'coords', primary: true },
           { label: 'Calles/lineas', action: 'basemap' },
@@ -1519,7 +1526,7 @@ const GuidedRegisterModule = (() => {
         ],
         false,
         '',
-        'Este es el primer control operativo del relevamiento: si la ubicacion oficial esta corrida, ajuste la referencia ahora para que bloques, fotos y cierre queden asociados al punto correcto. Si no hay internet, use las coordenadas disponibles y guarde igualmente la base.',
+        'Este paso cierra la referencia inicial. El paso siguiente ya no pedira escuela ni georreferencia: solo dibujar el contorno del predio con vertices.',
         true
       );
     }
@@ -1543,50 +1550,47 @@ const GuidedRegisterModule = (() => {
   function _predioQuestion(snap) {
     if (!snap.baseMapSaved) {
       return _question(
-        'Plano de partida',
-        'Guarde primero la ubicacion de la escuela',
-        'Antes de delinear la propiedad, la escuela debe quedar posicionada y guardada sobre la base mapa.',
+        'Paso anterior pendiente',
+        'Cierre primero la ubicacion base',
+        'Este paso ya no vuelve a pedir datos de escuela. Falta terminar el Paso 1: posicionar la escuela sobre la base mapa y tocar Guardar base.',
         [
-          { label: 'Volver a ubicacion', action: 'prev', primary: true },
-          { label: 'Usar coordenadas', action: 'coords' },
-          { label: 'Guardar georef.', action: 'saveBasemap' },
+          { label: 'Volver a Paso 1', action: 'prev', primary: true },
         ],
         false,
         '',
-        'La propiedad debe apoyarse en una georreferencia confirmada. Esto evita que el predio se dibuje sobre una escuela equivocada o en una posicion heredada de otro relevamiento.',
+        'La ubicacion base se guarda una sola vez. Cuando vuelva a este paso, la guia pedira solamente el contorno del predio.',
         true
       );
     }
     if (!snap.propertyBoundary) {
       return _question(
         'Bordes del predio',
-        'Delinee los bordes aproximados de la propiedad escolar',
-        'Agregue el perimetro del predio y acomode sus vertices sobre la base de calles o imagen de referencia. No necesita precision catastral: debe orientar los bloques dentro de la propiedad visitada.',
+        'Dibuje el perimetro con vertices editables',
+        'Agregue el perimetro del predio. Nacera como un contorno con puntos numerados, igual que las aulas o sanitarios con forma editable.',
         [
           { label: 'Dibujar perimetro', action: 'addPropertyBoundary', primary: true },
-          { label: 'Revisar base', action: 'basemap' },
-          { label: 'Mover plano', action: 'moveMode' },
+          { label: 'Volver a ubicacion base', action: 'prev' },
         ],
         false,
         '',
-        'Use el perimetro para indicar los bordes aproximados del local escolar: frente, fondo, laterales y accesos principales si se reconocen. Despues de confirmarlo, la guia pasara a bloques.',
+        'No es un rectangulo rigido: despues de crearlo, toque + Vertice si necesita mas puntos y arrastre cada numero hasta el borde aproximado del local escolar.',
         true
       );
     }
     if (!snap.propertyBoundaryConfirmed) {
       return _question(
         'Bordes del predio',
-        'Ajuste y confirme el perimetro del predio',
-        'Seleccione el perimetro, mueva sus vertices hasta cubrir la propiedad escolar aproximada y confirme cuando represente la ubicacion real de campo.',
+        'Mueva los vertices del perimetro',
+        'Seleccione el perimetro y arrastre sus puntos numerados. Use + Vertice para sumar puntos como en aulas; use - Vertice si sobran.',
         [
-          { label: 'Confirmar perimetro', action: 'confirmPropertyBoundary', value: snap.propertyBoundary.id, primary: true },
-          { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
-          { label: 'Editar ficha', action: 'openSiteFicha', value: snap.propertyBoundary.id },
-          { label: 'Revisar base', action: 'basemap' },
+          { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}`, primary: true },
+          { label: '+ Vertice', action: 'propertyBoundaryAddVertex', value: snap.propertyBoundary.id },
+          { label: '- Vertice', action: 'propertyBoundaryRemoveVertex', value: snap.propertyBoundary.id },
+          { label: 'Confirmar perimetro', action: 'confirmPropertyBoundary', value: snap.propertyBoundary.id },
         ],
         false,
         _guidedRequirementList(_siteElementRequirementItems(snap.propertyBoundary)),
-        'Si el predio no es rectangular, arrastre cada vertice hasta formar el contorno aproximado. Los detalles finos pueden completarse luego con exteriores, galerias, camineros y observaciones.',
+        'Este paso solo ajusta el borde del predio. No repita la ubicacion base salvo que el punto de escuela este mal; los bloques vendran despues y quedaran contenidos dentro de esta envolvente.',
         true
       );
     }
@@ -2988,6 +2992,65 @@ const GuidedRegisterModule = (() => {
     mec.focusSelectedPlanItem?.('Ajuste los vertices del perimetro aproximado del predio escolar y luego confirme desde la pregunta superior.');
     _refreshSoon();
     UI.showToast('Perimetro del predio agregado. Mueva sus vertices sobre la base y confirme cuando represente los bordes aproximados.', 'success', 6200);
+  }
+
+  function _currentPropertyBoundary(value = '') {
+    const id = String(value || '').replace(/^site::/, '').trim();
+    const snap = _snapshot();
+    const item = id
+      ? (snap.values?.__siteElements || []).find(current => current.id === id)
+      : (snap.propertyBoundary || _propertyBoundaryElement(snap.values?.__siteElements || []));
+    return item?.id ? item : null;
+  }
+
+  function _selectPropertyBoundary(value = '') {
+    const item = _currentPropertyBoundary(value);
+    if (!item) {
+      UI.showToast('Primero dibuje el perimetro del predio.', 'warning', 5200);
+      return;
+    }
+    _selectPlanItem(`site::${item.id}`);
+  }
+
+  function _setPropertyBoundaryShape(value = '', shape = 'polygon') {
+    const item = _currentPropertyBoundary(value);
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!item?.id || !mec?.setPlanSiteElementShape) {
+      UI.showToast('Primero seleccione el perimetro del predio.', 'warning', 5200);
+      return;
+    }
+    mec.setPlanSiteElementShape(item.id, shape);
+    _setFlag(_propertyBoundaryFlagKey(item), false);
+    _saveState();
+    _refreshSoon();
+  }
+
+  function _addPropertyBoundaryVertex(value = '') {
+    const item = _currentPropertyBoundary(value);
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!item?.id || !mec?.addPlanSiteElementVertex) {
+      UI.showToast('Primero dibuje o seleccione el perimetro del predio.', 'warning', 5200);
+      return;
+    }
+    mec.addPlanSiteElementVertex(item.id);
+    _setFlag(_propertyBoundaryFlagKey(item), false);
+    _saveState();
+    _refreshSoon();
+    UI.showToast('Vertice agregado al perimetro. Arrastre el punto numerado hasta el borde real del predio.', 'success', 4200);
+  }
+
+  function _removePropertyBoundaryVertex(value = '') {
+    const item = _currentPropertyBoundary(value);
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!item?.id || !mec?.removePlanSiteElementVertex) {
+      UI.showToast('Primero dibuje o seleccione el perimetro del predio.', 'warning', 5200);
+      return;
+    }
+    mec.removePlanSiteElementVertex(item.id);
+    _setFlag(_propertyBoundaryFlagKey(item), false);
+    _saveState();
+    _refreshSoon();
+    UI.showToast('Vertice retirado del perimetro. Confirme otra vez cuando el contorno quede correcto.', 'info', 4200);
   }
 
   function _confirmPropertyBoundary() {

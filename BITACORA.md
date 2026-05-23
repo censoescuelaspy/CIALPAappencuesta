@@ -4,6 +4,47 @@
 
 ---
 
+## Perimetro con vertices tipo aula y flujo base mapa claro - 2026-05-23 - v2.6.120
+
+### Objetivo
+- Hacer que el `Perimetro del predio escolar` se edite con la misma logica operativa que aulas/sanitarios: seleccionar, sumar vertices, quitar vertices y arrastrar puntos numerados.
+- Evitar que el `Registro guiado` repita o mezcle la solicitud de ubicacion base con la solicitud de perimetro del predio.
+
+### Diagnostico
+- Aunque `property_boundary` ya tenia `planShape`, al seleccionarlo seguia mostrando manijas de rectangulo/redimensionamiento y podia percibirse como un rectangulo rigido.
+- El modo rectangular del perimetro eliminaba el `planShape`, dejando un camino que volvia a perder vertices.
+- La tarjeta del paso `Perimetro predio` ofrecia acciones de base mapa/georreferencia cuando faltaba cerrar la ubicacion inicial, generando la sensacion de solicitud repetida.
+- La pregunta de ajuste del perimetro no mostraba directamente `+ Vertice` y `- Vertice`, obligando a descubrirlos en cinta/panel.
+
+### Cambios implementados
+- El perimetro conserva siempre un `planShape`; incluso `Rect.` queda como rectangulo editable de cuatro vertices, no como caja rigida.
+- Al seleccionar el perimetro poligonal se ocultan manijas de redimensionamiento/rotacion y quedan visibles los puntos numerados de vertices.
+- El paso `Perimetro predio` incorpora acciones directas `Seleccionar perimetro`, `+ Vertice`, `- Vertice` y `Confirmar perimetro`.
+- Las acciones superiores del paso predio se reducen al flujo real: crear perimetro, seleccionarlo, sumar vertices y confirmar.
+- Si falta guardar la ubicacion base, el paso predio solo redirige a `Paso 1`, sin volver a ofrecer `Usar coordenadas` o `Guardar georef.` como si fuera una nueva solicitud.
+- Los textos del paso `Ubicacion escuela` aclaran que la ubicacion base se guarda una sola vez y que luego el predio solo pide contorno.
+- Version visible, cache y assets actualizados a `v2.6.120`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.120`.
+- Probar en tablet: `Perimetro predio` -> `Dibujar perimetro` -> `+ Vertice` -> arrastrar punto numerado -> `Confirmar perimetro`.
+- Confirmar que el paso predio no vuelve a pedir georreferencia si el Paso 1 ya fue guardado.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.119` en assets de publicacion.
+- Revision estatica: el perimetro conserva `planShape`, expone `site-vertex` y usa `_defaultPropertyBoundaryRectShape()` para rectangulo editable.
+- Revision estatica: `Registro guiado` expone `propertyBoundaryAddVertex`, `propertyBoundaryRemoveVertex` y no repite acciones de georreferencia dentro del paso predio.
+
+---
+
 ## Perimetro poligonal y bloques contenidos en predio - 2026-05-23 - v2.6.119
 
 ### Objetivo

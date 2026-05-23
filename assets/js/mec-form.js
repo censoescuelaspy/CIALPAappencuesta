@@ -3196,12 +3196,25 @@ const MecFormModule = (() => {
     };
   }
 
+  function _defaultPropertyBoundaryRectShape() {
+    return {
+      type: 'property-boundary',
+      points: [
+        { x: .06, y: .08 },
+        { x: .94, y: .08 },
+        { x: .94, y: .92 },
+        { x: .06, y: .92 },
+      ],
+    };
+  }
+
   function _ensurePropertyBoundaryShape(element) {
     if (!element || element.type !== 'property_boundary') return null;
-    if (element.boundaryShapeMode === 'rect') return null;
     const current = _clonePlanShape(element.planShape);
     if (current) return current;
-    const shape = _defaultPropertyBoundaryShape();
+    const shape = element.boundaryShapeMode === 'rect'
+      ? _defaultPropertyBoundaryRectShape()
+      : _defaultPropertyBoundaryShape();
     element.planShape = shape;
     element.boundaryShapeMode = 'polygon';
     return shape;
@@ -4527,7 +4540,7 @@ const MecFormModule = (() => {
       gallery: { wRatio: .22, hRatio: .045 },
       walkway: { wRatio: .18, hRatio: .024 },
       open_space: { wRatio: .17, hRatio: .095 },
-      property_boundary: { wRatio: .72, hRatio: .58 },
+      property_boundary: { wRatio: .86, hRatio: .74 },
       pillar: { wRatio: .028, hRatio: .04 },
       stair: { wRatio: .072, hRatio: .065 },
       ramp: { wRatio: .11, hRatio: .038 },
@@ -14954,6 +14967,8 @@ const MecFormModule = (() => {
     const cfg = _siteElementConfig(item.type);
     const rotation = _siteElementRotationDeg(item);
     const local = { x: -rect.w / 2, y: -rect.h / 2, w: rect.w, h: rect.h };
+    const isPropertyBoundary = item.type === 'property_boundary';
+    let propertyBoundaryPoints = null;
     const cx = rect.x + rect.w / 2;
     const cy = rect.y + rect.h / 2;
     ctx.save();
@@ -14964,14 +14979,14 @@ const MecFormModule = (() => {
     ctx.strokeStyle = selected ? '#111827' : cfg.tone;
     ctx.fillStyle = selected ? 'rgba(255,255,255,.95)' : 'rgba(255,255,255,.78)';
     ctx.lineWidth = selected ? 3 : 2;
-    if (item.type === 'property_boundary') {
+    if (isPropertyBoundary) {
       _ensurePropertyBoundaryShape(item);
-      const boundaryPoints = _planShapePoints(item, local);
+      propertyBoundaryPoints = _planShapePoints(item, local);
       ctx.fillStyle = selected ? 'rgba(232,243,238,.18)' : 'rgba(11,93,59,.045)';
       ctx.strokeStyle = selected ? '#0b5d3b' : 'rgba(11,93,59,.86)';
       ctx.lineWidth = selected ? 3 : 2.2;
       ctx.setLineDash([10, 6]);
-      if (boundaryPoints && _drawPlanShapePath(ctx, boundaryPoints)) {
+      if (propertyBoundaryPoints && _drawPlanShapePath(ctx, propertyBoundaryPoints)) {
         ctx.fill();
         ctx.stroke();
       } else {
@@ -14982,7 +14997,7 @@ const MecFormModule = (() => {
       ctx.save();
       ctx.strokeStyle = 'rgba(11,93,59,.45)';
       ctx.lineWidth = 1;
-      if (boundaryPoints && _drawPlanShapePath(ctx, boundaryPoints)) ctx.stroke();
+      if (propertyBoundaryPoints && _drawPlanShapePath(ctx, propertyBoundaryPoints)) ctx.stroke();
       ctx.restore();
     } else if (item.type === 'water_tank') {
       ctx.beginPath();
@@ -15256,7 +15271,7 @@ const MecFormModule = (() => {
         }
       }
     }
-    if (selected) {
+    if (selected && !(isPropertyBoundary && propertyBoundaryPoints)) {
       ctx.save();
       ctx.strokeStyle = 'rgba(17,24,39,.55)';
       ctx.lineWidth = 1;
@@ -15316,6 +15331,7 @@ const MecFormModule = (() => {
       const selected = _selectedPlanId === `site::${item.id}`;
       const cfg = _siteElementConfig(item.type);
       const shapePoints = _planShapePoints(item, rect);
+      const propertyPolygonActive = Boolean(isPropertyBoundary && shapePoints);
       _pushPlanHitArea({
         id: `site::${item.id}`,
         type: 'site-element',
@@ -15340,7 +15356,7 @@ const MecFormModule = (() => {
         metersPerPx: 1,
       });
       if (selected) {
-        const handle = (isPropertyBoundary && shapePoints) ? null : _siteElementRotateHandle(item, rect);
+        const handle = propertyPolygonActive ? null : _siteElementRotateHandle(item, rect);
         if (handle) {
           _pushPlanHitArea({
             id: `site::${item.id}`,
@@ -15358,20 +15374,21 @@ const MecFormModule = (() => {
             baseH: rect.h,
           });
         }
-        _pushPlanResizeHitAreas({
-          id: `site::${item.id}`,
-          type: 'site-resize',
-          rect,
-          rotation: _siteElementRotationDeg(item),
-          siteId: item.id,
-        });
+        if (!propertyPolygonActive) {
+          _pushPlanResizeHitAreas({
+            id: `site::${item.id}`,
+            type: 'site-resize',
+            rect,
+            rotation: _siteElementRotationDeg(item),
+            siteId: item.id,
+          });
+        }
       }
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
       if (selected) {
         const dims = _siteElementDimensionPair(item);
         _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
-        if (isPropertyBoundary && shapePoints) {
-          _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
+        if (propertyPolygonActive) {
           ctx.save();
           const transform = _applyPlanCanvasRotation(ctx, rect, _siteElementRotationDeg(item));
           if (transform) _planTransformStack.push(transform);
@@ -19261,12 +19278,11 @@ const MecFormModule = (() => {
     }
     if (!_assertSiteElementUnlocked(element, 'cambiar su forma')) return;
     if (shape === 'rect') {
-      delete element.planShape;
-      element.boundaryShapeMode = 'rect';
+      element.planShape = _defaultPropertyBoundaryRectShape();
     } else {
-      element.planShape = _defaultPropertyBoundaryShape();
-      element.boundaryShapeMode = 'polygon';
+      element.planShape = _clonePlanShape(element.planShape) || _defaultPropertyBoundaryShape();
     }
+    element.boundaryShapeMode = 'polygon';
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
     _saveDraft(false);
