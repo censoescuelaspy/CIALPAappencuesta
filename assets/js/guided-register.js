@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.122
+ * Version: 2.6.123
  */
 
 const GuidedRegisterModule = (() => {
@@ -1590,7 +1590,7 @@ const GuidedRegisterModule = (() => {
         ],
         false,
         _guidedRequirementList(_siteElementRequirementItems(snap.propertyBoundary)),
-        'Este paso solo ajusta el borde del predio. No repita la ubicacion base salvo que el punto de escuela este mal; los bloques vendran despues y quedaran contenidos dentro de esta envolvente.',
+        'Este paso solo ajusta el borde del predio. Si carga largo y ancho del predio en la ficha, los bloques usaran esa misma escala de metros dentro de la envolvente.',
         true
       );
     }
@@ -1605,7 +1605,7 @@ const GuidedRegisterModule = (() => {
       ],
       true,
       '',
-      'El perimetro sirve como referencia de implantacion, no como plano catastral. Los bloques se dibujan dentro de esa envolvente con sus medidas reales.',
+      'El perimetro sirve como referencia de implantacion, no como plano catastral. Los bloques se dibujan dentro de esa envolvente con sus medidas reales y la escala del predio cuando esta cargada.',
       false
     );
   }

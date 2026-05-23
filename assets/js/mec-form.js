@@ -73,6 +73,10 @@ const MecFormModule = (() => {
   const PLAN_WALL_THICKNESS = 7;
   const PLAN_OPENING_STROKE = 1.5;
   const PLAN_VERTEX_HANDLE_SIZE = 12;
+  const PROPERTY_BOUNDARY_MAX_WIDTH_RATIO = .9;
+  const PROPERTY_BOUNDARY_MAX_HEIGHT_RATIO = .82;
+  const PROPERTY_BOUNDARY_FALLBACK_PX_PER_METER = 12;
+  const PROPERTY_BOUNDARY_SCALE_VERSION = 'meters-v2.6.123';
   const EVIDENCE_IMAGE_MAX_DIMENSION = 1600;
   const EVIDENCE_THUMB_MAX_DIMENSION = 720;
   const EVIDENCE_IMAGE_QUALITY = 0.78;
@@ -3923,14 +3927,21 @@ const MecFormModule = (() => {
       const planShape = type === 'property_boundary'
         ? _normalizePropertyBoundaryShape(item.planShape)
         : _clonePlanShape(item.planShape);
+      const applyBoundaryMeasuredScale = type === 'property_boundary' &&
+        measuredSize &&
+        item.boundaryScaleVersion !== PROPERTY_BOUNDARY_SCALE_VERSION;
       return {
         id: item.id || `site_${Date.now()}_${index}`,
         type,
         shape,
         xRatio: Number.isFinite(Number(item.xRatio)) ? Number(item.xRatio) : .08,
         yRatio: Number.isFinite(Number(item.yRatio)) ? Number(item.yRatio) : .78,
-        wRatio: Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : (measuredSize?.wRatio || size.wRatio),
-        hRatio: Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : (measuredSize?.hRatio || size.hRatio),
+        wRatio: applyBoundaryMeasuredScale
+          ? measuredSize.wRatio
+          : (Number.isFinite(Number(item.wRatio)) ? Number(item.wRatio) : (measuredSize?.wRatio || size.wRatio)),
+        hRatio: applyBoundaryMeasuredScale
+          ? measuredSize.hRatio
+          : (Number.isFinite(Number(item.hRatio)) ? Number(item.hRatio) : (measuredSize?.hRatio || size.hRatio)),
         rotationDeg,
         ficha,
         ...(type === 'ramp' ? { rampFallDirection } : {}),
@@ -3939,6 +3950,7 @@ const MecFormModule = (() => {
         autoSource: item.autoSource || null,
         locked: Boolean(item.locked),
         lockedAt: item.lockedAt || '',
+        ...(type === 'property_boundary' && measuredSize ? { boundaryScaleVersion: PROPERTY_BOUNDARY_SCALE_VERSION } : {}),
         ...(planShape ? { planShape } : {}),
       };
     });
@@ -4054,7 +4066,34 @@ const MecFormModule = (() => {
     };
   }
 
+  function _positivePlanMeasure(value) {
+    return _numberInRange(value, 0, 0, Number.MAX_SAFE_INTEGER);
+  }
+
+  function _planRatioSizeFromMeters(lengthM, widthM, options = {}) {
+    const length = _positivePlanMeasure(lengthM);
+    const width = _positivePlanMeasure(widthM);
+    if (!length || !width) return null;
+    const logicalWidth = typeof _planCanvasWidth === 'function' ? _planCanvasWidth() : 900;
+    const logicalHeight = typeof _planCanvasHeight === 'function' ? _planCanvasHeight() : 620;
+    const maxWRatio = Number(options.maxWRatio || PROPERTY_BOUNDARY_MAX_WIDTH_RATIO);
+    const maxHRatio = Number(options.maxHRatio || PROPERTY_BOUNDARY_MAX_HEIGHT_RATIO);
+    const maxW = Math.max(80, logicalWidth * maxWRatio);
+    const maxH = Math.max(70, logicalHeight * maxHRatio);
+    const pxPerMeter = Math.max(.1, Math.min(maxW / length, maxH / width));
+    return {
+      wRatio: Math.max(.006, Math.min(maxWRatio, (length * pxPerMeter) / logicalWidth)),
+      hRatio: Math.max(.006, Math.min(maxHRatio, (width * pxPerMeter) / logicalHeight)),
+    };
+  }
+
   function _siteElementSizeFromFicha(type, shape, ficha = {}) {
+    if (type === 'property_boundary') {
+      return _planRatioSizeFromMeters(ficha.largo_m || ficha.longitud_m, ficha.ancho_m, {
+        maxWRatio: PROPERTY_BOUNDARY_MAX_WIDTH_RATIO,
+        maxHRatio: PROPERTY_BOUNDARY_MAX_HEIGHT_RATIO,
+      });
+    }
     if (type === 'water_tank') {
       const diametro = Number(ficha.diametro_m || ficha.ancho_m || 0);
       const largo = Number(ficha.largo_m || diametro || 0);
@@ -4139,6 +4178,7 @@ const MecFormModule = (() => {
     if (size) {
       element.wRatio = size.wRatio;
       element.hRatio = size.hRatio;
+      if (element.type === 'property_boundary') element.boundaryScaleVersion = PROPERTY_BOUNDARY_SCALE_VERSION;
     }
   }
 
@@ -15394,33 +15434,43 @@ const MecFormModule = (() => {
   }
 
   function _planBlockLayout(blocks, canvasW, canvasH) {
+    const propertyMetrics = _propertyBoundaryPlanMetrics(canvasW, canvasH);
+    const propertyScale = propertyMetrics?.dimensions && propertyMetrics.pxPerMeter > 0
+      ? propertyMetrics.pxPerMeter
+      : 0;
+    const propertyBounds = propertyMetrics?.bounds
+      ? _clampRectToBounds(propertyMetrics.bounds, { x: 12, y: 12, w: canvasW - 24, h: canvasH - 24 })
+      : null;
     const models = blocks.map(block => {
-      const length = Number(block.largo_m || 0) || 30;
-      const width = Number(block.ancho_m || 0) || 20;
-      return { block, length, width };
+      const measuredLength = _positivePlanMeasure(block.largo_m);
+      const measuredWidth = _positivePlanMeasure(block.ancho_m);
+      const length = measuredLength || 30;
+      const width = measuredWidth || 20;
+      return { block, length, width, measuredLength, measuredWidth };
     });
     const maxLength = Math.max(...models.map(model => model.length), 30);
     const maxWidth = Math.max(...models.map(model => model.width), 20);
-    const cols = 2;
-    const cellW = (canvasW - 72) / cols;
+    const cols = propertyBounds ? Math.max(1, Math.min(3, Math.ceil(Math.sqrt(Math.max(1, blocks.length))))) : 2;
     const rows = Math.max(1, Math.ceil(blocks.length / cols));
-    const cellH = (canvasH - 72) / rows;
-    const scale = Math.max(.18, Math.min((cellW - 48) / maxLength, (cellH - 48) / maxWidth));
+    const cellW = propertyBounds ? propertyBounds.w / cols : (canvasW - 72) / cols;
+    const cellH = propertyBounds ? propertyBounds.h / rows : (canvasH - 72) / rows;
+    const scale = propertyScale || Math.max(.18, Math.min((cellW - 48) / maxLength, (cellH - 48) / maxWidth));
     return models.map((model, index) => {
-      const { block, length, width } = model;
+      const { block, length, width, measuredLength, measuredWidth } = model;
       const col = index % cols;
       const row = Math.floor(index / cols);
-      let bw = Math.max(70, length * scale);
-      let bh = Math.max(78, width * scale);
-      const cellX = 28 + col * cellW;
-      const cellY = 36 + row * cellH;
+      let bw = propertyScale && measuredLength ? Math.max(50, measuredLength * propertyScale) : Math.max(70, length * scale);
+      let bh = propertyScale && measuredWidth ? Math.max(42, measuredWidth * propertyScale) : Math.max(78, width * scale);
+      const cellX = (propertyBounds ? propertyBounds.x : 28) + col * cellW;
+      const cellY = (propertyBounds ? propertyBounds.y : 36) + row * cellH;
       const autoX = cellX + Math.max(0, (cellW - bw) / 2);
       const autoY = cellY + Math.max(0, (cellH - bh) / 2);
       const saved = block.planPosition || block.plano_general || null;
       const savedW = Number(saved?.wRatio);
       const savedH = Number(saved?.hRatio);
-      if (Number.isFinite(savedW) && savedW > 0) bw = Math.max(70, Math.min(canvasW - 24, savedW * canvasW));
-      if (Number.isFinite(savedH) && savedH > 0) bh = Math.max(78, Math.min(canvasH - 24, savedH * canvasH));
+      const preserveSavedSize = !(propertyScale && measuredLength && measuredWidth);
+      if (preserveSavedSize && Number.isFinite(savedW) && savedW > 0) bw = Math.max(70, Math.min(canvasW - 24, savedW * canvasW));
+      if (preserveSavedSize && Number.isFinite(savedH) && savedH > 0) bh = Math.max(78, Math.min(canvasH - 24, savedH * canvasH));
       const savedX = Number(saved?.xRatio);
       const savedY = Number(saved?.yRatio);
       const x = Number.isFinite(savedX) ? savedX * canvasW : autoX;
@@ -15501,6 +15551,33 @@ const MecFormModule = (() => {
 
   function _propertyBoundaryElement() {
     return _ensureSiteElements().find(item => item.type === 'property_boundary') || null;
+  }
+
+  function _propertyBoundaryDimensions(element = _propertyBoundaryElement()) {
+    const ficha = element?.ficha || {};
+    const length = _positivePlanMeasure(ficha.largo_m || ficha.longitud_m);
+    const width = _positivePlanMeasure(ficha.ancho_m);
+    return length && width ? { length, width } : null;
+  }
+
+  function _propertyBoundaryPlanMetrics(logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const element = _propertyBoundaryElement();
+    if (!element) return null;
+    const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+    let points = _planShapePoints(element, rect) || _rectCorners(rect);
+    const rotation = _siteElementRotationDeg(element);
+    if (rotation) {
+      const center = _planRectCenter(rect);
+      points = points.map(point => _rotatePointAround(center, point, rotation));
+    }
+    const bounds = _polygonBounds(points);
+    const dimensions = _propertyBoundaryDimensions(element);
+    const pxPerMeterX = dimensions?.length && bounds?.w ? bounds.w / dimensions.length : 0;
+    const pxPerMeterY = dimensions?.width && bounds?.h ? bounds.h / dimensions.width : 0;
+    const pxPerMeter = pxPerMeterX && pxPerMeterY
+      ? Math.min(pxPerMeterX, pxPerMeterY)
+      : (pxPerMeterX || pxPerMeterY || 0);
+    return { element, rect, points, bounds, dimensions, pxPerMeter };
   }
 
   function _propertyBoundaryCanvasPoints(logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
@@ -18632,8 +18709,31 @@ const MecFormModule = (() => {
   function _syncSiteElementMeasuresFromRect(element, rect, logicalWidth, logicalHeight) {
     if (!element || !rect) return;
     element.ficha = element.ficha || {};
+    const previousWRatio = Number(element.wRatio || 0);
+    const previousHRatio = Number(element.hRatio || 0);
     element.wRatio = Math.max(.006, rect.w / logicalWidth);
     element.hRatio = Math.max(.006, rect.h / logicalHeight);
+    if (element.type === 'property_boundary') {
+      const previousLength = _positivePlanMeasure(element.ficha.largo_m || element.ficha.longitud_m);
+      const previousWidth = _positivePlanMeasure(element.ficha.ancho_m);
+      const previousW = previousWRatio > 0 ? previousWRatio * logicalWidth : 0;
+      const previousH = previousHRatio > 0 ? previousHRatio * logicalHeight : 0;
+      const scaleX = previousLength && previousW ? previousLength / previousW : 0;
+      const scaleY = previousWidth && previousH ? previousWidth / previousH : 0;
+      let metersPerPx = scaleX && scaleY ? (scaleX + scaleY) / 2 : (scaleX || scaleY || 0);
+      if (!metersPerPx && _planBaseMapHasCoords(_data.__planBaseMap)) {
+        metersPerPx = _planBaseMapMetersPerPlanPixel(_data.__planBaseMap);
+      }
+      if (!metersPerPx) metersPerPx = 1 / PROPERTY_BOUNDARY_FALLBACK_PX_PER_METER;
+      const largo = Math.max(.5, rect.w * metersPerPx);
+      const ancho = Math.max(.5, rect.h * metersPerPx);
+      element.ficha.largo_m = largo.toFixed(2);
+      element.ficha.ancho_m = ancho.toFixed(2);
+      element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
+      element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
+      element.boundaryScaleVersion = PROPERTY_BOUNDARY_SCALE_VERSION;
+      return;
+    }
     if (element.type === 'pillar') {
       const measure = Math.max(.1, Math.max(rect.w, rect.h) / 42).toFixed(2);
       if (String(element.ficha.forma_pilar || element.ficha.seccion || '').toLowerCase().includes('cuad')) element.ficha.lado_m = measure;
@@ -18672,6 +18772,7 @@ const MecFormModule = (() => {
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _syncSiteElementMeasuresFromRect(element, clamped, logicalWidth, logicalHeight);
+    if (element.type === 'property_boundary') _persistBlocksWithinPropertyBoundary(logicalWidth, logicalHeight);
     _activePlanDrag = { id: `site::${element.id}`, siteId: element.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
     _drawSchoolPlan();
     return clamped;
@@ -19362,6 +19463,7 @@ const MecFormModule = (() => {
       if (!element) return false;
       _setPlanShapeVertex(element, drag.index, localPoint, drag.rect);
       _selectedPlanId = `site::${element.id}`;
+      if (element.type === 'property_boundary') _persistBlocksWithinPropertyBoundary();
       _drawSchoolPlan();
       return true;
     }

@@ -4,6 +4,48 @@
 
 ---
 
+## Escala comun entre predio y bloques - 2026-05-23 - v2.6.123
+
+### Objetivo
+- Corregir que las medidas del `Perimetro del predio escolar` no quedaran en la misma escala visual que los bloques y aulas que se insertan dentro.
+- Hacer que, cuando el predio tenga largo/ancho cargados, los bloques medidos se dibujen proporcionalmente dentro de esa envolvente.
+
+### Diagnostico
+- El predio convertia `largo_m` y `ancho_m` a `wRatio/hRatio` con un divisor fijo, mezclando el ancho y alto del canvas como si tuvieran la misma escala.
+- Los bloques calculaban su tamano desde `largo_m/ancho_m` con una escala propia, independiente del predio.
+- Al combinar ambos modelos, un bloque de medidas reales podia verse demasiado grande o demasiado chico respecto al perimetro del predio.
+
+### Cambios implementados
+- El predio medido ahora convierte metros a pixeles con una escala isotropica: un metro horizontal y un metro vertical ocupan la misma distancia visual.
+- Se agrega una version interna de normalizacion `meters-v2.6.123` para corregir predios medidos antes de esta version sin pisar redimensionamientos manuales posteriores.
+- `Perimetro del predio escolar` expone metricas de escala del contorno: dimensiones cargadas, caja real del poligono y pixeles por metro.
+- `_planBlockLayout()` usa la escala del predio cuando existe `largo_m/ancho_m` del perimetro y `largo_m/ancho_m` del bloque.
+- Los bloques con medidas dejan de usar su `wRatio/hRatio` viejo si el predio esta medido; se recalculan desde metros para coincidir con la escala del contorno.
+- Al redimensionar el predio, sus metros se actualizan con una sola escala y los bloques se reacomodan dentro del nuevo contorno.
+- Al mover vertices del predio, los bloques se vuelven a persistir dentro de la envolvente ajustada.
+- Los textos del `Registro guiado` aclaran que cargar largo/ancho del predio fija la escala usada por los bloques.
+- Version visible, cache y assets actualizados a `v2.6.123`.
+
+### Pendiente operativo
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.123`.
+- Probar en tablet: dibujar perimetro, abrir ficha del predio, cargar por ejemplo `80 x 55 m`, crear un bloque `30 x 20 m` y confirmar que ocupa una proporcion coherente dentro del predio.
+- Probar redimensionar el predio despues de tener bloques: los bloques deben conservar escala comun y quedar dentro de la envolvente.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`.
+- `npm.cmd run simulate:ui`: 2 pruebas saltadas correctamente por falta de credenciales.
+- Revision estatica: no quedan referencias activas a `2.6.122` en assets de publicacion.
+- Revision estatica: existe `PROPERTY_BOUNDARY_SCALE_VERSION = meters-v2.6.123`.
+- Revision estatica: `_planBlockLayout()` toma `propertyScale` desde `_propertyBoundaryPlanMetrics()` cuando predio y bloque estan medidos.
+
+---
+
 ## Perimetro con logica de forma tipo aula - 2026-05-23 - v2.6.122
 
 ### Objetivo
