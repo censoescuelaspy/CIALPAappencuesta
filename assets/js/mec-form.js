@@ -1814,14 +1814,16 @@ const MecFormModule = (() => {
 
   function _normalizeFloor(value) {
     const text = String(value || '').trim();
-    if (!text || text.toUpperCase() === 'PB') return 'Piso 1';
+    const normalized = _normalizeText(text);
+    if (!text || text.toUpperCase() === 'PB' || normalized === 'pb' || normalized.includes('planta baja') || normalized === 'piso 0') return 'Planta baja';
     const number = text.match(/\d+/)?.[0];
+    if (number && Number(number) <= 0) return 'Planta baja';
     if (number) return `Piso ${Number(number)}`;
     return text.startsWith('Piso ') ? text : `Piso ${text}`;
   }
 
   function _activeFloor() {
-    return _normalizeFloor(_data.__activeFloor || _data.__classroomSketch?.floor || 'Piso 1');
+    return _normalizeFloor(_data.__activeFloor || _data.__classroomSketch?.floor || 'Planta baja');
   }
 
   function _setActiveFloor(value) {
@@ -2320,7 +2322,7 @@ const MecFormModule = (() => {
               </div>
               <div class="form-group">
                 <label>Piso</label>
-                <input class="form-control" type="number" min="1" step="1" value="${_escape(String(sketch.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}" data-sketch-field="floorNumber" ${disabled}>
+                <input class="form-control" type="number" min="0" step="1" value="${_escape(String(_floorNumberValue(sketch.floor || 'Planta baja')))}" data-sketch-field="floorNumber" ${disabled}>
               </div>
               <div class="form-group form-group--wide">
                 <label>Estado del ambiente</label>
@@ -2562,7 +2564,7 @@ const MecFormModule = (() => {
       id: '',
       name: '',
       blockId,
-      floor: _normalizeFloor(floor || 'Piso 1'),
+      floor: _normalizeFloor(floor || 'Planta baja'),
       length: '',
       width: '',
       estado: '',
@@ -2600,7 +2602,9 @@ const MecFormModule = (() => {
   }
 
   function _floorNumberValue(floor) {
-    return Number(String(_normalizeFloor(floor || 'Piso 1')).match(/\d+/)?.[0] || 1);
+    const normalized = _normalizeFloor(floor || 'Planta baja');
+    if (normalized === 'Planta baja') return 0;
+    return Number(String(normalized).match(/\d+/)?.[0] || 1);
   }
 
   function _roomSpaceConfig(kind = 'classroom') {
@@ -2698,10 +2702,10 @@ const MecFormModule = (() => {
       floor: label,
       largo_m: block.largo_m || '',
       ancho_m: block.ancho_m || '',
-      xRatio: .06,
-      yRatio: .16,
-      wRatio: .88,
-      hRatio: .58,
+      xRatio: 0,
+      yRatio: 0,
+      wRatio: 1,
+      hRatio: 1,
       rotationDeg: 0,
       rotacion_grados: '0',
     };
@@ -2726,7 +2730,8 @@ const MecFormModule = (() => {
       ...(_data.__classrooms || []).filter(room => room.blockId === block?.id).map(room => _floorNumberValue(room.floor)),
       ...(_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block)).map(item => _floorNumberValue(item.planta)),
     ].filter(Number.isFinite);
-    return _normalizeFloor((Math.max(0, ...usedNumbers) || 0) + 1);
+    if (!usedNumbers.length) return 'Planta baja';
+    return _normalizeFloor(Math.max(0, ...usedNumbers) + 1);
   }
 
   function _floorRotationDeg(floor = {}) {
@@ -3814,6 +3819,22 @@ const MecFormModule = (() => {
     const value = Math.max(0, Math.round(Number(block.cantidad_plantas || 0)));
     block.cantidad_plantas = String(value);
     _ensureBlockFloors(block);
+    const hasBlockIdentity = Boolean(block.id || block.bloque_codigo || block.largo_m || block.ancho_m);
+    if (hasBlockIdentity && !block.floors?.length) {
+      block.floors = [{
+        id: `piso_${Date.now().toString(36)}_pb`,
+        label: 'Planta baja',
+        floor: 'Planta baja',
+        largo_m: block.largo_m || '',
+        ancho_m: block.ancho_m || '',
+        xRatio: 0,
+        yRatio: 0,
+        wRatio: 1,
+        hRatio: 1,
+        rotationDeg: 0,
+        rotacion_grados: '0',
+      }];
+    }
     if (block.floors?.length) block.cantidad_plantas = String(block.floors.length);
     return block;
   }
@@ -4542,8 +4563,26 @@ const MecFormModule = (() => {
     _syncActiveBlock();
     const next = (_data.__blocks || []).length + 1;
     _data.__activeBlockId = `bloque_${Date.now()}`;
-    _data.bloques = { bloque_codigo: _numberedLabel('Bloque', next - 1), estado_bloque: 'Operativo', cantidad_plantas: '0', floors: [] };
+    _data.bloques = {
+      bloque_codigo: _numberedLabel('Bloque', next - 1),
+      estado_bloque: 'Operativo',
+      cantidad_plantas: '1',
+      floors: [{
+        id: `piso_${Date.now().toString(36)}_pb`,
+        label: 'Planta baja',
+        floor: 'Planta baja',
+        largo_m: '',
+        ancho_m: '',
+        xRatio: 0,
+        yRatio: 0,
+        wRatio: 1,
+        hRatio: 1,
+        rotationDeg: 0,
+        rotacion_grados: '0',
+      }],
+    };
     _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
+    _setActiveFloor('Planta baja');
     _startTimeLog('bloque', _data.__activeBlockId, _data.bloques.bloque_codigo);
     _saveDraft(false);
     _render();
@@ -4626,10 +4665,10 @@ const MecFormModule = (() => {
       floor: label,
       largo_m: guided ? '' : (block.largo_m || ''),
       ancho_m: guided ? '' : (block.ancho_m || ''),
-      xRatio: .06,
-      yRatio: .16 + Math.min(index, 4) * .08,
-      wRatio: .88,
-      hRatio: .36,
+      xRatio: 0,
+      yRatio: 0,
+      wRatio: 1,
+      hRatio: 1,
       rotationDeg: 0,
       rotacion_grados: '0',
     };
@@ -4769,7 +4808,7 @@ const MecFormModule = (() => {
       const { id: _id, ...values } = block;
       _data.bloques = { ...(_data.bloques || {}), ...values };
     }
-    const nextFloor = remainingFloors[Math.min(Math.max(0, floorNumber - 1), Math.max(0, remainingFloors.length - 1))] || 'Piso 1';
+    const nextFloor = remainingFloors[Math.min(Math.max(0, floorNumber - 1), Math.max(0, remainingFloors.length - 1))] || 'Planta baja';
     _setActiveFloor(nextFloor);
     _selectBestClassroomAfterDeletion(block.id, nextFloor);
     _activeSanitaryId = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])[0]?.id || null;
@@ -4818,7 +4857,7 @@ const MecFormModule = (() => {
       const { id: _id, ...values } = next;
       _data.bloques = values;
     }
-    _setActiveFloor('Piso 1');
+    _setActiveFloor('Planta baja');
     _selectBestClassroomAfterDeletion(_data.__activeBlockId, _activeFloor());
     _activeSanitaryId = _visibleSanitariesForActiveBlockFloor(_data.__sanitaries || [])[0]?.id || null;
     _selectedPlanId = null;
@@ -5440,7 +5479,7 @@ const MecFormModule = (() => {
   }
 
   function _sanitaryInput(item, key, label, type, step = '1') {
-    const value = key === 'planta' ? (String(item[key] || 'Piso 1').match(/\d+/)?.[0] || '1') : (item[key] || '');
+    const value = key === 'planta' ? String(_floorNumberValue(item[key] || 'Planta baja')) : (item[key] || '');
     if (key === 'bloque') {
       _ensureBlocks();
       return `
@@ -11999,7 +12038,7 @@ const MecFormModule = (() => {
             </div>
             <div class="form-group">
               <label>Piso</label>
-              <input class="form-control" type="number" min="1" step="1" value="${_escape(String(room.floor || 'Piso 1').match(/\d+/)?.[0] || '1')}"
+              <input class="form-control" type="number" min="0" step="1" value="${_escape(String(_floorNumberValue(room.floor || 'Planta baja')))}"
                 onchange="MecFormModule.setSketchField('floorNumber', this.value)" ${locked ? 'disabled' : ''}>
             </div>
             <div class="form-group">
@@ -13769,11 +13808,11 @@ const MecFormModule = (() => {
       byLabel.set(_floorRecordLabel(floor), floor);
     });
     blockRooms.forEach(room => {
-      const label = _normalizeFloor(room.floor || 'Piso 1');
+      const label = _normalizeFloor(room.floor || 'Planta baja');
       if (!byLabel.has(label)) byLabel.set(label, { id: label, label, floor: label, virtual: true });
     });
     blockSanitaries.forEach(item => {
-      const label = _normalizeFloor(item.planta || 'Piso 1');
+      const label = _normalizeFloor(item.planta || 'Planta baja');
       if (!byLabel.has(label)) byLabel.set(label, { id: label, label, floor: label, virtual: true });
     });
     return [...byLabel.values()].sort((a, b) => _floorNumberValue(_floorRecordLabel(a)) - _floorNumberValue(_floorRecordLabel(b)));
@@ -13786,8 +13825,7 @@ const MecFormModule = (() => {
   function _planCanvasHeight() {
     const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const rows = Math.max(1, Math.ceil(blocks.length / 2));
-    const maxFloors = Math.max(1, ...blocks.map(block => _planFloorsForBlock(block).length));
-    return Math.max(620, 320 * rows + Math.max(0, maxFloors - 1) * 170);
+    return Math.max(620, 320 * rows);
   }
 
   function _drawSchoolPlanGrid(ctx, logical) {
@@ -14376,18 +14414,11 @@ const MecFormModule = (() => {
   }
 
   function _planFloorRect(blockX, blockY, blockW, blockH, floorIndex, floorCount, hasSanitaries) {
-    const innerX = blockX + 14;
-    const top = blockY + 48;
-    const gap = 34;
-    const bottomReserve = hasSanitaries ? 16 : 14;
-    const availableH = Math.max(36, blockH - 62 - bottomReserve - gap * Math.max(0, floorCount - 1));
-    const count = Math.max(1, floorCount || 1);
-    const bandH = availableH / count;
     return {
-      x: innerX,
-      y: top + floorIndex * (bandH + gap),
-      w: Math.max(40, blockW - 28),
-      h: Math.max(28, bandH),
+      x: blockX,
+      y: blockY,
+      w: Math.max(40, blockW),
+      h: Math.max(28, blockH),
     };
   }
 
@@ -14401,10 +14432,10 @@ const MecFormModule = (() => {
     const hasGeometry = [xRatio, yRatio, wRatio, hRatio].every(Number.isFinite);
     if (!hasGeometry) return fallbackRect;
     const bounds = {
-      x: blockRect.x + 10,
-      y: blockRect.y + 40,
-      w: Math.max(50, blockRect.w - 20),
-      h: Math.max(42, blockRect.h - 52),
+      x: blockRect.x,
+      y: blockRect.y,
+      w: Math.max(50, blockRect.w),
+      h: Math.max(42, blockRect.h),
     };
     const rect = {
       x: blockRect.x + xRatio * blockRect.w,
@@ -14429,19 +14460,19 @@ const MecFormModule = (() => {
     const blockWidth = Number(block.ancho_m || 0);
     const floorLength = Number(floorRecord.largo_m || 0);
     const floorWidth = Number(floorRecord.ancho_m || 0);
-    if (blockLength && floorLength) floorRecord.wRatio = Math.max(.08, Math.min(.96, floorLength / blockLength));
-    if (blockWidth && floorWidth) floorRecord.hRatio = Math.max(.08, Math.min(.82, floorWidth / blockWidth));
-    if (!Number.isFinite(Number(floorRecord.xRatio))) floorRecord.xRatio = .06;
-    if (!Number.isFinite(Number(floorRecord.yRatio))) floorRecord.yRatio = .16;
+    if (blockLength && floorLength) floorRecord.wRatio = Math.max(.04, Math.min(1, floorLength / blockLength));
+    if (blockWidth && floorWidth) floorRecord.hRatio = Math.max(.04, Math.min(1, floorWidth / blockWidth));
+    if (!Number.isFinite(Number(floorRecord.xRatio))) floorRecord.xRatio = 0;
+    if (!Number.isFinite(Number(floorRecord.yRatio))) floorRecord.yRatio = 0;
   }
 
   function _drawPlanBlockFloorResidue(ctx, block, floors = [], blockRect = null) {
     if (!blockRect || !Array.isArray(floors) || !floors.length) return;
     const bounds = {
-      x: blockRect.x + 10,
-      y: blockRect.y + 40,
-      w: Math.max(50, blockRect.w - 20),
-      h: Math.max(42, blockRect.h - 52),
+      x: blockRect.x,
+      y: blockRect.y,
+      w: Math.max(50, blockRect.w),
+      h: Math.max(42, blockRect.h),
     };
     const floorRects = floors.map((floor, index) => {
       const fallback = _planFloorRect(blockRect.x, blockRect.y, blockRect.w, blockRect.h, index, floors.length, false);
@@ -14496,32 +14527,32 @@ const MecFormModule = (() => {
       blockH: blockRect?.h,
     });
     ctx.save();
-    ctx.shadowColor = 'rgba(15,23,42,.12)';
-    ctx.shadowBlur = 4;
+    ctx.shadowColor = 'rgba(15,23,42,.10)';
+    ctx.shadowBlur = 3;
     ctx.shadowOffsetY = 1;
-    ctx.fillStyle = 'rgba(255,255,255,.88)';
+    ctx.fillStyle = active ? 'rgba(255,247,237,.30)' : 'rgba(255,255,255,.18)';
     ctx.fillRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
     ctx.shadowColor = 'transparent';
     ctx.strokeStyle = active ? '#e84c22' : '#6b8fb9';
     ctx.lineWidth = active ? 2.4 : 1.4;
     ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
-    ctx.fillStyle = active ? '#fff7ed' : (floorIndex % 2 ? '#eef6ff' : '#edf2f7');
-    ctx.fillRect(floorRect.x + 1, floorRect.y + 1, floorRect.w - 2, 20);
-    ctx.strokeStyle = active ? 'rgba(232,76,34,.42)' : 'rgba(107,143,185,.38)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(floorRect.x, floorRect.y + 21);
-    ctx.lineTo(floorRect.x + floorRect.w, floorRect.y + 21);
-    ctx.stroke();
     ctx.fillStyle = active ? '#9a3412' : '#334155';
     ctx.font = _canvasFont(900, 10);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(_truncateLabel(ctx, label, Math.max(32, floorRect.w - 16)), floorRect.x + 8, floorRect.y + 14);
+    const labelText = _truncateLabel(ctx, label, Math.max(32, floorRect.w - 20));
+    const labelW = Math.min(floorRect.w - 8, ctx.measureText(labelText).width + 14);
+    ctx.fillStyle = active ? 'rgba(255,247,237,.84)' : 'rgba(248,250,252,.74)';
+    ctx.fillRect(floorRect.x + 4, floorRect.y + 4, Math.max(34, labelW), 17);
+    ctx.strokeStyle = active ? 'rgba(232,76,34,.30)' : 'rgba(100,116,139,.20)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(floorRect.x + 4, floorRect.y + 4, Math.max(34, labelW), 17);
+    ctx.fillStyle = active ? '#9a3412' : '#334155';
+    ctx.fillText(labelText, floorRect.x + 11, floorRect.y + 16);
     if (floor?.largo_m || floor?.ancho_m) {
       ctx.font = _canvasFont(800, 8);
       ctx.fillStyle = active ? '#9a3412' : '#475467';
-      ctx.fillText(_truncateLabel(ctx, `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`, Math.max(28, floorRect.w - 16)), floorRect.x + 8, floorRect.y + 32);
+      ctx.fillText(_truncateLabel(ctx, `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`, Math.max(28, floorRect.w - 18)), floorRect.x + 11, floorRect.y + 28);
     }
     if (active) {
       _drawPlanRotateHandle(ctx, floorRect, _floorRotationDeg(floor));
@@ -15211,11 +15242,12 @@ const MecFormModule = (() => {
   }
 
   function _planFloorContentRect(floorRect) {
+    const pad = 3;
     return {
-      x: floorRect.x + 6,
-      y: floorRect.y + 23,
-      w: Math.max(28, floorRect.w - 12),
-      h: Math.max(20, floorRect.h - 29),
+      x: floorRect.x + pad,
+      y: floorRect.y + pad,
+      w: Math.max(28, floorRect.w - pad * 2),
+      h: Math.max(20, floorRect.h - pad * 2),
     };
   }
 
@@ -15232,25 +15264,21 @@ const MecFormModule = (() => {
     const models = blocks.map(block => {
       const length = Number(block.largo_m || 0) || 30;
       const width = Number(block.ancho_m || 0) || 20;
-      const floorCount = Math.max(1, _planFloorsForBlock(block).length);
-      return { block, length, width, floorCount };
+      return { block, length, width };
     });
     const maxLength = Math.max(...models.map(model => model.length), 30);
-    const maxStackWidth = Math.max(...models.map(model => model.width * model.floorCount), 20);
-    const floorGap = 34;
-    const maxGapPx = Math.max(...models.map(model => Math.max(0, model.floorCount - 1) * floorGap), 0);
+    const maxWidth = Math.max(...models.map(model => model.width), 20);
     const cols = 2;
     const cellW = (canvasW - 72) / cols;
     const rows = Math.max(1, Math.ceil(blocks.length / cols));
     const cellH = (canvasH - 72) / rows;
-    const scale = Math.max(.18, Math.min((cellW - 48) / maxLength, (cellH - 74 - maxGapPx) / maxStackWidth));
+    const scale = Math.max(.18, Math.min((cellW - 48) / maxLength, (cellH - 48) / maxWidth));
     return models.map((model, index) => {
-      const { block, length, width, floorCount } = model;
+      const { block, length, width } = model;
       const col = index % cols;
       const row = Math.floor(index / cols);
       let bw = Math.max(70, length * scale);
-      const floorH = Math.max(34, width * scale);
-      let bh = Math.max(78, 68 + floorCount * floorH + Math.max(0, floorCount - 1) * floorGap);
+      let bh = Math.max(78, width * scale);
       const cellX = 28 + col * cellW;
       const cellY = 36 + row * cellH;
       const autoX = cellX + Math.max(0, (cellW - bw) / 2);
@@ -15265,9 +15293,8 @@ const MecFormModule = (() => {
       const x = Number.isFinite(savedX) ? savedX * canvasW : autoX;
       const y = Number.isFinite(savedY) ? savedY * canvasH : autoY;
       const clamped = _clampPlanRect({ x, y, w: bw, h: bh }, canvasW, canvasH);
-      const stackH = Math.max(1, bh - 68 - Math.max(0, floorCount - 1) * floorGap);
       const scaleX = length ? bw / length : scale;
-      const scaleY = width ? (stackH / Math.max(1, floorCount)) / width : scaleX;
+      const scaleY = width ? bh / width : scaleX;
       return {
         block,
         x: clamped.x,
@@ -17846,10 +17873,10 @@ const MecFormModule = (() => {
     if (!block || !floor || !rect || !blockRect || floor.virtual) return null;
     if (!_assertBlockUnlocked(block, 'mover el piso')) return null;
     const bounds = {
-      x: blockRect.x + 10,
-      y: blockRect.y + 40,
-      w: Math.max(50, blockRect.w - 20),
-      h: Math.max(42, blockRect.h - 52),
+      x: blockRect.x,
+      y: blockRect.y,
+      w: Math.max(50, blockRect.w),
+      h: Math.max(42, blockRect.h),
     };
     const clamped = _clampRectToBounds({ x: targetX, y: targetY, w: rect.w, h: rect.h }, bounds);
     _saveFloorRectToRecord(block, floor, clamped, blockRect);
@@ -18099,7 +18126,7 @@ const MecFormModule = (() => {
   }
 
   function _planBlockMeasureHeight(rect, floorCount = 1) {
-    return Math.max(1, Number(rect?.h || 0) - 68 - Math.max(0, floorCount - 1) * 34);
+    return Math.max(1, Number(rect?.h || 0));
   }
 
   function _resizePlanBlock(blockId, rect, drag) {
@@ -18153,13 +18180,12 @@ const MecFormModule = (() => {
     if (!block || !floor || !rect || !blockRect || floor.virtual) return null;
     if (!_assertBlockUnlocked(block, 'redimensionar el piso')) return null;
     const bounds = {
-      x: blockRect.x + 10,
-      y: blockRect.y + 40,
-      w: Math.max(50, blockRect.w - 20),
-      h: Math.max(42, blockRect.h - 52),
+      x: blockRect.x,
+      y: blockRect.y,
+      w: Math.max(50, blockRect.w),
+      h: Math.max(42, blockRect.h),
     };
     const clamped = _clampRectToBounds(rect, bounds);
-    if (_rectOverlapsAny(clamped, _planFloorResizeBlockers(block, floorId, blockRect), 2)) return null;
     _saveFloorRectToRecord(block, floor, clamped, blockRect);
     const startRect = drag?.rect || clamped;
     const startLength = Number(drag?.startLength || floor.largo_m || 0);
@@ -18432,7 +18458,7 @@ const MecFormModule = (() => {
         handle: area.handle,
         rect,
         blockRect,
-        bounds: { x: blockRect.x + 10, y: blockRect.y + 40, w: Math.max(50, blockRect.w - 20), h: Math.max(42, blockRect.h - 52) },
+        bounds: { x: blockRect.x, y: blockRect.y, w: Math.max(50, blockRect.w), h: Math.max(42, blockRect.h) },
         startLength: Number(floor?.largo_m || 0),
         startWidth: Number(floor?.ancho_m || 0),
         rotation: _floorRotationDeg(floor),

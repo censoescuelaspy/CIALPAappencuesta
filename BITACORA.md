@@ -4,6 +4,38 @@
 
 ---
 
+## Planta baja como huella de bloque y redimensionamiento de pisos - 2026-05-22 - v2.6.111
+
+### Objetivo
+- Corregir que el piso dentro de un bloque no pudiera estirarse hasta coincidir con los bordes del bloque.
+- Ajustar la semantica de niveles: todo bloque contiene `Planta baja`; luego se agregan `Piso 1`, `Piso 2`, etc.
+- Eliminar la cabecera interna del piso que reducia artificialmente el area util y generaba margenes obligatorios.
+
+### Cambios implementados
+- `Planta baja` pasa a ser el primer nivel normalizado en el motor del plano y en el registro guiado.
+- Al crear un bloque nuevo, se crea automaticamente su `Planta baja`.
+- Los bloques antiguos sin pisos cargados reciben una `Planta baja` operativa al normalizar el borrador.
+- La geometria de piso ya no reserva cabecera ni margenes duros: puede ocupar toda la huella del bloque.
+- El redimensionamiento y movimiento del piso se limita al contorno completo del bloque, no a una caja interior reducida.
+- Se elimina el bloqueo de solape entre pisos, porque distintos niveles pueden compartir la misma huella edilicia.
+- El area sobrante entre bloque y planta/piso queda visible como relleno grisaceo `PASILLO / GALERIA`.
+- La escala del bloque en el plano deja de crecer por cantidad de pisos; representa la huella del bloque una sola vez.
+- Version visible y cache del Service Worker actualizados a `v2.6.111`.
+
+### Pendiente operativo
+- Probar en tablet: crear bloque, confirmar que nace `Planta baja`, seleccionar el piso y estirarlo hasta coincidir con el borde del bloque.
+- Pedir `Actualizar app` para tomar `cialpa-app-v2.6.111`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+---
+
 ## Mi Jornada, fotos Drive y cobertura MEC validada - 2026-05-22 - v2.6.110
 
 ### Objetivo

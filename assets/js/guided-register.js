@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.110
+ * Version: 2.6.111
  */
 
 const GuidedRegisterModule = (() => {
@@ -945,7 +945,7 @@ const GuidedRegisterModule = (() => {
     const activeBlock = blocks.find(block => block.id === values.__activeBlockId) || blocks[0] || null;
     const activeFloors = Array.isArray(activeBlock?.floors) ? activeBlock.floors : [];
     const firstFloor = activeFloors[0] || null;
-    const activeFloorLabel = _floorLabel(firstFloor) || _normalizeFloorLabel(values.__activeFloor || 'Piso 1');
+    const activeFloorLabel = _floorLabel(firstFloor) || _normalizeFloorLabel(values.__activeFloor || 'Planta baja');
     const blockId = activeBlock?.id || values.__activeBlockId || '';
     const activeBlockRooms = rooms.filter(room => (
       (!blockId || room.blockId === blockId) &&
@@ -1044,7 +1044,7 @@ const GuidedRegisterModule = (() => {
       }
 
       const floors = Array.isArray(block?.floors) ? block.floors : [];
-      const noFloor = flag(block?.id, 'Piso 1', 'noFloor');
+      const noFloor = flag(block?.id, 'Planta baja', 'noFloor');
       if (!floors.length && !noFloor) {
         add(blockLabel, 'Responder si tiene piso', 'Agregue un piso o marque que no corresponde.', 'floorGuide');
       }
@@ -1378,7 +1378,7 @@ const GuidedRegisterModule = (() => {
       const floor = snap.incompleteFloor || snap.activeFloors.find(item => !_floorReady(item)) || snap.activeFloors[0];
       const pending = _floorRequirementItems(floor);
       const next = _firstPendingRequirement(pending);
-      const floorValue = `${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Piso 1'}`;
+      const floorValue = `${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Planta baja'}`;
       if (next?.title === 'Cargar dimensiones') {
         return _question('Paso 3', 'Piso: medidas principales', 'Ingrese largo y ancho del piso desde la guia. La ficha queda disponible solo para revisar o corregir.', [
           { label: _hasMeasures(floor, 'largo_m', 'ancho_m') ? 'Confirmar medidas' : 'Guardar medidas', action: 'saveFloorMeasures', value: floorValue, primary: true },
@@ -1395,7 +1395,7 @@ const GuidedRegisterModule = (() => {
         ], false, _guidedRequirementList(pending));
       }
       return _question('Paso 3', next ? `Piso: ${next.title}` : 'Graficar y medir el piso', next?.help || 'El piso debe quedar dibujado sobre el bloque, con posicion, largo, ancho y rotacion antes de cargar ambientes.', [
-        { label: next?.plan ? 'Seleccionar piso' : 'Completar piso', action: next?.plan ? 'selectPlanItem' : 'floorGuide', value: `floor::${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Piso 1'}`, primary: true },
+        { label: next?.plan ? 'Seleccionar piso' : 'Completar piso', action: next?.plan ? 'selectPlanItem' : 'floorGuide', value: `floor::${snap.activeBlock?.id || ''}::${floor?.id || floor?.label || 'Planta baja'}`, primary: true },
         { label: 'Corregir medidas', action: 'resetFloorMeasures', value: floorValue },
         { label: 'Abrir ficha', action: 'floorGuide' },
       ], false, _guidedRequirementList(pending));
@@ -3448,9 +3448,12 @@ const GuidedRegisterModule = (() => {
 
   function _normalizeFloorLabel(value) {
     const text = String(value || '').trim();
+    const normalized = _normalizeText(text);
+    if (!text || normalized === 'pb' || normalized.includes('planta baja') || normalized === 'piso 0') return 'Planta baja';
     const match = text.match(/\d+/);
+    if (match && Number(match[0]) <= 0) return 'Planta baja';
     if (match) return `Piso ${Number(match[0]) || 1}`;
-    return text || 'Piso 1';
+    return text || 'Planta baja';
   }
 
   function _floorLabel(floor) {
@@ -3470,7 +3473,7 @@ const GuidedRegisterModule = (() => {
 
   function _targetKeyParts(blockId, floorLabel, name) {
     if (!blockId) return '';
-    return ['target', blockId, _normalizeFloorLabel(floorLabel || 'Piso 1'), name].join('::');
+    return ['target', blockId, _normalizeFloorLabel(floorLabel || 'Planta baja'), name].join('::');
   }
 
   function _targetValue(key) {
@@ -3480,7 +3483,7 @@ const GuidedRegisterModule = (() => {
   }
 
   function _flagKeyParts(blockId, floorLabel, name) {
-    return ['flag', blockId || 'sin-bloque', _normalizeFloorLabel(floorLabel || 'Piso 1'), name].join('::');
+    return ['flag', blockId || 'sin-bloque', _normalizeFloorLabel(floorLabel || 'Planta baja'), name].join('::');
   }
 
   function _flagValue(key) {
