@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.131" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.132" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.131" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.132" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.131</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.132</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.131</strong>
+      Edición vigente<br><strong class="app-version">v2.6.132</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -291,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.131</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.132</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -568,7 +568,7 @@
                 <div><strong>3. Autoguardado</strong><span>Cada avance actualiza el borrador local. Si no hay conexion, el registro queda en cola local y se sincroniza al volver Internet.</span></div>
                 <div><strong>4. Sincronizacion</strong><span>La capa API envia el paquete al Web App de Apps Script. El backend valida token, permisos, columnas y estado antes de escribir.</span></div>
                 <div><strong>5. Resguardo operativo</strong><span>Sheets recibe filas consultables; Drive recibe fotos y JSON; LOG/ERRORES registran eventos, fallas y trazabilidad tecnica.</span></div>
-                <div><strong>6. Resguardo formal</strong><span>El mismo paquete queda en cola para PostgreSQL. La API relacional aplica transaccion, evita duplicados y normaliza entidades.</span></div>
+                <div><strong>6. Consolidacion formal</strong><span>El paquete puede reprocesarse desde <code>db_sync_queue</code>, <code>mec_borradores</code> o JSONL con <code>npm run db:consolidate</code>.</span></div>
                 <div><strong>7. Uso institucional</strong><span>Mapa, tableros, planificacion, auditoria, reportes y exportaciones consultan datos con filtros por territorio, escuela, institucion, fecha, usuario y estado.</span></div>
               </div>
             </article>
@@ -604,6 +604,7 @@
                 <li><strong>Google Sheets:</strong> base operativa visible para administracion, control rapido y contingencia.</li>
                 <li><strong>Google Drive:</strong> resguarda fotos, anexos, PDFs, JSON completos y payloads de sincronizacion.</li>
                 <li><strong>PostgreSQL:</strong> destino formal para integridad referencial, auditoria, consultas y escalamiento.</li>
+                <li><strong>Consolidador DB:</strong> reenvia exportes historicos y errores de cola a la API transaccional con idempotencia.</li>
                 <li><strong>Leaflet, OSM y Canvas:</strong> mapa territorial, base mapa de escuela y plano tecnico editable.</li>
               </ul>
             </article>
@@ -669,6 +670,10 @@
                 <div>
                   <strong>Fase 2 - Doble escritura</strong>
                   <span>Guardar en Sheets y en <code>db_sync_queue</code>; reenviar a API PostgreSQL sin bloquear campo.</span>
+                </div>
+                <div>
+                  <strong>Fase 2B - Consolidacion historica</strong>
+                  <span>Usar <code>npm run db:consolidate</code> para pasar exportes de cola, borradores o JSONL a PostgreSQL y comparar conteos.</span>
                 </div>
                 <div>
                   <strong>Fase 3 - Fuente oficial</strong>
@@ -1447,20 +1452,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.131"></script>
-<script src="assets/js/local-store.js?v=2.6.131"></script>
-<script src="assets/js/api.js?v=2.6.131"></script>
-<script src="assets/js/auth.js?v=2.6.131"></script>
-<script src="assets/js/map.js?v=2.6.131"></script>
-<script src="assets/js/survey.js?v=2.6.131"></script>
-<script src="assets/js/stats.js?v=2.6.131"></script>
-<script src="assets/js/location-audit.js?v=2.6.131"></script>
-<script src="assets/js/planning.js?v=2.6.131"></script>
-<script src="assets/js/admin.js?v=2.6.131"></script>
-<script src="assets/js/jornada.js?v=2.6.131"></script>
-<script src="assets/js/manual.js?v=2.6.131"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.131"></script>
-<script src="assets/js/app.js?v=2.6.131"></script>
+<script src="assets/js/config.js?v=2.6.132"></script>
+<script src="assets/js/local-store.js?v=2.6.132"></script>
+<script src="assets/js/api.js?v=2.6.132"></script>
+<script src="assets/js/auth.js?v=2.6.132"></script>
+<script src="assets/js/map.js?v=2.6.132"></script>
+<script src="assets/js/survey.js?v=2.6.132"></script>
+<script src="assets/js/stats.js?v=2.6.132"></script>
+<script src="assets/js/location-audit.js?v=2.6.132"></script>
+<script src="assets/js/planning.js?v=2.6.132"></script>
+<script src="assets/js/admin.js?v=2.6.132"></script>
+<script src="assets/js/jornada.js?v=2.6.132"></script>
+<script src="assets/js/manual.js?v=2.6.132"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.132"></script>
+<script src="assets/js/app.js?v=2.6.132"></script>
 
 <script>
   // Set today's date in Inicio module

@@ -23,6 +23,7 @@ tools/simulation/*.csv
 tools/simulation/demo-output/
 tools/simulation/metrics/
 tools/location-audit/output/
+tools/database/output/
 
 # Credenciales locales
 .env

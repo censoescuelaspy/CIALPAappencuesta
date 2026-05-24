@@ -106,7 +106,7 @@ Indices operativos recomendados e implementados en el esquema inicial:
 - Para produccion, el token debe cargarse preferentemente como Script Property `DATABASE_SYNC_TOKEN`; la hoja `configuracion` queda como respaldo operativo temporal.
 - Con `DATABASE_SYNC_MODE=queue`, la cola queda preparada para migrar o reprocesar sin depender todavia de una API externa.
 - Con `DATABASE_SYNC_MODE=rest`, `DATABASE_SYNC_ENABLED=true` y `DATABASE_SYNC_URL` configurada, Apps Script intenta enviar el JSON del borrador a la API transaccional; si falla, conserva el error en `db_sync_queue` sin bloquear Sheets.
-- Este puente es temporal: la API definitiva debe validar permisos, normalizar entidades y escribir en PostgreSQL dentro de una transaccion.
+- La API relacional ya valida token, normaliza entidades y escribe en PostgreSQL dentro de una transaccion; Sheets/Drive quedan como respaldo operativo y fuente de reproceso.
 
 ## API relacional inicial
 
@@ -143,6 +143,48 @@ Configuracion minima en Apps Script:
 
 El token debe cargarse como Script Property `DATABASE_SYNC_TOKEN` para no dejarlo visible en la hoja.
 Como ayuda operativa, `tools/database/gas_database_sync_setup.gs.example` contiene una funcion manual para pegar y ejecutar desde la cuenta propietaria del Apps Script; la hoja `configuracion` queda con URL/modo habilitado y el token queda solo en `PropertiesService`.
+
+## Consolidacion plena y reproceso
+
+Para pasar de cola preparada a base formal consolidada se agrega el comando:
+
+```powershell
+npm run db:consolidate
+```
+
+El consolidador acepta cuatro fuentes:
+
+- Export CSV de `db_sync_queue`.
+- Export CSV de `mec_borradores`.
+- JSONL con payloads de `guardarBorradorMec`.
+- JSON unico o arreglo de JSON.
+
+El flujo recomendado es:
+
+1. Verificar `/health` de la API y `schema: ok`.
+2. Exportar `db_sync_queue` desde Google Sheets.
+3. Ejecutar simulacion sin escribir:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv
+```
+
+4. Escribir solo pendientes o errores:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv --status pendiente,error,pendiente_config --write
+```
+
+5. Comparar conteos entre `db_sync_queue`, `sync_mutations`, `mec_drafts`, `rooms`, `sanitary_groups`, `site_elements` y `evidence_files`.
+6. Activar doble escritura con `DATABASE_SYNC_MODE=rest` para que los nuevos guardados entren automaticamente.
+
+Si la columna `payload_json` de Sheets viene truncada, se usan los JSON completos guardados en Drive. Operativamente se pueden descargar a una carpeta local y ejecutar:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv --payload-dir .\exports\db_payloads --write
+```
+
+La consolidacion es idempotente: cada `mutation_id` se registra en `sync_mutations`, los reintentos incrementan `attempts`, y el snapshot normalizado se reemplaza por `draft_id` sin duplicar entidades hijas.
 
 ## Decisiones pendientes
 

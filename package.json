@@ -13,6 +13,7 @@
     "db:api": "node tools/database/cialpa_db_api.mjs",
     "db:check": "node --check tools/database/cialpa_db_api.mjs",
     "db:schema": "node tools/database/apply_schema.mjs",
+    "db:consolidate": "node tools/database/consolidate_db_queue.mjs",
     "db:install-tools": "powershell -ExecutionPolicy Bypass -File tools/database/install_database_prereqs.ps1",
     "db:local": "powershell -ExecutionPolicy Bypass -File tools/database/setup_local_postgres.ps1"
   },

@@ -6,6 +6,7 @@ Esta carpeta contiene el primer receptor transaccional para guardar los borrador
 
 - `schema.sql`: tablas PostgreSQL para escuelas, mutaciones, borradores, bloques, pisos, ambientes, objetos, sanitarios, exteriores, evidencias y tiempos.
 - `cialpa_db_api.mjs`: API HTTP compatible con Cloud Run. Recibe el JSON que Apps Script ya genera en `guardarBorradorMec`.
+- `consolidate_db_queue.mjs`: consolidador/backfill operativo para reenviar exportes de `db_sync_queue`, `mec_borradores` o JSONL hacia `/sync/mec-draft`.
 - `Dockerfile`: imagen minima para desplegar el receptor en Cloud Run.
 - `env.example`: variables necesarias para ejecutar o desplegar.
 - `install_database_prereqs.ps1`: instalador auxiliar para Google Cloud SDK y PostgreSQL/psql en Windows.
@@ -128,6 +129,69 @@ DATABASE_SYNC_TOKEN=<mismo token de la API>
 ```
 
 Si la API falla, Apps Script conserva el error en `db_sync_queue` y no bloquea el guardado en Sheets.
+
+## Consolidar datos existentes hacia PostgreSQL
+
+La consolidacion plena se hace con el mismo contrato de la API transaccional. Esto permite migrar cargas historicas o reprocesar errores sin crear otro modelo paralelo.
+
+Fuentes soportadas:
+
+- CSV exportado desde la hoja `db_sync_queue`.
+- CSV exportado desde `mec_borradores`.
+- JSONL con payloads de `guardarBorradorMec`, como los generados por la simulacion local.
+- JSON unico o arreglo de JSON.
+
+Primero hacer una corrida seca:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv
+```
+
+Enviar solo estados pendientes o con error:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv --status pendiente,error,pendiente_config --write
+```
+
+Consolidar desde `mec_borradores` cuando no se exporto la cola:
+
+```powershell
+npm run db:consolidate -- --mec-drafts-csv .\exports\mec_borradores.csv --write
+```
+
+Probar contra payloads JSONL:
+
+```powershell
+npm run db:consolidate -- --jsonl tools\simulation\demo-output\demo-responses-demo1000_20260521.jsonl --limit 5 --write
+```
+
+Variables recomendadas antes de escribir:
+
+```powershell
+$env:DATABASE_SYNC_URL = "https://<servicio>/sync/mec-draft"
+$env:DATABASE_SYNC_TOKEN = "<token-largo>"
+```
+
+Si se ejecuta contra la API local:
+
+```powershell
+$env:DATABASE_SYNC_URL = "http://127.0.0.1:8787/sync/mec-draft"
+$env:DATABASE_SYNC_TOKEN = "token-local"
+```
+
+El comando escribe reportes locales en `tools/database/output/`, carpeta ignorada por Git. Si `payload_json` viene truncado desde Sheets, exportar los JSON completos de Drive a una carpeta y usar:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv --payload-dir .\exports\db_payloads --write
+```
+
+Tambien puede intentar descargar los archivos de Drive si la sesion/permisos lo permiten:
+
+```powershell
+npm run db:consolidate -- --input .\exports\db_sync_queue.csv --fetch-payload-files --write
+```
+
+La escritura es idempotente: `mutation_id` se guarda en `sync_mutations`, el reintento incrementa `attempts`, y los hijos normalizados se reemplazan por `draft_id` sin duplicar aulas, sanitarios, exteriores ni evidencias.
 
 ## Despliegue sugerido en Cloud Run + Cloud SQL
 

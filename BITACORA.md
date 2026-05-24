@@ -4,6 +4,56 @@
 
 ---
 
+## Consolidacion plena hacia base PostgreSQL - 2026-05-24 - v2.6.132
+
+### Objetivo
+- Pasar de la cola preparada `db_sync_queue` a un flujo operativo real de consolidacion hacia PostgreSQL.
+- Permitir reprocesar cargas historicas, pendientes o con error sin depender de una accion manual fila por fila.
+- Mantener Sheets/Drive como respaldo operativo mientras la base formal gana trazabilidad, consistencia e idempotencia.
+
+### Diagnostico
+- La app ya escribia `mec_borradores` y registraba mutaciones en `db_sync_queue`.
+- La API relacional `tools/database/cialpa_db_api.mjs` ya podia recibir `POST /sync/mec-draft` y normalizar en PostgreSQL.
+- Faltaba una herramienta reproducible para tomar exportes de la cola, exportes de `mec_borradores` o JSONL y consolidarlos contra la API formal.
+
+### Cambios implementados
+- Se agrega `tools/database/consolidate_db_queue.mjs`.
+- Se agrega script `npm run db:consolidate`.
+- El consolidador acepta `db_sync_queue.csv`, `mec_borradores.csv`, JSONL de payloads y JSON unico/arreglo.
+- El modo por defecto es simulacion; solo escribe al usar `--write`.
+- Soporta filtros por estado (`--status pendiente,error,pendiente_config`), escuela (`--school`), limite (`--limit`) y concurrencia (`--concurrency`).
+- Si `payload_json` de Sheets viene truncado, puede usar JSON completos descargados de Drive con `--payload-dir` o intentar descarga con `--fetch-payload-files`.
+- Publica reportes locales JSON/CSV en `tools/database/output/`, carpeta ignorada por Git.
+- La vista `Metodologia y datos` incorpora la fase `Consolidacion historica` y el comando `npm run db:consolidate`.
+- `tools/database/README.md` y `docs/ARQUITECTURA_BASE_DATOS_CIALPA.md` documentan el procedimiento operativo.
+- Version visible, cache y assets actualizados a `v2.6.132`.
+
+### Pendiente operativo
+- Exportar la hoja real `db_sync_queue` desde Google Sheets y ejecutar primero una simulacion sin `--write`.
+- Definir el endpoint final `DATABASE_SYNC_URL` en Cloud Run/Supabase/AlloyDB y cargar `DATABASE_SYNC_TOKEN` como Script Property.
+- Ejecutar una consolidacion controlada de pendientes reales y comparar conteos entre Sheets, `sync_mutations`, `mec_drafts` y tablas normalizadas.
+
+### Validaciones ejecutadas
+- `node --check tools/database/consolidate_db_queue.mjs`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `npm.cmd run db:consolidate -- --help`.
+- `npm.cmd run db:consolidate -- --jsonl tools/simulation/demo-output/demo-responses-demo1000_20260521.jsonl --limit 2 --no-report`: detecta 1000 payloads y simula 2 sin errores.
+- `npm.cmd run db:consolidate -- --mec-drafts-csv tools/simulation/demo-output/demo-mec_borradores-demo1000_20260521.csv --limit 2 --no-report`: detecta 1000 filas y simula 2 sin errores.
+- `npm.cmd run db:local`.
+- `npm.cmd run db:schema` contra PostgreSQL local: `schools`, `school_institutions`, `mec_drafts` y `sync_mutations` OK.
+- API local `/health` con `DATABASE_URL=postgresql://postgres@127.0.0.1:55432/cialpa`: `database: ok`, `schema: ok`.
+- Escritura real local: `npm.cmd run db:consolidate -- --jsonl tools/simulation/demo-output/demo-responses-demo1000_20260521.jsonl --limit 2 --write --token token-local --no-report`.
+- Verificacion SQL local posterior: 2 `sync_mutations`, 2 `mec_drafts`, 2 `schools`, 2 `rooms`, 2 `sanitary_groups` y 9 `site_elements`.
+- Reintento idempotente de los mismos 2 payloads: conserva 2 mutaciones, 2 borradores, 2 ambientes y 2 sanitarios; `attempts` sube a 4.
+- Playwright local escritorio y movil `390x844`: `Metodologia y datos` muestra `v2.6.132`, `Consolidacion historica` y `npm run db:consolidate`, sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+
 ## Vista Metodologia y resguardo formal de datos - 2026-05-23 - v2.6.131
 
 ### Objetivo

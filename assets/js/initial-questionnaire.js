@@ -1,6 +1,6 @@
 /**
  * CIALPA - Cuestionario inicial R01
- * Version: 2.6.131
+ * Version: 2.6.132
  */
 
 const InitialQuestionnaire = (() => {
@@ -167,7 +167,7 @@ const InitialQuestionnaire = (() => {
         `)}
 
         <input type="hidden" name="token" value="${_escape(params.token || params.t || '')}" />
-        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.131')}" />
+        <input type="hidden" name="app_version" value="${_escape((typeof APP_CONFIG !== 'undefined' && APP_CONFIG.VERSION) || '2.6.132')}" />
 
         <div class="initial-submit">
           <button type="submit" class="btn btn-primary btn-lg">Enviar cuestionario inicial</button>
