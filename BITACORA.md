@@ -53,6 +53,12 @@
 - Reintento idempotente de los mismos 2 payloads: conserva 2 mutaciones, 2 borradores, 2 ambientes y 2 sanitarios; `attempts` sube a 4.
 - Playwright local escritorio y movil `390x844`: `Metodologia y datos` muestra `v2.6.132`, `Consolidacion historica` y `npm run db:consolidate`, sin errores de consola y sin overflow horizontal.
 - `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `90b378e feat: consolidar cola hacia postgresql v2.6.132`.
+- `git push origin main`: publica la herramienta y la vista `v2.6.132`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.132`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.132`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.132` y `Consolidacion historica`.
+- Playwright remoto escritorio y movil `390x844`: `Metodologia y datos` muestra `v2.6.132`, `Consolidacion historica` y `npm run db:consolidate`, sin errores de consola y sin overflow horizontal.
 
 ## Vista Metodologia y resguardo formal de datos - 2026-05-23 - v2.6.131
 
