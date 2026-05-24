@@ -4,6 +4,24 @@
 
 ---
 
+## Procedimiento operativo de publicacion documentado - 2026-05-24 - docs
+
+### Objetivo
+- Documentar con detalle el procedimiento usado para levantar, validar y publicar cambios de CIALPA.
+- Dejar explicitadas las herramientas, comandos y criterios de cierre que se aplican en cada version.
+- Separar cambios de documentacion de cambios ejecutables, evitando subir version/cache cuando no cambia la app publicada.
+
+### Cambios implementados
+- Se agrega `docs/PROCEDIMIENTO_LEVANTAR_PUBLICAR_CAMBIOS.md`.
+- El procedimiento cubre revision inicial de Git, lectura de contexto, implementacion, versionado, cache, validacion sintactica, servidor local, Playwright, Apps Script, PostgreSQL, GitHub Pages, verificacion HTTP y bitacora.
+- Se documentan herramientas usadas: PowerShell, `rg`, `git`, `node`, `npm`, Playwright, `clasp.cmd`, PostgreSQL/`psql`, `gcloud.cmd`, GitHub Pages, Google Apps Script, Sheets y Drive.
+- Se agrega criterio de credenciales y accesos recurrentes: `diegomezapy` como colaborador GitHub habitual, verificacion previa de acceso local y prohibicion de guardar contrasenas, tokens o claves privadas en repo, bitacora o memoria.
+- Se registran criterios de terminado: pruebas locales/remotas, commit, push, verificacion de assets publicados y pendientes operativos cuando dependen de cuenta propietaria, token o proveedor externo.
+
+### Validaciones ejecutadas
+- Revision de `DEPLOY_CHECKLIST.md`, `README.md`, `tools/simulation/README.md`, `tools/database/README.md` y `package.json`.
+- `git diff --check`.
+
 ## Consolidacion plena hacia base PostgreSQL - 2026-05-24 - v2.6.132
 
 ### Objetivo
