@@ -43,6 +43,16 @@
 - `node -e "JSON.parse(...package.json...)"`: OK.
 - Playwright local escritorio: `Plano escuela` muestra `v2.6.134`, activa `Satelite`, carga teselas `World_Imagery`, genera 6 vertices DMS del perimetro, incluye satelite/coordenadas en `pdfHtml`, sin errores de consola y sin overflow horizontal.
 - Playwright local movil `390x844`: activa satelite, genera vertices DMS y no presenta overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `aab4123 feat: agregar plano satelital georreferenciado v2.6.134`.
+- `git push origin main`: publica `v2.6.134`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.134` y `PLAN_BASEMAP_SATELLITE_TILE_URL`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.134`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.134`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `setPlanBaseMapSource`, `propertyBoundaryGeoVertices` y `World_Imagery`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `basemapSatellite`.
+- Playwright remoto escritorio: `Plano escuela` muestra `v2.6.134`, activa `Satelite`, carga teselas `World_Imagery`, genera 6 vertices DMS, incluye satelite/coordenadas en `pdfHtml`, sin errores de consola y sin overflow horizontal.
+- Playwright remoto movil `390x844`: misma prueba satelital/georreferenciada, sin errores de consola y sin overflow horizontal.
 
 ## Correcciones observadas en plano vivo y PDF - 2026-05-26 - v2.6.133
 
