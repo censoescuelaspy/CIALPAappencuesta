@@ -134,6 +134,8 @@ const GuidedRegisterModule = (() => {
       actions: [
         { label: 'Perimetro', icon: 'PRD', action: 'addPropertyBoundary', primary: true },
         { label: 'Seleccionar', icon: 'SEL', action: 'selectPropertyBoundary' },
+        { label: 'Ext. abajo', icon: 'ABA', action: 'extendPlanDown' },
+        { label: 'Acometida', icon: 'ACM', action: 'site', value: 'service_connection' },
         { label: '+ Vertice', icon: '+', action: 'propertyBoundaryAddVertex' },
         { label: 'Confirmar', icon: 'OK', action: 'confirmPropertyBoundary' },
       ],
@@ -206,6 +208,10 @@ const GuidedRegisterModule = (() => {
         { label: 'Caminero', icon: 'CAM', action: 'site', value: 'walkway' },
         { label: 'Espacio libre', icon: 'ESP', action: 'site', value: 'open_space' },
         { label: 'Pilar', icon: 'PIL', action: 'site', value: 'pillar' },
+        { label: 'Rampa', icon: 'RMP', action: 'site', value: 'ramp' },
+        { label: 'Acometida', icon: 'ACM', action: 'site', value: 'service_connection' },
+        { label: 'Medidor', icon: 'MED', action: 'site', value: 'meter' },
+        { label: 'Tablero', icon: 'TBL', action: 'site', value: 'main_switchboard' },
       ],
     },
     {
@@ -443,6 +449,12 @@ const GuidedRegisterModule = (() => {
           break;
         case 'moveMode':
           mec.togglePlanMoveMode();
+          break;
+        case 'extendPlanDown':
+          if (mec.extendSchoolPlanCanvas) mec.extendSchoolPlanCanvas('height');
+          break;
+        case 'extendPlanRight':
+          if (mec.extendSchoolPlanCanvas) mec.extendSchoolPlanCanvas('width');
           break;
         case 'guidedBlock':
           mec.startGuidedBlockRegistration();
@@ -1569,11 +1581,13 @@ const GuidedRegisterModule = (() => {
         'Agregue el perimetro del predio. Se comportara como las aulas: puede pasar a Forma L, sumar vertices y arrastrar puntos numerados.',
         [
           { label: 'Dibujar perimetro', action: 'addPropertyBoundary', primary: true },
+          { label: 'Extender abajo', action: 'extendPlanDown' },
+          { label: 'Acometida', action: 'site', value: 'service_connection' },
           { label: 'Volver a ubicacion base', action: 'prev' },
         ],
         false,
         '',
-        'No use un poligono especial: use la misma logica de aulas. Primero ubique el rectangulo base; luego use Forma L o + Vertice si necesita ajustar el contorno.',
+        'Si el borde real queda fuera del area visible, use Extender abajo antes de arrastrar vertices. Tambien puede registrar acometida desde este paso cuando quede alejada de los bloques.',
         true
       );
     }
@@ -1586,11 +1600,13 @@ const GuidedRegisterModule = (() => {
           { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}`, primary: true },
           { label: '+ Vertice', action: 'propertyBoundaryAddVertex', value: snap.propertyBoundary.id },
           { label: '- Vertice', action: 'propertyBoundaryRemoveVertex', value: snap.propertyBoundary.id },
+          { label: 'Extender abajo', action: 'extendPlanDown' },
+          { label: 'Acometida', action: 'site', value: 'service_connection' },
           { label: 'Confirmar perimetro', action: 'confirmPropertyBoundary', value: snap.propertyBoundary.id },
         ],
         false,
         _guidedRequirementList(_siteElementRequirementItems(snap.propertyBoundary)),
-        'Este paso solo ajusta el borde del predio. Si carga largo y ancho del predio en la ficha, los bloques usaran esa misma escala de metros dentro de la envolvente.',
+        'Este paso solo ajusta el borde del predio. Si el contorno toca el limite inferior del plano, primero extienda el lienzo y luego arrastre los puntos numerados.',
         true
       );
     }
@@ -1601,6 +1617,7 @@ const GuidedRegisterModule = (() => {
       [
         { label: 'Siguiente', action: 'next', primary: true },
         { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
+        { label: 'Acometida', action: 'site', value: 'service_connection' },
         { label: 'Revisar base', action: 'basemap' },
       ],
       true,
@@ -1697,6 +1714,7 @@ const GuidedRegisterModule = (() => {
     if (electric) return electric;
     return _question('Listo', 'Bloque listo para continuar', 'La estructura principal ya tiene las respuestas minimas para pasar a aulas, sanitarios o exteriores.', [
       { label: 'Siguiente', action: 'next', primary: true },
+      { label: 'Agregar planta alta', action: 'floor' },
       { label: 'Nuevo bloque', action: 'guidedBlock' },
       ...(snap.noFloor ? [{ label: 'Agregar piso', action: 'resetNoFloor' }] : []),
     ], true);
@@ -2100,6 +2118,10 @@ const GuidedRegisterModule = (() => {
         { label: 'Pozo/captacion', action: 'site', value: 'well' },
         { label: 'Galeria', action: 'site', value: 'gallery' },
         { label: 'Pilar', action: 'site', value: 'pillar' },
+        { label: 'Rampa', action: 'site', value: 'ramp' },
+        { label: 'Acometida', action: 'site', value: 'service_connection' },
+        { label: 'Medidor', action: 'site', value: 'meter' },
+        { label: 'Tablero', action: 'site', value: 'main_switchboard' },
         { label: 'No por ahora', action: 'markNoSiteElements' },
       ]);
     }
@@ -2115,6 +2137,7 @@ const GuidedRegisterModule = (() => {
     return _question('Listo', 'Exteriores configurados', 'Los elementos exteriores/tecnicos cargados estan ubicados y confirmados.', [
       { label: 'Siguiente', action: 'next', primary: true },
       { label: 'Agregar exterior', action: 'site', value: 'water_tank' },
+      { label: 'Acometida', action: 'site', value: 'service_connection' },
     ], true);
   }
 

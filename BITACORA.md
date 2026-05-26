@@ -4,6 +4,62 @@
 
 ---
 
+## Correcciones observadas en plano vivo y PDF - 2026-05-26 - v2.6.133
+
+### Objetivo
+- Revisar `H:\Mi unidad\OBS VER v2.6.132 (actualizado).docx` y resolver una por una las observaciones operativas reportadas sobre ubicacion, perimetro, bloques, pisos, aulas, exteriores y salida PDF.
+- Evitar que el predio, bloques o elementos exteriores queden atrapados por limites invisibles, seleccion superpuesta o zoom automatico.
+- Mejorar la lectura y edicion en campo sin perder trazabilidad ni compatibilidad con el flujo guiado existente.
+
+### Diagnostico
+- El perimetro podia tocar el limite inferior del lienzo y parecer bloqueado: los vertices y bordes desaparecian o no bajaban mas.
+- El boton `Deshacer` actuaba sobre el croquis del aula, pero no sobre cambios del plano general como vertices del predio, movimiento, rotacion o redimensionamiento.
+- En `Ubicar bloques`, el piso/planta baja podia cubrir el bloque completo y capturar la seleccion, dificultando mover el contorno principal.
+- Elementos tecnicos como pilares, rampas, acometida, medidor y tablero podian sentirse trabados por el ajuste automatico a estructuras.
+- `Agregar nuevo bloque` no llevaba inmediatamente a una ficha clara para cargar medidas.
+- Las fichas de aula guardaban las respuestas, pero los botones elegidos no se resaltaban visualmente hasta cerrar/guardar.
+- Al agregar exteriores repetidos, codigos default como `TQ 1` podian quedar duplicados.
+- El PDF no incluia una hoja general del predio con todos los exteriores alejados.
+
+### Cambios implementados
+- Se agrega tamano de lienzo persistente para el plano vivo, con botones `Mas abajo`, `Mas ancho`, `Mas ambos` y `Auto` en la pestaña `Vista`.
+- La guia de `Perimetro predio` incorpora `Extender abajo` y `Acometida`, para poder ajustar predios grandes y ubicar acometidas alejadas de los bloques.
+- El redimensionamiento del lienzo conserva las posiciones reales de bloques y exteriores, recalculando ratios sin estirar el dibujo existente.
+- El click fuera de objetos ya no reinicia automaticamente el zoom del plano.
+- Se agrega historial de deshacer/rehacer para cambios del plano general: crear/mover/redimensionar/rotar objetos, vertices, formas, lienzo y elementos exteriores.
+- Cuando un bloque esta seleccionado, el hit-test prioriza el bloque sobre el piso que lo cubre, facilitando arrastrar el contorno en `Ubicar bloque`.
+- Pilares, rampas y elementos electricos de exterior dejan de ajustarse automaticamente a bordes de estructuras, permitiendo moverlos libremente.
+- `Nuevo bloque` abre la ficha del bloque para cargar largo/ancho y estado sin depender de encontrar el boton despues.
+- La etapa `Bloques y pisos` agrega accion `Agregar planta alta`.
+- Las acciones de `Exteriores` agregan rampa, acometida, medidor y tablero.
+- Las rampas se dibujan en planta como rectangulo con flecha `SUBE`, mas cercano al croquis solicitado.
+- Los botones de ficha de aula se resaltan inmediatamente al tocarlos, antes de guardar la ficha.
+- Se normalizan codigos default de exteriores por tipo para evitar duplicados como `TQ 1`, `TQ 1`.
+- El PDF incorpora una hoja `Vista completa con exteriores`, usando el lienzo completo del plano vivo para mostrar perimetro, bloques y todos los exteriores alejados.
+- Version visible, cache y assets actualizados a `v2.6.133`.
+
+### Pendiente operativo
+- Pedir a encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.133`.
+- Probar en tablet con el caso real del documento: extender lienzo, bajar vertices del predio, mover bloque con piso visible y ubicar acometida/rampa/medidor/tablero.
+
+### Validaciones ejecutadas
+- Extraccion y revision del documento `H:\Mi unidad\OBS VER v2.6.132 (actualizado).docx`, incluyendo texto e imagenes adjuntas.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- Playwright local escritorio y movil `390x844`: `Plano escuela` carga sin errores de consola, expone `extendSchoolPlanCanvas`, permite extender lienzo a 940 px de alto y no genera overflow horizontal.
+- Playwright local escritorio: pestaña `Vista` muestra `Mas abajo`, `Mas ancho`, `Mas ambos` y `Auto`.
+- Playwright local escritorio: ficha de aula resalta inmediatamente `Teja` con `mec-choice--active` antes de guardar.
+- Playwright local escritorio: paquete PDF contiene hoja `Vista completa con exteriores` y version `v2.6.133`.
+- `npm.cmd run metrics:web -- --url=http://127.0.0.1:8073/ --viewport=mobile --cache-bust --no-service-worker`: 22 requests, 0 fallidas, 0 HTTP 4xx/5xx y 0 errores/advertencias de consola.
+
 ## Procedimiento operativo de publicacion documentado - 2026-05-24 - docs
 
 ### Objetivo

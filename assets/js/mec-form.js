@@ -18,6 +18,11 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_DEFAULT_OPACITY = .84;
   const PLAN_BASEMAP_DEFAULT_CONTRAST = 1.18;
   const PLAN_BASEMAP_DEFAULT_SATURATION = 1.08;
+  const PLAN_CANVAS_MIN_WIDTH = 900;
+  const PLAN_CANVAS_MIN_HEIGHT = 620;
+  const PLAN_CANVAS_MAX_WIDTH = 2600;
+  const PLAN_CANVAS_MAX_HEIGHT = 2600;
+  const PLAN_CANVAS_EXTEND_STEP = 320;
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
@@ -51,6 +56,8 @@ const MecFormModule = (() => {
   const DRAFT_SYNC_MIN_INTERVAL_MS = 12000;
   const _sketchHistory = [];
   const _sketchRedo = [];
+  const _planHistory = [];
+  const _planRedo = [];
   const _planLayers = {
     aulas: true,
     sanitarios: true,
@@ -1543,10 +1550,66 @@ const MecFormModule = (() => {
   }
 
   function _planCanvasWidth(root = _activeSchoolPlanRoot()) {
-    const minWidth = 900;
     const zoom = Math.max(.1, Math.min(30, Number(_schoolPlanZoom) || 1));
     const available = Math.floor(((root?.getBoundingClientRect?.().width || 0) - 30) / zoom);
-    return Math.max(minWidth, Math.min(1800, Number.isFinite(available) ? available : minWidth));
+    const savedWidth = Number(_data.__planCanvasSize?.width || 0);
+    const base = Math.max(PLAN_CANVAS_MIN_WIDTH, Number.isFinite(available) ? available : PLAN_CANVAS_MIN_WIDTH);
+    return Math.max(base, Math.min(PLAN_CANVAS_MAX_WIDTH, savedWidth || base));
+  }
+
+  function _setPlanCanvasSize(width, height, options = {}) {
+    const currentWidth = _planCanvasWidth();
+    const currentHeight = _planCanvasHeight();
+    const nextWidth = Math.max(PLAN_CANVAS_MIN_WIDTH, Math.min(PLAN_CANVAS_MAX_WIDTH, Number(width) || currentWidth));
+    const nextHeight = Math.max(PLAN_CANVAS_MIN_HEIGHT, Math.min(PLAN_CANVAS_MAX_HEIGHT, Number(height) || currentHeight));
+    const blockRects = new Map(_planBlockLayout(_data.__blocks || [], currentWidth, currentHeight)
+      .map(layout => [layout.block?.id, { x: layout.x, y: layout.y, w: layout.w, h: layout.h }]));
+    const siteRects = new Map(_ensureSiteElements().map(element => [
+      element.id,
+      _siteElementRect(element, currentWidth, currentHeight),
+    ]));
+    _data.__planCanvasSize = { width: Math.round(nextWidth), height: Math.round(nextHeight) };
+    (_data.__blocks || []).forEach(block => {
+      const rect = blockRects.get(block.id);
+      if (!rect) return;
+      const next = {
+        xRatio: rect.x / nextWidth,
+        yRatio: rect.y / nextHeight,
+        wRatio: rect.w / nextWidth,
+        hRatio: rect.h / nextHeight,
+      };
+      block.planPosition = { ...(block.planPosition || block.plano_general || {}), ...next };
+      block.plano_general = { ...(block.plano_general || {}), ...next, rotacion_grados: String(_blockRotationDeg(block)) };
+    });
+    _ensureSiteElements().forEach(element => {
+      const rect = siteRects.get(element.id);
+      if (!rect) return;
+      element.xRatio = rect.x / nextWidth;
+      element.yRatio = rect.y / nextHeight;
+      element.wRatio = rect.w / nextWidth;
+      element.hRatio = rect.h / nextHeight;
+    });
+    _saveDraft(false);
+    renderSchoolPlan();
+    if (!options.silent) UI.showToast(`Lienzo ajustado: ${Math.round(nextWidth)} x ${Math.round(nextHeight)} px.`, 'success', 4200);
+  }
+
+  function extendSchoolPlanCanvas(axis = 'height', amount = PLAN_CANVAS_EXTEND_STEP) {
+    const step = Math.max(80, Number(amount) || PLAN_CANVAS_EXTEND_STEP);
+    const currentWidth = _planCanvasWidth();
+    const currentHeight = _planCanvasHeight();
+    const nextWidth = axis === 'width' || axis === 'both' ? currentWidth + step : currentWidth;
+    const nextHeight = axis === 'height' || axis === 'both' ? currentHeight + step : currentHeight;
+    _pushPlanHistory();
+    _setPlanCanvasSize(nextWidth, nextHeight);
+  }
+
+  function resetSchoolPlanCanvasSize() {
+    _pushPlanHistory();
+    delete _data.__planCanvasSize;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast('Lienzo del plano restablecido al tamano automatico.', 'info', 4200);
   }
 
   function _bindSchoolPlanResize() {
@@ -3909,6 +3972,25 @@ const MecFormModule = (() => {
     return block;
   }
 
+  function _renumberDefaultSiteElementCodes(elements = []) {
+    const counters = {};
+    const seen = new Set();
+    elements.forEach(item => {
+      if (!item?.type || !item.ficha) return;
+      const cfg = SITE_ELEMENT_TYPES.find(type => type.id === item.type) || {};
+      const short = String(cfg.short || item.type || 'EXT').toUpperCase();
+      counters[item.type] = (counters[item.type] || 0) + 1;
+      const current = String(item.ficha.codigo || '').trim();
+      const compact = current.toUpperCase().replace(/\s+/g, '');
+      const defaultPattern = new RegExp(`^${short.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\d*$`);
+      const scoped = `${item.type}::${compact}`;
+      if (!current || defaultPattern.test(compact) || seen.has(scoped)) {
+        item.ficha.codigo = `${short} ${counters[item.type]}`;
+      }
+      seen.add(`${item.type}::${String(item.ficha.codigo || '').trim().toUpperCase().replace(/\s+/g, '')}`);
+    });
+  }
+
   function _ensureSiteElements() {
     _data.__siteElements = Array.isArray(_data.__siteElements) ? _data.__siteElements : [];
     _data.__siteElements = _data.__siteElements.map((item, index) => {
@@ -3958,6 +4040,7 @@ const MecFormModule = (() => {
         ...(planShape ? { planShape } : {}),
       };
     });
+    _renumberDefaultSiteElementCodes(_data.__siteElements);
     return _data.__siteElements;
   }
 
@@ -4690,6 +4773,7 @@ const MecFormModule = (() => {
 
   function newBlock() {
     _syncActiveBlock();
+    _pushPlanHistory();
     const next = (_data.__blocks || []).length + 1;
     _data.__activeBlockId = `bloque_${Date.now()}`;
     _data.bloques = {
@@ -4715,7 +4799,8 @@ const MecFormModule = (() => {
     _startTimeLog('bloque', _data.__activeBlockId, _data.bloques.bloque_codigo);
     _saveDraft(false);
     _render();
-    UI.showToast('Nuevo bloque listo para cargar.', 'success');
+    setTimeout(() => openPlanBlockFicha(_data.__activeBlockId), 80);
+    UI.showToast('Nuevo bloque listo para cargar. Complete largo y ancho en la ficha o en la guia superior.', 'success', 6200);
   }
 
   function startGuidedBlockRegistration() {
@@ -4785,6 +4870,7 @@ const MecFormModule = (() => {
       return null;
     }
     if (!_assertBlockUnlocked(block, 'agregar pisos')) return null;
+    _pushPlanHistory();
     const label = _nextFloorLabelForBlock(block);
     const floors = _ensureBlockFloors(block);
     const index = floors.length;
@@ -12322,9 +12408,14 @@ const MecFormModule = (() => {
   }
 
   function undoSketchObject() {
+    if ((_selectedPlanId || _activeSchoolPlanRoot()) && undoPlanChange()) {
+      UI.showToast('Cambio del plano deshecho.', 'info');
+      return;
+    }
     if (!_assertClassroomUnlocked(_activeClassroomRecord(), 'deshacer cambios')) return;
     if (!_sketchHistory.length) {
-      UI.showToast('No hay cambios para deshacer.', 'info');
+      if (undoPlanChange()) UI.showToast('Cambio del plano deshecho.', 'info');
+      else UI.showToast('No hay cambios para deshacer.', 'info');
       return;
     }
     _sketchRedo.push(_cloneSketchState());
@@ -12332,9 +12423,14 @@ const MecFormModule = (() => {
   }
 
   function redoSketchObject() {
+    if ((_selectedPlanId || _activeSchoolPlanRoot()) && redoPlanChange()) {
+      UI.showToast('Cambio del plano rehecho.', 'info');
+      return;
+    }
     if (!_assertClassroomUnlocked(_activeClassroomRecord(), 'rehacer cambios')) return;
     if (!_sketchRedo.length) {
-      UI.showToast('No hay cambios para rehacer.', 'info');
+      if (redoPlanChange()) UI.showToast('Cambio del plano rehecho.', 'info');
+      else UI.showToast('No hay cambios para rehacer.', 'info');
       return;
     }
     _sketchHistory.push(_cloneSketchState());
@@ -12675,6 +12771,16 @@ const MecFormModule = (() => {
       </div>`;
   }
 
+  function _renderPlanCanvasRibbon() {
+    return `
+      <div class="school-plan-ribbon__canvas">
+        ${_renderPlanRibbonButton({ icon: '&#8595;', label: 'Mas abajo', onClick: "MecFormModule.extendSchoolPlanCanvas('height')", title: 'Extender el lienzo hacia abajo para predios grandes' })}
+        ${_renderPlanRibbonButton({ icon: '&#8594;', label: 'Mas ancho', onClick: "MecFormModule.extendSchoolPlanCanvas('width')", title: 'Extender el lienzo hacia la derecha' })}
+        ${_renderPlanRibbonButton({ icon: '&#10530;', label: 'Mas ambos', onClick: "MecFormModule.extendSchoolPlanCanvas('both')", title: 'Extender alto y ancho del plano' })}
+        ${_renderPlanRibbonButton({ icon: '&#8634;', label: 'Auto', onClick: 'MecFormModule.resetSchoolPlanCanvasSize()', title: 'Volver al tamano automatico del lienzo' })}
+      </div>`;
+  }
+
   function _renderPlanLayersRibbon() {
     return `
       <div class="school-plan-ribbon__checks">
@@ -12751,6 +12857,7 @@ const MecFormModule = (() => {
     if (activeTab === 'vista') {
       return [
         _renderPlanRibbonGroup('Zoom', _renderPlanZoomRibbon()),
+        _renderPlanRibbonGroup('Lienzo', _renderPlanCanvasRibbon()),
         _renderPlanRibbonGroup('Base mapa', _renderPlanBaseMapRibbon(), 'school-plan-ribbon__group--wide'),
       ].join('');
     }
@@ -12849,10 +12956,20 @@ const MecFormModule = (() => {
         ${options.map(option => `
           <button class="mec-choice ${_choiceToneClass(option)} ${selected === option ? 'mec-choice--active' : ''}" type="button"
             aria-pressed="${selected === option ? 'true' : 'false'}"
-            onclick="${_escape(onClickForOption(option))}">
+            onclick="MecFormModule.activateChoiceButton(this); ${_escape(onClickForOption(option))}">
             ${_escape(option)}
           </button>`).join('')}
       </div>`;
+  }
+
+  function activateChoiceButton(button) {
+    const group = button?.closest?.('.mec-choice-buttons');
+    if (!group) return;
+    group.querySelectorAll('.mec-choice').forEach(item => {
+      const active = item === button;
+      item.classList.toggle('mec-choice--active', active);
+      item.setAttribute('aria-pressed', String(active));
+    });
   }
 
   function _renderPlanBuilderPanel() {
@@ -13966,7 +14083,9 @@ const MecFormModule = (() => {
   function _planCanvasHeight() {
     const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const rows = Math.max(1, Math.ceil(blocks.length / 2));
-    return Math.max(620, 320 * rows);
+    const savedHeight = Number(_data.__planCanvasSize?.height || 0);
+    const base = Math.max(PLAN_CANVAS_MIN_HEIGHT, 320 * rows);
+    return Math.max(base, Math.min(PLAN_CANVAS_MAX_HEIGHT, savedHeight || base));
   }
 
   function _drawSchoolPlanGrid(ctx, logical) {
@@ -15258,36 +15377,22 @@ const MecFormModule = (() => {
       const y = local.y;
       const w = local.w;
       const h = local.h;
+      const arrowY = y + h * .5;
+      const startX = fallLeft ? x + w * .78 : x + w * .22;
+      const endX = fallLeft ? x + w * .22 : x + w * .78;
+      const head = Math.max(5, Math.min(9, w * .08));
       ctx.fillStyle = selected ? 'rgba(255,255,255,.96)' : 'rgba(124,58,237,.10)';
-      ctx.beginPath();
-      if (fallLeft) {
-        ctx.moveTo(x, y + h);
-        ctx.lineTo(x + w, y + h);
-        ctx.lineTo(x + w, y);
-      } else {
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + w, y + h);
-        ctx.lineTo(x, y + h);
-      }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
       ctx.save();
       ctx.strokeStyle = cfg.tone;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      if (fallLeft) {
-        ctx.moveTo(x + w - 8, y + 8);
-        ctx.lineTo(x + 8, y + h - 8);
-      } else {
-        ctx.moveTo(x + 8, y + 8);
-        ctx.lineTo(x + w - 8, y + h - 8);
-      }
+      ctx.moveTo(x + w * .18, y + h * .22);
+      ctx.lineTo(x + w * .82, y + h * .22);
+      ctx.moveTo(x + w * .18, y + h * .78);
+      ctx.lineTo(x + w * .82, y + h * .78);
       ctx.stroke();
-      const arrowY = y + h * .58;
-      const startX = fallLeft ? x + w * .72 : x + w * .28;
-      const endX = fallLeft ? x + w * .24 : x + w * .76;
-      const head = Math.max(5, Math.min(9, w * .08));
       ctx.beginPath();
       ctx.moveTo(startX, arrowY);
       ctx.lineTo(endX, arrowY);
@@ -15302,18 +15407,12 @@ const MecFormModule = (() => {
       }
       ctx.stroke();
       ctx.fillStyle = cfg.tone;
-      ctx.beginPath();
-      if (fallLeft) {
-        ctx.moveTo(x + 5, y + h * .5);
-        ctx.lineTo(x + 13, y + h * .34);
-        ctx.lineTo(x + 13, y + h * .66);
-      } else {
-        ctx.moveTo(x + w - 5, y + h * .5);
-        ctx.lineTo(x + w - 13, y + h * .34);
-        ctx.lineTo(x + w - 13, y + h * .66);
-      }
-      ctx.closePath();
-      ctx.fill();
+      ctx.font = '700 10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('SUBE', x + w / 2, y + h * .5 - 12);
+      const slope = item.ficha?.pendiente_pct || item.ficha?.pendiente || '';
+      if (slope) ctx.fillText(`${slope}%`, x + w / 2, y + h * .5 + 12);
       ctx.restore();
     } else if (item.type === 'meter') {
       const side = Math.min(local.w, local.h);
@@ -17292,7 +17391,7 @@ const MecFormModule = (() => {
   }
 
   function _isSiteElementSnappable(type) {
-    return ['gallery', 'walkway', 'open_space', 'recreation', 'pillar'].includes(type);
+    return ['gallery', 'walkway', 'open_space', 'recreation'].includes(type);
   }
 
   function _rangesNearlyOverlap(a1, a2, b1, b2, pad = 0) {
@@ -17862,6 +17961,7 @@ const MecFormModule = (() => {
     const guided = _isGuidedInsert(options);
     const cfg = _siteElementConfig(type);
     if (!cfg) return null;
+    _pushPlanHistory();
     _planLayers.exteriores = true;
     const normalizedShape = type === 'recreation' ? _normalizeRecreationShape(shape || 'rectangle') : '';
     const next = _ensureSiteElements().filter(item => item.type === type).length + 1;
@@ -18106,6 +18206,7 @@ const MecFormModule = (() => {
     if (!_assertSiteElementUnlocked(element, 'eliminarlo')) return;
     const confirmed = await UI.showConfirm('Eliminar elemento', `¿Confirma eliminar ${_escape(element.ficha?.codigo || _siteElementLabel(element.type))}?`);
     if (!confirmed) return;
+    _pushPlanHistory();
     _data.__siteElements = (_data.__siteElements || []).filter(item => item.id !== id);
     if (_selectedPlanId === `site::${id}`) _selectedPlanId = null;
     closeSiteElementFicha();
@@ -18405,7 +18506,7 @@ const MecFormModule = (() => {
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const desired = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
-    const clamped = element.type === 'property_boundary'
+    const clamped = element.type === 'property_boundary' || !_isSiteElementSnappable(element.type)
       ? desired
       : _snapSiteElementRectToTargets(desired, logicalWidth, logicalHeight);
     element.xRatio = clamped.x / logicalWidth;
@@ -19107,6 +19208,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'rotarlo')) return;
+    _pushPlanHistory();
     _setSiteElementRotation(element, _siteElementRotationDeg(element) + Number(delta || 0));
     _selectedPlanId = `site::${element.id}`;
     _saveDraft(false);
@@ -19120,6 +19222,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'cambiar la caida')) return;
+    _pushPlanHistory();
     _setRampFallDirection(element, direction);
     _selectedPlanId = `site::${element.id}`;
     _saveDraft(false);
@@ -19133,6 +19236,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertBlockUnlocked(block, 'rotarlo')) return;
+    _pushPlanHistory();
     _setBlockRotation(block, _blockRotationDeg(block) + Number(delta || 0));
     _selectedPlanId = `block::${block.id}`;
     _saveDraft(false);
@@ -19147,6 +19251,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertBlockUnlocked(block, 'rotar el piso')) return;
+    _pushPlanHistory();
     _setFloorRotation(floor, _floorRotationDeg(floor) + Number(delta || 0));
     _selectedPlanId = _floorRecordPlanId(block, floor);
     _setActiveFloor(_floorRecordLabel(floor));
@@ -19176,6 +19281,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertClassroomUnlocked(room, 'rotarlo')) return;
+    _pushPlanHistory();
     _setRoomRotation(room, _roomRotationDeg(room) + Number(delta || 0));
     _selectedPlanId = `room::${room.id}`;
     _saveDraft(false);
@@ -19189,6 +19295,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSanitaryUnlocked(item, 'rotarlo')) return;
+    _pushPlanHistory();
     _setSanitaryRotation(item, _sanitaryRotationDeg(item) + Number(delta || 0));
     _selectedPlanId = `sanitary::${item.id}`;
     _saveDraft(false);
@@ -19342,6 +19449,7 @@ const MecFormModule = (() => {
   function setPlanBlockShape(blockId, shape = 'l') {
     const block = _blockById(blockId);
     if (!block) { UI.showToast('Seleccione un bloque para cambiar su forma.', 'warning'); return; }
+    _pushPlanHistory();
     if (shape === 'rect') delete block.planShape;
     else block.planShape = _defaultPlanShape(shape);
     _selectedPlanId = `block::${block.id}`;
@@ -19352,6 +19460,7 @@ const MecFormModule = (() => {
   function addPlanBlockVertex(blockId) {
     const block = _blockById(blockId);
     if (!block) return;
+    _pushPlanHistory();
     _insertPlanShapeVertex(block);
     _selectedPlanId = `block::${block.id}`;
     _saveDraft(false);
@@ -19361,6 +19470,7 @@ const MecFormModule = (() => {
   function removePlanBlockVertex(blockId) {
     const block = _blockById(blockId);
     if (!block) return;
+    _pushPlanHistory();
     _removePlanShapeVertex(block);
     _selectedPlanId = `block::${block.id}`;
     _saveDraft(false);
@@ -19374,6 +19484,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertClassroomUnlocked(room, 'cambiar su forma')) return;
+    _pushPlanHistory();
     if (shape === 'rect') delete room.planShape;
     else room.planShape = _defaultPlanShape(shape);
     _syncRoomShapeObject(room);
@@ -19391,6 +19502,7 @@ const MecFormModule = (() => {
     const room = _classroomById(roomId);
     if (!room) return;
     if (!_assertClassroomUnlocked(room, 'editar vertices')) return;
+    _pushPlanHistory();
     _insertPlanShapeVertex(room);
     _syncRoomShapeObject(room);
     if (_activeClassroomId === room.id && _data.__classroomSketch) {
@@ -19407,6 +19519,7 @@ const MecFormModule = (() => {
     const room = _classroomById(roomId);
     if (!room) return;
     if (!_assertClassroomUnlocked(room, 'editar vertices')) return;
+    _pushPlanHistory();
     _removePlanShapeVertex(room);
     _syncRoomShapeObject(room);
     if (_activeClassroomId === room.id && _data.__classroomSketch) {
@@ -19426,6 +19539,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSanitaryUnlocked(item, 'cambiar su forma')) return;
+    _pushPlanHistory();
     if (shape === 'rect') delete item.planShape;
     else item.planShape = _defaultPlanShape(shape);
     const object = _sanitaryRoomObject(item);
@@ -19442,6 +19556,7 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     if (!item) return;
     if (!_assertSanitaryUnlocked(item, 'editar vertices')) return;
+    _pushPlanHistory();
     _insertPlanShapeVertex(item);
     const object = _sanitaryRoomObject(item);
     if (object) object.planShape = _clonePlanShape(item.planShape);
@@ -19454,12 +19569,71 @@ const MecFormModule = (() => {
     const item = (_data.__sanitaries || []).find(sanitary => sanitary.id === sanitaryId);
     if (!item) return;
     if (!_assertSanitaryUnlocked(item, 'editar vertices')) return;
+    _pushPlanHistory();
     _removePlanShapeVertex(item);
     const object = _sanitaryRoomObject(item);
     if (object) object.planShape = _clonePlanShape(item.planShape);
     _selectedPlanId = `sanitary::${item.id}`;
     _saveDraft(false);
     renderSchoolPlan();
+  }
+
+  function _clonePlanState() {
+    return JSON.parse(JSON.stringify({
+      __blocks: _data.__blocks || [],
+      bloques: _data.bloques || {},
+      __activeBlockId: _data.__activeBlockId || '',
+      __activeFloor: _data.__activeFloor || '',
+      __classrooms: _data.__classrooms || [],
+      __sanitaries: _data.__sanitaries || [],
+      __siteElements: _data.__siteElements || [],
+      __planCanvasSize: _data.__planCanvasSize || null,
+      __planBaseMap: _data.__planBaseMap || null,
+      selectedPlanId: _selectedPlanId || '',
+      planMoveMode: Boolean(_planMoveMode),
+    }));
+  }
+
+  function _pushPlanHistory() {
+    _planHistory.push(_clonePlanState());
+    if (_planHistory.length > 60) _planHistory.shift();
+    _planRedo.length = 0;
+  }
+
+  function _restorePlanState(snapshot) {
+    if (!snapshot) return false;
+    _data.__blocks = JSON.parse(JSON.stringify(snapshot.__blocks || []));
+    _data.bloques = JSON.parse(JSON.stringify(snapshot.bloques || {}));
+    _data.__activeBlockId = snapshot.__activeBlockId || '';
+    _data.__activeFloor = snapshot.__activeFloor || '';
+    _data.__classrooms = JSON.parse(JSON.stringify(snapshot.__classrooms || []));
+    _data.__sanitaries = JSON.parse(JSON.stringify(snapshot.__sanitaries || []));
+    _data.__siteElements = JSON.parse(JSON.stringify(snapshot.__siteElements || []));
+    if (snapshot.__planCanvasSize) _data.__planCanvasSize = JSON.parse(JSON.stringify(snapshot.__planCanvasSize));
+    else delete _data.__planCanvasSize;
+    if (snapshot.__planBaseMap) _data.__planBaseMap = JSON.parse(JSON.stringify(snapshot.__planBaseMap));
+    _selectedPlanId = snapshot.selectedPlanId || '';
+    _planMoveMode = Boolean(snapshot.planMoveMode);
+    _activePlanDrag = null;
+    _ensureBlocks();
+    _ensureSiteElements();
+    _saveDraft(false);
+    _render();
+    renderSchoolPlan();
+    _notifyGuidedPlanSync();
+    return true;
+  }
+
+  function undoPlanChange() {
+    if (!_planHistory.length) return false;
+    _planRedo.push(_clonePlanState());
+    return _restorePlanState(_planHistory.pop());
+  }
+
+  function redoPlanChange() {
+    if (!_planRedo.length) return false;
+    _planHistory.push(_clonePlanState());
+    return _restorePlanState(_planRedo.pop());
   }
 
   function setPlanSiteElementShape(elementId, shape = 'l') {
@@ -19469,6 +19643,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'cambiar su forma')) return;
+    _pushPlanHistory();
     if (shape === 'rect') delete element.planShape;
     else element.planShape = _defaultPlanShape(shape === 'polygon' ? 'l' : shape);
     delete element.boundaryShapeMode;
@@ -19482,6 +19657,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') return;
     if (!_assertSiteElementUnlocked(element, 'editar vertices')) return;
+    _pushPlanHistory();
     _insertPlanShapeVertex(element);
     delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
@@ -19494,6 +19670,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') return;
     if (!_assertSiteElementUnlocked(element, 'editar vertices')) return;
+    _pushPlanHistory();
     _removePlanShapeVertex(element);
     delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
@@ -19721,6 +19898,7 @@ const MecFormModule = (() => {
   function nudgeSelectedPlanItem(dx, dy) {
     const raw = String(_selectedPlanId || '');
     if (!raw || (!dx && !dy)) return false;
+    _pushPlanHistory();
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     if (raw.startsWith('site::')) {
@@ -19901,7 +20079,12 @@ const MecFormModule = (() => {
       const structuralArea = reversedAreas.find(candidate =>
         ['block', 'floor', 'room', 'sanitary'].includes(candidate?.type) && containsPoint(candidate)
       );
-      const area = isPropertyBoundaryArea(directArea) && structuralArea ? structuralArea : directArea;
+      const selectedBlockArea = String(_selectedPlanId || '').startsWith('block::')
+        ? reversedAreas.find(candidate => candidate?.type === 'block' && candidate.id === _selectedPlanId && containsPoint(candidate))
+        : null;
+      const area = selectedBlockArea && ['floor', 'room', 'sanitary'].includes(directArea?.type || '')
+        ? selectedBlockArea
+        : (isPropertyBoundaryArea(directArea) && structuralArea ? structuralArea : directArea);
       if (siteResizeShouldPreferBody(area)) return siteAreaFromPoint(point) || area;
       if (area && !['block', 'floor', 'room', 'sanitary'].includes(area.type)) return area;
       return siteAreaFromPoint(point, { includePropertyBoundary: !area }) || area;
@@ -19914,24 +20097,13 @@ const MecFormModule = (() => {
     };
     const isSelectableArea = area => Boolean(area?.id);
     const resetPlanSelectionAndZoom = event => {
-      const shouldReset = Boolean(_selectedPlanId) || Math.abs(Number(_schoolPlanZoom || 1) - 1) > .01;
+      const shouldReset = Boolean(_selectedPlanId);
       if (!shouldReset) return;
-      const point = event ? pointFromEvent(event) : null;
-      const wrap = canvas.closest('.school-plan__canvas-wrap');
-      const viewportPoint = wrap ? { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 } : null;
       _selectedPlanId = null;
       _activePlanDrag = null;
       lastTap = null;
       _hideCanvasHoverTooltip();
-      _schoolPlanZoom = 1;
       renderSchoolPlan();
-      if (point && viewportPoint) {
-        requestAnimationFrame(() => {
-          const nextCanvas = _activeSchoolPlanCanvas();
-          const nextWrap = nextCanvas?.closest('.school-plan__canvas-wrap');
-          _scrollCanvasWrapToPoint(nextWrap, point, _schoolPlanZoom, viewportPoint);
-        });
-      }
     };
     const movablePlanTypes = ['block', 'site-element', 'floor', 'room', 'sanitary'];
     const isClassObjectArea = area => Boolean(area?.roomId && area?.objectId && !area?.sanitaryId);
@@ -20046,6 +20218,7 @@ const MecFormModule = (() => {
       canvas.setPointerCapture?.(event.pointerId);
       const rotateConfig = _rotationDragConfig(area);
       if (rotateConfig) {
+        _pushPlanHistory();
         const center = { x: area.centerX, y: area.centerY };
         rotateDrag = {
           kind: rotateConfig.kind,
@@ -20063,6 +20236,7 @@ const MecFormModule = (() => {
       }
       const resizeConfig = _planResizeDragConfig(area);
       if (resizeConfig) {
+        _pushPlanHistory();
         resizeDrag = resizeConfig;
         pointerCandidate = null;
         _selectedPlanId = resizeConfig.selectedId;
@@ -20072,6 +20246,7 @@ const MecFormModule = (() => {
       }
       const vertexConfig = _planVertexDragConfig(area);
       if (vertexConfig) {
+        _pushPlanHistory();
         vertexDrag = vertexConfig;
         pointerCandidate = null;
         _selectedPlanId = vertexConfig.selectedId;
@@ -20219,6 +20394,7 @@ const MecFormModule = (() => {
           const dragType = isClassObjectArea(pointerCandidate)
             ? 'class-object'
             : (isSanitaryObjectArea(pointerCandidate) ? 'sanitary-object' : pointerCandidate.type);
+          _pushPlanHistory();
           blockDrag = {
             type: dragType,
             blockId: pointerCandidate.blockId,
@@ -21138,6 +21314,31 @@ const MecFormModule = (() => {
       </section>`;
   }
 
+  function _planPrintOverviewSheet(sheetIndex, totalSheets, generatedAt) {
+    const info = _planPrintSchoolInfo();
+    return `
+      <section class="print-sheet print-overview">
+        <header class="overview-header">
+          <div>
+            <span>CIALPA / Plano general del predio</span>
+            <h1>Vista completa con exteriores</h1>
+            <p>${_escape(info.name)} - ${_escape(info.code)}</p>
+          </div>
+          <div>
+            <strong>Hoja ${sheetIndex} de ${totalSheets}</strong>
+            <small>${_escape(generatedAt)}</small>
+          </div>
+        </header>
+        <main class="overview-canvas">
+          ${_planSvgMarkup()}
+        </main>
+        <footer class="overview-footer">
+          <span>Esta hoja usa el lienzo completo del plano vivo para incluir perimetro, bloques y todos los exteriores alejados.</span>
+          <span>CIALPA - Relevamiento Escolar</span>
+        </footer>
+      </section>`;
+  }
+
   function _planPrintClampRect(rect, bounds) {
     const w = Math.max(.8, Math.min(rect.w, bounds.w));
     const h = Math.max(.8, Math.min(rect.h, bounds.h));
@@ -21760,13 +21961,14 @@ const MecFormModule = (() => {
       });
     });
     const photoSheetCount = Math.ceil(photoIndex.photos.length / 6);
-    const totalSheets = Math.max(1, planPages.length + photoSheetCount + 1);
+    const totalSheets = Math.max(2, planPages.length + photoSheetCount + 2);
     const coverSheet = _planPrintCoverSheet(totalSheets, generatedAt, scale, photoIndex.photos);
+    const overviewSheet = _planPrintOverviewSheet(2, totalSheets, generatedAt);
     const planSheets = planPages.length
-      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 2, totalSheets, scale, generatedAt, photoIndex.photos, photoIndex.markerNumbers)).join('')
+      ? planPages.map((item, index) => _planPrintFloorSheet(item.block, item.floor, index + 3, totalSheets, scale, generatedAt, photoIndex.photos, photoIndex.markerNumbers)).join('')
       : '<section class="print-sheet"><p class="print-empty">No hay plano cargado para imprimir.</p></section>';
-    const photoSheets = _planPrintPhotoSheets(photoIndex.photos, planPages.length + 2, totalSheets, generatedAt);
-    const sheets = `${coverSheet}${planSheets}${photoSheets}`;
+    const photoSheets = _planPrintPhotoSheets(photoIndex.photos, planPages.length + 3, totalSheets, generatedAt);
+    const sheets = `${coverSheet}${overviewSheet}${planSheets}${photoSheets}`;
     return `
       <!doctype html>
       <html lang="es">
@@ -21842,6 +22044,17 @@ const MecFormModule = (() => {
           .photo-card figcaption span { color: #475467; font-size: 7.2pt; line-height: 1.2; }
           .photo-card figcaption small { color: #667085; font-size: 6.7pt; font-weight: 750; }
           .photo-sheet__footer { display: flex; justify-content: space-between; gap: 6mm; padding: 0 9mm 5mm; color: #667085; font-size: 7pt; font-weight: 750; border-top: 1px dashed #cbd5e1; }
+          .print-overview { display: grid; grid-template-rows: auto 1fr auto; }
+          .overview-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10mm; padding: 7mm 9mm 4mm; border-bottom: 1px dashed #cbd5e1; background: #eef4f8; }
+          .overview-header span { color: #15546b; font-size: 7.5pt; font-weight: 900; letter-spacing: .02em; text-transform: uppercase; }
+          .overview-header h1 { margin: 1mm 0 .8mm; font-size: 17pt; line-height: 1; }
+          .overview-header p { margin: 0; color: #475467; font-size: 9pt; font-weight: 750; }
+          .overview-header strong, .overview-header small { display: block; text-align: right; }
+          .overview-header strong { font-size: 10pt; }
+          .overview-header small { margin-top: 1mm; color: #667085; font-size: 7.5pt; }
+          .overview-canvas { min-height: 0; padding: 4mm 8mm; background: #f8fafc; }
+          .overview-canvas svg { width: 100%; height: 100%; object-fit: contain; background: #fff; border: 1px solid #d7dee8; }
+          .overview-footer { display: flex; justify-content: space-between; gap: 6mm; padding: 0 9mm 5mm; color: #667085; font-size: 7pt; font-weight: 750; border-top: 1px dashed #cbd5e1; }
           @media print {
             html, body { background: #fff; }
             .print-actions { display: none; }
@@ -21871,12 +22084,13 @@ const MecFormModule = (() => {
   function _planSvgMarkup() {
     const rooms = _data.__classrooms || [];
     const blocks = _data.__blocks?.length ? _data.__blocks : [{ id: 'sin_bloque', bloque_codigo: 'Sin bloque' }];
+    const width = _planCanvasWidth();
     const height = _planCanvasHeight();
-    const layout = _planBlockLayout(blocks, 900, height);
+    const layout = _planBlockLayout(blocks, width, height);
     const parts = [
-      `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="${height}" viewBox="0 0 900 ${height}">`,
-      `<rect width="900" height="${height}" fill="#f8fafc"/>`,
-      _planBaseMapSvgImages(900, height),
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+      `<rect width="${width}" height="${height}" fill="#f8fafc"/>`,
+      _planBaseMapSvgImages(width, height),
     ];
     layout.forEach(({ block, x, y, w, h }) => {
       const blockTransform = _planSvgRotateTransform(_blockRotationDeg(block), x + w / 2, y + h / 2);
@@ -21915,7 +22129,7 @@ const MecFormModule = (() => {
       parts.push('</g>');
     });
     _ensureSiteElements().forEach(item => {
-      const rect = _siteElementRect(item, 900, height);
+      const rect = _siteElementRect(item, width, height);
       const cfg = _siteElementConfig(item.type);
       const rotation = _siteElementRotationDeg(item);
       const cx = rect.x + rect.w / 2;
@@ -21927,15 +22141,9 @@ const MecFormModule = (() => {
         const y = rect.y;
         const w = rect.w;
         const h = rect.h;
-        const points = fallLeft
-          ? `${x},${y + h} ${x + w},${y + h} ${x + w},${y}`
-          : `${x},${y} ${x + w},${y + h} ${x},${y + h}`;
-        const diag = fallLeft
-          ? { x1: x + w - 8, y1: y + 8, x2: x + 8, y2: y + h - 8 }
-          : { x1: x + 8, y1: y + 8, x2: x + w - 8, y2: y + h - 8 };
-        const arrowStart = fallLeft ? x + w * .72 : x + w * .28;
-        const arrowEnd = fallLeft ? x + w * .24 : x + w * .76;
-        const arrowY = y + h * .58;
+        const arrowStart = fallLeft ? x + w * .78 : x + w * .22;
+        const arrowEnd = fallLeft ? x + w * .22 : x + w * .78;
+        const arrowY = y + h * .5;
         const head = Math.max(5, Math.min(9, w * .08));
         const head1 = fallLeft
           ? { x: arrowEnd + head, y: arrowY - head * .55 }
@@ -21943,9 +22151,11 @@ const MecFormModule = (() => {
         const head2 = fallLeft
           ? { x: arrowEnd + head, y: arrowY + head * .55 }
           : { x: arrowEnd - head, y: arrowY + head * .55 };
-        parts.push(`<polygon points="${points}" fill="#ffffff" fill-opacity=".78" stroke="${cfg.tone}" stroke-width="2"/>`);
-        parts.push(`<line x1="${diag.x1}" y1="${diag.y1}" x2="${diag.x2}" y2="${diag.y2}" stroke="${cfg.tone}" stroke-width="1.5"/>`);
+        parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffffff" fill-opacity=".78" stroke="${cfg.tone}" stroke-width="2"/>`);
+        parts.push(`<line x1="${x + w * .18}" y1="${y + h * .22}" x2="${x + w * .82}" y2="${y + h * .22}" stroke="${cfg.tone}" stroke-width="1.2"/>`);
+        parts.push(`<line x1="${x + w * .18}" y1="${y + h * .78}" x2="${x + w * .82}" y2="${y + h * .78}" stroke="${cfg.tone}" stroke-width="1.2"/>`);
         parts.push(`<path d="M ${arrowStart} ${arrowY} L ${arrowEnd} ${arrowY} L ${head1.x} ${head1.y} M ${arrowEnd} ${arrowY} L ${head2.x} ${head2.y}" fill="none" stroke="${cfg.tone}" stroke-width="1.5"/>`);
+        parts.push(`<text x="${x + w / 2}" y="${y + h * .5 - 7}" font-family="system-ui" font-size="8" font-weight="900" text-anchor="middle" fill="${cfg.tone}">SUBE</text>`);
       } else if (item.type === 'water_tank' || item.type === 'pillar') {
         parts.push(`<ellipse cx="${rect.x + rect.w / 2}" cy="${rect.y + rect.h / 2}" rx="${rect.w / 2}" ry="${rect.h / 2}" fill="#ffffff" stroke="${cfg.tone}" stroke-width="2"/>`);
       } else if (item.type === 'recreation' && _recreationShapeConfig(item.shape || item.ficha?.forma).court) {
@@ -22302,6 +22512,7 @@ const MecFormModule = (() => {
     resetSchoolRegistration,
     exportJson,
     toggleModule,
+    activateChoiceButton,
     setSketchTool,
     setSketchField,
     setGuidedBlockField,
@@ -22443,6 +22654,8 @@ const MecFormModule = (() => {
     togglePlanBaseMap,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
+    extendSchoolPlanCanvas,
+    resetSchoolPlanCanvasSize,
     setPlanBaseMapValue,
     zoomPlanBaseMap,
     rotatePlanBaseMap,
