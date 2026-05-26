@@ -18,6 +18,8 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_DEFAULT_OPACITY = .84;
   const PLAN_BASEMAP_DEFAULT_CONTRAST = 1.18;
   const PLAN_BASEMAP_DEFAULT_SATURATION = 1.08;
+  const PLAN_BASEMAP_SOURCE_STREET = 'street';
+  const PLAN_BASEMAP_SOURCE_SATELLITE = 'satellite';
   const PLAN_CANVAS_MIN_WIDTH = 900;
   const PLAN_CANVAS_MIN_HEIGHT = 620;
   const PLAN_CANVAS_MAX_WIDTH = 2600;
@@ -1111,6 +1113,7 @@ const MecFormModule = (() => {
     const coords = _schoolCoordinateDefaults();
     return {
       enabled: false,
+      source: PLAN_BASEMAP_SOURCE_STREET,
       lat: coords.lat,
       lng: coords.lng,
       zoom: PLAN_BASEMAP_DEFAULT_ZOOM,
@@ -1126,15 +1129,17 @@ const MecFormModule = (() => {
     };
   }
 
-  function _planBaseMapMaxZoom() {
+  function _planBaseMapMaxZoom(source = _planBaseMapSource(_data.__planBaseMap)) {
     const configured = typeof APP_CONFIG !== 'undefined'
-      ? (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM)
+      ? (source === PLAN_BASEMAP_SOURCE_SATELLITE
+        ? (APP_CONFIG.PLAN_BASEMAP_SATELLITE_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM || APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM)
+        : (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.MAP_MAX_ZOOM))
       : PLAN_BASEMAP_FALLBACK_MAX_ZOOM;
     return Math.round(_numberInRange(configured, PLAN_BASEMAP_FALLBACK_MAX_ZOOM, PLAN_BASEMAP_MIN_ZOOM, 22));
   }
 
-  function _clampPlanBaseMapZoom(value, fallback = PLAN_BASEMAP_DEFAULT_ZOOM) {
-    return Math.round(_numberInRange(value, fallback, PLAN_BASEMAP_MIN_ZOOM, _planBaseMapMaxZoom()));
+  function _clampPlanBaseMapZoom(value, fallback = PLAN_BASEMAP_DEFAULT_ZOOM, source = _planBaseMapSource(_data.__planBaseMap)) {
+    return Math.round(_numberInRange(value, fallback, PLAN_BASEMAP_MIN_ZOOM, _planBaseMapMaxZoom(source)));
   }
 
   function _clampPlanBaseMapScale(value, fallback = PLAN_BASEMAP_DEFAULT_SCALE) {
@@ -1153,9 +1158,39 @@ const MecFormModule = (() => {
     return `contrast(${_cssNumber(contrast)}) saturate(${_cssNumber(saturation)})`;
   }
 
+  function _planBaseMapSource(baseMap = _data.__planBaseMap) {
+    const source = String(baseMap?.source || '').toLowerCase();
+    return source === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
+  }
+
+  function _planBaseMapSourceConfig(baseMap = _data.__planBaseMap) {
+    const source = _planBaseMapSource(baseMap);
+    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) {
+      return {
+        id: PLAN_BASEMAP_SOURCE_SATELLITE,
+        label: 'Satelite',
+        tileUrl: (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_SATELLITE_TILE_URL || APP_CONFIG.SATELLITE_TILE_URL))
+          || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_SATELLITE_ATTRIBUTION || APP_CONFIG.SATELLITE_ATTRIBUTION))
+          || 'Tiles &copy; Esri',
+      };
+    }
+    return {
+      id: PLAN_BASEMAP_SOURCE_STREET,
+      label: 'Calles',
+      tileUrl: (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_TILE_URL || APP_CONFIG.TILE_URL))
+        || 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+      attribution: (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_ATTRIBUTION || APP_CONFIG.TILE_ATTRIBUTION))
+        || '&copy; OpenStreetMap contributors, HOT',
+    };
+  }
+
   function _preferClosePlanBaseMapView(baseMap) {
     if (!baseMap || baseMap.confirmed) return baseMap;
-    if (Number(baseMap.zoom || 0) < PLAN_BASEMAP_DEFAULT_ZOOM) baseMap.zoom = PLAN_BASEMAP_DEFAULT_ZOOM;
+    const source = _planBaseMapSource(baseMap);
+    const closeZoom = Math.min(PLAN_BASEMAP_DEFAULT_ZOOM, _planBaseMapMaxZoom(source));
+    if (Number(baseMap.zoom || 0) < closeZoom) baseMap.zoom = closeZoom;
+    baseMap.zoom = _clampPlanBaseMapZoom(baseMap.zoom, closeZoom, source);
     if (Number(baseMap.scale || 0) < PLAN_BASEMAP_DEFAULT_SCALE) baseMap.scale = PLAN_BASEMAP_DEFAULT_SCALE;
     if (!Number.isFinite(Number(baseMap.opacity)) || Number(baseMap.opacity) <= .56) baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
     if (!Number.isFinite(Number(baseMap.contrast))) baseMap.contrast = PLAN_BASEMAP_DEFAULT_CONTRAST;
@@ -1356,7 +1391,8 @@ const MecFormModule = (() => {
     if ((merged.lng === '' || merged.lng === undefined || merged.lng === null) && defaults.lng !== '') merged.lng = defaults.lng;
     merged.lat = merged.lat === '' ? '' : _numberInRange(merged.lat, defaults.lat === '' ? '' : defaults.lat, -85, 85);
     merged.lng = merged.lng === '' ? '' : _numberInRange(merged.lng, defaults.lng === '' ? '' : defaults.lng, -180, 180);
-    merged.zoom = _clampPlanBaseMapZoom(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM);
+    merged.source = _planBaseMapSource(merged);
+    merged.zoom = _clampPlanBaseMapZoom(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, merged.source);
     merged.opacity = _numberInRange(merged.opacity, PLAN_BASEMAP_DEFAULT_OPACITY, .15, 1);
     merged.scale = _clampPlanBaseMapScale(merged.scale, PLAN_BASEMAP_DEFAULT_SCALE);
     merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
@@ -1381,12 +1417,11 @@ const MecFormModule = (() => {
   }
 
   function _planBaseMapTileTemplate() {
-    return (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_TILE_URL || APP_CONFIG.SATELLITE_TILE_URL))
-      || 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png';
+    return _planBaseMapSourceConfig(_data.__planBaseMap).tileUrl;
   }
 
   function _planBaseMapAttribution() {
-    return (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_ATTRIBUTION || APP_CONFIG.SATELLITE_ATTRIBUTION)) || '&copy; OpenStreetMap contributors, HOT';
+    return _planBaseMapSourceConfig(_data.__planBaseMap).attribution;
   }
 
   function _worldPixelFromLatLng(lat, lng, zoom) {
@@ -1397,6 +1432,17 @@ const MecFormModule = (() => {
     return {
       x: ((safeLng + 180) / 360) * scale,
       y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * scale,
+    };
+  }
+
+  function _latLngFromWorldPixel(x, y, zoom) {
+    const scale = PLAN_BASEMAP_TILE_SIZE * Math.pow(2, zoom);
+    const lng = (Number(x || 0) / scale) * 360 - 180;
+    const n = Math.PI - (2 * Math.PI * Number(y || 0)) / scale;
+    const lat = (180 / Math.PI) * Math.atan(Math.sinh(n));
+    return {
+      lat: Math.max(-85.05112878, Math.min(85.05112878, lat)),
+      lng: Math.max(-180, Math.min(180, lng)),
     };
   }
 
@@ -1475,6 +1521,39 @@ const MecFormModule = (() => {
     return groundMetersPerTilePixel / Math.max(.01, mapScale);
   }
 
+  function _planPointToBaseMapLatLng(point, logicalWidth = 900, logicalHeight = _planCanvasHeight(), baseMap = _data.__planBaseMap) {
+    if (!point || !_planBaseMapHasCoords(baseMap)) return null;
+    const zoom = Math.round(Number(baseMap.zoom) || PLAN_BASEMAP_DEFAULT_ZOOM);
+    const centerWorld = _worldPixelFromLatLng(baseMap.lat, baseMap.lng, zoom);
+    const centerCanvas = {
+      x: logicalWidth / 2 + Number(baseMap.offsetX || 0),
+      y: logicalHeight / 2 + Number(baseMap.offsetY || 0),
+    };
+    const mapScale = Math.max(.01, Number(baseMap.scale || 1));
+    const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
+    const planPoint = rotation
+      ? _rotatePointAround({ x: logicalWidth / 2, y: logicalHeight / 2 }, point, -rotation)
+      : point;
+    const worldX = centerWorld.x + (planPoint.x - centerCanvas.x) / mapScale;
+    const worldY = centerWorld.y + (planPoint.y - centerCanvas.y) / mapScale;
+    return _latLngFromWorldPixel(worldX, worldY, zoom);
+  }
+
+  function _formatDmsPart(value, positive, negative) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '';
+    const abs = Math.abs(number);
+    const degrees = Math.floor(abs);
+    const minutesFloat = (abs - degrees) * 60;
+    const minutes = Math.floor(minutesFloat);
+    const seconds = (minutesFloat - minutes) * 60;
+    return `${degrees}\u00B0${String(minutes).padStart(2, '0')}'${seconds.toFixed(2).padStart(5, '0')}"${number >= 0 ? positive : negative}`;
+  }
+
+  function _formatDmsCoordinate(lat, lng) {
+    return `${_formatDmsPart(lat, 'N', 'S')} ${_formatDmsPart(lng, 'E', 'W')}`;
+  }
+
   function _planBaseMapMetricText(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
     const baseMap = _ensurePlanBaseMap();
     if (!_planBaseMapHasCoords(baseMap)) return 'Cargue coordenadas para activar la base de calles y lineas.';
@@ -1492,6 +1571,7 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     return [
       baseMap.enabled ? 1 : 0,
+      _planBaseMapSource(baseMap),
       baseMap.lat,
       baseMap.lng,
       baseMap.zoom,
@@ -1639,12 +1719,15 @@ const MecFormModule = (() => {
   function _renderPlanBaseMapToolbar() {
     const baseMap = _ensurePlanBaseMap();
     const active = _planBaseMapVisible(baseMap);
+    const source = _planBaseMapSource(baseMap);
     const coords = _planBaseMapHasCoords(baseMap)
       ? `${Number(baseMap.lat).toFixed(5)}, ${Number(baseMap.lng).toFixed(5)}`
       : 'Sin coordenadas';
     return `
       <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
-        <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Calles activo' : 'Calles/lineas'}</button>
+        <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Base activa' : 'Base mapa'}</button>
+        <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')">Satelite</button>
+        <button class="btn ${source === PLAN_BASEMAP_SOURCE_STREET ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('street')">Calles</button>
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
         <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base mapa</button>
@@ -1655,6 +1738,7 @@ const MecFormModule = (() => {
   function _renderPlanBaseMapPanel() {
     if (!_planBaseMapPanelOpen) return '';
     const baseMap = _ensurePlanBaseMap();
+    const source = _planBaseMapSource(baseMap);
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
     const dragHint = _planBaseMapDragMode
       ? 'Arrastre sobre el plano para mover la base. Use la rueda sin Ctrl para escalar la base.'
@@ -1671,6 +1755,12 @@ const MecFormModule = (() => {
           <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.useSchoolCoordinatesForBaseMap()">Usar coordenadas escuela</button>
         </div>
         <div class="school-plan-basemap-panel__grid">
+          <label>Fuente visual
+            <select onchange="MecFormModule.setPlanBaseMapSource(this.value)">
+              <option value="satellite" ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'selected' : ''}>Satelite</option>
+              <option value="street" ${source === PLAN_BASEMAP_SOURCE_STREET ? 'selected' : ''}>Calles y lineas</option>
+            </select>
+          </label>
           <label>Latitud
             <input type="number" step="0.000001" value="${_escape(baseMap.lat)}" onchange="MecFormModule.setPlanBaseMapValue('lat', this.value)">
           </label>
@@ -1678,7 +1768,7 @@ const MecFormModule = (() => {
             <input type="number" step="0.000001" value="${_escape(baseMap.lng)}" onchange="MecFormModule.setPlanBaseMapValue('lng', this.value)">
           </label>
           <label>Zoom cartografico
-            <input type="range" min="${PLAN_BASEMAP_MIN_ZOOM}" max="${_escape(_planBaseMapMaxZoom())}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
+            <input type="range" min="${PLAN_BASEMAP_MIN_ZOOM}" max="${_escape(_planBaseMapMaxZoom(source))}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
             <b>${_escape(baseMap.zoom)}</b>
           </label>
           <label>Escala base
@@ -1866,6 +1956,22 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function setPlanBaseMapSource(source = PLAN_BASEMAP_SOURCE_STREET) {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.source = source === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
+    baseMap.zoom = _clampPlanBaseMapZoom(baseMap.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, baseMap.source);
+    if (_planBaseMapHasCoords(baseMap)) {
+      baseMap.enabled = true;
+      _preferClosePlanBaseMapView(baseMap);
+    } else {
+      _planBaseMapPanelOpen = true;
+      UI.showToast('Cargue coordenadas para activar la base satelital o de calles.', 'warning', 5200);
+    }
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function _saveBaseMapCoordinatesToSchool(baseMap) {
     if (!_planBaseMapHasCoords(baseMap)) return;
     const lat = String(baseMap.lat);
@@ -1898,7 +2004,7 @@ const MecFormModule = (() => {
     _planBaseMapDragMode = false;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast('Base mapa guardada para construir el plano sobre calles y lineas de referencia.', 'success', 5600);
+    UI.showToast('Base mapa guardada para construir el plano sobre satelite, calles o lineas de referencia.', 'success', 5600);
   }
 
   function _fieldVisible(field) {
@@ -12735,6 +12841,7 @@ const MecFormModule = (() => {
   function _renderPlanBaseMapRibbon() {
     const baseMap = _ensurePlanBaseMap();
     const active = _planBaseMapVisible(baseMap);
+    const source = _planBaseMapSource(baseMap);
     const coords = _planBaseMapHasCoords(baseMap)
       ? `${Number(baseMap.lat).toFixed(5)}, ${Number(baseMap.lng).toFixed(5)}`
       : 'Sin coordenadas';
@@ -12742,11 +12849,27 @@ const MecFormModule = (() => {
       <div class="school-plan-ribbon__basemap">
         ${_renderPlanRibbonButton({
           icon: '&#8801;',
-          label: active ? 'Calles on' : 'Calles',
+          label: active ? 'Base on' : 'Base',
           onClick: 'MecFormModule.togglePlanBaseMap()',
           tone: active ? 'btn-primary' : 'btn-outline',
           active,
-          title: active ? 'Ocultar calles y lineas' : 'Mostrar calles y lineas',
+          title: active ? 'Ocultar base mapa' : 'Mostrar base mapa',
+        })}
+        ${_renderPlanRibbonButton({
+          icon: '&#128506;',
+          label: 'Satelite',
+          onClick: "MecFormModule.setPlanBaseMapSource('satellite')",
+          tone: source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline',
+          active: source === PLAN_BASEMAP_SOURCE_SATELLITE,
+          title: 'Usar imagen satelital como base del plano',
+        })}
+        ${_renderPlanRibbonButton({
+          icon: '&#9776;',
+          label: 'Calles',
+          onClick: "MecFormModule.setPlanBaseMapSource('street')",
+          tone: source === PLAN_BASEMAP_SOURCE_STREET ? 'btn-primary' : 'btn-outline',
+          active: source === PLAN_BASEMAP_SOURCE_STREET,
+          title: 'Usar base de calles y lineas',
         })}
         ${_renderPlanRibbonButton({
           icon: '&#9881;',
@@ -14508,13 +14631,15 @@ const MecFormModule = (() => {
     }
 
     const distanceItems = [];
+    const geoBlockLabels = [];
     if (_planLayers.exteriores) _drawSiteElements(ctx, logical, distanceItems, { onlyPropertyBoundary: true });
     const layout = _planBlockLayout(blocks, logical.width, logical.height);
-    layout.forEach(({ block, x, y, w, h, scale }) => {
+    layout.forEach(({ block, x, y, w, h, scale }, blockIndex) => {
       const blockPlanId = `block::${block.id}`;
       const blockSelected = _selectedPlanId === blockPlanId || _activePlanDrag?.blockId === block.id;
       const blockRotation = _blockRotationDeg(block);
       const blockRect = { x, y, w, h };
+      geoBlockLabels.push({ block, rect: blockRect, index: blockIndex });
       ctx.save();
       const blockTransform = _applyPlanCanvasRotation(ctx, blockRect, blockRotation);
       if (blockTransform) _planTransformStack.push(blockTransform);
@@ -14672,6 +14797,8 @@ const MecFormModule = (() => {
     });
     if (_planLayers.exteriores) _drawSiteElements(ctx, logical, distanceItems, { excludePropertyBoundary: true });
     _drawPlanDistanceGuides(ctx, distanceItems);
+    _drawGeoBlockLabels(ctx, geoBlockLabels);
+    _drawPropertyBoundaryGeoOverlay(ctx, logical);
   }
 
   function _planFloorRect(blockX, blockY, blockW, blockH, floorIndex, floorCount, hasSanitaries) {
@@ -15016,6 +15143,188 @@ const MecFormModule = (() => {
       x: center.x + dx * cos - dy * sin,
       y: center.y + dx * sin + dy * cos,
     };
+  }
+
+  function _siteElementAbsoluteShapePoints(item, rect) {
+    if (!item || !rect) return [];
+    const local = { x: -rect.w / 2, y: -rect.h / 2, w: rect.w, h: rect.h };
+    const localPoints = _planShapePoints(item, local) || [
+      { x: local.x, y: local.y },
+      { x: local.x + local.w, y: local.y },
+      { x: local.x + local.w, y: local.y + local.h },
+      { x: local.x, y: local.y + local.h },
+    ];
+    const center = _planRectCenter(rect);
+    const rotation = _siteElementRotationDeg(item);
+    return localPoints.map(point => {
+      let localPoint = { ...point };
+      if (item.type !== 'ramp' && item.flipH) localPoint.x *= -1;
+      if (item.flipV) localPoint.y *= -1;
+      return _rotatePointAround(center, {
+        x: center.x + localPoint.x,
+        y: center.y + localPoint.y,
+      }, rotation);
+    });
+  }
+
+  function _propertyBoundaryGeoVertices(logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapVisible(baseMap)) return [];
+    const property = _propertyBoundaryElement();
+    if (!property) return [];
+    const rect = _siteElementRect(property, logicalWidth, logicalHeight);
+    return _siteElementAbsoluteShapePoints(property, rect)
+      .map((point, index) => {
+        const geo = _planPointToBaseMapLatLng(point, logicalWidth, logicalHeight, baseMap);
+        if (!geo) return null;
+        return {
+          index,
+          point,
+          lat: geo.lat,
+          lng: geo.lng,
+          label: _formatDmsCoordinate(geo.lat, geo.lng),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function _drawPlanGeoPin(ctx, point) {
+    if (!ctx || !point) return;
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.fillStyle = '#ffeb3b';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 9);
+    ctx.bezierCurveTo(-8, -1, -9, -9, 0, -13);
+    ctx.bezierCurveTo(9, -9, 8, -1, 0, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#0b5d3b';
+    ctx.beginPath();
+    ctx.arc(0, -7, 3.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function _drawOutlinedCanvasText(ctx, text, x, y, options = {}) {
+    if (!text) return;
+    ctx.save();
+    ctx.font = options.font || _canvasFont(800, 12);
+    ctx.textAlign = options.align || 'left';
+    ctx.textBaseline = options.baseline || 'middle';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = options.stroke || '#ffffff';
+    ctx.lineWidth = options.strokeWidth || 4;
+    ctx.fillStyle = options.fill || '#111827';
+    ctx.strokeText(text, x, y);
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+
+  function _drawPropertyBoundaryGeoOverlay(ctx, logical) {
+    if (!ctx || !logical) return;
+    const vertices = _propertyBoundaryGeoVertices(logical.width, logical.height);
+    if (!vertices.length) return;
+    const center = vertices.reduce((acc, item) => ({
+      x: acc.x + item.point.x / vertices.length,
+      y: acc.y + item.point.y / vertices.length,
+    }), { x: 0, y: 0 });
+    ctx.save();
+    ctx.strokeStyle = '#ffd84d';
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = 'rgba(0,0,0,.35)';
+    ctx.shadowBlur = 3;
+    ctx.beginPath();
+    vertices.forEach((item, index) => {
+      if (index) ctx.lineTo(item.point.x, item.point.y);
+      else ctx.moveTo(item.point.x, item.point.y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+    vertices.forEach(item => {
+      const dx = item.point.x - center.x;
+      const dy = item.point.y - center.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const offsetX = (dx / length) * 24;
+      const offsetY = (dy / length) * 20;
+      const labelX = Math.max(8, Math.min(logical.width - 8, item.point.x + offsetX));
+      const labelY = Math.max(16, Math.min(logical.height - 12, item.point.y + offsetY));
+      _drawPlanGeoPin(ctx, item.point);
+      _drawOutlinedCanvasText(ctx, item.label, labelX, labelY, {
+        font: _canvasFont(800, 12),
+        align: offsetX < -2 ? 'right' : 'left',
+        strokeWidth: 4.5,
+        fill: '#111827',
+      });
+    });
+  }
+
+  function _blockGeoLabel(block, index = 0) {
+    const raw = String(block?.bloque_codigo || block?.codigo || block?.name || '').trim();
+    if (/^B\s*\d+/i.test(raw)) return raw.toUpperCase().replace(/\s+/g, '');
+    const number = raw.match(/\d+/)?.[0];
+    return `B${number || index + 1}`;
+  }
+
+  function _drawGeoBlockLabels(ctx, items = []) {
+    if (!_planBaseMapVisible(_data.__planBaseMap)) return;
+    items.forEach(({ block, rect, index }) => {
+      const label = _blockGeoLabel(block, index);
+      const fontSize = Math.max(24, Math.min(54, Math.min(rect.w, rect.h) * .38));
+      _drawOutlinedCanvasText(ctx, label, rect.x + rect.w / 2, rect.y + rect.h / 2, {
+        font: _canvasFont(900, fontSize),
+        align: 'center',
+        baseline: 'middle',
+        stroke: '#ffffff',
+        strokeWidth: Math.max(5, fontSize * .13),
+        fill: '#111827',
+      });
+    });
+  }
+
+  function _propertyBoundaryGeoOverlaySvg(width = _planCanvasWidth(), height = _planCanvasHeight()) {
+    const vertices = _propertyBoundaryGeoVertices(width, height);
+    if (!vertices.length) return '';
+    const center = vertices.reduce((acc, item) => ({
+      x: acc.x + item.point.x / vertices.length,
+      y: acc.y + item.point.y / vertices.length,
+    }), { x: 0, y: 0 });
+    const path = vertices.map((item, index) => `${index ? 'L' : 'M'} ${_cssNumber(item.point.x)} ${_cssNumber(item.point.y)}`).join(' ');
+    const labels = vertices.map(item => {
+      const dx = item.point.x - center.x;
+      const dy = item.point.y - center.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const offsetX = (dx / length) * 24;
+      const offsetY = (dy / length) * 20;
+      const x = Math.max(8, Math.min(width - 8, item.point.x + offsetX));
+      const y = Math.max(16, Math.min(height - 12, item.point.y + offsetY));
+      const anchor = offsetX < -2 ? 'end' : 'start';
+      return `
+        <g transform="translate(${_cssNumber(item.point.x)} ${_cssNumber(item.point.y)})">
+          <path d="M 0 9 C -8 -1 -9 -9 0 -13 C 9 -9 8 -1 0 9 Z" fill="#ffeb3b" stroke="#ffffff" stroke-width="2.4"/>
+          <circle cx="0" cy="-7" r="3.1" fill="#0b5d3b"/>
+        </g>
+        <text x="${_cssNumber(x)}" y="${_cssNumber(y)}" font-family="system-ui" font-size="12" font-weight="800" text-anchor="${anchor}" dominant-baseline="middle" stroke="#ffffff" stroke-width="4.5" paint-order="stroke fill" fill="#111827">${_escape(item.label)}</text>`;
+    }).join('');
+    return `
+      <g class="property-boundary-geo">
+        <path d="${path} Z" fill="#ffd84d" fill-opacity=".08" stroke="#ffd84d" stroke-width="4" stroke-linejoin="round"/>
+        ${labels}
+      </g>`;
+  }
+
+  function _geoBlockLabelsSvg(items = []) {
+    if (!_planBaseMapVisible(_data.__planBaseMap)) return '';
+    return items.map(({ block, rect, index }) => {
+      const label = _blockGeoLabel(block, index);
+      const fontSize = Math.max(24, Math.min(54, Math.min(rect.w, rect.h) * .38));
+      return `<text x="${_cssNumber(rect.x + rect.w / 2)}" y="${_cssNumber(rect.y + rect.h / 2)}" font-family="system-ui" font-size="${_cssNumber(fontSize)}" font-weight="900" text-anchor="middle" dominant-baseline="middle" stroke="#ffffff" stroke-width="${_cssNumber(Math.max(5, fontSize * .13))}" paint-order="stroke fill" fill="#111827">${_escape(label)}</text>`;
+    }).join('');
   }
 
   function _planRectCenter(rect) {
@@ -20657,6 +20966,12 @@ const MecFormModule = (() => {
       schemaVersion: MEC_SCHEMA.version,
       source: 'CIALPA plano escolar',
       baseMap: _data.__planBaseMap || null,
+      propertyBoundaryGeoVertices: _propertyBoundaryGeoVertices(_planCanvasWidth(), _planCanvasHeight()).map(item => ({
+        index: item.index + 1,
+        lat: Number(item.lat.toFixed(8)),
+        lng: Number(item.lng.toFixed(8)),
+        label: item.label,
+      })),
       blocks,
       classroomsWithoutBlock: (_data.__classrooms || []).filter(room => !room.blockId),
       sanitaries: _data.__sanitaries || [],
@@ -22087,12 +22402,14 @@ const MecFormModule = (() => {
     const width = _planCanvasWidth();
     const height = _planCanvasHeight();
     const layout = _planBlockLayout(blocks, width, height);
+    const geoBlockLabelItems = [];
     const parts = [
       `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
       `<rect width="${width}" height="${height}" fill="#f8fafc"/>`,
       _planBaseMapSvgImages(width, height),
     ];
-    layout.forEach(({ block, x, y, w, h }) => {
+    layout.forEach(({ block, x, y, w, h }, blockIndex) => {
+      geoBlockLabelItems.push({ block, rect: { x, y, w, h }, index: blockIndex });
       const blockTransform = _planSvgRotateTransform(_blockRotationDeg(block), x + w / 2, y + h / 2);
       parts.push(`<g${blockTransform}>`);
       parts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#eef2f7" stroke="#172033" stroke-width="2"/>`);
@@ -22188,6 +22505,8 @@ const MecFormModule = (() => {
       parts.push(`<text x="${rect.x + rect.w / 2}" y="${rect.y + rect.h / 2 + 3}" font-family="system-ui" font-size="9" font-weight="900" text-anchor="middle" fill="${cfg.tone}">${_escape(item.ficha?.codigo || cfg.short)}</text>`);
       parts.push('</g>');
     });
+    parts.push(_geoBlockLabelsSvg(geoBlockLabelItems));
+    parts.push(_propertyBoundaryGeoOverlaySvg(width, height));
     parts.push('</svg>');
     return parts.join('');
   }
@@ -22652,6 +22971,7 @@ const MecFormModule = (() => {
     setPlanRibbonTab,
     togglePlanMoveMode,
     togglePlanBaseMap,
+    setPlanBaseMapSource,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
     extendSchoolPlanCanvas,

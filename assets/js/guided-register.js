@@ -441,6 +441,9 @@ const GuidedRegisterModule = (() => {
         case 'basemap':
           mec.togglePlanBaseMap();
           break;
+        case 'basemapSatellite':
+          if (mec.setPlanBaseMapSource) mec.setPlanBaseMapSource('satellite');
+          break;
         case 'coords':
           mec.useSchoolCoordinatesForBaseMap();
           break;
@@ -1515,6 +1518,7 @@ const GuidedRegisterModule = (() => {
         [
           { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
           { label: 'Usar coordenadas', action: 'coords' },
+          { label: 'Satelite', action: 'basemapSatellite' },
           { label: 'Base mapa', action: 'basemap' },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
           { label: 'Reiniciar escuela', action: 'resetSchoolData' },
@@ -1532,6 +1536,7 @@ const GuidedRegisterModule = (() => {
         'Use las coordenadas de la escuela, ajuste la base de calles si hace falta y toque Guardar georef. Despues la guia pasara al perimetro del predio.',
         [
           { label: 'Usar coordenadas', action: 'coords', primary: true },
+          { label: 'Satelite', action: 'basemapSatellite' },
           { label: 'Calles/lineas', action: 'basemap' },
           { label: 'Guardar georef.', action: 'saveBasemap' },
           { label: 'Corregir datos', action: 'resetSchoolIdentity' },

@@ -4,6 +4,46 @@
 
 ---
 
+## Plano satelital georreferenciado con vertices y bloques - 2026-05-26 - v2.6.134
+
+### Objetivo
+- Incorporar al plano vivo una funcion parecida a la imagen de referencia: base satelital, perimetro del predio destacado, pines en vertices, coordenadas DMS visibles y rotulos grandes de bloques tipo `B1`, `B2`, `B3`.
+- Permitir que el esquema sea util para inspeccion visual, validacion de ubicacion del predio y salida documental PDF/SVG.
+
+### Diagnostico
+- El plano ya tenia una base calibrable de calles/lineas y georreferencia guardable, pero no un selector satelital real dentro del plano.
+- El perimetro del predio podia dibujarse sobre el lienzo, pero sus vertices no mostraban coordenadas calculadas desde la base cartografica.
+- La salida PDF incluia la vista completa del plano, pero no resaltaba coordenadas de vertices ni rotulos de bloques con lectura tipo imagen satelital.
+
+### Cambios implementados
+- `Plano escuela` agrega fuente visual `Satelite` usando teselas Esri World Imagery y conserva `Calles` como alternativa.
+- La cinta y el panel de base mapa permiten alternar `Satelite` / `Calles`, activar la base, moverla, escalarla, rotarla y guardarla.
+- `Registro guiado` agrega accion directa `Satelite` en la confirmacion de ubicacion y en el paso de georreferencia base.
+- Se agrega conversion inversa de punto de lienzo a latitud/longitud Web Mercator, respetando escala, desplazamiento y rotacion de la base.
+- El perimetro del predio muestra una linea amarilla superior, pines amarillos por vertice y coordenadas en formato DMS.
+- Los bloques se rotulan sobre la base con etiquetas grandes tipo `B1`, `B2`, etc., legibles sobre imagen satelital.
+- El modelo exportado agrega `propertyBoundaryGeoVertices` con indice, latitud, longitud y etiqueta DMS.
+- La vista SVG/PDF completa incluye imagen satelital, pines, coordenadas y rotulos de bloques.
+- Version visible, cache y assets actualizados a `v2.6.134`.
+
+### Pendiente operativo
+- Pedir a encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.134`.
+- En campo, usar coordenadas de escuela, activar `Satelite`, ajustar la base si hace falta, confirmar georreferencia y luego dibujar el perimetro del predio.
+- Si Esri no ofrece detalle suficiente en una zona puntual, alternar a `Calles` o ajustar manualmente el contorno y registrar observacion.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
+- Playwright local escritorio: `Plano escuela` muestra `v2.6.134`, activa `Satelite`, carga teselas `World_Imagery`, genera 6 vertices DMS del perimetro, incluye satelite/coordenadas en `pdfHtml`, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: activa satelite, genera vertices DMS y no presenta overflow horizontal.
+
 ## Correcciones observadas en plano vivo y PDF - 2026-05-26 - v2.6.133
 
 ### Objetivo
