@@ -28,8 +28,24 @@
 ### Validaciones ejecutadas
 - `node --check assets/js/mec-form.js`.
 - `node --check assets/js/config.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/initial-questionnaire.js`.
+- `node --check sw.js`.
+- `node -e "JSON.parse(...package.json...)"`: OK.
 - Playwright local escritorio: escuela simulada solo con `LAT_DEC/LNG_DEC`, satelite activo en zoom `17`, 6 vertices DMS generados, sin errores de consola y sin overflow horizontal.
 - Playwright local movil `390x844`: satelite activo en zoom `17`, 6 vertices DMS, sin errores de consola y sin overflow horizontal.
+- `git diff --check`: OK, solo advertencias esperadas de normalizacion LF/CRLF.
+- `git commit`: `736d746 fix: estabilizar base satelital del plano v2.6.135`.
+- `git push origin main`: publica `v2.6.135`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.135` y `PLAN_BASEMAP_SATELLITE_MAX_ZOOM: 17`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.135`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.135`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `LAT_DEC`, mensaje de base apagada y max zoom satelital.
+- Playwright remoto escritorio: escuela simulada solo con `LAT_DEC/LNG_DEC`, satelite activo en zoom `17`, 6 vertices DMS, sin errores de consola y sin overflow horizontal.
+- Playwright remoto movil `390x844`: misma prueba satelital, sin errores de consola y sin overflow horizontal.
 
 ## Plano satelital georreferenciado con vertices y bloques - 2026-05-26 - v2.6.134
 
