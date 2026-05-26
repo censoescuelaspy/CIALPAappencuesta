@@ -273,6 +273,8 @@ const MecFormModule = (() => {
   function _schoolSnapshot(school) {
     const code = school?.codigo_local || school?.codigo || school?.codigo_establecimiento || school?.id_escuela || school?.id || school?.code || '';
     const name = school?.nombre || school?.nombre_escuela || school?.nombre_establecimiento || school?.institucion || school?.name || '';
+    const lat = _firstPresent(school, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'lat_corr', 'LAT_CORR']);
+    const lng = _firstPresent(school, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'lng_corr', 'LONG_CORR']);
     return {
       id_escuela: school?.id_escuela || school?.id || school?.code || '',
       codigo_local: code,
@@ -286,8 +288,8 @@ const MecFormModule = (() => {
       distrito: school?.distrito || '',
       localidad: school?.localidad || school?.barrio || '',
       direccion: school?.direccion || school?.direccion_referencia || school?.referencia || '',
-      latitud: school?.latitud || school?.lat || school?.latitude || '',
-      longitud: school?.longitud || school?.lng || school?.lon || school?.longitude || '',
+      latitud: lat || '',
+      longitud: lng || '',
       zona: school?.zona || '',
       syncedAt: new Date().toISOString(),
     };
@@ -1072,8 +1074,8 @@ const MecFormModule = (() => {
     }
     _data.general = _data.general || {};
     const mapping = {
-      latitud: ['latitud', 'lat', 'latitude'],
-      longitud: ['longitud', 'lng', 'lon', 'longitude'],
+      latitud: ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'lat_corr', 'LAT_CORR'],
+      longitud: ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'lng_corr', 'LONG_CORR'],
       codigo_local: ['codigo_local', 'cod_local', 'codigo', 'id_escuela'],
       departamento: ['departamento'],
       distrito: ['distrito'],
@@ -1099,8 +1101,12 @@ const MecFormModule = (() => {
   function _schoolCoordinateDefaults() {
     const school = _selectedSchoolFromContext() || _data.__selectedSchool || {};
     const general = _data.general || {};
-    const latRaw = _firstPresent(school, ['latitud', 'lat', 'latitude']) || general.latitud || '';
-    const lngRaw = _firstPresent(school, ['longitud', 'lng', 'lon', 'longitude']) || general.longitud || '';
+    const latRaw = _firstPresent(school, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'lat_corr', 'LAT_CORR'])
+      || _firstPresent(general, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'lat_corr', 'LAT_CORR'])
+      || '';
+    const lngRaw = _firstPresent(school, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'lng_corr', 'LONG_CORR'])
+      || _firstPresent(general, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'lng_corr', 'LONG_CORR'])
+      || '';
     const lat = _numberInRange(latRaw, NaN, -85, 85);
     const lng = _numberInRange(lngRaw, NaN, -180, 180);
     return {
@@ -14623,10 +14629,16 @@ const MecFormModule = (() => {
     const siteElements = _ensureSiteElements();
     const blocks = _data.__blocks?.length ? _data.__blocks : [];
     if (!rooms.length && !sanitaries.length && !siteElements.length && !blocks.length) {
+      const baseMap = _ensurePlanBaseMap();
+      const waitText = _planBaseMapVisible(baseMap)
+        ? 'Plano general en espera: pulse Nuevo bloque para iniciar'
+        : (_planBaseMapHasCoords(baseMap)
+          ? 'Base mapa apagada: pulse Satelite y luego Nuevo bloque'
+          : 'Sin mapa: confirme coordenadas de escuela o cargue latitud/longitud');
       ctx.fillStyle = '#667085';
       ctx.font = _canvasFont(700, 18);
       ctx.textAlign = 'center';
-      ctx.fillText('Plano general en espera: pulse Nuevo bloque para iniciar', logical.width / 2, logical.height / 2);
+      ctx.fillText(waitText, logical.width / 2, logical.height / 2);
       return;
     }
 

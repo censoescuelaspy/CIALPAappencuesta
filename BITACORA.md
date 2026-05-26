@@ -4,6 +4,33 @@
 
 ---
 
+## Fallback estable para base satelital del plano - 2026-05-26 - v2.6.135
+
+### Objetivo
+- Corregir el caso reportado donde la base satelital del plano no aparecia o devolvia `Map data yet not available`.
+- Hacer que el plano tome coordenadas aunque la escuela venga con nombres de columna alternativos del padron oficial.
+
+### Diagnostico
+- La funcion satelital quedaba apoyada en zoom alto; en algunas zonas Esri puede devolver teselas sin imagen disponible.
+- El plano reconocia `latitud/longitud`, `lat/lng` y variantes basicas, pero no todos los alias usados por padrones oficiales (`LAT_DEC`, `LNG_DEC`, `lat_dec`, `lng_dec`, `X/Y`, etc.).
+- Si el plano no encontraba coordenadas, quedaba solo la cuadrilla con el mensaje generico de iniciar bloque, sin explicar que faltaba georreferencia.
+
+### Cambios implementados
+- `PLAN_BASEMAP_SATELLITE_MAX_ZOOM` baja a `17` para evitar teselas satelitales de zoom alto sin cobertura.
+- `_schoolSnapshot()`, `_prefillGeneralFromSelectedSchool()` y `_schoolCoordinateDefaults()` reconocen alias amplios de latitud/longitud.
+- El mensaje del plano vacio ahora distingue entre base visible, base apagada con coordenadas y falta de coordenadas.
+- Version visible, cache y assets actualizados a `v2.6.135`.
+
+### Pendiente operativo
+- Pedir a encuestadores `Actualizar app` para tomar `cialpa-app-v2.6.135`.
+- Si una escuela sigue sin base satelital, revisar que la ficha tenga latitud/longitud o corregirla desde datos generales/georreferencia.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- Playwright local escritorio: escuela simulada solo con `LAT_DEC/LNG_DEC`, satelite activo en zoom `17`, 6 vertices DMS generados, sin errores de consola y sin overflow horizontal.
+- Playwright local movil `390x844`: satelite activo en zoom `17`, 6 vertices DMS, sin errores de consola y sin overflow horizontal.
+
 ## Plano satelital georreferenciado con vertices y bloques - 2026-05-26 - v2.6.134
 
 ### Objetivo
