@@ -59,6 +59,14 @@
 - Playwright local escritorio: ficha de aula resalta inmediatamente `Teja` con `mec-choice--active` antes de guardar.
 - Playwright local escritorio: paquete PDF contiene hoja `Vista completa con exteriores` y version `v2.6.133`.
 - `npm.cmd run metrics:web -- --url=http://127.0.0.1:8073/ --viewport=mobile --cache-bust --no-service-worker`: 22 requests, 0 fallidas, 0 HTTP 4xx/5xx y 0 errores/advertencias de consola.
+- `git commit`: `39142d1 fix: corregir plano vivo observaciones v2.6.133`.
+- `git push origin main`: publica `v2.6.133`.
+- Verificacion HTTP de GitHub Pages para `assets/js/config.js`: version `2.6.133`.
+- Verificacion HTTP de GitHub Pages para `sw.js`: cache `cialpa-app-v2.6.133`.
+- Verificacion HTTP de GitHub Pages para `index.html`: contiene `v2.6.133`.
+- Verificacion HTTP de GitHub Pages para `assets/js/mec-form.js`: contiene `Mas abajo`, `Vista completa con exteriores` y `activateChoiceButton`.
+- Verificacion HTTP de GitHub Pages para `assets/js/guided-register.js`: contiene `Extender abajo`, `Agregar planta alta` y `service_connection`.
+- Playwright remoto escritorio y movil `390x844`: `Plano escuela` muestra `v2.6.133`, renderiza canvas, expone `Mas abajo`, permite extender el lienzo a 940 px, sin errores de consola y sin overflow horizontal.
 
 ## Procedimiento operativo de publicacion documentado - 2026-05-24 - docs
 
