@@ -4,6 +4,37 @@
 
 ---
 
+## Script Earth Engine con muestra real - 2026-05-30
+
+### Objetivo
+- Proveer un unico script para Earth Engine que genere exportaciones GeoTIFF para las 86 escuelas muestreadas.
+- Tomar la muestra real desde el Excel operativo de inventario y dejar el codigo listo para copiar/pegar en Code Editor.
+
+### Fuente usada
+- Archivo real localizado: `G:\Mi unidad\CIALPA\03_DATOS\Inventarios_Escuelas\Listado_Relevamiento infraestructura 2026_original_procesado_MUETREO.xlsx`.
+- Hoja usada: `muestra_final`.
+- Columnas usadas: `CODIGO`, `NOMBRE`, `DEPTO`, `DIST`, `LOCALIDAD`, `LAT_DEC`, `LNG_DEC`.
+- Total generado: `86` escuelas con coordenadas.
+
+### Cambios implementados
+- Se agrega `tools/earthengine/cialpa_pilot_batch_template.js` como template reusable para Earth Engine con soporte para lista pegada o tabla Asset.
+- `tools/earthengine/generate_pilot_earthengine_batch.mjs` ahora escapa Unicode en strings para que el script generado sea ASCII y no se rompan acentos al copiar desde consola/editor.
+- Se genera script privado no versionado en `tools/earthengine/output/cialpa_pilot_batch_earthengine.js`.
+- Se genera worklist privada no versionada en `tools/earthengine/output/pilot-schools-worklist.json`.
+
+### Validaciones ejecutadas
+- Extraccion de Excel con `openpyxl`: primera escuela `1005052`, ultima escuela `1108042`.
+- `node --check tools\earthengine\generate_pilot_earthengine_batch.mjs`.
+- `node --check tools\earthengine\output\cialpa_pilot_batch_earthengine.js`.
+- `node --check tools\earthengine\cialpa_pilot_batch_template.js`.
+- `rg` confirma que el script privado generado queda ASCII luego de escapar caracteres Unicode.
+
+### Pendiente operativo
+- Copiar `tools\earthengine\output\cialpa_pilot_batch_earthengine.js` en Earth Engine Code Editor.
+- Ejecutar `Run`; luego abrir `Tasks` y lanzar las 86 tareas de exportacion a Drive.
+- Si Earth Engine se vuelve incomodo con 86 tareas, cambiar `EXPORT_START_INDEX` y `EXPORT_LIMIT` para procesar tandas.
+- Descargar/sincronizar los GeoTIFFs de `CIALPA_EE_PILOTO_ESCUELAS` y correr `install_pilot_highres_batch.py`.
+
 ## Lote de imagenes alta resolucion muestra piloto - 2026-05-30
 
 ### Objetivo

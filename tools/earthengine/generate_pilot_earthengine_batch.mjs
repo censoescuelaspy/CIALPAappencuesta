@@ -68,7 +68,9 @@ function slugify(value, fallback = 'ESCUELA') {
 }
 
 function js(value) {
-  return JSON.stringify(value);
+  return JSON.stringify(value).replace(/[\u007f-\uffff]/g, char =>
+    `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`
+  );
 }
 
 function normalizeSchool(row, index) {
