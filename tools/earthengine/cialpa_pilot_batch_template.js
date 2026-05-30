@@ -8,6 +8,8 @@
 //   ya configurada en la app. No usar este script para descargar/cachar Google.
 // - Si Earth Engine muestra "caller does not have access", falta habilitar
 //   acceso Planet/NICFI en la cuenta.
+//   Pasos: Planet Account Settings -> Access NICFI Data in Google Earth Engine
+//   -> Add to Earth Engine -> ingresar el email exacto de esta cuenta GEE.
 
 // ---------------------------------------------------------------------------
 // 1) ESCUELAS PILOTO
@@ -131,12 +133,14 @@ var PREVIEW_COUNT = 3;
 
 var NICFI_START_DATE = '2024-01-01';
 var NICFI_END_DATE = '2026-01-01';
+var EXPORT_NICFI = true; // requiere acceso Planet/NICFI habilitado en esta cuenta.
 var EXPORT_SCALE_METERS = 4.77;
 var EXPORT_RAW_RGB = true; // true recomendado para convertir luego a tiles.
 var NICFI_VIS = { bands: ['R', 'G', 'B'], min: 64, max: 5454, gamma: 1.4 };
 
 // Sentinel-2 queda solo como emergencia tecnica. Es de 10 m y no sirve para
-// bloques finos. Mantener false salvo que se quiera probar el pipeline.
+// bloques finos. Si NICFI no esta habilitado, se puede poner EXPORT_NICFI=false
+// y EXPORT_SENTINEL2_FALLBACK=true para probar el lote, pero no sera alta res.
 var EXPORT_SENTINEL2_FALLBACK = false;
 var S2_START_DATE = '2024-01-01';
 var S2_END_DATE = '2026-05-30';
@@ -257,9 +261,12 @@ function runExports(rawSchools) {
 
   Map.setOptions('SATELLITE');
 
-  var nicfiBase = ee.ImageCollection('projects/planet-nicfi/assets/basemaps/americas')
-    .filterDate(NICFI_START_DATE, NICFI_END_DATE)
-    .sort('system:time_start', false);
+  var nicfiBase = null;
+  if (EXPORT_NICFI) {
+    nicfiBase = ee.ImageCollection('projects/planet-nicfi/assets/basemaps/americas')
+      .filterDate(NICFI_START_DATE, NICFI_END_DATE)
+      .sort('system:time_start', false);
+  }
 
   var s2Base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
     .filterDate(S2_START_DATE, S2_END_DATE)
@@ -284,10 +291,6 @@ function runExports(rawSchools) {
   selectedSchools.forEach(function(school, localIndex) {
     var point = ee.Geometry.Point([school.lon, school.lat]);
     var roi = point.buffer(BUFFER_METERS).bounds();
-    var nicfi = nicfiBase.filterBounds(roi);
-    var latest = ee.Image(nicfi.first()).clip(roi);
-    var rgb = latest.select(['R', 'G', 'B']);
-    var exportImage = EXPORT_RAW_RGB ? rgb : rgb.visualize(NICFI_VIS);
     var exportName = fileNameForSchool(school);
 
     if (localIndex < PREVIEW_COUNT) {
@@ -297,23 +300,33 @@ function runExports(rawSchools) {
         width: 2
       });
       Map.addLayer(roiOutline, { palette: ['yellow'] }, 'ROI ' + school.code, false);
-      Map.addLayer(latest, NICFI_VIS, 'NICFI preview ' + school.code, localIndex === 0);
-      print('NICFI cantidad imagenes ' + school.code, nicfi.size());
     }
 
-    Export.image.toDrive({
-      image: exportImage,
-      description: exportName,
-      folder: DRIVE_FOLDER,
-      fileNamePrefix: exportName,
-      region: roi,
-      scale: EXPORT_SCALE_METERS,
-      maxPixels: 1e9,
-      fileFormat: 'GeoTIFF',
-      formatOptions: {
-        cloudOptimized: true
+    if (EXPORT_NICFI) {
+      var nicfi = nicfiBase.filterBounds(roi);
+      var latest = ee.Image(nicfi.first()).clip(roi);
+      var rgb = latest.select(['R', 'G', 'B']);
+      var exportImage = EXPORT_RAW_RGB ? rgb : rgb.visualize(NICFI_VIS);
+
+      if (localIndex < PREVIEW_COUNT) {
+        Map.addLayer(latest, NICFI_VIS, 'NICFI preview ' + school.code, localIndex === 0);
+        print('NICFI cantidad imagenes ' + school.code, nicfi.size());
       }
-    });
+
+      Export.image.toDrive({
+        image: exportImage,
+        description: exportName,
+        folder: DRIVE_FOLDER,
+        fileNamePrefix: exportName,
+        region: roi,
+        scale: EXPORT_SCALE_METERS,
+        maxPixels: 1e9,
+        fileFormat: 'GeoTIFF',
+        formatOptions: {
+          cloudOptimized: true
+        }
+      });
+    }
 
     if (EXPORT_SENTINEL2_FALLBACK) {
       var s2 = s2Base.filterBounds(roi).median().clip(roi).select(['B4', 'B3', 'B2']);
