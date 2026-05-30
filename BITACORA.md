@@ -58,6 +58,11 @@ py -3 tools\earthengine\install_pilot_highres_batch.py --src-dir="G:\Mi unidad\C
 - Activar fuentes locales solo despues de revision visual; si NICFI no mejora la lectura, seguir usando Google online para trazado manual.
 - `git push origin main` sigue sujeto a corregir la autenticacion GitHub HTTPS/SSH del equipo.
 
+### Commit y publicacion
+- Commit local de implementacion creado.
+- Se intento `git push origin main`, pero el proceso quedo esperando autenticacion en Git Credential Manager y fue cerrado para no dejar procesos colgados.
+- Verificacion remota posterior: `origin/main` sigue en `8b86ecb`, por lo que los commits locales aun no estan publicados.
+
 ## Piloto Earth Engine alta resolucion Isla Tuyu - 2026-05-30 - v2.6.142
 
 ### Objetivo
