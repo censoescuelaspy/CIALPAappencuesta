@@ -24,6 +24,10 @@ tools/simulation/demo-output/
 tools/simulation/metrics/
 tools/location-audit/output/
 tools/database/output/
+tools/earthengine/output/
+tools/earthengine/*.csv
+tools/earthengine/*.tif
+tools/earthengine/*.tiff
 
 # Credenciales locales
 .env

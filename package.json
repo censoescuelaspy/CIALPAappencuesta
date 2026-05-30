@@ -8,6 +8,8 @@
     "simulate:ui": "playwright test --config=tools/simulation/playwright.config.mjs",
     "metrics:web": "node tools/simulation/cialpa_web_metrics.mjs",
     "audit:locations": "node tools/location-audit/verify_school_locations.mjs",
+    "imagery:worklist": "node tools/earthengine/build_pilot_imagery_worklist.mjs",
+    "imagery:ee-batch": "node tools/earthengine/generate_pilot_earthengine_batch.mjs",
     "build:r01-schools": "node tools/simulation/build_r01_public_schools.mjs",
     "embed:schools": "node tools/simulation/embed_schools_csv.mjs",
     "db:api": "node tools/database/cialpa_db_api.mjs",

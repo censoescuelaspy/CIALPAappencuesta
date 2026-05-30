@@ -1,8 +1,119 @@
-# Piloto Earth Engine - Isla Tuyu 101095
+# Imagenes de alta resolucion para planos CIALPA
 
-Este directorio contiene el piloto para generar una base de imagen alrededor de una escuela y preparar su vinculacion al plano de CIALPA cuando exista una fuente realmente util.
+Este directorio contiene los scripts para preparar imagenes por escuela y
+vincularlas al plano vivo de CIALPA.
 
-## Escuela piloto
+Hay dos caminos complementarios:
+
+1. **Base Google online en la app**: sirve para dibujar manualmente perimetros,
+   bloques, caminos y referencias con la mejor nitidez disponible en pantalla.
+2. **GeoTIFF/tiles locales por escuela**: sirve cuando existe una fuente
+   exportable con licencia, por ejemplo NICFI/Planet en Earth Engine u otra
+   ortofoto/submetro. El fondo Google `SATELLITE` visible en Earth Engine no es
+   un `ee.Image` exportable.
+
+## Flujo para toda la muestra piloto
+
+La lista con coordenadas no debe subirse al repositorio. Por eso el flujo genera
+archivos privados bajo `tools/earthengine/output/`, carpeta ignorada por git.
+
+### 1. Crear worklist privada
+
+Opcion con usuario y clave CIALPA:
+
+```powershell
+$env:CIALPA_USER='usuario'
+$env:CIALPA_PASSWORD='clave'
+node tools\earthengine\build_pilot_imagery_worklist.mjs
+```
+
+Opcion con token de sesion:
+
+```powershell
+$env:CIALPA_API_TOKEN='token-de-sesion'
+node tools\earthengine\build_pilot_imagery_worklist.mjs
+```
+
+Opcion desde CSV/JSON privado ya exportado:
+
+```powershell
+node tools\earthengine\build_pilot_imagery_worklist.mjs --input="C:\privado\muestra_piloto.csv"
+```
+
+Salida esperada:
+
+```text
+tools/earthengine/output/pilot-schools-worklist.json
+```
+
+### 2. Generar script Earth Engine por lote
+
+```powershell
+node tools\earthengine\generate_pilot_earthengine_batch.mjs
+```
+
+Salida esperada:
+
+```text
+tools/earthengine/output/cialpa_pilot_batch_earthengine.js
+```
+
+Abrir ese archivo, pegarlo en Google Earth Engine Code Editor y ejecutar. El
+script crea una tarea `Export.image.toDrive` por escuela seleccionada.
+
+Para procesar por partes, generar o editar el script con indices:
+
+```powershell
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --start=0 --limit=25
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --start=25 --limit=25
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --start=50 --limit=25
+```
+
+En Earth Engine tambien se pueden ajustar:
+
+```javascript
+var EXPORT_START_INDEX = 0;
+var EXPORT_LIMIT = 25; // 0 = todas las escuelas restantes.
+```
+
+### 3. Descargar GeoTIFFs desde Drive
+
+La carpeta Drive por defecto es:
+
+```text
+CIALPA_EE_PILOTO_ESCUELAS
+```
+
+Cada archivo lleva el codigo de escuela en el nombre. Ejemplo:
+
+```text
+CIALPA_PILOTO_1_101095_101095_ESCUELA_BASICA_N_2076_NICFI_RGB_2024_2026.tif
+```
+
+### 4. Convertir e instalar tiles locales
+
+Para una escuela:
+
+```powershell
+py -3 tools\earthengine\install_school_highres.py "G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS\CIALPA_PILOTO_1_101095_101095_ESCUELA_BASICA_N_2076_NICFI_RGB_2024_2026.tif" --school-code=101095
+```
+
+Para convertir todas las descargas encontradas en una carpeta:
+
+```powershell
+py -3 tools\earthengine\install_pilot_highres_batch.py --src-dir="G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS"
+```
+
+Para activar las fuentes locales en la app despues de revisar visualmente:
+
+```powershell
+py -3 tools\earthengine\install_pilot_highres_batch.py --src-dir="G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS" --activate
+```
+
+El `--activate` actualiza `APP_CONFIG.PLAN_BASEMAP_HIGHRES_SOURCES` sin borrar
+otras escuelas ya activadas.
+
+## Piloto Isla Tuyu 101095
 
 - Codigo local: `101095`
 - Institucion: `ESCUELA BASICA N 2076`
@@ -12,57 +123,32 @@ Este directorio contiene el piloto para generar una base de imagen alrededor de 
 - Centro: `-23.0827577778, -56.94791`
 - Radio de prueba: `500 m`
 
-## Flujo recomendado
-
-1. Abrir Earth Engine Code Editor.
-2. Aceptar el repo si corresponde: `https://code.earthengine.google.com/?accept_repo=users/dmezapyPyGreen/censoescuelaspy`.
-3. Pegar o abrir `isla_tuyu_101095_pilot.js`.
-4. Ejecutar el script. Ahora intenta `NICFI` por defecto y no exporta Sentinel-2, para evitar volver a cargar imagenes borrosas.
-5. Si Earth Engine muestra `ImageCollection asset ... not found` o `caller does not have access`, primero habilitar acceso Planet/NICFI en esa cuenta.
-6. Si `NICFI RGB mas reciente` se ve mejor que la base satelital, lanzar el export GeoTIFF a Drive.
-7. Descargar el GeoTIFF esperado a la carpeta local:
+Script manual:
 
 ```text
-G:\Mi unidad\CIALPA_EE_PILOTO_ISLA_TUYU\CIALPA_101095_ISLA_TUYU_NICFI_RGB_2024_2026.tif
+tools/earthengine/isla_tuyu_101095_pilot.js
 ```
 
-8. Convertirlo a tiles y preparar el manifiesto:
+Ese script intenta `NICFI` por defecto y no exporta Sentinel-2, para evitar
+volver a cargar imagenes borrosas.
 
-```powershell
-py -3 tools\earthengine\install_school_highres.py "G:\Mi unidad\CIALPA_EE_PILOTO_ISLA_TUYU\CIALPA_101095_ISLA_TUYU_NICFI_RGB_2024_2026.tif"
-```
+## Sentinel-2
 
-9. Revisar visualmente la app o los tiles. Si realmente mejora la base satelital, activar el boton en la app:
+Sentinel-2 queda solo como prueba tecnica de pipeline. Su resolucion de 10 m no
+alcanza para identificar bloques finos, asi que no debe activarse como capa
+operativa de alta resolucion.
 
-```powershell
-py -3 tools\earthengine\install_school_highres.py "G:\Mi unidad\CIALPA_EE_PILOTO_ISLA_TUYU\CIALPA_101095_ISLA_TUYU_NICFI_RGB_2024_2026.tif" --activate
-```
+## Notas operativas
 
-El comando `--activate` actualiza `APP_CONFIG.PLAN_BASEMAP_HIGHRES_SOURCES` para la escuela `101095`.
-
-## Fallback Sentinel-2 usado en el primer ensayo
-
-Para repetir solamente la prueba de pipeline con Sentinel-2, cambiar en `isla_tuyu_101095_pilot.js`:
-
-```javascript
-var ENABLE_NICFI = false;
-var EXPORT_SENTINEL2_FALLBACK = true;
-```
-
-Luego convertir el GeoTIFF S2 con:
-
-```powershell
-py -3 tools\earthengine\geotiff_to_xyz_tiles.py "G:\Mi unidad\CIALPA_EE_PILOTO_ISLA_TUYU\CIALPA_101095_ISLA_TUYU_S2_RGB_2024_2026.tif" "assets\imagery\schools\101095\tiles" --min-zoom 17 --max-zoom 19
-```
-
-No activar esta capa en la app; el ensayo Sentinel-2 10 m quedo desactivado porque se ve borroso frente a la base satelital.
-
-## Notas
-
-- La imagen muy nitida que aparece como fondo `SATELLITE` en Earth Engine es el basemap de Google del visor. Sirve para inspeccion visual, pero no es un `ee.Image` exportable con `Export.image.toDrive`.
-- En la app, el equivalente operativo online es mantener la base `Satelite`; la capa local "alta resolucion" solo debe activarse si una fuente exportable supera visualmente esa base.
-- Si se necesita la misma nitidez visual de Google dentro de la app, configurar una API key oficial de Google Map Tiles en `APP_CONFIG.GOOGLE_MAP_TILES_API_KEY`. La app mostrara la opcion `Google` en el plano cuando esa clave exista.
-- `Sentinel-2` ya fue usado como primer ensayo y funciona para probar el pipeline, pero su resolucion de 10 m no alcanza para bloques finos. Por eso no debe mostrarse como capa operativa en la app.
-- `NICFI` puede mejorar el contexto porque su resolucion aproximada es de 4.77 m, pero requiere acceso habilitado en la cuenta Earth Engine. Para dibujar bloques finos puede no alcanzar; si se consigue una ortofoto o imagen submetro con licencia, se conserva la misma estructura de tiles.
-- No subir tiles comerciales o restringidos al repositorio sin confirmar licencia de redistribucion.
-- El manifiesto app-ready esta en `assets/data/highres-school-pilot-isla-tuyu-101095.json`.
+- La muestra piloto vigente fue diagnosticada como `86` escuelas en el backend.
+  El usuario puede referirse a "casi 90"; el flujo soporta todas las que vengan
+  en la worklist privada.
+- Si Earth Engine muestra `ImageCollection asset ... not found` o `caller does
+  not have access`, falta habilitar acceso Planet/NICFI en esa cuenta.
+- NICFI tiene resolucion aproximada de `4.77 m`; puede mejorar contexto, pero no
+  iguala la nitidez submetro de Google. Para dibujar bloques finos, la base
+  Google online sigue siendo la referencia visual principal.
+- Si se consigue ortofoto o imagen submetro con licencia, usar el mismo
+  instalador de GeoTIFF y la misma estructura de tiles.
+- No subir worklists privadas, coordenadas operativas ni tiles comerciales o
+  restringidos al repositorio sin confirmar licencia de redistribucion.

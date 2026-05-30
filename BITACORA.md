@@ -4,6 +4,60 @@
 
 ---
 
+## Lote de imagenes alta resolucion muestra piloto - 2026-05-30
+
+### Objetivo
+- Escalar el flujo de imagenes por escuela desde el piloto Isla Tuyu `101095` a la muestra piloto completa.
+- Mantener el dibujo de perimetros y bloques como tarea manual del operador sobre una base visual nitida.
+- Evitar publicar coordenadas operativas, worklists privadas o tiles restringidos dentro del repositorio.
+
+### Criterio operativo
+- La muestra piloto vigente fue diagnosticada en backend como `86` escuelas; el usuario la refiere como "casi 90".
+- Para trabajo online, la base `Google`/Map Tiles queda como referencia visual principal para identificar predio, edificios, caminos y contexto.
+- Para archivos descargables, Earth Engine solo puede exportar datasets exportables como NICFI/Planet u otra fuente licenciada; el fondo Google `SATELLITE` visto en Earth Engine no es exportable.
+- NICFI se conserva como pipeline tecnico aproximado de `4.77 m`; si no alcanza para bloques finos, se reemplaza por ortofoto/submetro usando el mismo instalador.
+
+### Cambios implementados
+- Se agrega `tools/earthengine/build_pilot_imagery_worklist.mjs` para crear una worklist privada desde credenciales/token CIALPA o desde CSV/JSON privado con coordenadas.
+- Se agrega `tools/earthengine/generate_pilot_earthengine_batch.mjs` para generar un script de Earth Engine por lote con `Export.image.toDrive` para todas las escuelas de la worklist.
+- Se agrega `tools/earthengine/install_pilot_highres_batch.py` para convertir en lote los GeoTIFF descargados desde Drive y preparar tiles por codigo de escuela.
+- `tools/earthengine/install_school_highres.py` deja de estar atado a `101095`; ahora acepta `--school-code`, crea manifiestos por escuela y activa fuentes sin borrar otras entradas.
+- `.gitignore` excluye `tools/earthengine/output/`, CSV privados y GeoTIFFs locales de Earth Engine.
+- `package.json` incorpora scripts `imagery:worklist` e `imagery:ee-batch`.
+- `tools/earthengine/README.md` documenta el flujo completo: worklist privada, script Earth Engine, descarga de GeoTIFFs e instalacion de tiles.
+
+### Uso resumido
+```powershell
+$env:CIALPA_USER='usuario'
+$env:CIALPA_PASSWORD='clave'
+npm run imagery:worklist
+npm run imagery:ee-batch
+```
+
+Luego abrir `tools/earthengine/output/cialpa_pilot_batch_earthengine.js` en Earth Engine Code Editor, ejecutar y lanzar las tareas desde `Tasks`.
+
+Para instalar los GeoTIFFs descargados:
+
+```powershell
+py -3 tools\earthengine\install_pilot_highres_batch.py --src-dir="G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS"
+```
+
+### Validaciones ejecutadas
+- `node --check tools\earthengine\build_pilot_imagery_worklist.mjs`.
+- `node --check tools\earthengine\generate_pilot_earthengine_batch.mjs`.
+- `py -3 -m py_compile tools\earthengine\geotiff_to_xyz_tiles.py tools\earthengine\install_school_highres.py tools\earthengine\install_pilot_highres_batch.py`.
+- Parse de `package.json`.
+- Ayuda CLI verificada para los generadores de worklist y script Earth Engine.
+- Generacion de script Earth Engine con worklist ficticia bajo `tools/earthengine/output/`; sintaxis validada y archivos temporales eliminados.
+- `rg` confirma que los archivos nuevos no introducen caracteres no ASCII.
+
+### Pendiente operativo
+- Ejecutar `npm run imagery:worklist` con token o credenciales reales CIALPA para producir la worklist privada de las 86 escuelas con coordenadas.
+- Generar el script Earth Engine real y procesar la muestra en tandas si la cola de tareas resulta extensa.
+- Descargar los GeoTIFFs desde Drive y correr el instalador por lote.
+- Activar fuentes locales solo despues de revision visual; si NICFI no mejora la lectura, seguir usando Google online para trazado manual.
+- `git push origin main` sigue sujeto a corregir la autenticacion GitHub HTTPS/SSH del equipo.
+
 ## Piloto Earth Engine alta resolucion Isla Tuyu - 2026-05-30 - v2.6.142
 
 ### Objetivo
