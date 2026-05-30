@@ -21,6 +21,8 @@
 - `tools/earthengine/generate_pilot_earthengine_batch.mjs` ahora escapa Unicode en strings para que el script generado sea ASCII y no se rompan acentos al copiar desde consola/editor.
 - Se genera script privado no versionado en `tools/earthengine/output/cialpa_pilot_batch_earthengine.js`.
 - Se genera worklist privada no versionada en `tools/earthengine/output/pilot-schools-worklist.json`.
+- `tools/earthengine/cialpa_pilot_batch_template.js` queda completado con las 86 escuelas reales en `SCHOOLS`, para poder copiar el archivo directamente en Earth Engine sin depender del generador.
+- Se corrige la localidad de `1006058` a `3 DE FEBRERO`, cruzando con el padron publico local, porque el Excel traia esa celda como fecha textual.
 
 ### Validaciones ejecutadas
 - Extraccion de Excel con `openpyxl`: primera escuela `1005052`, ultima escuela `1108042`.
@@ -28,6 +30,7 @@
 - `node --check tools\earthengine\output\cialpa_pilot_batch_earthengine.js`.
 - `node --check tools\earthengine\cialpa_pilot_batch_template.js`.
 - `rg` confirma que el script privado generado queda ASCII luego de escapar caracteres Unicode.
+- Verificacion del arreglo embebido: `SCHOOLS.length = 86`; primera escuela `1005052`, ultima escuela `1108042`.
 
 ### Pendiente operativo
 - Copiar `tools\earthengine\output\cialpa_pilot_batch_earthengine.js` en Earth Engine Code Editor.
