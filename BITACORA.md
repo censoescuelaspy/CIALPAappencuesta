@@ -9,6 +9,7 @@
 ### Objetivo
 - Proveer un unico script para Earth Engine que genere exportaciones GeoTIFF para las 86 escuelas muestreadas.
 - Tomar la muestra real desde el Excel operativo de inventario y dejar el codigo listo para copiar/pegar en Code Editor.
+- Resolver el problema operativo de tener que iniciar manualmente una tarea por escuela en la pestaña `Tasks`.
 
 ### Fuente usada
 - Archivo real localizado: `G:\Mi unidad\CIALPA\03_DATOS\Inventarios_Escuelas\Listado_Relevamiento infraestructura 2026_original_procesado_MUETREO.xlsx`.
@@ -23,6 +24,8 @@
 - Se genera worklist privada no versionada en `tools/earthengine/output/pilot-schools-worklist.json`.
 - `tools/earthengine/cialpa_pilot_batch_template.js` queda completado con las 86 escuelas reales en `SCHOOLS`, para poder copiar el archivo directamente en Earth Engine sin depender del generador.
 - Se corrige la localidad de `1006058` a `3 DE FEBRERO`, cruzando con el padron publico local, porque el Excel traia esa celda como fecha textual.
+- Se agrega `tools/earthengine/start_pilot_ee_exports.py` para iniciar automaticamente las tareas de exportacion con la API Python de Earth Engine mediante `task.start()`.
+- `tools/earthengine/README.md` documenta el flujo sin clic manual, instalacion de `earthengine-api`, autenticacion y ejecucion por tandas.
 
 ### Validaciones ejecutadas
 - Extraccion de Excel con `openpyxl`: primera escuela `1005052`, ultima escuela `1108042`.
@@ -31,11 +34,15 @@
 - `node --check tools\earthengine\cialpa_pilot_batch_template.js`.
 - `rg` confirma que el script privado generado queda ASCII luego de escapar caracteres Unicode.
 - Verificacion del arreglo embebido: `SCHOOLS.length = 86`; primera escuela `1005052`, ultima escuela `1108042`.
+- `py -3 -m py_compile tools\earthengine\start_pilot_ee_exports.py`.
+- `py -3 tools\earthengine\start_pilot_ee_exports.py --source=s2 --limit=1 --dry-run`: genera nombre de exportacion y log privado sin iniciar tareas reales.
 
 ### Pendiente operativo
 - Copiar `tools\earthengine\output\cialpa_pilot_batch_earthengine.js` en Earth Engine Code Editor.
 - Ejecutar `Run`; luego abrir `Tasks` y lanzar las 86 tareas de exportacion a Drive.
 - Si Earth Engine se vuelve incomodo con 86 tareas, cambiar `EXPORT_START_INDEX` y `EXPORT_LIMIT` para procesar tandas.
+- Alternativa recomendada para no hacer clic por tarea: ejecutar `py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi`.
+- En el Python local actual puede faltar el paquete `ee`; instalar con `py -3 -m pip install earthengine-api`.
 - Descargar/sincronizar los GeoTIFFs de `CIALPA_EE_PILOTO_ESCUELAS` y correr `install_pilot_highres_batch.py`.
 
 ## Lote de imagenes alta resolucion muestra piloto - 2026-05-30

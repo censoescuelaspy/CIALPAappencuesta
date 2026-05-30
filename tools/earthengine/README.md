@@ -61,6 +61,50 @@ tools/earthengine/output/cialpa_pilot_batch_earthengine.js
 Abrir ese archivo, pegarlo en Google Earth Engine Code Editor y ejecutar. El
 script crea una tarea `Export.image.toDrive` por escuela seleccionada.
 
+Importante: en Code Editor, Earth Engine deja esas tareas en la pestaña
+`Tasks`; normalmente hay que iniciarlas una por una. Para evitar ese paso,
+usar el modo Python de la seccion siguiente.
+
+### 2b. Iniciar todas las tareas sin hacer clic una por una
+
+Instalar la API Python si falta:
+
+```powershell
+py -3 -m pip install earthengine-api
+```
+
+Autenticar y lanzar las exportaciones desde Python:
+
+```powershell
+py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi
+```
+
+Ese comando lee:
+
+```text
+tools/earthengine/output/pilot-schools-worklist.json
+```
+
+y ejecuta automaticamente `task.start()` para cada escuela. Earth Engine decide
+cuantas tareas corren en paralelo y cuantas quedan en cola.
+
+Para probar sin iniciar tareas reales:
+
+```powershell
+py -3 tools\earthengine\start_pilot_ee_exports.py --source=s2 --limit=1 --dry-run
+```
+
+Para lanzar por tandas:
+
+```powershell
+py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi --start=0 --limit=25
+py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi --start=25 --limit=25
+py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi --start=50 --limit=25
+```
+
+Cada corrida deja un log privado en `tools/earthengine/output/` con los IDs de
+tareas iniciadas.
+
 Para procesar por partes, generar o editar el script con indices:
 
 ```powershell
