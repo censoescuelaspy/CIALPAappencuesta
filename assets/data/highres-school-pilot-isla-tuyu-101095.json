@@ -1,0 +1,53 @@
+{
+  "schema": "cialpa_highres_school_basemap_v1",
+  "status": "disabled_sentinel2_not_operational",
+  "generated_at": "2026-05-30",
+  "school": {
+    "code": "101095",
+    "name": "ESCUELA BASICA N 2076",
+    "department": "CONCEPCION",
+    "district": "PASO BARRETO",
+    "locality": "ISLA TUYU",
+    "source_dms": {
+      "lat": "23º4'57.928\"S",
+      "lng": "56º56'52.476\"W"
+    },
+    "center": {
+      "lat": -23.08275777777778,
+      "lng": -56.94790999999999
+    }
+  },
+  "area": {
+    "buffer_m": 500,
+    "bbox_wgs84": {
+      "west": -56.95279244690255,
+      "south": -23.087249333652736,
+      "east": -56.94302755309744,
+      "north": -23.078266221902823
+    }
+  },
+  "tiles": {
+    "template": "assets/imagery/schools/101095/tiles/{z}/{x}/{y}.png",
+    "local_folder": "assets/imagery/schools/101095/tiles",
+    "min_zoom": 17,
+    "max_zoom": 19,
+    "coverage_xyz": [
+      { "z": 17, "x_min": 44800, "x_max": 44803, "y_min": 74175, "y_max": 74178, "tile_count": 20 },
+      { "z": 18, "x_min": 89600, "x_max": 89607, "y_min": 148350, "y_max": 148357, "tile_count": 72 },
+      { "z": 19, "x_min": 179200, "x_max": 179214, "y_min": 296701, "y_max": 296715, "tile_count": 240 }
+    ]
+  },
+  "earth_engine": {
+    "script": "tools/earthengine/isla_tuyu_101095_pilot.js",
+    "drive_folder": "CIALPA_EE_PILOTO_ISLA_TUYU",
+    "recommended_dataset": "projects/planet-nicfi/assets/basemaps/americas",
+    "fallback_dataset": "COPERNICUS/S2_SR_HARMONIZED",
+    "used_export": "G:/Mi unidad/CIALPA_EE_PILOTO_ISLA_TUYU/CIALPA_101095_ISLA_TUYU_S2_RGB_2024_2026.tif",
+    "recommended_export": "CIALPA_101095_ISLA_TUYU_NICFI_RGB_2024_2026.tif"
+  },
+  "app": {
+    "basemap_source": "",
+    "attribution": "Sentinel-2 / Earth Engine - piloto Isla Tuyu 101095",
+    "notes": "Tiles S2 10 m generados en assets/imagery/schools/101095/tiles. Quedaron desactivados en la interfaz porque no sirven para identificar bloques; para uso operativo se debe reemplazar por ortofoto/submetro o una fuente licenciada de mayor resolucion."
+  }
+}

@@ -4,6 +4,86 @@
 
 ---
 
+## Piloto Earth Engine alta resolucion Isla Tuyu - 2026-05-30 - v2.6.142
+
+### Objetivo
+- Ensayar una capa de imagen de alta resolucion para una escuela concreta de Isla Tuyu, Paraguay, antes de escalar a mas escuelas.
+- Dejar preparado el flujo para exportar desde Google Earth Engine, convertir a tiles y vincularlos al plano vivo de la app.
+- Mantener la operacion final como trazado manual de perimetros y bloques sobre una base visual nitida.
+
+### Escuela piloto
+- Codigo local: `101095`.
+- Institucion: `ESCUELA BASICA N 2076`.
+- Ubicacion: Concepcion / Paso Barreto / Isla Tuyu.
+- Coordenadas de padron: `23º4'57.928"S`, `56º56'52.476"W`.
+- Coordenadas decimales usadas: `-23.08275777777778`, `-56.94790999999999`.
+
+### Cambios implementados
+- Se agrega `tools/earthengine/isla_tuyu_101095_pilot.js` para ejecutar en Earth Engine Code Editor.
+- El script prepara ROI de 500 m, visualiza punto/area, usa NICFI Americas como fuente recomendada y Sentinel-2 como fallback de menor resolucion.
+- Se agrega manifiesto app-ready en `assets/data/highres-school-pilot-isla-tuyu-101095.json`.
+- Se agrega carpeta destino `assets/imagery/schools/101095/tiles/` para colocar tiles XYZ exportados/convertidos.
+- `APP_CONFIG` deja `PLAN_BASEMAP_HIGHRES_SOURCES` sin fuentes activas porque la imagen Sentinel-2 10 m no aporta utilidad operativa.
+- `mec-form.js` mantiene soporte tecnico para una futura fuente `highres`, pero si un borrador viejo quedo con `source: highres` ahora cae automaticamente a `Satelite`.
+- El boton local `S2 10 m` queda desactivado/no visible hasta contar con ortofoto, submetro o fuente licenciada de mayor resolucion.
+- `isla_tuyu_101095_pilot.js` pasa a intentar `NICFI` por defecto y apaga el export Sentinel-2 para no volver a generar una capa borrosa como candidata operativa.
+- El script ahora imprime una advertencia explicita: el fondo `SATELLITE` nitido del visor Earth Engine no es un `ee.Image` exportable; se usa solo para inspeccion visual.
+- El ROI en Earth Engine cambia de poligono amarillo a borde amarillo para no tapar la imagen satelital durante la inspeccion.
+- Se agrega `tools/earthengine/install_school_highres.py` para convertir un GeoTIFF NICFI descargado, actualizar el manifiesto y activar la fuente local solo con `--activate`.
+- Se comprueba que Esri World Imagery devuelve imagen real en z17 para Isla Tuyu, pero z18-z21 devuelven tiles livianos de baja utilidad; por eso al acercar se ve borroso.
+- Se agrega soporte opcional para Google Map Tiles API como fuente `Google` del plano vivo, visible solo si `APP_CONFIG.GOOGLE_MAP_TILES_API_KEY` esta configurado.
+- Se mantiene el trazado manual de perimetros y bloques sobre la base `Google`/`Satelite`.
+- Se retira el asistente semiautomatico de imagen para `Predio` y `Bloques` porque no dio resultados confiables en la prueba operativa.
+- El ribbon conserva `Google`, `Terreno` y `Detalle` para ubicar la escuela, ver contexto de caminos/terreno y volver al detalle del edificio.
+- El zoom de la fuente local se limita al rango disponible de tiles, `17-19`, para evitar solicitudes inexistentes.
+- El service worker deja de precachear el manifiesto S2 piloto porque no se usa en la interfaz operativa.
+- Version visible, cache y assets actualizados a `v2.6.142`.
+
+### Bloqueo operativo
+- El CLI local de Earth Engine existe, pero la credencial actual falla con `deleted_client: The OAuth client was deleted`.
+- Por ese motivo no se pudieron lanzar tareas de exportacion desde consola en esta sesion.
+- `earthengine ls projects/planet-nicfi/assets/basemaps/americas` falla por la misma credencial antes de poder validar permisos NICFI.
+- El script queda listo para ejecutar desde Code Editor luego de reautenticar Earth Engine y habilitar/acceder a Planet NICFI.
+
+### Pendiente operativo
+- Si se quiere mejorar resolucion, habilitar NICFI en Earth Engine o conseguir una ortofoto/submetro con licencia.
+- La imagen Sentinel-2 cargada no permite identificar bloques; se desactiva en la interfaz y queda solo como prueba tecnica del pipeline, no como insumo operativo de trazado arquitectonico.
+- Descargar el export NICFI esperado `CIALPA_101095_ISLA_TUYU_NICFI_RGB_2024_2026.tif` y ejecutar `install_school_highres.py`; activar con `--activate` solo si supera visualmente a la base satelital.
+- Si se consigue imagen submetro/ortofoto con licencia, usar el mismo instalador y estructura de tiles.
+- Mantener la API key de Google restringida por referer/dominio y por API permitida antes de uso productivo.
+- Probar en navegador real: seleccionar escuela `101095`, abrir plano, confirmar que ya no aparece el boton `S2 10 m`, que `Google` carga como base visual y que el perimetro se coloca manualmente.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check tools/earthengine/isla_tuyu_101095_pilot.js`.
+- `py -3 -m py_compile tools\earthengine\geotiff_to_xyz_tiles.py tools\earthengine\install_school_highres.py`.
+- Parse JSON de `assets/data/highres-school-pilot-isla-tuyu-101095.json`.
+- GeoTIFF descargado localizado en `G:\Mi unidad\CIALPA_EE_PILOTO_ISLA_TUYU\CIALPA_101095_ISLA_TUYU_S2_RGB_2024_2026.tif`.
+- Conversion local con `tools/earthengine/geotiff_to_xyz_tiles.py` a `assets/imagery/schools/101095/tiles/`, zoom `17-19`.
+- Resultado de tiles: `332` PNG, aprox. `5.0 MB`; conteo por zoom: z17=`20`, z18=`72`, z19=`240`.
+- `rg` para confirmar version/cache `v2.6.142`, `PLAN_BASEMAP_HIGHRES_SOURCES: {}` y soporte opcional `GOOGLE_MAP_TILES_API_KEY`.
+- Servidor HTTP local `127.0.0.1:8078`: `index.html`, `config.js` y `sw.js` servidos con HTTP 200; `config.js` confirma fuentes locales vacias y `sw.js` ya no precachea el manifiesto S2.
+- Servidor HTTP local `127.0.0.1:8078`: `index.html`, `config.js` y `mec-form.js` servidos con HTTP 200 en `v2.6.142`; se confirma presencia de `GOOGLE_MAP_TILES_API_KEY`, `google_satellite` y `tile.googleapis.com`.
+- API key de Google Map Tiles cargada desde portapapeles sin imprimirla; `createSession` respondio HTTP 200 con sesion valida y teselas 256x256.
+- API key de Google Map Tiles reemplazada por nueva clave desde portapapeles sin imprimirla; `createSession` vuelve a responder HTTP 200 con sesion valida.
+- Se agregan presets `Terreno` y `Detalle` en el ribbon del plano: `Terreno` abre el encuadre para ver predio, calles y accesos; `Detalle` vuelve al zoom del edificio.
+- Para Google satelital, el ajuste automatico pasa a usar zoom contextual menor y escala 1 para evitar que el edificio llene todo el lienzo y quede media hoja en blanco.
+- Se elimina el asistente semiautomatico de imagen y sus botones `Predio`/`Bloques`; el perimetro y cada bloque quedan a cargo del operador mediante dibujo manual.
+- `rg` confirma que ya no quedan exportaciones ni llamadas `suggestPlanBlocksFromImage` / `suggestPlanPropertyBoundaryFromImage` en `mec-form.js`.
+- Servidor HTTP local `127.0.0.1:8078`: `config.js` confirma clave Google cargada y `mec-form.js` confirma flujo `google_satellite/createSession`.
+- Tesela Google Map Tiles consultada con `Origin: http://127.0.0.1:8078`: HTTP 200 y `Access-Control-Allow-Origin` local, por lo que la base Google puede renderizarse en navegador local.
+- Servidor HTTP local `127.0.0.1:8078` en `v2.6.142`: `index`, `config`, `mec-form` y `sw` responden HTTP 200; `mec-form` confirma `manualOk=True` y `googleOk=True`.
+- Servidor HTTP local `127.0.0.1:8077`: tesela central `assets/imagery/schools/101095/tiles/19/179207/296708.png`, manifiesto, `config.js` y `mec-form.js` servidos con HTTP 200.
+- Servidor HTTP local `127.0.0.1:8076`: `index.html`, `config.js`, `mec-form.js`, `sw.js`, manifiesto piloto y script Earth Engine servidos con HTTP 200.
+- `git diff --check` sin errores; solo advertencias esperadas de normalizacion LF/CRLF en Windows.
+
+### Commit y publicacion
+- Commit local preparado con el flujo manual y la version `v2.6.142`.
+- `git push origin main` queda pendiente: GitHub rechazo la autenticacion HTTPS con `Invalid username or token`.
+- `gh` no esta instalado en el entorno y SSH a GitHub devuelve `Permission denied (publickey)`.
+
 ## Fallback estable para base satelital del plano - 2026-05-26 - v2.6.135
 
 ### Objetivo

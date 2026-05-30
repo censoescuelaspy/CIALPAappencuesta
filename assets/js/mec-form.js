@@ -20,6 +20,9 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_DEFAULT_SATURATION = 1.08;
   const PLAN_BASEMAP_SOURCE_STREET = 'street';
   const PLAN_BASEMAP_SOURCE_SATELLITE = 'satellite';
+  const PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE = 'google_satellite';
+  const PLAN_BASEMAP_SOURCE_HIGHRES = 'highres';
+  const PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE = 'google-map-tiles://satellite';
   const PLAN_CANVAS_MIN_WIDTH = 900;
   const PLAN_CANVAS_MIN_HEIGHT = 620;
   const PLAN_CANVAS_MAX_WIDTH = 2600;
@@ -45,6 +48,7 @@ const MecFormModule = (() => {
   let _planRibbonTab = 'editar';
   let _planBaseMapPanelOpen = false;
   let _planBaseMapDragMode = false;
+  let _googleMapTilesSession = { key: '', token: '', pending: false, error: '' };
   let _activeCanvasZoom = 1;
   let _schoolPlanResizeBound = false;
   let _schoolPlanResizeTimer = null;
@@ -1136,16 +1140,29 @@ const MecFormModule = (() => {
   }
 
   function _planBaseMapMaxZoom(source = _planBaseMapSource(_data.__planBaseMap)) {
+    const highres = source === PLAN_BASEMAP_SOURCE_HIGHRES ? _planBaseMapHighresSource() : null;
     const configured = typeof APP_CONFIG !== 'undefined'
-      ? (source === PLAN_BASEMAP_SOURCE_SATELLITE
-        ? (APP_CONFIG.PLAN_BASEMAP_SATELLITE_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM || APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM)
-        : (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.MAP_MAX_ZOOM))
+      ? (source === PLAN_BASEMAP_SOURCE_HIGHRES && highres
+        ? (highres.maxZoom || APP_CONFIG.PLAN_BASEMAP_HIGHRES_MAX_ZOOM || APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM)
+        : (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE
+          ? (APP_CONFIG.PLAN_BASEMAP_GOOGLE_SATELLITE_MAX_ZOOM || APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM)
+        : (source === PLAN_BASEMAP_SOURCE_SATELLITE
+          ? (APP_CONFIG.PLAN_BASEMAP_SATELLITE_MAX_ZOOM || APP_CONFIG.SATELLITE_MAX_ZOOM || APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM)
+          : (APP_CONFIG.PLAN_BASEMAP_MAX_ZOOM || APP_CONFIG.MAP_MAX_ZOOM))))
       : PLAN_BASEMAP_FALLBACK_MAX_ZOOM;
     return Math.round(_numberInRange(configured, PLAN_BASEMAP_FALLBACK_MAX_ZOOM, PLAN_BASEMAP_MIN_ZOOM, 22));
   }
 
+  function _planBaseMapMinZoom(source = _planBaseMapSource(_data.__planBaseMap)) {
+    const highres = source === PLAN_BASEMAP_SOURCE_HIGHRES ? _planBaseMapHighresSource() : null;
+    const configured = source === PLAN_BASEMAP_SOURCE_HIGHRES && highres
+      ? (highres.minZoom || PLAN_BASEMAP_MIN_ZOOM)
+      : PLAN_BASEMAP_MIN_ZOOM;
+    return Math.round(_numberInRange(configured, PLAN_BASEMAP_MIN_ZOOM, PLAN_BASEMAP_MIN_ZOOM, _planBaseMapMaxZoom(source)));
+  }
+
   function _clampPlanBaseMapZoom(value, fallback = PLAN_BASEMAP_DEFAULT_ZOOM, source = _planBaseMapSource(_data.__planBaseMap)) {
-    return Math.round(_numberInRange(value, fallback, PLAN_BASEMAP_MIN_ZOOM, _planBaseMapMaxZoom(source)));
+    return Math.round(_numberInRange(value, fallback, _planBaseMapMinZoom(source), _planBaseMapMaxZoom(source)));
   }
 
   function _clampPlanBaseMapScale(value, fallback = PLAN_BASEMAP_DEFAULT_SCALE) {
@@ -1164,13 +1181,121 @@ const MecFormModule = (() => {
     return `contrast(${_cssNumber(contrast)}) saturate(${_cssNumber(saturation)})`;
   }
 
+  function _googleMapTilesApiKey() {
+    return String(typeof APP_CONFIG !== 'undefined' ? (APP_CONFIG.GOOGLE_MAP_TILES_API_KEY || '') : '').trim();
+  }
+
+  function _hasGoogleSatelliteSource() {
+    return Boolean(_googleMapTilesApiKey());
+  }
+
+  function _requestGoogleMapTilesSession() {
+    const key = _googleMapTilesApiKey();
+    if (!key) return;
+    if (_googleMapTilesSession.key !== key) {
+      _googleMapTilesSession = { key, token: '', pending: false, error: '' };
+    }
+    if (_googleMapTilesSession.token || _googleMapTilesSession.pending) return;
+    _googleMapTilesSession.pending = true;
+    fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mapType: 'satellite', language: 'es-419', region: 'PY' }),
+    })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        const token = String(data?.session || '').trim();
+        if (!token) throw new Error('Sesion Google Map Tiles vacia');
+        _googleMapTilesSession = { key, token, pending: false, error: '' };
+        renderSchoolPlan();
+      })
+      .catch(error => {
+        _googleMapTilesSession = { key, token: '', pending: false, error: error?.message || String(error || '') };
+        UI.showToast('No se pudo iniciar Google Map Tiles. Revise API key, facturacion y restricciones de dominio.', 'warning', 7200);
+        renderSchoolPlan();
+      });
+  }
+
+  function _googleMapTilesUrl(z, x, y) {
+    const key = _googleMapTilesApiKey();
+    if (!key) return '';
+    if (_googleMapTilesSession.key !== key || !_googleMapTilesSession.token) {
+      _requestGoogleMapTilesSession();
+      return '';
+    }
+    return `https://tile.googleapis.com/v1/2dtiles/${z}/${x}/${y}?session=${encodeURIComponent(_googleMapTilesSession.token)}&key=${encodeURIComponent(key)}`;
+  }
+
+  function _planBaseMapHighresSource() {
+    const sources = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.PLAN_BASEMAP_HIGHRES_SOURCES : null;
+    if (!sources || typeof sources !== 'object') return null;
+    const selected = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    const general = _data.general || {};
+    const rawValues = [
+      ..._schoolIdentityValues(selected),
+      general.codigo_establecimiento,
+      general.codigo_local,
+      general.codigo,
+      general.id_escuela,
+    ];
+    const keys = rawValues
+      .flatMap(value => [String(value ?? '').trim(), _digits(value)])
+      .filter(Boolean);
+    for (const key of keys) {
+      if (sources[key]) return sources[key];
+    }
+    return null;
+  }
+
+  function _planBaseMapHighresLabel(source = _planBaseMapHighresSource()) {
+    return source?.label || 'Imagen local';
+  }
+
+  function _planBaseMapContextPreset(source = _planBaseMapSource(_data.__planBaseMap)) {
+    if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return { zoom: 19, scale: 1 };
+    if (source === PLAN_BASEMAP_SOURCE_HIGHRES) return { zoom: 18, scale: 1 };
+    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) return { zoom: 17, scale: 1 };
+    return { zoom: 18, scale: 1 };
+  }
+
+  function _planBaseMapDetailPreset(source = _planBaseMapSource(_data.__planBaseMap)) {
+    if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return { zoom: 21, scale: 1 };
+    if (source === PLAN_BASEMAP_SOURCE_HIGHRES) return { zoom: _planBaseMapMaxZoom(source), scale: 1 };
+    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) return { zoom: 17, scale: PLAN_BASEMAP_DEFAULT_SCALE };
+    return { zoom: 19, scale: 1.4 };
+  }
+
   function _planBaseMapSource(baseMap = _data.__planBaseMap) {
     const source = String(baseMap?.source || '').toLowerCase();
+    if (source === PLAN_BASEMAP_SOURCE_HIGHRES && _planBaseMapHighresSource()) return PLAN_BASEMAP_SOURCE_HIGHRES;
+    if (source === PLAN_BASEMAP_SOURCE_HIGHRES) return PLAN_BASEMAP_SOURCE_SATELLITE;
+    if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE && _hasGoogleSatelliteSource()) return PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
+    if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return PLAN_BASEMAP_SOURCE_SATELLITE;
     return source === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
   }
 
   function _planBaseMapSourceConfig(baseMap = _data.__planBaseMap) {
     const source = _planBaseMapSource(baseMap);
+    if (source === PLAN_BASEMAP_SOURCE_HIGHRES) {
+      const highres = _planBaseMapHighresSource() || {};
+      return {
+        id: PLAN_BASEMAP_SOURCE_HIGHRES,
+        label: _planBaseMapHighresLabel(highres),
+        tileUrl: highres.tileUrl || '',
+        attribution: highres.attribution || 'Imagen local de alta resolucion',
+      };
+    }
+    if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) {
+      return {
+        id: PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE,
+        label: 'Google sat.',
+        tileUrl: PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE,
+        attribution: 'Imagery &copy; Google',
+      };
+    }
     if (source === PLAN_BASEMAP_SOURCE_SATELLITE) {
       return {
         id: PLAN_BASEMAP_SOURCE_SATELLITE,
@@ -1194,10 +1319,12 @@ const MecFormModule = (() => {
   function _preferClosePlanBaseMapView(baseMap) {
     if (!baseMap || baseMap.confirmed) return baseMap;
     const source = _planBaseMapSource(baseMap);
-    const closeZoom = Math.min(PLAN_BASEMAP_DEFAULT_ZOOM, _planBaseMapMaxZoom(source));
+    const preset = _planBaseMapContextPreset(source);
+    const closeZoom = Math.min(preset.zoom, _planBaseMapMaxZoom(source));
     if (Number(baseMap.zoom || 0) < closeZoom) baseMap.zoom = closeZoom;
     baseMap.zoom = _clampPlanBaseMapZoom(baseMap.zoom, closeZoom, source);
-    if (Number(baseMap.scale || 0) < PLAN_BASEMAP_DEFAULT_SCALE) baseMap.scale = PLAN_BASEMAP_DEFAULT_SCALE;
+    const preferredScale = preset.scale || PLAN_BASEMAP_DEFAULT_SCALE;
+    if (!Number.isFinite(Number(baseMap.scale)) || Number(baseMap.scale || 0) < preferredScale) baseMap.scale = preferredScale;
     if (!Number.isFinite(Number(baseMap.opacity)) || Number(baseMap.opacity) <= .56) baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
     if (!Number.isFinite(Number(baseMap.contrast))) baseMap.contrast = PLAN_BASEMAP_DEFAULT_CONTRAST;
     if (!Number.isFinite(Number(baseMap.saturation))) baseMap.saturation = PLAN_BASEMAP_DEFAULT_SATURATION;
@@ -1453,6 +1580,7 @@ const MecFormModule = (() => {
   }
 
   function _tileUrlFromTemplate(template, z, x, y) {
+    if (template === PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE) return _googleMapTilesUrl(z, x, y);
     const subdomains = ['a', 'b', 'c'];
     const subdomain = subdomains[Math.abs(x + y) % subdomains.length];
     return String(template || '')
@@ -1505,12 +1633,15 @@ const MecFormModule = (() => {
         const planX = centerCanvas.x + ((tileX * PLAN_BASEMAP_TILE_SIZE) - centerWorld.x) * mapScale;
         const planY = centerCanvas.y + ((tileY * PLAN_BASEMAP_TILE_SIZE) - centerWorld.y) * mapScale;
         const tileSize = PLAN_BASEMAP_TILE_SIZE * mapScale;
+        const url = _tileUrlFromTemplate(template, zoom, wrappedX, tileY);
+        if (!url) continue;
         items.push({
           x: planX * renderScale,
           y: planY * renderScale,
           w: tileSize * renderScale,
           h: tileSize * renderScale,
-          url: _tileUrlFromTemplate(template, zoom, wrappedX, tileY),
+          url,
+          referrerPolicy: template === PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE ? 'strict-origin-when-cross-origin' : 'no-referrer',
         });
         if (items.length >= 96) return items;
       }
@@ -1607,7 +1738,7 @@ const MecFormModule = (() => {
     const originY = (logicalHeight * displayScale) / 2;
     const filter = _planBaseMapCssFilter(baseMap);
     const images = items.map(item => `
-      <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"
+      <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="${_escape(item.referrerPolicy || 'no-referrer')}"
         style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`).join('');
     return `
       <div class="school-plan-basemap" data-plan-basemap aria-hidden="true">
@@ -1726,13 +1857,17 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     const active = _planBaseMapVisible(baseMap);
     const source = _planBaseMapSource(baseMap);
+    const highres = _planBaseMapHighresSource();
+    const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const coords = _planBaseMapHasCoords(baseMap)
       ? `${Number(baseMap.lat).toFixed(5)}, ${Number(baseMap.lng).toFixed(5)}`
       : 'Sin coordenadas';
     return `
       <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
         <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Base activa' : 'Base mapa'}</button>
+        ${highres ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('highres')">${_escape(_planBaseMapHighresLabel(highres))}</button>` : ''}
         <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')">Satelite</button>
+        ${hasGoogleSatellite ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('google_satellite')">Google sat.</button>` : ''}
         <button class="btn ${source === PLAN_BASEMAP_SOURCE_STREET ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('street')">Calles</button>
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
@@ -1745,6 +1880,8 @@ const MecFormModule = (() => {
     if (!_planBaseMapPanelOpen) return '';
     const baseMap = _ensurePlanBaseMap();
     const source = _planBaseMapSource(baseMap);
+    const highres = _planBaseMapHighresSource();
+    const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
     const dragHint = _planBaseMapDragMode
       ? 'Arrastre sobre el plano para mover la base. Use la rueda sin Ctrl para escalar la base.'
@@ -1763,7 +1900,9 @@ const MecFormModule = (() => {
         <div class="school-plan-basemap-panel__grid">
           <label>Fuente visual
             <select onchange="MecFormModule.setPlanBaseMapSource(this.value)">
+              ${highres ? `<option value="highres" ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'selected' : ''}>${_escape(_planBaseMapHighresLabel(highres))}</option>` : ''}
               <option value="satellite" ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'selected' : ''}>Satelite</option>
+              ${hasGoogleSatellite ? `<option value="google_satellite" ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'selected' : ''}>Google satelite</option>` : ''}
               <option value="street" ${source === PLAN_BASEMAP_SOURCE_STREET ? 'selected' : ''}>Calles y lineas</option>
             </select>
           </label>
@@ -1774,7 +1913,7 @@ const MecFormModule = (() => {
             <input type="number" step="0.000001" value="${_escape(baseMap.lng)}" onchange="MecFormModule.setPlanBaseMapValue('lng', this.value)">
           </label>
           <label>Zoom cartografico
-            <input type="range" min="${PLAN_BASEMAP_MIN_ZOOM}" max="${_escape(_planBaseMapMaxZoom(source))}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
+            <input type="range" min="${_escape(_planBaseMapMinZoom(source))}" max="${_escape(_planBaseMapMaxZoom(source))}" step="1" value="${_escape(baseMap.zoom)}" onchange="MecFormModule.setPlanBaseMapValue('zoom', this.value)">
             <b>${_escape(baseMap.zoom)}</b>
           </label>
           <label>Escala base
@@ -1894,6 +2033,37 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function fitPlanBaseMapContext() {
+    const baseMap = _ensurePlanBaseMap();
+    const source = _planBaseMapSource(baseMap);
+    const preset = _planBaseMapContextPreset(source);
+    baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, source);
+    baseMap.scale = _clampPlanBaseMapScale(preset.scale, preset.scale);
+    baseMap.offsetX = 0;
+    baseMap.offsetY = 0;
+    baseMap.rotationDeg = 0;
+    baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function focusPlanBaseMapDetail() {
+    const baseMap = _ensurePlanBaseMap();
+    const source = _planBaseMapSource(baseMap);
+    const preset = _planBaseMapDetailPreset(source);
+    baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, source);
+    baseMap.scale = _clampPlanBaseMapScale(preset.scale, preset.scale);
+    baseMap.offsetX = 0;
+    baseMap.offsetY = 0;
+    baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function rotatePlanBaseMap(delta = 0) {
     const baseMap = _ensurePlanBaseMap();
     baseMap.rotationDeg = _planBaseMapRotationDeg(Number(baseMap.rotationDeg || 0) + Number(delta || 0));
@@ -1934,10 +2104,13 @@ const MecFormModule = (() => {
 
   function resetPlanBaseMapTransform() {
     const baseMap = _ensurePlanBaseMap();
+    const source = _planBaseMapSource(baseMap);
+    const preset = _planBaseMapContextPreset(source);
     baseMap.offsetX = 0;
     baseMap.offsetY = 0;
     baseMap.rotationDeg = 0;
-    baseMap.scale = PLAN_BASEMAP_DEFAULT_SCALE;
+    baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, source);
+    baseMap.scale = _clampPlanBaseMapScale(preset.scale, preset.scale);
     baseMap.opacity = PLAN_BASEMAP_DEFAULT_OPACITY;
     baseMap.contrast = PLAN_BASEMAP_DEFAULT_CONTRAST;
     baseMap.saturation = PLAN_BASEMAP_DEFAULT_SATURATION;
@@ -1964,7 +2137,23 @@ const MecFormModule = (() => {
 
   function setPlanBaseMapSource(source = PLAN_BASEMAP_SOURCE_STREET) {
     const baseMap = _ensurePlanBaseMap();
-    baseMap.source = source === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
+    const requested = String(source || '').toLowerCase();
+    if (requested === PLAN_BASEMAP_SOURCE_HIGHRES) {
+      if (!_planBaseMapHighresSource()) {
+        UI.showToast('Esta escuela aun no tiene una capa de alta resolucion configurada.', 'warning', 5200);
+        return;
+      }
+      baseMap.source = PLAN_BASEMAP_SOURCE_HIGHRES;
+    } else if (requested === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) {
+      if (!_hasGoogleSatelliteSource()) {
+        UI.showToast('Configure GOOGLE_MAP_TILES_API_KEY para usar la satelital de Google.', 'warning', 6200);
+        return;
+      }
+      baseMap.source = PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
+      _requestGoogleMapTilesSession();
+    } else {
+      baseMap.source = requested === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
+    }
     baseMap.zoom = _clampPlanBaseMapZoom(baseMap.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, baseMap.source);
     if (_planBaseMapHasCoords(baseMap)) {
       baseMap.enabled = true;
@@ -12848,6 +13037,8 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     const active = _planBaseMapVisible(baseMap);
     const source = _planBaseMapSource(baseMap);
+    const highres = _planBaseMapHighresSource();
+    const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const coords = _planBaseMapHasCoords(baseMap)
       ? `${Number(baseMap.lat).toFixed(5)}, ${Number(baseMap.lng).toFixed(5)}`
       : 'Sin coordenadas';
@@ -12861,6 +13052,16 @@ const MecFormModule = (() => {
           active,
           title: active ? 'Ocultar base mapa' : 'Mostrar base mapa',
         })}
+        ${highres ? _renderPlanRibbonButton({
+          icon: '&#9638;',
+          label: _planBaseMapHighresLabel(highres),
+          onClick: "MecFormModule.setPlanBaseMapSource('highres')",
+          tone: source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline',
+          active: source === PLAN_BASEMAP_SOURCE_HIGHRES,
+          title: highres.status === 'earth_engine_export_pending'
+            ? 'Capa piloto configurada; falta colocar tiles exportados desde Earth Engine'
+            : 'Usar imagen local de alta resolucion',
+        }) : ''}
         ${_renderPlanRibbonButton({
           icon: '&#128506;',
           label: 'Satelite',
@@ -12869,6 +13070,14 @@ const MecFormModule = (() => {
           active: source === PLAN_BASEMAP_SOURCE_SATELLITE,
           title: 'Usar imagen satelital como base del plano',
         })}
+        ${hasGoogleSatellite ? _renderPlanRibbonButton({
+          icon: '&#128506;',
+          label: 'Google',
+          onClick: "MecFormModule.setPlanBaseMapSource('google_satellite')",
+          tone: source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline',
+          active: source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE,
+          title: 'Usar Google Map Tiles satelital',
+        }) : ''}
         ${_renderPlanRibbonButton({
           icon: '&#9776;',
           label: 'Calles',
@@ -12893,6 +13102,8 @@ const MecFormModule = (() => {
           active: _planBaseMapDragMode,
           title: 'Arrastrar la base mapa para alinearla con el plano',
         })}
+        ${_renderPlanRibbonButton({ icon: '&#9633;', label: 'Terreno', onClick: 'MecFormModule.fitPlanBaseMapContext()', title: 'Ver mas terreno, calles y accesos alrededor' })}
+        ${_renderPlanRibbonButton({ icon: '&#8981;', label: 'Detalle', onClick: 'MecFormModule.focusPlanBaseMapDetail()', title: 'Volver al detalle del edificio' })}
         ${_renderPlanRibbonButton({ icon: '-', label: 'Base -', onClick: 'MecFormModule.zoomPlanBaseMap(0.8)', title: 'Alejar base mapa' })}
         ${_renderPlanRibbonButton({ icon: '+', label: 'Base +', onClick: 'MecFormModule.zoomPlanBaseMap(1.25)', title: 'Acercar base mapa' })}
         ${_renderPlanRibbonButton({ icon: '&#10003;', label: 'Guardar', onClick: 'MecFormModule.savePlanBaseMap()', tone: 'btn-success', title: 'Guardar base mapa' })}
@@ -22992,6 +23203,8 @@ const MecFormModule = (() => {
     zoomPlanBaseMap,
     rotatePlanBaseMap,
     enhancePlanBaseMap,
+    fitPlanBaseMapContext,
+    focusPlanBaseMapDetail,
     nudgePlanBaseMap,
     resetPlanBaseMapOffset,
     resetPlanBaseMapTransform,
