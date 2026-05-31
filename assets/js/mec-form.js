@@ -2171,8 +2171,8 @@ const MecFormModule = (() => {
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
     const dragHint = _planBaseMapDragMode
-      ? 'Arrastre sobre el plano para mover la base. Use rueda sin Ctrl, o dos dedos para mover, acercar y girar.'
-      : 'Active Mover base para arrastrar calles y lineas. En tactil, dos dedos ajustan la base mapa.';
+      ? 'Arrastre para mover. Shift + arrastre o Shift + rueda gira la base; rueda sola acerca/aleja; dos dedos mueven, acercan y giran.'
+      : 'Active Mover base para arrastrar, acercar y girar la base mapa sin perder la vista actual.';
     const sourceNotice = source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE
       ? 'Google satelite se usa solo como fondo online para dibujar. La app guarda el perimetro con vertices lat/lon, accesos, bloques y otros vectores propios; la imagen de Google no se descarga ni funciona offline.'
       : 'La base mapa es una referencia visual. Al guardar, el perimetro queda fijado por vertices lat/lon aunque la ficha completa de la escuela siga pendiente.';
@@ -2362,6 +2362,21 @@ const MecFormModule = (() => {
     baseMap.confirmed = false;
     _saveDraft(false);
     renderSchoolPlan();
+  }
+
+  function _applyPlanBaseMapWheelRotate(delta = 0) {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.rotationDeg = _planBaseMapRotationDeg(Number(baseMap.rotationDeg || 0) + Number(delta || 0));
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    const canvas = _activeSchoolPlanCanvas();
+    if (canvas) {
+      _refreshPlanBaseMapLayer(canvas, true);
+      _drawSchoolPlan();
+    } else {
+      renderSchoolPlan();
+    }
   }
 
   function enhancePlanBaseMap() {
@@ -11645,6 +11660,26 @@ const MecFormModule = (() => {
     });
   }
 
+  function _captureSchoolPlanViewport(root = _activeSchoolPlanRoot()) {
+    const wrap = root?.querySelector?.('.school-plan__canvas-wrap');
+    const point = _canvasViewportCenterPoint(wrap, _schoolPlanZoom);
+    if (!wrap || !point) return null;
+    return {
+      point,
+      viewportPoint: {
+        x: wrap.clientWidth / 2,
+        y: wrap.clientHeight / 2,
+      },
+    };
+  }
+
+  function _restoreSchoolPlanViewport(root, viewport) {
+    if (!viewport?.point) return;
+    const wrap = root?.querySelector?.('.school-plan__canvas-wrap');
+    if (!wrap) return;
+    _scrollCanvasWrapToPoint(wrap, viewport.point, _schoolPlanZoom, viewport.viewportPoint);
+  }
+
   function _sketchObjectFocusPoint(object) {
     if (!object) return null;
     if (object.type === 'wall') return { x: (object.x1 + object.x2) / 2, y: (object.y1 + object.y2) / 2 };
@@ -13160,6 +13195,7 @@ const MecFormModule = (() => {
     if (!_initialized && !Object.keys(_data || {}).length) _loadDraft();
     const root = _activeSchoolPlanRoot();
     if (!root) return;
+    const viewport = _captureSchoolPlanViewport(root);
     _bindSchoolPlanResize();
     const sketch = _data.__classroomSketch || {};
     _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
@@ -13228,6 +13264,7 @@ const MecFormModule = (() => {
     _drawSchoolPlan();
     _applySchoolPlanZoom();
     _bindSchoolPlanCanvas();
+    _restoreSchoolPlanViewport(root, viewport);
   }
 
   function _renderPlanFloatingActions() {
@@ -13423,7 +13460,7 @@ const MecFormModule = (() => {
           onClick: 'MecFormModule.togglePlanBaseMapDragMode()',
           tone: _planBaseMapDragMode ? 'btn-primary' : 'btn-outline',
           active: _planBaseMapDragMode,
-          title: 'Arrastrar la base mapa para alinearla con el plano',
+          title: 'Arrastrar mueve la base. Shift + arrastre o Shift + rueda gira; rueda sola acerca/aleja la base.',
         })}
         ${_renderPlanRibbonButton({ icon: '&#9633;', label: 'Terreno', onClick: 'MecFormModule.fitPlanBaseMapContext()', title: 'Ver mas terreno, calles y accesos alrededor' })}
         ${_renderPlanRibbonButton({ icon: '&#8981;', label: 'Detalle', onClick: 'MecFormModule.focusPlanBaseMapDetail()', title: 'Volver al detalle del edificio' })}
@@ -21211,6 +21248,7 @@ const MecFormModule = (() => {
     let resizeDrag = null;
     let vertexDrag = null;
     let baseMapDrag = null;
+    let baseMapRotateDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
     let lastTap = null;
@@ -21253,6 +21291,11 @@ const MecFormModule = (() => {
       return (Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180) / Math.PI;
     };
     const canDragBaseMap = () => Boolean(_planBaseMapDragMode && _planBaseMapVisible(_ensurePlanBaseMap()));
+    const baseMapRotationCenter = () => {
+      const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
+      return { x: logical.width / 2, y: logical.height / 2 };
+    };
+    const baseMapAngleFromCenter = (center, point) => (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
     const applyBaseMapDrag = currentPoint => {
       if (!baseMapDrag) return;
       const baseMap = _ensurePlanBaseMap();
@@ -21260,6 +21303,16 @@ const MecFormModule = (() => {
       baseMap.offsetY = _numberInRange(baseMapDrag.offsetY + currentPoint.y - baseMapDrag.start.y, 0, -2000, 2000);
       baseMap.confirmed = false;
       _refreshPlanBaseMapLayer(canvas, true);
+    };
+    const applyBaseMapRotate = currentPoint => {
+      if (!baseMapRotateDrag) return;
+      const baseMap = _ensurePlanBaseMap();
+      const angle = baseMapAngleFromCenter(baseMapRotateDrag.center, currentPoint);
+      baseMap.rotationDeg = _planBaseMapRotationDeg(baseMapRotateDrag.rotation + angle - baseMapRotateDrag.startAngle);
+      if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+      baseMap.confirmed = false;
+      _refreshPlanBaseMapLayer(canvas, true);
+      _drawSchoolPlan();
     };
     const siteAreaFromPoint = (point, options = {}) => {
       if (!_planLayers.exteriores) return null;
@@ -21482,12 +21535,28 @@ const MecFormModule = (() => {
         resizeDrag = null;
         vertexDrag = null;
         baseMapDrag = null;
+        baseMapRotateDrag = null;
         suppressClickUntil = Date.now() + 350;
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
         return;
       }
       const baseMapDragCandidate = canDragBaseMap() ? hit(event) : null;
+      if (canDragBaseMap() && baseMapDragCandidate?.type !== 'school-marker' && (event.shiftKey || event.altKey)) {
+        pointerStart = pointFromEvent(event);
+        const baseMap = _ensurePlanBaseMap();
+        const center = baseMapRotationCenter();
+        baseMapRotateDrag = {
+          center,
+          startAngle: baseMapAngleFromCenter(center, pointerStart),
+          rotation: _planBaseMapRotationDeg(baseMap.rotationDeg),
+        };
+        pointerCandidate = null;
+        canvas.setPointerCapture?.(event.pointerId);
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
       if (canDragBaseMap() && baseMapDragCandidate?.type !== 'school-marker') {
         pointerStart = pointFromEvent(event);
         const baseMap = _ensurePlanBaseMap();
@@ -21573,6 +21642,12 @@ const MecFormModule = (() => {
         return;
       }
       const currentPoint = pointFromEvent(event);
+      if (baseMapRotateDrag) {
+        applyBaseMapRotate(currentPoint);
+        suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
       if (baseMapDrag) {
         applyBaseMapDrag(currentPoint);
         suppressClickUntil = Date.now() + 350;
@@ -21743,6 +21818,18 @@ const MecFormModule = (() => {
         resizeDrag = null;
         vertexDrag = null;
         baseMapDrag = null;
+        baseMapRotateDrag = null;
+        event.preventDefault();
+        return;
+      }
+      if (baseMapRotateDrag) {
+        baseMapRotateDrag = null;
+        pointerCandidate = null;
+        pointerStart = null;
+        _saveDraft(false);
+        renderSchoolPlan();
+        _notifyGuidedPlanSync();
+        suppressClickUntil = Date.now() + 350;
         event.preventDefault();
         return;
       }
@@ -21881,6 +21968,7 @@ const MecFormModule = (() => {
       resizeDrag = null;
       vertexDrag = null;
       baseMapDrag = null;
+      baseMapRotateDrag = null;
       _activePlanDrag = null;
     });
     canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);
@@ -21907,6 +21995,12 @@ const MecFormModule = (() => {
     canvas.addEventListener('wheel', event => {
       if (_planBaseMapDragMode && _planBaseMapVisible(_data.__planBaseMap) && !event.ctrlKey && !event.metaKey) {
         event.preventDefault();
+        if (event.shiftKey || event.altKey) {
+          const step = event.altKey ? .5 : 1.5;
+          _applyPlanBaseMapWheelRotate(event.deltaY > 0 ? step : -step);
+          suppressClickUntil = Date.now() + 350;
+          return;
+        }
         zoomPlanBaseMap(event.deltaY > 0 ? (1 / 1.08) : 1.08);
         suppressClickUntil = Date.now() + 350;
         return;
