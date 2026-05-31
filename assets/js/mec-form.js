@@ -25,9 +25,10 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE = 'google-map-tiles://satellite';
   const PLAN_CANVAS_MIN_WIDTH = 760;
   const PLAN_CANVAS_MIN_HEIGHT = 500;
-  const PLAN_CANVAS_MAX_WIDTH = 2600;
-  const PLAN_CANVAS_MAX_HEIGHT = 2600;
+  const PLAN_CANVAS_MAX_WIDTH = 4200;
+  const PLAN_CANVAS_MAX_HEIGHT = 4200;
   const PLAN_CANVAS_EXTEND_STEP = 320;
+  const PLAN_BASEMAP_OFFSET_LIMIT = PLAN_CANVAS_MAX_WIDTH;
   let _data = {};
   let _initialized = false;
   let _activeModuleId = 'general';
@@ -1580,8 +1581,8 @@ const MecFormModule = (() => {
     merged.zoom = _clampPlanBaseMapZoom(merged.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, merged.source);
     merged.opacity = _numberInRange(merged.opacity, PLAN_BASEMAP_DEFAULT_OPACITY, .15, 1);
     merged.scale = _clampPlanBaseMapScale(merged.scale, PLAN_BASEMAP_DEFAULT_SCALE);
-    merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
-    merged.offsetY = _numberInRange(merged.offsetY, 0, -2000, 2000);
+    merged.offsetX = _numberInRange(merged.offsetX, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+    merged.offsetY = _numberInRange(merged.offsetY, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
     merged.rotationDeg = _planBaseMapRotationDeg(merged.rotationDeg ?? merged.rotacion_grados ?? merged.rotation ?? 0);
     merged.schoolLat = merged.schoolLat === '' || merged.schoolLat === undefined || merged.schoolLat === null
       ? ''
@@ -1912,8 +1913,22 @@ const MecFormModule = (() => {
     const maxY = Math.max(...ys);
     const width = Math.max(8, maxX - minX);
     const height = Math.max(8, maxY - minY);
-    element.xRatio = minX / logicalWidth;
-    element.yRatio = minY / logicalHeight;
+    const expansion = _ensurePlanCanvasContainsRect({ x: minX, y: minY, w: width, h: height }, { padding: 96 });
+    if (expansion) {
+      points = points.map(point => ({
+        ...point,
+        x: Number(point.x) + Number(expansion.shiftX || 0),
+        y: Number(point.y) + Number(expansion.shiftY || 0),
+      }));
+      logicalWidth = _planCanvasWidth();
+      logicalHeight = _planCanvasHeight();
+    }
+    const shiftedXs = points.map(point => Number(point.x)).filter(Number.isFinite);
+    const shiftedYs = points.map(point => Number(point.y)).filter(Number.isFinite);
+    const shiftedMinX = shiftedXs.length ? Math.min(...shiftedXs) : minX;
+    const shiftedMinY = shiftedYs.length ? Math.min(...shiftedYs) : minY;
+    element.xRatio = shiftedMinX / logicalWidth;
+    element.yRatio = shiftedMinY / logicalHeight;
     element.wRatio = width / logicalWidth;
     element.hRatio = height / logicalHeight;
     element.rotationDeg = 0;
@@ -1922,11 +1937,11 @@ const MecFormModule = (() => {
     element.planShape = {
       type: 'polygon',
       points: points.map(point => ({
-        x: (point.x - minX) / width,
-        y: (point.y - minY) / height,
+        x: (point.x - shiftedMinX) / width,
+        y: (point.y - shiftedMinY) / height,
       })),
     };
-    _syncSiteElementMeasuresFromRect(element, { x: minX, y: minY, w: width, h: height }, logicalWidth, logicalHeight);
+    _syncSiteElementMeasuresFromRect(element, { x: shiftedMinX, y: shiftedMinY, w: width, h: height }, logicalWidth, logicalHeight);
     return true;
   }
 
@@ -2047,6 +2062,14 @@ const MecFormModule = (() => {
       element.id,
       _siteElementRect(element, currentWidth, currentHeight),
     ]));
+    if (options.preserveBaseMapCenter !== false && _data.__planBaseMap) {
+      const deltaW = nextWidth - currentWidth;
+      const deltaH = nextHeight - currentHeight;
+      if (deltaW || deltaH) {
+        _data.__planBaseMap.offsetX = _numberInRange(Number(_data.__planBaseMap.offsetX || 0) - deltaW / 2, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+        _data.__planBaseMap.offsetY = _numberInRange(Number(_data.__planBaseMap.offsetY || 0) - deltaH / 2, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+      }
+    }
     _data.__planCanvasSize = { width: Math.round(nextWidth), height: Math.round(nextHeight) };
     (_data.__blocks || []).forEach(block => {
       const rect = blockRects.get(block.id);
@@ -2068,9 +2091,71 @@ const MecFormModule = (() => {
       element.wRatio = rect.w / nextWidth;
       element.hRatio = rect.h / nextHeight;
     });
-    _saveDraft(false);
-    renderSchoolPlan();
+    if (!options.skipSave) _saveDraft(false);
+    if (!options.skipRender) renderSchoolPlan();
     if (!options.silent) UI.showToast(`Lienzo ajustado: ${Math.round(nextWidth)} x ${Math.round(nextHeight)} px.`, 'success', 4200);
+  }
+
+  function _ensurePlanCanvasContainsRect(rect, options = {}) {
+    if (!rect) return false;
+    const padding = Number.isFinite(Number(options.padding)) ? Number(options.padding) : 80;
+    const currentWidth = _planCanvasWidth();
+    const currentHeight = _planCanvasHeight();
+    const rectX = Number(rect.x) || 0;
+    const rectY = Number(rect.y) || 0;
+    const rectW = Math.max(0, Number(rect.w) || 0);
+    const rectH = Math.max(0, Number(rect.h) || 0);
+    const requestedLeft = Math.max(0, padding - rectX);
+    const requestedTop = Math.max(0, padding - rectY);
+    const requestedRight = Math.max(0, rectX + rectW + padding - currentWidth);
+    const requestedBottom = Math.max(0, rectY + rectH + padding - currentHeight);
+    const nextWidth = Math.min(PLAN_CANVAS_MAX_WIDTH, Math.max(PLAN_CANVAS_MIN_WIDTH, Math.ceil(currentWidth + requestedLeft + requestedRight)));
+    const nextHeight = Math.min(PLAN_CANVAS_MAX_HEIGHT, Math.max(PLAN_CANVAS_MIN_HEIGHT, Math.ceil(currentHeight + requestedTop + requestedBottom)));
+    const extraWidth = Math.max(0, nextWidth - currentWidth);
+    const extraHeight = Math.max(0, nextHeight - currentHeight);
+    const shiftX = Math.min(requestedLeft, extraWidth);
+    const shiftY = Math.min(requestedTop, extraHeight);
+    if (!extraWidth && !extraHeight) return false;
+    _setPlanCanvasSize(nextWidth, nextHeight, {
+      silent: true,
+      skipSave: true,
+      skipRender: true,
+      preserveBaseMapCenter: options.preserveBaseMapCenter !== false,
+    });
+    if (shiftX || shiftY) {
+      _shiftPlanCanvasContents(shiftX, shiftY, nextWidth, nextHeight);
+      if (_data.__planBaseMap) {
+        _data.__planBaseMap.offsetX = _numberInRange(Number(_data.__planBaseMap.offsetX || 0) + shiftX, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+        _data.__planBaseMap.offsetY = _numberInRange(Number(_data.__planBaseMap.offsetY || 0) + shiftY, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+      }
+    }
+    const canvas = _activeSchoolPlanCanvas();
+    if (canvas) {
+      _applyCanvasZoom(canvas, _schoolPlanZoom, nextWidth, nextHeight);
+      _refreshPlanBaseMapLayer(canvas, true);
+    }
+    return { changed: true, shiftX, shiftY, width: nextWidth, height: nextHeight };
+  }
+
+  function _shiftPlanCanvasContents(shiftX = 0, shiftY = 0, logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const dx = Number(shiftX) || 0;
+    const dy = Number(shiftY) || 0;
+    if (!dx && !dy) return;
+    const width = Math.max(1, Number(logicalWidth) || _planCanvasWidth());
+    const height = Math.max(1, Number(logicalHeight) || _planCanvasHeight());
+    (_data.__blocks || []).forEach(block => {
+      const source = block.planPosition || block.plano_general || {};
+      const next = {
+        xRatio: (Number(source.xRatio || 0) * width + dx) / width,
+        yRatio: (Number(source.yRatio || 0) * height + dy) / height,
+      };
+      block.planPosition = { ...(block.planPosition || {}), ...next };
+      block.plano_general = { ...(block.plano_general || {}), ...next };
+    });
+    _ensureSiteElements().forEach(element => {
+      element.xRatio = (Number(element.xRatio || 0) * width + dx) / width;
+      element.yRatio = (Number(element.yRatio || 0) * height + dy) / height;
+    });
   }
 
   function extendSchoolPlanCanvas(axis = 'height', amount = PLAN_CANVAS_EXTEND_STEP) {
@@ -2306,8 +2391,8 @@ const MecFormModule = (() => {
     if (key === 'rotationDeg') baseMap.rotationDeg = _planBaseMapRotationDeg(value);
     if (key === 'contrast') baseMap.contrast = _numberInRange(value, baseMap.contrast, .75, 1.75);
     if (key === 'saturation') baseMap.saturation = _numberInRange(value, baseMap.saturation, .5, 1.8);
-    if (key === 'offsetX') baseMap.offsetX = _numberInRange(value, baseMap.offsetX, -2000, 2000);
-    if (key === 'offsetY') baseMap.offsetY = _numberInRange(value, baseMap.offsetY, -2000, 2000);
+    if (key === 'offsetX') baseMap.offsetX = _numberInRange(value, baseMap.offsetX, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+    if (key === 'offsetY') baseMap.offsetY = _numberInRange(value, baseMap.offsetY, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
     if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
     baseMap.confirmed = false;
     _saveDraft(false);
@@ -2392,8 +2477,8 @@ const MecFormModule = (() => {
 
   function nudgePlanBaseMap(dx = 0, dy = 0) {
     const baseMap = _ensurePlanBaseMap();
-    baseMap.offsetX = _numberInRange(Number(baseMap.offsetX || 0) + Number(dx || 0), 0, -2000, 2000);
-    baseMap.offsetY = _numberInRange(Number(baseMap.offsetY || 0) + Number(dy || 0), 0, -2000, 2000);
+    baseMap.offsetX = _numberInRange(Number(baseMap.offsetX || 0) + Number(dx || 0), 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+    baseMap.offsetY = _numberInRange(Number(baseMap.offsetY || 0) + Number(dy || 0), 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
     baseMap.confirmed = false;
     _saveDraft(false);
     renderSchoolPlan();
@@ -11680,6 +11765,45 @@ const MecFormModule = (() => {
     _scrollCanvasWrapToPoint(wrap, viewport.point, _schoolPlanZoom, viewport.viewportPoint);
   }
 
+  function _focusSchoolPlanRect(rect, options = {}) {
+    const canvas = _activeSchoolPlanCanvas();
+    const wrap = canvas?.closest('.school-plan__canvas-wrap');
+    if (!canvas || !wrap || !rect?.w || !rect?.h) return;
+    const padding = Number.isFinite(Number(options.padding)) ? Number(options.padding) : 58;
+    let zoom = _schoolPlanZoom;
+    if (options.fit) {
+      const fitX = (wrap.clientWidth - padding * 2) / Math.max(1, rect.w);
+      const fitY = (wrap.clientHeight - padding * 2) / Math.max(1, rect.h);
+      const nextZoom = Math.max(.1, Math.min(zoom, fitX, fitY));
+      if (Number.isFinite(nextZoom) && nextZoom > 0 && nextZoom < zoom - .01) {
+        _schoolPlanZoom = nextZoom;
+        zoom = nextZoom;
+        _applySchoolPlanZoom(canvas);
+        _drawSchoolPlan();
+      }
+    }
+    _scrollCanvasWrapToPoint(
+      wrap,
+      { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 },
+      zoom,
+      { x: wrap.clientWidth / 2, y: wrap.clientHeight / 2 }
+    );
+  }
+
+  function _focusPlanSiteElement(elementId, options = {}) {
+    if (!elementId) return;
+    requestAnimationFrame(() => {
+      const canvas = _activeSchoolPlanCanvas();
+      if (!canvas) return;
+      const element = _ensureSiteElements().find(item => item.id === elementId);
+      if (!element) return;
+      const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
+      const rect = _siteElementRect(element, logical.width, logical.height);
+      const bounds = _rotatedSiteElementBounds(rect, element);
+      _focusSchoolPlanRect(bounds, options);
+    });
+  }
+
   function _sketchObjectFocusPoint(object) {
     if (!object) return null;
     if (object.type === 'wall') return { x: (object.x1 + object.x2) / 2, y: (object.y1 + object.y2) / 2 };
@@ -19670,6 +19794,14 @@ const MecFormModule = (() => {
     if (!element || !rect) return null;
     if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
     if (!_requirePropertyBoundaryEdit(element, 'mover el perimetro')) return null;
+    if (element.type === 'property_boundary') {
+      const wanted = { x: targetX, y: targetY, w: rect.w, h: rect.h };
+      const expansion = _ensurePlanCanvasContainsRect(_rotatedSiteElementBounds(wanted, element), { padding: 96 });
+      if (expansion) {
+        targetX += Number(expansion.shiftX || 0);
+        targetY += Number(expansion.shiftY || 0);
+      }
+    }
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const desired = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
@@ -19893,6 +20025,16 @@ const MecFormModule = (() => {
       h = bottom - y;
     }
     if (handleName.includes('s')) h = Math.max(minH, point.y - y);
+    const maxW = Number(bounds?.maxW || 0);
+    const maxH = Number(bounds?.maxH || 0);
+    if (maxW > 0 && w > maxW) {
+      if (handleName.includes('w') && !handleName.includes('e')) x = right - maxW;
+      w = maxW;
+    }
+    if (maxH > 0 && h > maxH) {
+      if (handleName.includes('n') && !handleName.includes('s')) y = bottom - maxH;
+      h = maxH;
+    }
     const next = {
       x: Math.round(x),
       y: Math.round(y),
@@ -20160,6 +20302,16 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
     if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
+    if (element.type === 'property_boundary') {
+      const expansion = _ensurePlanCanvasContainsRect(_rotatedSiteElementBounds(rect, element), { padding: 96 });
+      if (expansion) {
+        rect = {
+          ...rect,
+          x: Number(rect.x || 0) + Number(expansion.shiftX || 0),
+          y: Number(rect.y || 0) + Number(expansion.shiftY || 0),
+        };
+      }
+    }
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const clamped = _clampPlanRect(rect, logicalWidth, logicalHeight);
@@ -20284,7 +20436,17 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
       if (!element) return null;
       if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
-      return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element), elementType: element.type };
+      const boundaryBounds = element.type === 'property_boundary'
+        ? {
+            x: -PLAN_CANVAS_MAX_WIDTH,
+            y: -PLAN_CANVAS_MAX_HEIGHT,
+            w: PLAN_CANVAS_MAX_WIDTH * 2,
+            h: PLAN_CANVAS_MAX_HEIGHT * 2,
+            maxW: PLAN_CANVAS_MAX_WIDTH - 24,
+            maxH: PLAN_CANVAS_MAX_HEIGHT - 24,
+          }
+        : { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 };
+      return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: boundaryBounds, rotation: _siteElementRotationDeg(element), elementType: element.type };
     }
     if (area.type === 'class-object-resize') {
       const room = _classroomById(area.roomId);
@@ -20373,7 +20535,14 @@ const MecFormModule = (() => {
     element.rotacion_grados = String(element.rotationDeg);
     element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
     _keepSiteElementRotatedBoundsInCanvas(element, logicalWidth, logicalHeight);
-    if (element.type === 'property_boundary') _syncPropertyBoundaryGeoVertices(element, logicalWidth, logicalHeight);
+    if (element.type === 'property_boundary') {
+      const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+      if (_ensurePlanCanvasContainsRect(_rotatedSiteElementBounds(rect, element), { padding: 96 })) {
+        _syncPropertyBoundaryGeoVertices(element);
+      } else {
+        _syncPropertyBoundaryGeoVertices(element, logicalWidth, logicalHeight);
+      }
+    }
   }
 
   function rotatePlanSiteElement(elementId, delta = 15) {
@@ -21322,8 +21491,8 @@ const MecFormModule = (() => {
     const applyBaseMapDrag = currentPoint => {
       if (!baseMapDrag) return;
       const baseMap = _ensurePlanBaseMap();
-      baseMap.offsetX = _numberInRange(baseMapDrag.offsetX + currentPoint.x - baseMapDrag.start.x, 0, -2000, 2000);
-      baseMap.offsetY = _numberInRange(baseMapDrag.offsetY + currentPoint.y - baseMapDrag.start.y, 0, -2000, 2000);
+      baseMap.offsetX = _numberInRange(baseMapDrag.offsetX + currentPoint.x - baseMapDrag.start.x, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+      baseMap.offsetY = _numberInRange(baseMapDrag.offsetY + currentPoint.y - baseMapDrag.start.y, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
       baseMap.confirmed = false;
       _refreshPlanBaseMapLayer(canvas, true);
     };
@@ -21650,8 +21819,8 @@ const MecFormModule = (() => {
             const startCenter = planPinch.center || center;
             baseMap.scale = _clampPlanBaseMapScale(planPinch.scale * (distance / planPinch.distance), planPinch.scale);
             baseMap.rotationDeg = _planBaseMapRotationDeg(planPinch.rotation + pointerAngle() - planPinch.angle);
-            baseMap.offsetX = _numberInRange(planPinch.offsetX + center.x - startCenter.x, 0, -2000, 2000);
-            baseMap.offsetY = _numberInRange(planPinch.offsetY + center.y - startCenter.y, 0, -2000, 2000);
+            baseMap.offsetX = _numberInRange(planPinch.offsetX + center.x - startCenter.x, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+            baseMap.offsetY = _numberInRange(planPinch.offsetY + center.y - startCenter.y, 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
             baseMap.enabled = true;
             baseMap.confirmed = false;
             _refreshPlanBaseMapLayer(canvas, true);
@@ -21869,6 +22038,10 @@ const MecFormModule = (() => {
       }
       if (rotateDrag) {
         const selectedId = rotateDrag.selectedId;
+        const focusSiteId = rotateDrag.kind === 'site' &&
+          _ensureSiteElements().find(item => item.id === rotateDrag.id)?.type === 'property_boundary'
+          ? rotateDrag.id
+          : '';
         rotateDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -21877,6 +22050,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -21885,6 +22059,10 @@ const MecFormModule = (() => {
       if (resizeDrag) {
         const selectedId = resizeDrag.selectedId;
         const finishedResize = { ...resizeDrag };
+        const focusSiteId = finishedResize.type === 'site-element' &&
+          _ensureSiteElements().find(item => item.id === finishedResize.siteId)?.type === 'property_boundary'
+          ? finishedResize.siteId
+          : '';
         resizeDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -21893,6 +22071,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedResizeDrag(finishedResize);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -21900,6 +22079,10 @@ const MecFormModule = (() => {
       }
       if (vertexDrag) {
         const selectedId = vertexDrag.selectedId;
+        const focusSiteId = vertexDrag.type === 'site' &&
+          _ensureSiteElements().find(item => item.id === vertexDrag.siteId)?.type === 'property_boundary'
+          ? vertexDrag.siteId
+          : '';
         if (vertexDrag.type === 'room') {
           const room = _classroomById(vertexDrag.roomId);
           if (room && _activeClassroomId === room.id && _data.__classroomSketch) _syncActiveClassroomFromSketch();
@@ -21917,6 +22100,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -21930,6 +22114,10 @@ const MecFormModule = (() => {
         const sanitaryId = blockDrag.sanitaryId;
         const objectId = blockDrag.objectId;
         const dragType = blockDrag.type;
+        const focusSiteId = dragType === 'site-element' &&
+          _ensureSiteElements().find(item => item.id === siteId)?.type === 'property_boundary'
+          ? siteId
+          : '';
         blockDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -21950,6 +22138,7 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
+        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();

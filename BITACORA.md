@@ -4,6 +4,25 @@
 
 ---
 
+## Perimetro visible al estirar predio - 2026-05-31
+
+### Objetivo
+- Resolver que el perimetro del predio se sintiera encerrado por el lienzo y quedara recortado al aumentar largo/ancho.
+- Evitar que al agrandar el lienzo la base satelital se desplace respecto de los vectores guardados.
+
+### Cambios implementados
+- El lienzo del plano general ahora puede crecer hasta `4200 x 4200 px`.
+- Al redimensionar o mover el perimetro, el lienzo se expande automaticamente si el predio necesita mas espacio, tambien hacia arriba o izquierda.
+- Al cambiar el tamano del lienzo se compensa `offsetX/offsetY` de la base mapa para conservar la alineacion satelital/vectorial.
+- Al soltar el perimetro luego de mover, girar, estirar o editar vertices, la vista se reencuadra y reduce zoom si hace falta para ver el predio completo.
+- Version publicada preparada como `v2.6.154`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+
 ## Script Earth Engine con muestra real - 2026-05-30
 
 ### Objetivo
