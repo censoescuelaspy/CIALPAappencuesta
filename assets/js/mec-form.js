@@ -23,8 +23,8 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE = 'google_satellite';
   const PLAN_BASEMAP_SOURCE_HIGHRES = 'highres';
   const PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE = 'google-map-tiles://satellite';
-  const PLAN_CANVAS_MIN_WIDTH = 900;
-  const PLAN_CANVAS_MIN_HEIGHT = 620;
+  const PLAN_CANVAS_MIN_WIDTH = 760;
+  const PLAN_CANVAS_MIN_HEIGHT = 500;
   const PLAN_CANVAS_MAX_WIDTH = 2600;
   const PLAN_CANVAS_MAX_HEIGHT = 2600;
   const PLAN_CANVAS_EXTEND_STEP = 320;
@@ -2032,7 +2032,8 @@ const MecFormModule = (() => {
     const available = Math.floor(((root?.getBoundingClientRect?.().width || 0) - 30) / zoom);
     const savedWidth = Number(_data.__planCanvasSize?.width || 0);
     const base = Math.max(PLAN_CANVAS_MIN_WIDTH, Number.isFinite(available) ? available : PLAN_CANVAS_MIN_WIDTH);
-    return Math.max(base, Math.min(PLAN_CANVAS_MAX_WIDTH, savedWidth || base));
+    if (savedWidth) return Math.max(PLAN_CANVAS_MIN_WIDTH, Math.min(PLAN_CANVAS_MAX_WIDTH, savedWidth));
+    return base;
   }
 
   function _setPlanCanvasSize(width, height, options = {}) {
@@ -2073,7 +2074,9 @@ const MecFormModule = (() => {
   }
 
   function extendSchoolPlanCanvas(axis = 'height', amount = PLAN_CANVAS_EXTEND_STEP) {
-    const step = Math.max(80, Number(amount) || PLAN_CANVAS_EXTEND_STEP);
+    const rawAmount = Number(amount);
+    const signedAmount = Number.isFinite(rawAmount) && rawAmount !== 0 ? rawAmount : PLAN_CANVAS_EXTEND_STEP;
+    const step = Math.max(80, Math.abs(signedAmount)) * (signedAmount < 0 ? -1 : 1);
     const currentWidth = _planCanvasWidth();
     const currentHeight = _planCanvasHeight();
     const nextWidth = axis === 'width' || axis === 'both' ? currentWidth + step : currentWidth;
@@ -2088,6 +2091,29 @@ const MecFormModule = (() => {
     _saveDraft(false);
     renderSchoolPlan();
     UI.showToast('Lienzo del plano restablecido al tamano automatico.', 'info', 4200);
+  }
+
+  function _ensurePlanUi() {
+    const current = _data.__planUi && typeof _data.__planUi === 'object' ? _data.__planUi : {};
+    const side = ['compact', 'wide', 'hidden'].includes(current.side) ? current.side : 'compact';
+    _data.__planUi = { ...current, side };
+    return _data.__planUi;
+  }
+
+  function _planSideMode() {
+    return _ensurePlanUi().side || 'compact';
+  }
+
+  function _planLayoutClass() {
+    return `school-plan__layout school-plan__layout--side-${_planSideMode()}`;
+  }
+
+  function setPlanSideMode(mode = 'compact') {
+    const nextMode = ['compact', 'wide', 'hidden'].includes(String(mode || '')) ? String(mode) : 'compact';
+    const ui = _ensurePlanUi();
+    ui.side = nextMode;
+    _saveDraft(false);
+    renderSchoolPlan();
   }
 
   function _bindSchoolPlanResize() {
@@ -5238,7 +5264,7 @@ const MecFormModule = (() => {
       gallery: { wRatio: .22, hRatio: .045 },
       walkway: { wRatio: .18, hRatio: .024 },
       open_space: { wRatio: .17, hRatio: .095 },
-      property_boundary: { wRatio: .86, hRatio: .74 },
+      property_boundary: { wRatio: .24, hRatio: .18 },
       pillar: { wRatio: .028, hRatio: .04 },
       stair: { wRatio: .072, hRatio: .065 },
       ramp: { wRatio: .11, hRatio: .038 },
@@ -13163,7 +13189,7 @@ const MecFormModule = (() => {
         ${root.id === 'guided-school-plan-root' ? '' : _renderSchoolContextBar(true)}
         ${_renderPlanBuilderPanel()}
 
-        <section class="school-plan__layout">
+        <section class="${_planLayoutClass()}">
           <div class="school-plan__board">
             <div class="school-plan__toolbar">
               ${_renderSchoolPlanRibbon()}
@@ -13411,10 +13437,22 @@ const MecFormModule = (() => {
   function _renderPlanCanvasRibbon() {
     return `
       <div class="school-plan-ribbon__canvas">
-        ${_renderPlanRibbonButton({ icon: '&#8595;', label: 'Mas abajo', onClick: "MecFormModule.extendSchoolPlanCanvas('height')", title: 'Extender el lienzo hacia abajo para predios grandes' })}
-        ${_renderPlanRibbonButton({ icon: '&#8594;', label: 'Mas ancho', onClick: "MecFormModule.extendSchoolPlanCanvas('width')", title: 'Extender el lienzo hacia la derecha' })}
-        ${_renderPlanRibbonButton({ icon: '&#10530;', label: 'Mas ambos', onClick: "MecFormModule.extendSchoolPlanCanvas('both')", title: 'Extender alto y ancho del plano' })}
+        ${_renderPlanRibbonButton({ icon: '&#8595;', label: 'Alto +', onClick: "MecFormModule.extendSchoolPlanCanvas('height', 220)", title: 'Aumentar alto del lienzo' })}
+        ${_renderPlanRibbonButton({ icon: '&#8593;', label: 'Alto -', onClick: "MecFormModule.extendSchoolPlanCanvas('height', -220)", title: 'Reducir alto del lienzo' })}
+        ${_renderPlanRibbonButton({ icon: '&#8594;', label: 'Ancho +', onClick: "MecFormModule.extendSchoolPlanCanvas('width', 220)", title: 'Aumentar ancho del lienzo' })}
+        ${_renderPlanRibbonButton({ icon: '&#8592;', label: 'Ancho -', onClick: "MecFormModule.extendSchoolPlanCanvas('width', -220)", title: 'Reducir ancho del lienzo' })}
+        ${_renderPlanRibbonButton({ icon: '&#10530;', label: 'Ambos +', onClick: "MecFormModule.extendSchoolPlanCanvas('both', 220)", title: 'Aumentar alto y ancho del plano' })}
         ${_renderPlanRibbonButton({ icon: '&#8634;', label: 'Auto', onClick: 'MecFormModule.resetSchoolPlanCanvasSize()', title: 'Volver al tamano automatico del lienzo' })}
+      </div>`;
+  }
+
+  function _renderPlanViewLayoutRibbon() {
+    const mode = _planSideMode();
+    return `
+      <div class="school-plan-ribbon__panelmode">
+        ${_renderPlanRibbonButton({ icon: '&#9633;', label: 'Compacto', onClick: "MecFormModule.setPlanSideMode('compact')", active: mode === 'compact', tone: mode === 'compact' ? 'btn-primary' : 'btn-outline', title: 'Usar panel lateral compacto' })}
+        ${_renderPlanRibbonButton({ icon: '&#9635;', label: 'Amplio', onClick: "MecFormModule.setPlanSideMode('wide')", active: mode === 'wide', tone: mode === 'wide' ? 'btn-primary' : 'btn-outline', title: 'Agrandar panel lateral' })}
+        ${_renderPlanRibbonButton({ icon: '&#9711;', label: 'Sin panel', onClick: "MecFormModule.setPlanSideMode('hidden')", active: mode === 'hidden', tone: mode === 'hidden' ? 'btn-primary' : 'btn-outline', title: 'Ocultar panel lateral para ganar mapa' })}
       </div>`;
   }
 
@@ -13500,6 +13538,7 @@ const MecFormModule = (() => {
       return [
         _renderPlanRibbonGroup('Zoom', _renderPlanZoomRibbon()),
         _renderPlanRibbonGroup('Lienzo', _renderPlanCanvasRibbon()),
+        _renderPlanRibbonGroup('Panel', _renderPlanViewLayoutRibbon()),
         _renderPlanRibbonGroup('Base mapa', _renderPlanBaseMapRibbon(), 'school-plan-ribbon__group--wide'),
       ].join('');
     }
@@ -13575,6 +13614,7 @@ const MecFormModule = (() => {
         _renderPlanRibbonButton({ icon: '&#10005;', label: 'Eliminar', onClick: 'MecFormModule.deletePlanSelection()', tone: 'btn-danger', disabled: !canDelete, title: canDelete ? 'Eliminar seleccion' : 'Seleccione un elemento para eliminar' }),
       ].join('')),
       _renderPlanRibbonGroup('Orientar', _renderSelectedPlanOrientationButtons('btn-sm', true, true), 'school-plan-ribbon__group--wide'),
+      _renderPlanRibbonGroup('Tamano', _renderSelectedPlanSizeButtons(true), 'school-plan-ribbon__group--wide'),
       _formaGroupContent ? _renderPlanRibbonGroup('Forma', _formaGroupContent) : '',
     ].join('');
   }
@@ -13824,6 +13864,35 @@ const MecFormModule = (() => {
           <span></span>
         </div>
       </div>`;
+  }
+
+  function _isSelectedPlanSizeTarget(id = _selectedPlanId) {
+    const property = _selectedPlanPropertyBoundary(id);
+    if (property && !_propertyBoundaryEditActive(property)) return false;
+    const raw = String(id || '');
+    if (raw === SCHOOL_MARKER_PLAN_ID) return false;
+    return Boolean(raw && (
+      raw.startsWith('block::') ||
+      raw.startsWith('floor::') ||
+      raw.startsWith('room::') ||
+      raw.startsWith('sanitary::') ||
+      raw.startsWith('site::') ||
+      raw.includes('::')
+    ));
+  }
+
+  function _renderSelectedPlanSizeButtons(ribbon = false) {
+    const enabled = _isSelectedPlanSizeTarget();
+    const title = enabled ? 'Cambiar tamano del elemento seleccionado' : 'Seleccione un elemento redimensionable';
+    if (!ribbon && !enabled) return '';
+    return [
+      _renderPlanRibbonButton({ icon: '-', label: 'Menor', onClick: "MecFormModule.resizeSelectedPlanItem('both', 0.9)", disabled: !enabled, title }),
+      _renderPlanRibbonButton({ icon: '+', label: 'Mayor', onClick: "MecFormModule.resizeSelectedPlanItem('both', 1.1)", disabled: !enabled, title }),
+      _renderPlanRibbonButton({ icon: '&#8596;', label: 'A -', onClick: "MecFormModule.resizeSelectedPlanItem('width', 0.9)", disabled: !enabled, title: enabled ? 'Reducir ancho' : title }),
+      _renderPlanRibbonButton({ icon: '&#8596;', label: 'A +', onClick: "MecFormModule.resizeSelectedPlanItem('width', 1.1)", disabled: !enabled, title: enabled ? 'Aumentar ancho' : title }),
+      _renderPlanRibbonButton({ icon: '&#8597;', label: 'H -', onClick: "MecFormModule.resizeSelectedPlanItem('height', 0.9)", disabled: !enabled, title: enabled ? 'Reducir alto' : title }),
+      _renderPlanRibbonButton({ icon: '&#8597;', label: 'H +', onClick: "MecFormModule.resizeSelectedPlanItem('height', 1.1)", disabled: !enabled, title: enabled ? 'Aumentar alto' : title }),
+    ].join('');
   }
 
   function _renderSelectedPlanOrientationButtons(sizeClass = 'btn-sm', alwaysVisible = false, ribbon = false) {
@@ -14768,8 +14837,9 @@ const MecFormModule = (() => {
     const blocks = _data.__blocks?.length ? _data.__blocks : [];
     const rows = Math.max(1, Math.ceil(blocks.length / 2));
     const savedHeight = Number(_data.__planCanvasSize?.height || 0);
-    const base = Math.max(PLAN_CANVAS_MIN_HEIGHT, 320 * rows);
-    return Math.max(base, Math.min(PLAN_CANVAS_MAX_HEIGHT, savedHeight || base));
+    const base = Math.max(PLAN_CANVAS_MIN_HEIGHT, 270 * rows);
+    if (savedHeight) return Math.max(PLAN_CANVAS_MIN_HEIGHT, Math.min(PLAN_CANVAS_MAX_HEIGHT, savedHeight));
+    return base;
   }
 
   function _drawSchoolPlanGrid(ctx, logical) {
@@ -18481,8 +18551,8 @@ const MecFormModule = (() => {
     const logicalHeight = _planCanvasHeight();
     const size = _siteElementDefaultSize(type, shape);
     if (type === 'property_boundary') {
-      const w = Math.min(logicalWidth - 48, Math.max(220, size.wRatio * logicalWidth));
-      const h = Math.min(logicalHeight - 48, Math.max(160, size.hRatio * logicalHeight));
+      const w = Math.min(logicalWidth - 48, Math.max(130, size.wRatio * logicalWidth));
+      const h = Math.min(logicalHeight - 48, Math.max(100, size.hRatio * logicalHeight));
       return {
         xRatio: Math.max(0, (logicalWidth - w) / 2) / logicalWidth,
         yRatio: Math.max(0, (logicalHeight - h) / 2) / logicalHeight,
@@ -21012,6 +21082,119 @@ const MecFormModule = (() => {
       const rect = _planAreaBaseRect(area);
       if (!area || !rect || !area.parentRect) return false;
       return _savePlanNudge(_movePlanClassObject(roomId || area.roomId, objectId || area.objectId, rect.x + dx, rect.y + dy, rect, area.parentRect));
+    }
+    return false;
+  }
+
+  function _centeredPlanResizeRect(rect, scaleX = 1, scaleY = 1, minW = 18, minH = 14) {
+    if (!rect) return null;
+    const nextW = Math.max(minW, Math.round(Number(rect.w || 0) * (Number(scaleX) || 1)));
+    const nextH = Math.max(minH, Math.round(Number(rect.h || 0) * (Number(scaleY) || 1)));
+    return {
+      x: Math.round(Number(rect.x || 0) + (Number(rect.w || 0) - nextW) / 2),
+      y: Math.round(Number(rect.y || 0) + (Number(rect.h || 0) - nextH) / 2),
+      w: nextW,
+      h: nextH,
+    };
+  }
+
+  function _savePlanResize(result, selectedId, drag) {
+    if (!result) return false;
+    _activePlanDrag = null;
+    _selectedPlanId = selectedId;
+    _activatePlanSelection(_selectedPlanId);
+    _saveDraft(false);
+    renderSchoolPlan();
+    _notifyGuidedResizeDrag(drag || {});
+    return true;
+  }
+
+  function resizeSelectedPlanItem(axis = 'both', factor = 1) {
+    const raw = String(_selectedPlanId || '');
+    if (!_isSelectedPlanSizeTarget(raw)) {
+      UI.showToast('Seleccione un bloque, perimetro, ambiente, sanitario u objeto para cambiar tamano.', 'info', 4200);
+      return false;
+    }
+    const amount = Math.max(.55, Math.min(1.8, Number(factor) || 1));
+    const mode = String(axis || 'both');
+    const scaleX = mode === 'height' ? 1 : amount;
+    const scaleY = mode === 'width' ? 1 : amount;
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+
+    if (raw.startsWith('site::')) {
+      const elementId = raw.replace('site::', '');
+      const element = _ensureSiteElements().find(el => el.id === elementId);
+      const rect = element ? _siteElementRect(element, logicalWidth, logicalHeight) : null;
+      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 18, 14);
+      if (!element || !next) return false;
+      _pushPlanHistory();
+      return _savePlanResize(_resizePlanSiteElement(elementId, next), raw, { type: 'site-element', siteId: elementId });
+    }
+
+    if (raw.startsWith('block::')) {
+      const blockId = raw.replace('block::', '');
+      const block = _blockById(blockId);
+      const layout = _planBlockLayout(_data.__blocks || [], logicalWidth, logicalHeight).find(item => item.block?.id === blockId);
+      const rect = layout ? { x: layout.x, y: layout.y, w: layout.w, h: layout.h } : null;
+      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 70, 78);
+      if (!block || !next) return false;
+      _pushPlanHistory();
+      return _savePlanResize(_resizePlanBlock(blockId, next, {
+        rect,
+        floorCount: Math.max(1, _planFloorsForBlock(block).length),
+        startLength: Number(block.largo_m || 0),
+        startWidth: Number(block.ancho_m || 0),
+      }), raw, { type: 'block', blockId });
+    }
+
+    if (raw.startsWith('floor::')) {
+      const [, blockId, floorId] = raw.split('::');
+      const area = _selectedPlanMoveArea(raw);
+      const rect = _planAreaBaseRect(area);
+      const blockRect = _planAreaBlockRect(area);
+      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 44, 32);
+      if (!area || !rect || !blockRect || !next) return false;
+      _pushPlanHistory();
+      return _savePlanResize(_resizePlanFloor(blockId || area.blockId, floorId || area.floorId, next, blockRect, { rect, blockRect }), raw, { type: 'floor', floorId: floorId || area.floorId });
+    }
+
+    if (raw.startsWith('room::')) {
+      const roomId = raw.replace('room::', '');
+      const area = _selectedPlanMoveArea(raw);
+      const rect = _planAreaBaseRect(area);
+      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 30, 24);
+      if (!area || !rect || !area.floorRect || !next) return false;
+      _pushPlanHistory();
+      return _savePlanResize(_resizePlanRoom(roomId || area.roomId, next, area.floorRect), raw, { type: 'room', roomId: roomId || area.roomId });
+    }
+
+    if (raw.startsWith('sanitary::')) {
+      const [, sanitaryId, objectId] = raw.split('::');
+      const area = _selectedPlanMoveArea(raw);
+      const rect = _planAreaBaseRect(area);
+      if (!area || !rect) return false;
+      if (objectId) {
+        const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 12, 10);
+        if (!area.parentRect || !next) return false;
+        _pushPlanHistory();
+        return _savePlanResize(_resizePlanSanitaryObject(sanitaryId || area.sanitaryId, objectId || area.objectId, next, area.parentRect), raw, { type: 'sanitary-object', sanitaryId: sanitaryId || area.sanitaryId });
+      }
+      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 28, 22);
+      if (!area.floorRect || !next) return false;
+      _pushPlanHistory();
+      return _savePlanResize(_resizePlanSanitary(sanitaryId || area.sanitaryId, next, area.floorRect), raw, { type: 'sanitary', sanitaryId: sanitaryId || area.sanitaryId });
+    }
+
+    if (raw.includes('::')) {
+      const [roomId, objectId] = raw.split('::');
+      const area = _selectedPlanMoveArea(raw);
+      const rect = _planAreaBaseRect(area);
+      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 12, 10);
+      if (!area || !rect || !area.parentRect || !next) return false;
+      _pushPlanHistory();
+      _pushSketchHistory();
+      return _savePlanResize(_resizePlanClassObject(roomId || area.roomId, objectId || area.objectId, next, area.parentRect), raw, { type: 'class-object', roomId: roomId || area.roomId });
     }
     return false;
   }
@@ -23790,6 +23973,7 @@ const MecFormModule = (() => {
     rotateSelectedPlanItem,
     flipSelectedPlanItem,
     nudgeSelectedPlanItem,
+    resizeSelectedPlanItem,
     deletePlanFloor,
     deletePlanBlock,
     newPlanClassroom,
@@ -23802,6 +23986,7 @@ const MecFormModule = (() => {
     setPlanBaseMapSource,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
+    setPlanSideMode,
     extendSchoolPlanCanvas,
     resetSchoolPlanCanvasSize,
     setPlanBaseMapValue,

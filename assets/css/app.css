@@ -5856,7 +5856,7 @@ textarea.form-control {
 }
 
 #module-registro .school-plan {
-  gap: .65rem;
+  gap: .42rem;
 }
 
 #module-registro .school-plan-builder {
@@ -5864,8 +5864,20 @@ textarea.form-control {
 }
 
 #module-registro .school-plan__layout {
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
-  gap: .65rem;
+  grid-template-columns: minmax(0, 1fr) minmax(148px, var(--plan-side-width, 186px));
+  gap: .42rem;
+}
+
+#module-registro .school-plan__layout--side-wide {
+  --plan-side-width: 280px;
+}
+
+#module-registro .school-plan__layout--side-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#module-registro .school-plan__layout--side-hidden .school-plan__side {
+  display: none;
 }
 
 #module-registro .school-plan__board,
@@ -5888,26 +5900,28 @@ textarea.form-control {
 }
 
 #module-registro .school-plan-ribbon__panel {
-  min-height: 54px;
-  padding: .32rem .36rem;
-  gap: .34rem;
+  min-height: 44px;
+  padding: .22rem .28rem;
+  gap: .24rem;
   align-items: flex-start;
   flex-wrap: wrap;
-  max-height: 186px;
+  max-height: 132px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
 #module-registro .school-plan-ribbon__group {
-  min-width: min(100%, 176px);
+  min-width: min(100%, 132px);
   max-width: 100%;
-  padding-right: .34rem;
+  padding-right: .22rem;
 }
 
 #module-registro .school-plan-ribbon__group-body,
 #module-registro .school-plan-ribbon__zoom,
 #module-registro .school-plan-ribbon__basemap,
+#module-registro .school-plan-ribbon__canvas,
+#module-registro .school-plan-ribbon__panelmode,
 #module-registro .school-plan-ribbon__checks {
   flex-wrap: wrap;
   align-items: stretch;
@@ -5920,17 +5934,17 @@ textarea.form-control {
 }
 
 #module-registro .school-plan-ribbon__button {
-  min-width: 46px;
-  min-height: 38px;
-  padding: .18rem .28rem;
-  flex: 0 0 52px;
+  min-width: 40px;
+  min-height: 31px;
+  padding: .14rem .2rem;
+  flex: 0 0 44px;
 }
 
 #module-registro .school-plan-ribbon__label {
-  max-width: 58px;
+  max-width: 50px;
   white-space: normal;
   overflow-wrap: anywhere;
-  font-size: .53rem;
+  font-size: .49rem;
 }
 
 #module-registro .school-plan__tools-row {
@@ -5946,7 +5960,7 @@ textarea.form-control {
 }
 
 #module-registro .school-plan__canvas-wrap {
-  max-height: min(60vh, 720px);
+  max-height: min(74vh, 860px);
 }
 
 #module-registro [data-school-plan-canvas],
@@ -5955,9 +5969,9 @@ textarea.form-control {
 }
 
 #module-registro .school-plan__side {
-  max-height: min(60vh, 720px);
+  max-height: min(74vh, 860px);
   overflow: auto;
-  padding: .55rem;
+  padding: .42rem;
 }
 
 #module-registro .school-plan__kpis {
@@ -5966,8 +5980,8 @@ textarea.form-control {
 }
 
 #module-registro .school-plan-kpi {
-  min-height: 38px;
-  padding: .3rem .38rem;
+  min-height: 32px;
+  padding: .22rem .3rem;
 }
 
 #module-registro .school-plan-kpi strong {

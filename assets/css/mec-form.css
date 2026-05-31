@@ -1909,9 +1909,21 @@
 
 .school-plan__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 250px);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(170px, var(--plan-side-width, 220px));
+  gap: .6rem;
   align-items: start;
+}
+
+.school-plan__layout--side-wide {
+  --plan-side-width: 300px;
+}
+
+.school-plan__layout--side-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.school-plan__layout--side-hidden .school-plan__side {
+  display: none;
 }
 
 .school-plan__board,
@@ -1923,7 +1935,7 @@
 }
 
 .school-plan__board {
-  padding: .75rem;
+  padding: .55rem;
 }
 
 .school-plan__toolbar {
@@ -1974,11 +1986,11 @@
 }
 
 .school-plan-ribbon__panel {
-  min-height: 62px;
+  min-height: 50px;
   display: flex;
   align-items: stretch;
-  gap: .48rem;
-  padding: .44rem .5rem;
+  gap: .34rem;
+  padding: .32rem .38rem;
   overflow-x: auto;
   scrollbar-width: thin;
 }
@@ -1987,8 +1999,8 @@
   min-width: max-content;
   display: grid;
   grid-template-rows: auto 1fr;
-  gap: .22rem;
-  padding-right: .52rem;
+  gap: .16rem;
+  padding-right: .34rem;
   border-right: 1px solid #d8e1eb;
 }
 
@@ -2012,6 +2024,8 @@
 .school-plan-ribbon__group-body,
 .school-plan-ribbon__zoom,
 .school-plan-ribbon__basemap,
+.school-plan-ribbon__canvas,
+.school-plan-ribbon__panelmode,
 .school-plan-ribbon__checks {
   display: flex;
   align-items: center;
@@ -2020,8 +2034,8 @@
 }
 
 .school-plan-ribbon__button {
-  min-width: 50px;
-  min-height: 42px;
+  min-width: 44px;
+  min-height: 34px;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -2204,7 +2218,7 @@
 .school-plan__canvas-wrap {
   position: relative;
   width: 100%;
-  max-height: 72vh;
+  max-height: 78vh;
   overflow: auto;
   border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
@@ -2458,7 +2472,7 @@
 }
 
 .school-plan__side {
-  padding: .85rem;
+  padding: .58rem;
 }
 
 .school-plan__side h3 {
