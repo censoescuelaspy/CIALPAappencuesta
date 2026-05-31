@@ -27,6 +27,11 @@
 - `node --check sw.js`.
 - `git diff --check`.
 
+### Publicacion
+- Commit publicado: `aa45eac`.
+- Push confirmado en `origin/main`.
+- GitHub Pages verificado con cache-busting: `config.js`, `index.html` y `mec-form.js` entregan `v2.6.157`, capa `cableado` y `_drawPlanElectricalBackbone`.
+
 ## Rutas reales Google en mapa - 2026-05-31
 
 ### Objetivo
