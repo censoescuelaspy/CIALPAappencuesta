@@ -1710,6 +1710,148 @@ const MecFormModule = (() => {
     return _baseMapLatLngToPlanPoint(coords.lat, coords.lng, logicalWidth, logicalHeight, baseMap);
   }
 
+  function _normalizeBoundaryGeoVertices(vertices = []) {
+    if (!Array.isArray(vertices)) return [];
+    let normalized = vertices.map((vertex, index) => {
+      const rawLat = vertex?.lat ?? vertex?.latitude ?? vertex?.latitud ?? vertex?.y;
+      const rawLng = vertex?.lng ?? vertex?.lon ?? vertex?.longitude ?? vertex?.longitud ?? vertex?.x;
+      const lat = _numberInRange(rawLat, NaN, -85, 85);
+      const lng = _numberInRange(rawLng, NaN, -180, 180);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return {
+        index,
+        lat: Number(lat.toFixed(8)),
+        lng: Number(lng.toFixed(8)),
+      };
+    }).filter(Boolean);
+    if (normalized.length > 3) {
+      const first = normalized[0];
+      const last = normalized[normalized.length - 1];
+      if (first && last && first.lat === last.lat && first.lng === last.lng) normalized = normalized.slice(0, -1);
+    }
+    return normalized.length >= 3 ? normalized : [];
+  }
+
+  function _parseBoundaryGeoVerticesFromFicha(ficha = {}) {
+    const candidates = [ficha.geoVertices, ficha.vertices_geo, ficha.vertices_latlon];
+    for (const candidate of candidates) {
+      const normalized = _normalizeBoundaryGeoVertices(candidate);
+      if (normalized.length) return normalized;
+    }
+    const geoJsonText = String(ficha.vertices_geojson || '').trim();
+    if (geoJsonText) {
+      try {
+        const parsed = JSON.parse(geoJsonText);
+        const coordinates = Array.isArray(parsed?.features?.[0]?.geometry?.coordinates?.[0])
+          ? parsed.features[0].geometry.coordinates[0]
+          : (Array.isArray(parsed?.geometry?.coordinates?.[0])
+            ? parsed.geometry.coordinates[0]
+            : (Array.isArray(parsed?.coordinates?.[0]) ? parsed.coordinates[0] : parsed));
+        const normalized = _normalizeBoundaryGeoVertices((coordinates || []).map(pair => ({
+          lng: Array.isArray(pair) ? pair[0] : pair?.lng,
+          lat: Array.isArray(pair) ? pair[1] : pair?.lat,
+        })));
+        if (normalized.length) return normalized;
+      } catch (_err) {
+        // Ignore older manual text values; the live geometry remains available.
+      }
+    }
+    const latLonText = String(ficha.vertices_latlon || '').trim();
+    if (latLonText) {
+      const normalized = _normalizeBoundaryGeoVertices(latLonText.split('|').map(part => {
+        const pieces = String(part || '').split(',').map(value => value.trim());
+        return { lat: pieces[0], lng: pieces[1] };
+      }));
+      if (normalized.length) return normalized;
+    }
+    return [];
+  }
+
+  function _boundaryGeoVerticesFromItem(item = {}) {
+    const primary = _normalizeBoundaryGeoVertices(item.geoVertices);
+    if (primary.length) return primary;
+    const legacy = _normalizeBoundaryGeoVertices(item.boundaryGeoVertices);
+    if (legacy.length) return legacy;
+    return _parseBoundaryGeoVerticesFromFicha(item.ficha || {});
+  }
+
+  function _setPropertyBoundaryGeoVertices(element, vertices = []) {
+    const normalized = _normalizeBoundaryGeoVertices(vertices);
+    if (!element || element.type !== 'property_boundary' || normalized.length < 3) return false;
+    element.geoVertices = normalized;
+    element.geoFixed = true;
+    element.geoSavedAt = new Date().toISOString();
+    element.ficha = element.ficha || {};
+    const ring = normalized.map(vertex => [vertex.lng, vertex.lat]);
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push([...first]);
+    element.ficha.vertices_latlon = normalized.map(vertex => `${vertex.lat},${vertex.lng}`).join(' | ');
+    element.ficha.vertices_geojson = JSON.stringify({
+      type: 'Polygon',
+      coordinates: [ring],
+    });
+    return true;
+  }
+
+  function _syncPropertyBoundaryGeoVertices(element = _propertyBoundaryElement(), logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!element || element.type !== 'property_boundary' || !_planBaseMapHasCoords(baseMap)) return false;
+    const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+    const vertices = _siteElementAbsoluteShapePoints(element, rect)
+      .map(point => _planPointToBaseMapLatLng(point, logicalWidth, logicalHeight, baseMap))
+      .filter(Boolean);
+    return _setPropertyBoundaryGeoVertices(element, vertices);
+  }
+
+  function _propertyBoundaryPointsFromGeo(element = _propertyBoundaryElement(), logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!element || element.type !== 'property_boundary' || !_planBaseMapHasCoords(baseMap)) return [];
+    return _boundaryGeoVerticesFromItem(element)
+      .map(vertex => {
+        const point = _baseMapLatLngToPlanPoint(vertex.lat, vertex.lng, logicalWidth, logicalHeight, baseMap);
+        if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+        return { ...vertex, point, label: _formatDmsCoordinate(vertex.lat, vertex.lng) };
+      })
+      .filter(Boolean);
+  }
+
+  function _fitPropertyBoundaryToAbsolutePoints(element, points = [], logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    if (!element || element.type !== 'property_boundary' || !Array.isArray(points) || points.length < 3) return false;
+    const xs = points.map(point => Number(point.x)).filter(Number.isFinite);
+    const ys = points.map(point => Number(point.y)).filter(Number.isFinite);
+    if (xs.length < 3 || ys.length < 3) return false;
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const width = Math.max(8, maxX - minX);
+    const height = Math.max(8, maxY - minY);
+    element.xRatio = minX / logicalWidth;
+    element.yRatio = minY / logicalHeight;
+    element.wRatio = width / logicalWidth;
+    element.hRatio = height / logicalHeight;
+    element.rotationDeg = 0;
+    element.ficha = element.ficha || {};
+    element.ficha.rotacion_grados = '0';
+    element.planShape = {
+      type: 'polygon',
+      points: points.map(point => ({
+        x: (point.x - minX) / width,
+        y: (point.y - minY) / height,
+      })),
+    };
+    _syncSiteElementMeasuresFromRect(element, { x: minX, y: minY, w: width, h: height }, logicalWidth, logicalHeight);
+    return true;
+  }
+
+  function _applyPropertyBoundaryGeoLock(logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const property = _propertyBoundaryElement();
+    const vertices = _propertyBoundaryPointsFromGeo(property, logicalWidth, logicalHeight);
+    if (vertices.length < 3) return false;
+    return _fitPropertyBoundaryToAbsolutePoints(property, vertices.map(vertex => vertex.point), logicalWidth, logicalHeight);
+  }
+
   function _formatDmsPart(value, positive, negative) {
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
@@ -1905,7 +2047,7 @@ const MecFormModule = (() => {
         <button class="btn ${source === PLAN_BASEMAP_SOURCE_STREET ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('street')">Calles</button>
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
-        <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base mapa</button>
+        <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base/perimetro</button>
         <small>${_escape(coords)}</small>
       </div>`;
   }
@@ -1921,8 +2063,8 @@ const MecFormModule = (() => {
       ? 'Arrastre sobre el plano para mover la base. Use la rueda sin Ctrl para escalar la base.'
       : 'Active Mover base para arrastrar calles y lineas sin mover bloques.';
     const sourceNotice = source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE
-      ? 'Google satelite se usa solo como fondo online para dibujar. La app guarda el perimetro, accesos, bloques y otros vectores propios; la imagen de Google no se descarga ni funciona offline.'
-      : 'La base mapa es una referencia visual. Para trabajo offline se conservan los vectores y fichas guardadas en el borrador.';
+      ? 'Google satelite se usa solo como fondo online para dibujar. La app guarda el perimetro con vertices lat/lon, accesos, bloques y otros vectores propios; la imagen de Google no se descarga ni funciona offline.'
+      : 'La base mapa es una referencia visual. Al guardar, el perimetro queda fijado por vertices lat/lon aunque la ficha completa de la escuela siga pendiente.';
     return `
       <section class="school-plan-basemap-panel" aria-label="Configuracion de base mapa">
         <div class="school-plan-basemap-panel__header">
@@ -2176,6 +2318,9 @@ const MecFormModule = (() => {
   function setPlanBaseMapSource(source = PLAN_BASEMAP_SOURCE_STREET) {
     const baseMap = _ensurePlanBaseMap();
     const requested = String(source || '').toLowerCase();
+    const previousSource = _planBaseMapSource(baseMap);
+    const previousZoom = _clampPlanBaseMapZoom(baseMap.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, previousSource);
+    const previousScale = _clampPlanBaseMapScale(baseMap.scale, PLAN_BASEMAP_DEFAULT_SCALE);
     if (requested === PLAN_BASEMAP_SOURCE_HIGHRES) {
       if (!_planBaseMapHighresSource()) {
         UI.showToast('Esta escuela aun no tiene una capa de alta resolucion configurada.', 'warning', 5200);
@@ -2192,10 +2337,23 @@ const MecFormModule = (() => {
     } else {
       baseMap.source = requested === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
     }
-    baseMap.zoom = _clampPlanBaseMapZoom(baseMap.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, baseMap.source);
+    const nextSource = _planBaseMapSource(baseMap);
+    const nextZoom = _clampPlanBaseMapZoom(previousZoom, PLAN_BASEMAP_DEFAULT_ZOOM, nextSource);
+    baseMap.zoom = nextZoom;
+    if (nextSource !== previousSource) {
+      baseMap.scale = _clampPlanBaseMapScale(previousScale * Math.pow(2, previousZoom - nextZoom), previousScale);
+    } else {
+      baseMap.scale = previousScale;
+    }
     if (_planBaseMapHasCoords(baseMap)) {
       baseMap.enabled = true;
+      const zoomBeforePrefer = baseMap.zoom;
+      const scaleBeforePrefer = baseMap.scale;
       _preferClosePlanBaseMapView(baseMap);
+      if (nextSource !== previousSource && baseMap.zoom !== zoomBeforePrefer) {
+        baseMap.scale = _clampPlanBaseMapScale(scaleBeforePrefer * Math.pow(2, zoomBeforePrefer - baseMap.zoom), scaleBeforePrefer);
+      }
+      _applyPropertyBoundaryGeoLock();
     } else {
       _planBaseMapPanelOpen = true;
       UI.showToast('Cargue coordenadas para activar la base satelital o de calles.', 'warning', 5200);
@@ -2234,10 +2392,11 @@ const MecFormModule = (() => {
     baseMap.confirmed = true;
     baseMap.savedAt = new Date().toISOString();
     _saveBaseMapCoordinatesToSchool(baseMap);
+    _syncPropertyBoundaryGeoVertices();
     _planBaseMapDragMode = false;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast('Base mapa y vectores del plano guardados. La imagen Google queda como fondo online; offline se conservan perimetro, bloques y fichas.', 'success', 6800);
+    UI.showToast('Base mapa y perimetro georreferenciado guardados. La imagen Google queda online; offline se conservan vertices, bloques y fichas.', 'success', 7200);
   }
 
   function _fieldVisible(field) {
@@ -4352,6 +4511,7 @@ const MecFormModule = (() => {
       const planShape = type === 'property_boundary'
         ? _normalizePropertyBoundaryShape(item.planShape)
         : _clonePlanShape(item.planShape);
+      const geoVertices = type === 'property_boundary' ? _boundaryGeoVerticesFromItem(item) : [];
       const applyBoundaryMeasuredScale = type === 'property_boundary' &&
         measuredSize &&
         item.boundaryScaleVersion !== PROPERTY_BOUNDARY_SCALE_VERSION;
@@ -4375,6 +4535,11 @@ const MecFormModule = (() => {
         autoSource: item.autoSource || null,
         locked: Boolean(item.locked),
         lockedAt: item.lockedAt || '',
+        ...(type === 'property_boundary' && geoVertices.length ? {
+          geoVertices,
+          geoFixed: true,
+          geoSavedAt: item.geoSavedAt || item.ficha?.geoSavedAt || '',
+        } : {}),
         ...(type === 'property_boundary' && measuredSize ? { boundaryScaleVersion: PROPERTY_BOUNDARY_SCALE_VERSION } : {}),
         ...(planShape ? { planShape } : {}),
       };
@@ -12881,6 +13046,7 @@ const MecFormModule = (() => {
     _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
     _data.__sanitaries = Array.isArray(_data.__sanitaries) ? _data.__sanitaries : [];
     _ensureSiteElements();
+    _applyPropertyBoundaryGeoLock();
     _normalizePlanMeasureHierarchy();
     const objects = _schoolPlanObjects();
     const metrics = _schoolPlanMetrics(sketch, objects);
@@ -15440,6 +15606,16 @@ const MecFormModule = (() => {
     if (!_planBaseMapVisible(baseMap)) return [];
     const property = _propertyBoundaryElement();
     if (!property) return [];
+    const fixedVertices = _propertyBoundaryPointsFromGeo(property, logicalWidth, logicalHeight);
+    if (fixedVertices.length) {
+      return fixedVertices.map((item, index) => ({
+        index,
+        point: item.point,
+        lat: item.lat,
+        lng: item.lng,
+        label: item.label,
+      }));
+    }
     const rect = _siteElementRect(property, logicalWidth, logicalHeight);
     return _siteElementAbsoluteShapePoints(property, rect)
       .map((point, index) => {
@@ -19141,7 +19317,10 @@ const MecFormModule = (() => {
       : _snapSiteElementRectToTargets(desired, logicalWidth, logicalHeight);
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
-    if (element.type === 'property_boundary') _persistBlocksWithinPropertyBoundary(logicalWidth, logicalHeight);
+    if (element.type === 'property_boundary') {
+      _persistBlocksWithinPropertyBoundary(logicalWidth, logicalHeight);
+      _syncPropertyBoundaryGeoVertices(element, logicalWidth, logicalHeight);
+    }
     _activePlanDrag = {
       id: `site::${element.id}`,
       siteId: element.id,
@@ -19626,7 +19805,10 @@ const MecFormModule = (() => {
     element.xRatio = clamped.x / logicalWidth;
     element.yRatio = clamped.y / logicalHeight;
     _syncSiteElementMeasuresFromRect(element, clamped, logicalWidth, logicalHeight);
-    if (element.type === 'property_boundary') _persistBlocksWithinPropertyBoundary(logicalWidth, logicalHeight);
+    if (element.type === 'property_boundary') {
+      _persistBlocksWithinPropertyBoundary(logicalWidth, logicalHeight);
+      _syncPropertyBoundaryGeoVertices(element, logicalWidth, logicalHeight);
+    }
     _activePlanDrag = { id: `site::${element.id}`, siteId: element.id, x: clamped.x, y: clamped.y, w: clamped.w, h: clamped.h };
     _drawSchoolPlan();
     return clamped;
@@ -20279,6 +20461,7 @@ const MecFormModule = (() => {
     delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
+    _syncPropertyBoundaryGeoVertices(element);
     _saveDraft(false);
     renderSchoolPlan();
   }
@@ -20292,6 +20475,7 @@ const MecFormModule = (() => {
     delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
+    _syncPropertyBoundaryGeoVertices(element);
     _saveDraft(false);
     renderSchoolPlan();
   }
@@ -20305,6 +20489,7 @@ const MecFormModule = (() => {
     delete element.boundaryShapeMode;
     _selectedPlanId = `site::${element.id}`;
     _persistBlocksWithinPropertyBoundary();
+    _syncPropertyBoundaryGeoVertices(element);
     _saveDraft(false);
     renderSchoolPlan();
   }
@@ -20393,7 +20578,10 @@ const MecFormModule = (() => {
       if (!element) return false;
       _setPlanShapeVertex(element, drag.index, localPoint, drag.rect);
       _selectedPlanId = `site::${element.id}`;
-      if (element.type === 'property_boundary') _persistBlocksWithinPropertyBoundary();
+      if (element.type === 'property_boundary') {
+        _persistBlocksWithinPropertyBoundary();
+        _syncPropertyBoundaryGeoVertices(element);
+      }
       _drawSchoolPlan();
       return true;
     }
@@ -21112,7 +21300,11 @@ const MecFormModule = (() => {
           const room = _classroomById(vertexDrag.roomId);
           if (room && _activeClassroomId === room.id && _data.__classroomSketch) _syncActiveClassroomFromSketch();
         }
-        if (vertexDrag.type === 'site') _persistBlocksWithinPropertyBoundary();
+        if (vertexDrag.type === 'site') {
+          const element = _ensureSiteElements().find(item => item.id === vertexDrag.siteId);
+          _persistBlocksWithinPropertyBoundary();
+          if (element?.type === 'property_boundary') _syncPropertyBoundaryGeoVertices(element);
+        }
         vertexDrag = null;
         pointerCandidate = null;
         pointerStart = null;
