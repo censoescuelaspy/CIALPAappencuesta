@@ -5949,6 +5949,11 @@ textarea.form-control {
   max-height: min(60vh, 720px);
 }
 
+#module-registro [data-school-plan-canvas],
+#module-plano [data-school-plan-canvas] {
+  touch-action: none;
+}
+
 #module-registro .school-plan__side {
   max-height: min(60vh, 720px);
   overflow: auto;

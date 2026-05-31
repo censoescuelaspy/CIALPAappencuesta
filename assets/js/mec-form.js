@@ -84,9 +84,10 @@ const MecFormModule = (() => {
     { id: 'exportar', label: 'Exportar', icon: '&#8681;' },
   ];
 
-  const PLAN_WALL_THICKNESS = 7;
+  const PLAN_WALL_THICKNESS = 5;
   const PLAN_OPENING_STROKE = 1.5;
-  const PLAN_VERTEX_HANDLE_SIZE = 12;
+  const PLAN_VERTEX_HANDLE_SIZE = 9;
+  const SCHOOL_MARKER_PLAN_ID = 'school::coordinate';
   const PROPERTY_BOUNDARY_MAX_WIDTH_RATIO = .9;
   const PROPERTY_BOUNDARY_MAX_HEIGHT_RATIO = .82;
   const PROPERTY_BOUNDARY_FALLBACK_PX_PER_METER = 12;
@@ -1104,13 +1105,22 @@ const MecFormModule = (() => {
   }
 
   function _schoolCoordinateDefaults() {
-    const school = _selectedSchoolFromContext() || _data.__selectedSchool || {};
+    const school = _data.__selectedSchool || _selectedSchoolFromContext() || {};
     const general = _data.general || {};
-    const latRaw = _firstPresent(school, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'lat_corr', 'LAT_CORR'])
-      || _firstPresent(general, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y', 'lat_corr', 'LAT_CORR'])
+    const baseMap = _data.__planBaseMap || {};
+    const correctedLat = _firstPresent(general, ['latitud_corregida', 'lat_corr', 'LAT_CORR'])
+      || _firstPresent(school, ['latitud_corregida', 'lat_corr', 'LAT_CORR'])
+      || (baseMap.schoolCoordinateCorrected ? baseMap.schoolLat : '');
+    const correctedLng = _firstPresent(general, ['longitud_corregida', 'lng_corr', 'LONG_CORR'])
+      || _firstPresent(school, ['longitud_corregida', 'lng_corr', 'LONG_CORR'])
+      || (baseMap.schoolCoordinateCorrected ? baseMap.schoolLng : '');
+    const latRaw = correctedLat
+      || _firstPresent(general, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y'])
+      || _firstPresent(school, ['latitud', 'LAT_DEC', 'lat_dec', 'lat', 'LAT', 'latitude', 'Y', 'y'])
       || '';
-    const lngRaw = _firstPresent(school, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'lng_corr', 'LONG_CORR'])
-      || _firstPresent(general, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x', 'lng_corr', 'LONG_CORR'])
+    const lngRaw = correctedLng
+      || _firstPresent(general, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x'])
+      || _firstPresent(school, ['longitud', 'LNG_DEC', 'lng_dec', 'lng', 'LNG', 'lon', 'LON', 'longitude', 'X', 'x'])
       || '';
     const lat = _numberInRange(latRaw, NaN, -85, 85);
     const lng = _numberInRange(lngRaw, NaN, -180, 180);
@@ -1118,6 +1128,40 @@ const MecFormModule = (() => {
       lat: Number.isFinite(lat) ? lat : '',
       lng: Number.isFinite(lng) ? lng : '',
     };
+  }
+
+  function _setSchoolCoordinatesFromLatLng(lat, lng, options = {}) {
+    const safeLat = _numberInRange(lat, NaN, -85, 85);
+    const safeLng = _numberInRange(lng, NaN, -180, 180);
+    if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) return false;
+    const latText = safeLat.toFixed(8);
+    const lngText = safeLng.toFixed(8);
+    _data.general = _data.general || {};
+    _data.general.latitud = latText;
+    _data.general.longitud = lngText;
+    _data.general.latitud_corregida = latText;
+    _data.general.longitud_corregida = lngText;
+    _data.general.lat_corr = latText;
+    _data.general.lng_corr = lngText;
+    const selected = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    _data.__selectedSchool = _schoolSnapshot({
+      ...selected,
+      latitud: latText,
+      lat: latText,
+      lat_corr: latText,
+      LAT_CORR: latText,
+      longitud: lngText,
+      lng: lngText,
+      lon: lngText,
+      lng_corr: lngText,
+      LONG_CORR: lngText,
+    });
+    if (!options.skipBaseMapMarker && _data.__planBaseMap) {
+      _data.__planBaseMap.schoolLat = safeLat;
+      _data.__planBaseMap.schoolLng = safeLng;
+      _data.__planBaseMap.schoolCoordinateCorrected = true;
+    }
+    return true;
   }
 
   function _preferredPlanBaseMapSource() {
@@ -1137,6 +1181,9 @@ const MecFormModule = (() => {
       offsetX: 0,
       offsetY: 0,
       rotationDeg: 0,
+      schoolLat: coords.lat,
+      schoolLng: coords.lng,
+      schoolCoordinateCorrected: false,
       contrast: PLAN_BASEMAP_DEFAULT_CONTRAST,
       saturation: PLAN_BASEMAP_DEFAULT_SATURATION,
       savedAt: '',
@@ -1536,6 +1583,13 @@ const MecFormModule = (() => {
     merged.offsetX = _numberInRange(merged.offsetX, 0, -2000, 2000);
     merged.offsetY = _numberInRange(merged.offsetY, 0, -2000, 2000);
     merged.rotationDeg = _planBaseMapRotationDeg(merged.rotationDeg ?? merged.rotacion_grados ?? merged.rotation ?? 0);
+    merged.schoolLat = merged.schoolLat === '' || merged.schoolLat === undefined || merged.schoolLat === null
+      ? ''
+      : _numberInRange(merged.schoolLat, '', -85, 85);
+    merged.schoolLng = merged.schoolLng === '' || merged.schoolLng === undefined || merged.schoolLng === null
+      ? ''
+      : _numberInRange(merged.schoolLng, '', -180, 180);
+    merged.schoolCoordinateCorrected = Boolean(merged.schoolCoordinateCorrected);
     merged.contrast = _numberInRange(merged.contrast, PLAN_BASEMAP_DEFAULT_CONTRAST, .75, 1.75);
     merged.saturation = _numberInRange(merged.saturation, PLAN_BASEMAP_DEFAULT_SATURATION, .5, 1.8);
     merged.enabled = Boolean(merged.enabled);
@@ -1708,7 +1762,37 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     if (!_planBaseMapVisible(baseMap)) return null;
     const coords = _schoolCoordinateDefaults();
+    if (coords.lat === '' || coords.lng === '') return null;
     return _baseMapLatLngToPlanPoint(coords.lat, coords.lng, logicalWidth, logicalHeight, baseMap);
+  }
+
+  function _moveSchoolCoordinateMarker(targetX, targetY, rect = null) {
+    const logicalWidth = _planCanvasWidth();
+    const logicalHeight = _planCanvasHeight();
+    const width = rect?.w || 36;
+    const height = rect?.h || width;
+    const point = {
+      x: Number(targetX) + width / 2,
+      y: Number(targetY) + height / 2,
+    };
+    const geo = _planPointToBaseMapLatLng(point, logicalWidth, logicalHeight, _ensurePlanBaseMap());
+    if (!geo) return null;
+    if (!_setSchoolCoordinatesFromLatLng(geo.lat, geo.lng)) return null;
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.schoolLat = _numberInRange(geo.lat, '', -85, 85);
+    baseMap.schoolLng = _numberInRange(geo.lng, '', -180, 180);
+    baseMap.schoolCoordinateCorrected = true;
+    baseMap.confirmed = false;
+    const clamped = { x: point.x - width / 2, y: point.y - height / 2, w: width, h: height };
+    _activePlanDrag = {
+      id: SCHOOL_MARKER_PLAN_ID,
+      x: clamped.x,
+      y: clamped.y,
+      w: clamped.w,
+      h: clamped.h,
+    };
+    _drawSchoolPlan();
+    return clamped;
   }
 
   function _normalizeBoundaryGeoVertices(vertices = []) {
@@ -2061,8 +2145,8 @@ const MecFormModule = (() => {
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
     const dragHint = _planBaseMapDragMode
-      ? 'Arrastre sobre el plano para mover la base. Use la rueda sin Ctrl para escalar la base.'
-      : 'Active Mover base para arrastrar calles y lineas sin mover bloques.';
+      ? 'Arrastre sobre el plano para mover la base. Use rueda sin Ctrl, o dos dedos para mover, acercar y girar.'
+      : 'Active Mover base para arrastrar calles y lineas. En tactil, dos dedos ajustan la base mapa.';
     const sourceNotice = source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE
       ? 'Google satelite se usa solo como fondo online para dibujar. La app guarda el perimetro con vertices lat/lon, accesos, bloques y otros vectores propios; la imagen de Google no se descarga ni funciona offline.'
       : 'La base mapa es una referencia visual. Al guardar, el perimetro queda fijado por vertices lat/lon aunque la ficha completa de la escuela siga pendiente.';
@@ -2366,19 +2450,13 @@ const MecFormModule = (() => {
 
   function _saveBaseMapCoordinatesToSchool(baseMap) {
     if (!_planBaseMapHasCoords(baseMap)) return;
-    const lat = String(baseMap.lat);
-    const lng = String(baseMap.lng);
-    _data.general = _data.general || {};
-    _data.general.latitud = lat;
-    _data.general.longitud = lng;
-    const selected = _data.__selectedSchool || _selectedSchoolFromContext() || {};
-    _data.__selectedSchool = _schoolSnapshot({
-      ...selected,
-      latitud: lat,
-      lat,
-      longitud: lng,
-      lng,
-    });
+    const markerLat = Number(baseMap.schoolLat);
+    const markerLng = Number(baseMap.schoolLng);
+    const lat = Number.isFinite(markerLat) ? markerLat : baseMap.lat;
+    const lng = Number.isFinite(markerLng) ? markerLng : baseMap.lng;
+    _setSchoolCoordinatesFromLatLng(lat, lng, { skipBaseMapMarker: true });
+    baseMap.schoolLat = _numberInRange(lat, '', -85, 85);
+    baseMap.schoolLng = _numberInRange(lng, '', -180, 180);
   }
 
   function savePlanBaseMap() {
@@ -3740,6 +3818,19 @@ const MecFormModule = (() => {
 
   function _defaultPlanShape(kind = 'l') {
     if (kind === 'rect') return null;
+    if (kind === 'polygon') {
+      return {
+        type: 'polygon',
+        points: [
+          { x: .10, y: .08 },
+          { x: .82, y: .02 },
+          { x: 1, y: .40 },
+          { x: .84, y: .92 },
+          { x: .22, y: 1 },
+          { x: 0, y: .48 },
+        ],
+      };
+    }
     return {
       type: kind === 'l' ? 'l-shape' : 'polygon',
       points: [
@@ -5285,20 +5376,8 @@ const MecFormModule = (() => {
     _data.bloques = {
       bloque_codigo: _numberedLabel('Bloque', next - 1),
       estado_bloque: 'Operativo',
-      cantidad_plantas: '1',
-      floors: [{
-        id: `piso_${Date.now().toString(36)}_pb`,
-        label: 'Planta baja',
-        floor: 'Planta baja',
-        largo_m: '',
-        ancho_m: '',
-        xRatio: 0,
-        yRatio: 0,
-        wRatio: 1,
-        hRatio: 1,
-        rotationDeg: 0,
-        rotacion_grados: '0',
-      }],
+      cantidad_plantas: '0',
+      floors: [],
     };
     _data.__blocks.push({ id: _data.__activeBlockId, ..._data.bloques });
     _setActiveFloor('Planta baja');
@@ -5306,7 +5385,7 @@ const MecFormModule = (() => {
     _saveDraft(false);
     _render();
     setTimeout(() => openPlanBlockFicha(_data.__activeBlockId), 80);
-    UI.showToast('Nuevo bloque listo para cargar. Complete largo y ancho en la ficha o en la guia superior.', 'success', 6200);
+    UI.showToast('Nuevo bloque listo. Dibuje el perimetro del bloque; agregue pisos despues solo si corresponde.', 'success', 6200);
   }
 
   function startGuidedBlockRegistration() {
@@ -10699,6 +10778,18 @@ const MecFormModule = (() => {
 
   function _planHoverInfo(area) {
     if (!area) return null;
+    if (area.type === 'school-marker') {
+      const coords = _schoolCoordinateDefaults();
+      return {
+        title: 'Punto escuela',
+        subtitle: 'Geolocalizacion MEC corregible',
+        rows: [
+          { label: 'Latitud', value: coords.lat !== '' ? Number(coords.lat).toFixed(8) : '' },
+          { label: 'Longitud', value: coords.lng !== '' ? Number(coords.lng).toFixed(8) : '' },
+          { label: 'Accion', value: 'Arrastre el punto para corregir la ubicacion' },
+        ].filter(row => row.value),
+      };
+    }
     if (area.type === 'block' || area.type === 'block-rotate') {
       const block = _blockById(area.blockId);
       if (!block) return null;
@@ -13431,6 +13522,7 @@ const MecFormModule = (() => {
       const _fbId = _selForma.replace('block::', '');
       _formaGroupContent = [
         _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanBlockShape('${_escape(_fbId)}', 'l')`, title: 'Cambiar a forma en L' }),
+        _renderPlanRibbonButton({ icon: '&#x25B1;', label: 'Poligono', onClick: `MecFormModule.setPlanBlockShape('${_escape(_fbId)}', 'polygon')`, title: 'Cambiar a poligono libre' }),
         _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanBlockVertex('${_escape(_fbId)}')`, title: 'Agregar vertice al bloque' }),
         _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanBlockVertex('${_escape(_fbId)}')`, title: 'Eliminar vertice del bloque' }),
         _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanBlockShape('${_escape(_fbId)}', 'rect')`, title: 'Restablecer forma rectangular' }),
@@ -13684,6 +13776,7 @@ const MecFormModule = (() => {
     const property = _selectedPlanPropertyBoundary(id);
     if (property && !_propertyBoundaryEditActive(property)) return false;
     const raw = String(id || '');
+    if (raw === SCHOOL_MARKER_PLAN_ID) return false;
     return Boolean(raw && (
       raw.startsWith('block::') ||
       raw.startsWith('floor::') ||
@@ -13698,6 +13791,7 @@ const MecFormModule = (() => {
     const property = _selectedPlanPropertyBoundary(id);
     if (property && !_propertyBoundaryEditActive(property)) return false;
     const raw = String(id || '');
+    if (raw === SCHOOL_MARKER_PLAN_ID) return true;
     return Boolean(raw && (
       raw.startsWith('block::') ||
       raw.startsWith('floor::') ||
@@ -13780,6 +13874,19 @@ const MecFormModule = (() => {
     };
     if (!id) return fallback;
     const raw = String(id);
+    if (raw === SCHOOL_MARKER_PLAN_ID) {
+      const coords = _schoolCoordinateDefaults();
+      return {
+        title: 'Punto escuela',
+        detail: coords.lat !== '' && coords.lng !== ''
+          ? `${Number(coords.lat).toFixed(8)}, ${Number(coords.lng).toFixed(8)}`
+          : 'Sin coordenadas validas',
+        actions: [
+          { label: 'Guardar base/perimetro', tone: 'btn-primary', onClick: 'MecFormModule.savePlanBaseMap()' },
+          { label: 'Usar como centro', onClick: 'MecFormModule.useSchoolCoordinatesForBaseMap()' },
+        ],
+      };
+    }
     if (raw.startsWith('block::')) {
       const blockId = raw.replace('block::', '');
       const block = _blockById(blockId);
@@ -13797,6 +13904,7 @@ const MecFormModule = (() => {
           { label: '+ Sanitario', onClick: 'MecFormModule.addPlanSanitary()' },
           { label: '+ Exterior', onClick: "MecFormModule.openSiteElementTypePicker('plan')" },
           { label: 'Forma L', onClick: `MecFormModule.setPlanBlockShape('${_escape(block.id)}', 'l')` },
+          { label: 'Poligono', onClick: `MecFormModule.setPlanBlockShape('${_escape(block.id)}', 'polygon')` },
           { label: '+ Vertice', onClick: `MecFormModule.addPlanBlockVertex('${_escape(block.id)}')` },
           { label: '- Vertice', onClick: `MecFormModule.removePlanBlockVertex('${_escape(block.id)}')` },
           { label: 'Rectangular', onClick: `MecFormModule.setPlanBlockShape('${_escape(block.id)}', 'rect')` },
@@ -14017,6 +14125,7 @@ const MecFormModule = (() => {
   function _selectedPlanTreeContext(id = _selectedPlanId) {
     const raw = String(id || '');
     if (!raw) return { blockId: _data.__activeBlockId || '', floor: _activeFloor(), type: '' };
+    if (raw === SCHOOL_MARKER_PLAN_ID) return { blockId: '', floor: '', type: 'school-marker' };
     if (raw.startsWith('block::')) return { blockId: raw.replace('block::', ''), floor: _activeFloor(), type: 'block' };
     if (raw.startsWith('floor::')) {
       const [, blockId, floorId] = raw.split('::');
@@ -15125,18 +15234,18 @@ const MecFormModule = (() => {
         ctx.strokeRect(x, y, w, h);
       }
       ctx.fillStyle = '#172033';
-      ctx.font = _canvasFont(800, 12);
+      ctx.font = _canvasFont(800, 9);
       ctx.textAlign = 'left';
-      ctx.fillText(block.bloque_codigo || 'Bloque', x + 10, y + 14);
+      ctx.fillText(block.bloque_codigo || 'Bloque', x + 8, y + 12);
       if (block.largo_m && block.ancho_m) {
-        ctx.font = _canvasFont(700, 9);
+        ctx.font = _canvasFont(700, 7);
         ctx.fillStyle = '#475467';
-        ctx.fillText(`${block.largo_m} x ${block.ancho_m} m`, x + 10, y + 26);
+        ctx.fillText(`${block.largo_m} x ${block.ancho_m} m`, x + 8, y + 22);
         if (blockSelected) _drawPlanDimensionLabels(ctx, blockRect, block.largo_m, block.ancho_m, '#111827');
       } else {
-        ctx.font = _canvasFont(700, 9);
+        ctx.font = _canvasFont(700, 7);
         ctx.fillStyle = '#667085';
-        ctx.fillText('Sin dimensiones: abrir ficha', x + 10, y + 26);
+        ctx.fillText('Sin dimensiones', x + 8, y + 22);
       }
       _drawBlockInfrastructureHints(ctx, block, x, y, w, h);
       if (blockSelected && blockShapePoints) {
@@ -15501,25 +15610,25 @@ const MecFormModule = (() => {
     ctx.fillRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
     ctx.shadowColor = 'transparent';
     ctx.strokeStyle = active ? '#e84c22' : '#6b8fb9';
-    ctx.lineWidth = active ? 2.4 : 1.4;
+    ctx.lineWidth = active ? 1.6 : .9;
     ctx.strokeRect(floorRect.x, floorRect.y, floorRect.w, floorRect.h);
     ctx.fillStyle = active ? '#9a3412' : '#334155';
-    ctx.font = _canvasFont(900, 10);
+    ctx.font = _canvasFont(900, 8);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'alphabetic';
-    const labelText = _truncateLabel(ctx, label, Math.max(32, floorRect.w - 20));
-    const labelW = Math.min(floorRect.w - 8, ctx.measureText(labelText).width + 14);
+    const labelText = _truncateLabel(ctx, label, Math.max(28, floorRect.w - 18));
+    const labelW = Math.min(floorRect.w - 8, ctx.measureText(labelText).width + 12);
     ctx.fillStyle = active ? 'rgba(255,247,237,.84)' : 'rgba(248,250,252,.74)';
-    ctx.fillRect(floorRect.x + 4, floorRect.y + 4, Math.max(34, labelW), 17);
+    ctx.fillRect(floorRect.x + 4, floorRect.y + 4, Math.max(28, labelW), 14);
     ctx.strokeStyle = active ? 'rgba(232,76,34,.30)' : 'rgba(100,116,139,.20)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(floorRect.x + 4, floorRect.y + 4, Math.max(34, labelW), 17);
+    ctx.lineWidth = .8;
+    ctx.strokeRect(floorRect.x + 4, floorRect.y + 4, Math.max(28, labelW), 14);
     ctx.fillStyle = active ? '#9a3412' : '#334155';
-    ctx.fillText(labelText, floorRect.x + 11, floorRect.y + 16);
+    ctx.fillText(labelText, floorRect.x + 10, floorRect.y + 14);
     if (floor?.largo_m || floor?.ancho_m) {
-      ctx.font = _canvasFont(800, 8);
+      ctx.font = _canvasFont(800, 7);
       ctx.fillStyle = active ? '#9a3412' : '#475467';
-      ctx.fillText(_truncateLabel(ctx, `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`, Math.max(28, floorRect.w - 18)), floorRect.x + 11, floorRect.y + 28);
+      ctx.fillText(_truncateLabel(ctx, `${floor?.largo_m || '?'} x ${floor?.ancho_m || '?'} m`, Math.max(24, floorRect.w - 16)), floorRect.x + 10, floorRect.y + 25);
     }
     if (active) {
       _drawPlanRotateHandle(ctx, floorRect, _floorRotationDeg(floor));
@@ -15740,6 +15849,20 @@ const MecFormModule = (() => {
     if (!point) return;
     const margin = 22;
     if (point.x < -margin || point.y < -margin || point.x > logical.width + margin || point.y > logical.height + margin) return;
+    const selected = _selectedPlanId === SCHOOL_MARKER_PLAN_ID || _activePlanDrag?.id === SCHOOL_MARKER_PLAN_ID;
+    const hitSize = 36;
+    _pushPlanHitArea({
+      id: SCHOOL_MARKER_PLAN_ID,
+      type: 'school-marker',
+      x: point.x - hitSize / 2,
+      y: point.y - hitSize / 2,
+      w: hitSize,
+      h: hitSize,
+      baseX: point.x - hitSize / 2,
+      baseY: point.y - hitSize / 2,
+      baseW: hitSize,
+      baseH: hitSize,
+    });
     ctx.save();
     ctx.shadowColor = 'rgba(15,23,42,.36)';
     ctx.shadowBlur = 7;
@@ -15757,15 +15880,22 @@ const MecFormModule = (() => {
     ctx.beginPath();
     ctx.arc(point.x, point.y, 16, 0, Math.PI * 2);
     ctx.stroke();
+    if (selected) {
+      ctx.strokeStyle = '#111827';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(point.x - hitSize / 2, point.y - hitSize / 2, hitSize, hitSize);
+      ctx.setLineDash([]);
+    }
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(point.x, point.y, 2.7, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     _drawOutlinedCanvasText(ctx, 'Punto escuela', Math.min(logical.width - 8, point.x + 18), Math.max(14, point.y - 15), {
-      font: _canvasFont(900, 12),
+      font: _canvasFont(900, 10),
       align: point.x > logical.width - 130 ? 'right' : 'left',
-      strokeWidth: 4.5,
+      strokeWidth: 3.4,
       fill: '#b91c1c',
     });
   }
@@ -15781,13 +15911,13 @@ const MecFormModule = (() => {
     if (!_planBaseMapVisible(_data.__planBaseMap)) return;
     items.forEach(({ block, rect, index }) => {
       const label = _blockGeoLabel(block, index);
-      const fontSize = Math.max(24, Math.min(54, Math.min(rect.w, rect.h) * .38));
+      const fontSize = Math.max(10, Math.min(24, Math.min(rect.w, rect.h) * .18));
       _drawOutlinedCanvasText(ctx, label, rect.x + rect.w / 2, rect.y + rect.h / 2, {
         font: _canvasFont(900, fontSize),
         align: 'center',
         baseline: 'middle',
         stroke: '#ffffff',
-        strokeWidth: Math.max(5, fontSize * .13),
+        strokeWidth: Math.max(2.4, fontSize * .12),
         fill: '#111827',
       });
     });
@@ -15828,8 +15958,8 @@ const MecFormModule = (() => {
     if (!_planBaseMapVisible(_data.__planBaseMap)) return '';
     return items.map(({ block, rect, index }) => {
       const label = _blockGeoLabel(block, index);
-      const fontSize = Math.max(24, Math.min(54, Math.min(rect.w, rect.h) * .38));
-      return `<text x="${_cssNumber(rect.x + rect.w / 2)}" y="${_cssNumber(rect.y + rect.h / 2)}" font-family="system-ui" font-size="${_cssNumber(fontSize)}" font-weight="900" text-anchor="middle" dominant-baseline="middle" stroke="#ffffff" stroke-width="${_cssNumber(Math.max(5, fontSize * .13))}" paint-order="stroke fill" fill="#111827">${_escape(label)}</text>`;
+      const fontSize = Math.max(10, Math.min(24, Math.min(rect.w, rect.h) * .18));
+      return `<text x="${_cssNumber(rect.x + rect.w / 2)}" y="${_cssNumber(rect.y + rect.h / 2)}" font-family="system-ui" font-size="${_cssNumber(fontSize)}" font-weight="900" text-anchor="middle" dominant-baseline="middle" stroke="#ffffff" stroke-width="${_cssNumber(Math.max(2.4, fontSize * .12))}" paint-order="stroke fill" fill="#111827">${_escape(label)}</text>`;
     }).join('');
   }
 
@@ -15846,7 +15976,7 @@ const MecFormModule = (() => {
         <circle cx="${_cssNumber(point.x)}" cy="${_cssNumber(point.y)}" r="16" fill="none" stroke="rgba(220,38,38,.72)" stroke-width="2.2"/>
         <circle cx="${_cssNumber(point.x)}" cy="${_cssNumber(point.y)}" r="8" fill="#dc2626" stroke="#ffffff" stroke-width="3"/>
         <circle cx="${_cssNumber(point.x)}" cy="${_cssNumber(point.y)}" r="2.7" fill="#ffffff"/>
-        <text x="${_cssNumber(textX)}" y="${_cssNumber(textY)}" font-family="system-ui" font-size="12" font-weight="900" text-anchor="${anchor}" dominant-baseline="middle" stroke="#ffffff" stroke-width="4.5" paint-order="stroke fill" fill="#b91c1c">Punto escuela</text>
+        <text x="${_cssNumber(textX)}" y="${_cssNumber(textY)}" font-family="system-ui" font-size="10" font-weight="900" text-anchor="${anchor}" dominant-baseline="middle" stroke="#ffffff" stroke-width="3.4" paint-order="stroke fill" fill="#b91c1c">Punto escuela</text>
       </g>`;
   }
 
@@ -15934,7 +16064,7 @@ const MecFormModule = (() => {
     if (!rect) return [];
     const center = _planRectCenter(rect);
     const minDim = Math.min(rect.w, rect.h);
-    const size = minDim < 14 ? 10 : (minDim < 28 ? 14 : 22);
+    const size = minDim < 14 ? 8 : (minDim < 28 ? 12 : 16);
     return [
       { name: 'nw', x: rect.x, y: rect.y },
       { name: 'ne', x: rect.x + rect.w, y: rect.y },
@@ -15951,11 +16081,11 @@ const MecFormModule = (() => {
     const handles = _planResizeHandles(rect, rotation);
     if (!handles.length) return;
     const minDim = Math.min(rect.w, rect.h);
-    const half = minDim < 14 ? 3 : (minDim < 28 ? 4 : 5.5);
+    const half = minDim < 14 ? 2.4 : (minDim < 28 ? 3 : 4);
     ctx.save();
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#111827';
-    ctx.lineWidth = minDim < 14 ? 1 : (minDim < 28 ? 1.5 : 2);
+    ctx.lineWidth = minDim < 14 ? .8 : (minDim < 28 ? 1 : 1.4);
     handles.forEach(handle => {
       ctx.beginPath();
       ctx.rect(handle.x - half, handle.y - half, half * 2, half * 2);
@@ -17702,6 +17832,7 @@ const MecFormModule = (() => {
   function _activatePlanSelection(id) {
     const raw = String(id || '');
     if (!raw) return;
+    if (raw === SCHOOL_MARKER_PLAN_ID) return;
     if (raw.startsWith('block::')) {
       const blockId = raw.replace('block::', '');
       const block = _blockById(blockId);
@@ -17839,6 +17970,12 @@ const MecFormModule = (() => {
     const raw = String(_selectedPlanId || '');
     if (!raw) {
       UI.showToast('Seleccione una pieza del plano para abrirla.', 'info');
+      return;
+    }
+    if (raw === SCHOOL_MARKER_PLAN_ID) {
+      _planBaseMapPanelOpen = true;
+      renderSchoolPlan();
+      UI.showToast('Arrastre el punto rojo para corregir la geolocalizacion; luego guarde base/perimetro.', 'info', 6200);
       return;
     }
     if (raw.startsWith('block::')) {
@@ -19184,6 +19321,10 @@ const MecFormModule = (() => {
   async function deletePlanSelection() {
     if (!_selectedPlanId) {
       UI.showToast('Seleccione un aula o elemento en el plano general.', 'warning');
+      return;
+    }
+    if (String(_selectedPlanId) === SCHOOL_MARKER_PLAN_ID) {
+      UI.showToast('El punto escuela no se elimina. Arrastrelo para corregir la geolocalizacion.', 'info', 5200);
       return;
     }
     if (String(_selectedPlanId).startsWith('block::')) {
@@ -20815,6 +20956,12 @@ const MecFormModule = (() => {
     _pushPlanHistory();
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
+    if (raw === SCHOOL_MARKER_PLAN_ID) {
+      const area = _selectedPlanMoveArea(raw);
+      const rect = _planAreaBaseRect(area);
+      if (!area || !rect) return false;
+      return _savePlanNudge(_moveSchoolCoordinateMarker(rect.x + dx, rect.y + dy, rect));
+    }
     if (raw.startsWith('site::')) {
       const elementId = raw.replace('site::', '');
       const element = _ensureSiteElements().find(el => el.id === elementId);
@@ -20894,6 +21041,15 @@ const MecFormModule = (() => {
         y: (event.clientY - rect.top) * (logical.height / rect.height),
       };
     };
+    const pointFromClient = clientPoint => {
+      if (!clientPoint) return null;
+      const rect = canvas.getBoundingClientRect();
+      const logical = _canvasLogicalSize(canvas, _planCanvasWidth(), _planCanvasHeight());
+      return {
+        x: (clientPoint.x - rect.left) * (logical.width / rect.width),
+        y: (clientPoint.y - rect.top) * (logical.height / rect.height),
+      };
+    };
     const rememberPointer = event => {
       activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     };
@@ -20907,6 +21063,11 @@ const MecFormModule = (() => {
       if (!points.length) return null;
       const sum = points.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 });
       return { x: sum.x / points.length, y: sum.y / points.length };
+    };
+    const pointerAngle = () => {
+      const points = [...activePointers.values()];
+      if (points.length < 2) return 0;
+      return (Math.atan2(points[1].y - points[0].y, points[1].x - points[0].x) * 180) / Math.PI;
     };
     const canDragBaseMap = () => Boolean(_planBaseMapDragMode && _planBaseMapVisible(_ensurePlanBaseMap()));
     const applyBaseMapDrag = currentPoint => {
@@ -21021,7 +21182,7 @@ const MecFormModule = (() => {
       _hideCanvasHoverTooltip();
       renderSchoolPlan();
     };
-    const movablePlanTypes = ['block', 'site-element', 'floor', 'room', 'sanitary'];
+    const movablePlanTypes = ['block', 'site-element', 'floor', 'room', 'sanitary', 'school-marker'];
     const isClassObjectArea = area => Boolean(area?.roomId && area?.objectId && !area?.sanitaryId);
     const isSanitaryObjectArea = area => Boolean(area?.sanitaryId && area?.objectId);
     const isPlanMovableArea = area => Boolean(area && (
@@ -21029,7 +21190,7 @@ const MecFormModule = (() => {
       isClassObjectArea(area) ||
       isSanitaryObjectArea(area)
     ));
-    const directDragTypes = ['site-element', 'floor', 'room', 'sanitary'];
+    const directDragTypes = ['site-element', 'floor', 'room', 'sanitary', 'school-marker'];
     const canEditPropertyBoundaryArea = area => {
       if (!area || area.type !== 'site-element') return true;
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
@@ -21050,12 +21211,18 @@ const MecFormModule = (() => {
       if (blockDrag.type === 'floor') return _movePlanFloor(blockDrag.blockId, blockDrag.floorId, x, y, blockDrag.rect, blockDrag.blockRect);
       if (blockDrag.type === 'room') return _movePlanRoom(blockDrag.roomId, x, y, blockDrag.rect, blockDrag.floorRect);
       if (blockDrag.type === 'sanitary') return _movePlanSanitary(blockDrag.sanitaryId, x, y, blockDrag.rect, blockDrag.floorRect);
+      if (blockDrag.type === 'school-marker') return _moveSchoolCoordinateMarker(x, y, blockDrag.rect);
       if (blockDrag.type === 'class-object') return _movePlanClassObject(blockDrag.roomId, blockDrag.objectId, x, y, blockDrag.rect, blockDrag.parentRect);
       if (blockDrag.type === 'sanitary-object') return _movePlanSanitaryObject(blockDrag.sanitaryId, blockDrag.objectId, x, y, blockDrag.rect, blockDrag.parentRect);
       return _movePlanBlock(blockDrag.blockId, x, y, blockDrag.rect);
     };
     const editAreaFicha = area => {
       if (!area) return;
+      if (area.type === 'school-marker') {
+        selectPlanItem(SCHOOL_MARKER_PLAN_ID);
+        openPlanSelection();
+        return;
+      }
       if (area.siteId) {
         selectPlanItem(`site::${area.siteId}`);
         openSiteElementFicha(area.siteId);
@@ -21103,11 +21270,28 @@ const MecFormModule = (() => {
         canvas.focus();
       }
       if (event.pointerType === 'touch' && activePointers.size >= 2) {
-        planPinch = {
-          distance: pointerDistance(),
-          zoom: _schoolPlanZoom,
-          focus: _zoomFocusFromClient(canvas, canvas.closest('.school-plan__canvas-wrap'), pointerCenter()),
-        };
+        const distance = pointerDistance();
+        const centerClient = pointerCenter();
+        const baseMap = _ensurePlanBaseMap();
+        if (_planBaseMapVisible(baseMap)) {
+          planPinch = {
+            mode: 'basemap',
+            distance,
+            angle: pointerAngle(),
+            center: pointFromClient(centerClient),
+            scale: Number(baseMap.scale || PLAN_BASEMAP_DEFAULT_SCALE),
+            rotation: _planBaseMapRotationDeg(baseMap.rotationDeg),
+            offsetX: Number(baseMap.offsetX || 0),
+            offsetY: Number(baseMap.offsetY || 0),
+          };
+        } else {
+          planPinch = {
+            mode: 'plan',
+            distance,
+            zoom: _schoolPlanZoom,
+            focus: _zoomFocusFromClient(canvas, canvas.closest('.school-plan__canvas-wrap'), centerClient),
+          };
+        }
         pointerCandidate = null;
         pointerStart = null;
         blockDrag = null;
@@ -21120,7 +21304,8 @@ const MecFormModule = (() => {
         event.preventDefault();
         return;
       }
-      if (canDragBaseMap()) {
+      const baseMapDragCandidate = canDragBaseMap() ? hit(event) : null;
+      if (canDragBaseMap() && baseMapDragCandidate?.type !== 'school-marker') {
         pointerStart = pointFromEvent(event);
         const baseMap = _ensurePlanBaseMap();
         baseMapDrag = {
@@ -21134,7 +21319,7 @@ const MecFormModule = (() => {
         event.preventDefault();
         return;
       }
-      const area = hit(event);
+      const area = baseMapDragCandidate || hit(event);
       if (!isSelectableArea(area)) return;
       pointerStart = pointFromEvent(event);
       canvas.setPointerCapture?.(event.pointerId);
@@ -21184,7 +21369,21 @@ const MecFormModule = (() => {
       if (planPinch && activePointers.size >= 2) {
         const distance = pointerDistance();
         if (distance > 0 && planPinch.distance > 0) {
-          _setSchoolPlanZoomValue(planPinch.zoom * (distance / planPinch.distance), planPinch.focus || false);
+          if (planPinch.mode === 'basemap') {
+            const baseMap = _ensurePlanBaseMap();
+            const center = pointFromClient(pointerCenter()) || planPinch.center || { x: 0, y: 0 };
+            const startCenter = planPinch.center || center;
+            baseMap.scale = _clampPlanBaseMapScale(planPinch.scale * (distance / planPinch.distance), planPinch.scale);
+            baseMap.rotationDeg = _planBaseMapRotationDeg(planPinch.rotation + pointerAngle() - planPinch.angle);
+            baseMap.offsetX = _numberInRange(planPinch.offsetX + center.x - startCenter.x, 0, -2000, 2000);
+            baseMap.offsetY = _numberInRange(planPinch.offsetY + center.y - startCenter.y, 0, -2000, 2000);
+            baseMap.enabled = true;
+            baseMap.confirmed = false;
+            _refreshPlanBaseMapLayer(canvas, true);
+            _drawSchoolPlan();
+          } else {
+            _setSchoolPlanZoomValue(planPinch.zoom * (distance / planPinch.distance), planPinch.focus || false);
+          }
           suppressClickUntil = Date.now() + 350;
         }
         event.preventDefault();
@@ -21344,7 +21543,15 @@ const MecFormModule = (() => {
     canvas.addEventListener('pointerup', event => {
       activePointers.delete(event.pointerId);
       if (planPinch) {
-        if (activePointers.size < 2) planPinch = null;
+        const pinchMode = planPinch.mode || 'plan';
+        if (activePointers.size < 2) {
+          planPinch = null;
+          if (pinchMode === 'basemap') {
+            _saveDraft(false);
+            renderSchoolPlan();
+            _notifyGuidedPlanSync();
+          }
+        }
         suppressClickUntil = Date.now() + 350;
         pointerCandidate = null;
         pointerStart = null;
@@ -21434,17 +21641,19 @@ const MecFormModule = (() => {
         pointerCandidate = null;
         pointerStart = null;
         _activePlanDrag = null;
-        _selectedPlanId = dragType === 'site-element'
-          ? `site::${siteId}`
-          : (dragType === 'floor'
-            ? `floor::${blockId}::${floorId}`
-            : (dragType === 'room'
-              ? `room::${roomId}`
-              : (dragType === 'sanitary'
-                ? `sanitary::${sanitaryId}`
-                : (dragType === 'class-object'
-                  ? `${roomId}::${objectId}`
-                  : (dragType === 'sanitary-object' ? `sanitary::${sanitaryId}::${objectId}` : `block::${blockId}`)))));
+        _selectedPlanId = dragType === 'school-marker'
+          ? SCHOOL_MARKER_PLAN_ID
+          : (dragType === 'site-element'
+            ? `site::${siteId}`
+            : (dragType === 'floor'
+              ? `floor::${blockId}::${floorId}`
+              : (dragType === 'room'
+                ? `room::${roomId}`
+                : (dragType === 'sanitary'
+                  ? `sanitary::${sanitaryId}`
+                  : (dragType === 'class-object'
+                    ? `${roomId}::${objectId}`
+                    : (dragType === 'sanitary-object' ? `sanitary::${sanitaryId}::${objectId}` : `block::${blockId}`))))));
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
