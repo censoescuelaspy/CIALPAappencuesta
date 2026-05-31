@@ -13626,6 +13626,10 @@ const MecFormModule = (() => {
         const _propertyEditActive = _propertyBoundaryEditActive(_siteItem);
         _formaGroupContent = [
           _renderPlanRibbonButton({ icon: _propertyEditActive ? '&#10003;' : '&#9998;', label: _propertyEditActive ? 'Fijar' : 'Editar', onClick: `MecFormModule.togglePropertyBoundaryEdit('${_escape(_siteId)}')`, tone: _propertyEditActive ? 'btn-success' : 'btn-warning', active: _propertyEditActive, title: _propertyEditActive ? 'Fijar el perimetro para trabajar con bloques' : 'Activar edicion del perimetro' }),
+          _renderPlanRibbonButton({ icon: '&#8596;', label: 'Largo +', onClick: "MecFormModule.resizeSelectedPlanItem('width', 1.18)", title: 'Aumentar el largo del perimetro' }),
+          _renderPlanRibbonButton({ icon: '&#8596;', label: 'Largo -', onClick: "MecFormModule.resizeSelectedPlanItem('width', 0.85)", title: 'Reducir el largo del perimetro' }),
+          _renderPlanRibbonButton({ icon: '&#8597;', label: 'Ancho +', onClick: "MecFormModule.resizeSelectedPlanItem('height', 1.18)", title: 'Aumentar el ancho del perimetro' }),
+          _renderPlanRibbonButton({ icon: '&#8597;', label: 'Ancho -', onClick: "MecFormModule.resizeSelectedPlanItem('height', 0.85)", title: 'Reducir el ancho del perimetro' }),
           _renderPlanRibbonButton({ icon: '&#8634;', label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(_siteId)}', -15)`, title: 'Rotar el perimetro 15 grados a la izquierda' }),
           _renderPlanRibbonButton({ icon: '&#8635;', label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(_siteId)}', 15)`, title: 'Rotar el perimetro 15 grados a la derecha' }),
           _renderPlanRibbonButton({ icon: '0', label: '0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(_siteId)}', ${-_siteElementRotationDeg(_siteItem)})`, title: 'Restablecer rotacion del perimetro' }),
@@ -13908,7 +13912,7 @@ const MecFormModule = (() => {
 
   function _isSelectedPlanSizeTarget(id = _selectedPlanId) {
     const property = _selectedPlanPropertyBoundary(id);
-    if (property && !_propertyBoundaryEditActive(property)) return false;
+    if (property) return true;
     const raw = String(id || '');
     if (raw === SCHOOL_MARKER_PLAN_ID) return false;
     return Boolean(raw && (
@@ -16645,6 +16649,7 @@ const MecFormModule = (() => {
       const propertyEditActive = !isPropertyBoundary || _propertyBoundaryEditActive(item);
       const showEditControls = selected && propertyEditActive;
       const showRotateControl = selected;
+      const showResizeControls = selected;
       _pushPlanHitArea({
         id: `site::${item.id}`,
         type: 'site-element',
@@ -16688,7 +16693,7 @@ const MecFormModule = (() => {
           });
         }
       }
-      if (showEditControls) {
+      if (showResizeControls) {
         _pushPlanResizeHitAreas({
           id: `site::${item.id}`,
           type: 'site-resize',
@@ -16702,9 +16707,13 @@ const MecFormModule = (() => {
         const dims = _siteElementDimensionPair(item);
         _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
       }
-      if (showEditControls) {
+      if (showRotateControl) {
         _drawPlanRotateHandle(ctx, rect, _siteElementRotationDeg(item));
+      }
+      if (showResizeControls) {
         _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
+      }
+      if (showEditControls) {
         if (propertyPolygonActive) {
           ctx.save();
           const transform = _applyPlanCanvasRotation(ctx, rect, _siteElementRotationDeg(item));
@@ -16716,8 +16725,6 @@ const MecFormModule = (() => {
           if (transform) _planTransformStack.pop();
           ctx.restore();
         }
-      } else if (showRotateControl) {
-        _drawPlanRotateHandle(ctx, rect, _siteElementRotationDeg(item));
       }
     });
   }
@@ -20145,7 +20152,6 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
     if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
-    if (!_requirePropertyBoundaryEdit(element, 'redimensionar el perimetro')) return null;
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const clamped = _clampPlanRect(rect, logicalWidth, logicalHeight);
@@ -20270,7 +20276,6 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
       if (!element) return null;
       if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
-      if (!_requirePropertyBoundaryEdit(element, 'redimensionar el perimetro')) return null;
       return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element), elementType: element.type };
     }
     if (area.type === 'class-object-resize') {

@@ -5948,3 +5948,30 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ---
 
 *Bitácora generada: 2026-04-28*
+
+---
+
+## Ajuste de estirado directo del perimetro - 2026-05-31
+
+### Objetivo
+- Permitir que el operador aumente o reduzca largo y ancho del perimetro escolar sin quedar bloqueado por el modo de edicion de vertices.
+- Mantener la edicion fina de vertices como accion explicita mediante `Editar perimetro`.
+
+### Problema reportado
+- Al seleccionar un perimetro, no era posible estirarlo en largo/ancho de forma comoda; los controles de tamano quedaban bloqueados si el perimetro no estaba en modo de edicion.
+
+### Cambios implementados
+- `assets/js/mec-form.js`: el perimetro seleccionado ahora es objetivo valido para cambio de tamano aunque no este activo `Editar perimetro`.
+- `assets/js/mec-form.js`: los tiradores de redimensionado se dibujan y responden al seleccionar el perimetro.
+- `assets/js/mec-form.js`: se agregan botones visibles `Largo +`, `Largo -`, `Ancho +`, `Ancho -` en la cinta de herramientas del perimetro.
+- `assets/js/config.js`, `index.html`, `sw.js`: version actualizada a `2.6.151` para cache-busting y trazabilidad.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local: `http://127.0.0.1:8765/` responde `200`.
+
+### Estado
+- Commit publicado en este cambio: `feat: habilitar estirado del perimetro`.
