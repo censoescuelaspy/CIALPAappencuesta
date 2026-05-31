@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.135
+ * Version: 2.6.152
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -369,6 +369,8 @@ const AppController = (() => {
   let _adminAlertsLastSummaryAt = 0;
   const ADMIN_ALERTS_POLL_MS = 60000;
   const ADMIN_ALERTS_SUMMARY_MS = 15 * 60 * 1000;
+  const UPDATE_RESUME_KEY = 'cialpa_update_resume_context_v1';
+  const UPDATE_RESUME_TTL_MS = 30 * 60 * 1000;
   const _lazyAssetPromises = new Map();
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
@@ -518,7 +520,11 @@ const AppController = (() => {
       UI.showToast?.('Se restauro la vista Inicio despues de actualizar la app.', 'warning', 6000);
     } finally {
       const requestedModule = _requestedModuleFromUrl();
-      if (requestedModule && MODULES[requestedModule] && Auth.canAccess(MODULES[requestedModule].minRole)) {
+      const updateResume = _consumeUpdateResumeContext();
+      if (updateResume) {
+        _restoreUpdateResumeContext(updateResume);
+        _clearRequestedModuleFromUrl();
+      } else if (requestedModule && MODULES[requestedModule] && Auth.canAccess(MODULES[requestedModule].minRole)) {
         _clearActiveSchoolContext();
         showModule(requestedModule);
         _clearRequestedModuleFromUrl();
@@ -963,7 +969,11 @@ const AppController = (() => {
   }
 
   async function updateApp() {
-    UI.showToast('Limpiando caché y reiniciando la app…', 'info');
+    const resumeContext = _captureUpdateResumeContext();
+    _storeUpdateResumeContext(resumeContext);
+    UI.showToast(resumeContext?.school
+      ? 'Actualizando app. Al volver se reabrira la escuela activa...'
+      : 'Limpiando cache y reiniciando la app...', 'info');
     const freshUrl = _freshAppUrl();
     try {
       if ('caches' in window) {
@@ -984,6 +994,162 @@ const AppController = (() => {
       console.warn('Actualización manual incompleta:', err);
     }
     window.location.replace(freshUrl);
+  }
+
+  function _captureUpdateResumeContext() {
+    const school = _activeSchoolForResume();
+    const moduleId = _currentModule || _activeModuleFromDom() || START_MODULE;
+    return {
+      type: 'updateApp',
+      createdAt: Date.now(),
+      module: moduleId,
+      school: school ? _schoolSnapshotForResume(school) : null,
+      schoolId: school ? _schoolPrimaryIdForResume(school) : '',
+      mecModule: typeof MecFormModule !== 'undefined' && MecFormModule.getActiveModule
+        ? MecFormModule.getActiveModule()
+        : '',
+      mapFilters: _readMapFilters(),
+      scrollY: window.scrollY || 0,
+    };
+  }
+
+  function _storeUpdateResumeContext(context) {
+    try {
+      sessionStorage.setItem(UPDATE_RESUME_KEY, JSON.stringify(context || {}));
+    } catch {
+      try { localStorage.setItem(UPDATE_RESUME_KEY, JSON.stringify(context || {})); } catch { /* storage unavailable */ }
+    }
+  }
+
+  function _consumeUpdateResumeContext() {
+    let raw = '';
+    try {
+      raw = sessionStorage.getItem(UPDATE_RESUME_KEY) || '';
+      sessionStorage.removeItem(UPDATE_RESUME_KEY);
+    } catch {
+      raw = '';
+    }
+    if (!raw) {
+      try {
+        raw = localStorage.getItem(UPDATE_RESUME_KEY) || '';
+        localStorage.removeItem(UPDATE_RESUME_KEY);
+      } catch {
+        raw = '';
+      }
+    }
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      const age = Date.now() - Number(parsed.createdAt || 0);
+      if (!Number.isFinite(age) || age < 0 || age > UPDATE_RESUME_TTL_MS) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  async function _restoreUpdateResumeContext(context = {}) {
+    const moduleId = MODULES[context.module] && Auth.canAccess(MODULES[context.module].minRole)
+      ? context.module
+      : START_MODULE;
+    const school = context.school || null;
+    try {
+      if (school && typeof SurveyModule !== 'undefined' && typeof SurveyModule.setCurrentEscuela === 'function') {
+        SurveyModule.setCurrentEscuela(school, { skipAssignmentCheck: true });
+      }
+      await Promise.resolve(showModule(moduleId));
+      if (school) await _restoreActiveSchoolAfterUpdate(school, moduleId, context);
+      _restoreMapFiltersAfterUpdate(context);
+      if (school) {
+        UI.showToast(`Se reabrio ${_schoolLabelForResume(school)} despues de actualizar.`, 'success', 6500);
+      } else if (moduleId !== START_MODULE) {
+        UI.showToast(`Se reabrio ${MODULES[moduleId]?.label || 'el modulo activo'} despues de actualizar.`, 'success', 5200);
+      }
+    } catch (err) {
+      console.warn('[CIALPA] No se pudo restaurar contexto despues de actualizar:', err);
+      resetToHome({ clearSelection: false });
+      UI.showToast('La app se actualizo, pero no se pudo reabrir automaticamente la escuela anterior.', 'warning', 8000);
+    }
+  }
+
+  async function _restoreActiveSchoolAfterUpdate(school, moduleId, context = {}) {
+    if (typeof MecFormModule !== 'undefined' && MecFormModule.setSelectedSchool) {
+      MecFormModule.setSelectedSchool(school, { render: moduleId === 'mec', force: true });
+      if (context.mecModule && MecFormModule.selectModule && moduleId === 'mec') {
+        try { MecFormModule.selectModule(context.mecModule); } catch { /* non-fatal */ }
+      }
+      if (moduleId === 'plano' && MecFormModule.renderSchoolPlan) MecFormModule.renderSchoolPlan();
+    }
+    if (moduleId === 'registro' && typeof GuidedRegisterModule !== 'undefined') {
+      GuidedRegisterModule.init();
+    }
+    if (moduleId === 'mapa' && typeof MapModule !== 'undefined' && MapModule.flyTo) {
+      window.setTimeout(() => MapModule.flyTo(_schoolPrimaryIdForResume(school)), 350);
+    }
+  }
+
+  function _restoreMapFiltersAfterUpdate(context = {}) {
+    const filters = context.mapFilters || {};
+    if (!filters || typeof filters !== 'object') return;
+    Object.entries(filters).forEach(([id, value]) => {
+      const input = document.getElementById(`filter-${id}`) || document.getElementById(id);
+      if (input) input.value = value || '';
+    });
+    if (typeof UI !== 'undefined' && UI.refreshButtonChoices) UI.refreshButtonChoices(document.getElementById('map-filter-form') || document);
+    if (context.module === 'mapa') window.setTimeout(_applyMapFiltersNow, 450);
+  }
+
+  function _activeModuleFromDom() {
+    const active = document.querySelector('.module-panel--active');
+    return active?.id?.replace(/^module-/, '') || '';
+  }
+
+  function _activeSchoolForResume() {
+    const candidates = [
+      () => typeof SurveyModule !== 'undefined' && SurveyModule.getCurrentEscuela?.(),
+      () => typeof MapModule !== 'undefined' && MapModule.getSelectedEscuela?.(),
+      () => typeof MecFormModule !== 'undefined' && MecFormModule.getSelectedSchool?.(),
+      () => _schoolFromMecDraftStorage(),
+    ];
+    for (const read of candidates) {
+      try {
+        const school = read();
+        if (_schoolPrimaryIdForResume(school)) return school;
+      } catch {
+        // Try the next source.
+      }
+    }
+    return null;
+  }
+
+  function _schoolFromMecDraftStorage() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('cialpa_mec_form_draft_v1') || '{}') || {};
+      return (saved.values || saved || {}).__selectedSchool || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function _schoolSnapshotForResume(school = {}) {
+    const item = school || {};
+    return {
+      ...item,
+      id_escuela: item.id_escuela || item.id || '',
+      codigo_local: item.codigo_local || item.codigo || item.code || '',
+      nombre: item.nombre || item.nombre_escuela || item.name || '',
+    };
+  }
+
+  function _schoolPrimaryIdForResume(school = {}) {
+    const item = school || {};
+    return String(item.id_escuela || item.codigo_local || item.codigo || item.id || item.code || '').trim();
+  }
+
+  function _schoolLabelForResume(school = {}) {
+    const code = school.codigo_local || school.codigo || school.id_escuela || school.id || school.code || '';
+    const name = school.nombre || school.nombre_escuela || school.name || '';
+    return [code, name].filter(Boolean).join(' - ') || 'la escuela activa';
   }
 
   function _freshAppUrl() {

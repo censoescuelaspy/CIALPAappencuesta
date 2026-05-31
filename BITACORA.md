@@ -5975,3 +5975,29 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Estado
 - Commit publicado en este cambio: `feat: habilitar estirado del perimetro`.
+
+---
+
+## Reanudar escuela activa tras Actualizar app - 2026-05-31
+
+### Objetivo
+- Evitar que el boton `Actualizar app` devuelva automaticamente a Inicio cuando el operador esta completando una escuela.
+- Restaurar el modulo, la escuela activa, la etapa MEC y filtros de mapa despues de limpiar cache y recargar.
+
+### Problema reportado
+- Durante la carga de una escuela, al pulsar `Actualizar app` se reiniciaba la vista en Inicio y costaba volver a encontrar la escuela que estaba en proceso.
+
+### Cambios implementados
+- `assets/js/app.js`: antes de actualizar se guarda en `sessionStorage` el contexto de reanudacion con modulo activo, escuela, etapa MEC, filtros y scroll.
+- `assets/js/app.js`: al reiniciar se consume ese contexto y se reabre el modulo anterior sin limpiar la seleccion de escuela.
+- `assets/js/app.js`: si la escuela estaba activa, se restaura en `SurveyModule`, `MecFormModule`, `GuidedRegisterModule` y, si corresponde, se enfoca en el mapa.
+- `assets/js/mec-form.js`: se exponen `getSelectedSchool()` y `getActiveModule()` para que el controlador pueda capturar contexto sin depender solo del mapa.
+- `assets/js/config.js`, `index.html`, `sw.js`: version actualizada a `2.6.152` para cache-busting y trazabilidad.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local: `http://127.0.0.1:8765/` responde `200`.

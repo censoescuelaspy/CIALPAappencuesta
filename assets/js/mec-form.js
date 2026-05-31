@@ -12515,6 +12515,14 @@ const MecFormModule = (() => {
     return true;
   }
 
+  function getSelectedSchool() {
+    return _data.__selectedSchool || _selectedSchoolFromContext() || null;
+  }
+
+  function getActiveModule() {
+    return _activeModuleId || 'general';
+  }
+
   function clearActiveSchoolContext(options = {}) {
     clearTimeout(_draftSyncTimer);
     _draftSyncTimer = null;
@@ -23944,6 +23952,8 @@ const MecFormModule = (() => {
     saveNow,
     saveSketchAndNext,
     setSelectedSchool,
+    getSelectedSchool,
+    getActiveModule,
     clearActiveSchoolContext,
     resetDraft,
     updateGuidedSchoolIdentity,
