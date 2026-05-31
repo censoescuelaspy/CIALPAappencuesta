@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.155
+ * Version: 2.6.156
  */
 
 const APP_CONFIG = {
@@ -17,8 +17,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.155',
-  EDITION_LABEL: 'Edición vigente v2.6.155',
+  VERSION: '2.6.156',
+  EDITION_LABEL: 'Edición vigente v2.6.156',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -46,6 +46,8 @@ const APP_CONFIG = {
   PLAN_BASEMAP_SATELLITE_ATTRIBUTION: 'Tiles &copy; Esri',
   PLAN_BASEMAP_SATELLITE_MAX_ZOOM: 17,
   GOOGLE_MAP_TILES_API_KEY: 'AIzaSyD_pqMM_Yzp3RyYbp8AnrLsI8PNw8zM35Y',
+  GOOGLE_ROUTES_API_KEY: '',
+  MAP_REAL_ROUTES_ENABLED: true,
   PLAN_BASEMAP_GOOGLE_SATELLITE_MAX_ZOOM: 21,
   PLAN_BASEMAP_HIGHRES_MAX_ZOOM: 19,
   // Sin fuentes locales activas: el piloto S2 10 m quedo solo como prueba tecnica.

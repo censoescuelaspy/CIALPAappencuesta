@@ -4,6 +4,28 @@
 
 ---
 
+## Rutas reales Google en mapa - 2026-05-31
+
+### Objetivo
+- Reemplazar, cuando sea posible, las rutas rectas por recorridos reales calculados por Google Routes API.
+- Mantener una salida inmediata y estable aunque Google no responda, falte una clave habilitada o el equipo este sin conexion.
+
+### Cambios implementados
+- El mapa dibuja primero la linea directa como respaldo para no dejar vacia la visualizacion.
+- Si hay una clave Google disponible y la opcion esta activa, la app solicita `computeRoutes` y reemplaza la linea directa por la polilinea real de manejo.
+- Las rutas largas se dividen en tramos para respetar el limite de puntos intermedios y se cachean por coordenadas para evitar recalculos innecesarios.
+- Si Google Routes falla o no esta habilitado para la clave actual, se muestra un aviso y se conservan las lineas directas.
+- Se agrega configuracion `GOOGLE_ROUTES_API_KEY` y `MAP_REAL_ROUTES_ENABLED`.
+- Version publicada preparada como `v2.6.156`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Preflight CORS de `routes.googleapis.com/directions/v2:computeRoutes` desde `https://censoescuelaspy.github.io` permite `POST`, `content-type`, `x-goog-api-key` y `x-goog-fieldmask`.
+
 ## Bloques movibles dentro del perimetro - 2026-05-31
 
 ### Objetivo

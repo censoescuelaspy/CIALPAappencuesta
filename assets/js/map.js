@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.114
+ * Version: 2.6.156
  */
 
 const MapModule = (() => {
@@ -16,10 +16,16 @@ const MapModule = (() => {
   let _selectedEscuela = null;
   let _routeLayer = null;
   let _routesVisible = true;
+  let _routeRenderToken = 0;
+  let _googleRoutesUnavailable = false;
+  let _googleRoutesNoticeShown = false;
+  const _googleRouteCache = new Map();
 
   const _PALETTE = ['#2b6cb0', '#2f855a', '#b7791f', '#805ad5', '#c05621', '#0f766e', '#b83280', '#4a5568', '#2563eb', '#16a34a'];
   const _OSM_SUBDOMAINS = ['a', 'b', 'c'];
   const MAP_LIST_LIMIT = 240;
+  const GOOGLE_ROUTES_ENDPOINT = 'https://routes.googleapis.com/directions/v2:computeRoutes';
+  const GOOGLE_ROUTES_MAX_POINTS = 27;
 
   // ── Icon factory ──────────────────────────────────────────────────────────
 
@@ -525,21 +531,191 @@ const MapModule = (() => {
     return route;
   }
 
+  function _googleRoutesKey() {
+    return String(APP_CONFIG.GOOGLE_ROUTES_API_KEY || APP_CONFIG.GOOGLE_MAP_TILES_API_KEY || '').trim();
+  }
+
+  function _googleRoutesEnabled() {
+    return APP_CONFIG.MAP_REAL_ROUTES_ENABLED !== false &&
+      !_googleRoutesUnavailable &&
+      Boolean(_googleRoutesKey()) &&
+      !(typeof navigator !== 'undefined' && navigator.onLine === false);
+  }
+
+  function _googleWaypoint(point) {
+    return {
+      location: {
+        latLng: {
+          latitude: Number(point.lat),
+          longitude: Number(point.lng),
+        },
+      },
+    };
+  }
+
+  function _routeCacheKey(points = []) {
+    return points
+      .map(point => `${Number(point.lat).toFixed(5)},${Number(point.lng).toFixed(5)}`)
+      .join('|');
+  }
+
+  function _decodeGooglePolyline(encoded = '') {
+    const points = [];
+    let index = 0;
+    let lat = 0;
+    let lng = 0;
+    while (index < encoded.length) {
+      let shift = 0;
+      let result = 0;
+      let byte = 0;
+      do {
+        byte = encoded.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20 && index < encoded.length);
+      lat += (result & 1) ? ~(result >> 1) : (result >> 1);
+      shift = 0;
+      result = 0;
+      do {
+        byte = encoded.charCodeAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20 && index < encoded.length);
+      lng += (result & 1) ? ~(result >> 1) : (result >> 1);
+      points.push([lat / 1e5, lng / 1e5]);
+    }
+    return points;
+  }
+
+  function _durationSeconds(value = '') {
+    const match = String(value || '').match(/^(\d+(?:\.\d+)?)s$/);
+    return match ? Number(match[1]) : 0;
+  }
+
+  function _formatRouteDistance(meters = 0) {
+    const n = Number(meters || 0);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    return n >= 1000 ? `${(n / 1000).toFixed(1)} km` : `${Math.round(n)} m`;
+  }
+
+  function _formatRouteDuration(seconds = 0) {
+    const minutes = Math.round(Number(seconds || 0) / 60);
+    if (!Number.isFinite(minutes) || minutes <= 0) return '';
+    if (minutes < 60) return `${minutes} min viaje`;
+    return `${Math.floor(minutes / 60)} h ${minutes % 60} min viaje`;
+  }
+
+  async function _computeGoogleRouteChunk(points = []) {
+    if (points.length < 2) return { latlngs: [], distanceMeters: 0, durationSeconds: 0 };
+    const key = _routeCacheKey(points);
+    if (_googleRouteCache.has(key)) return _googleRouteCache.get(key);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 14000);
+    try {
+      const response = await fetch(GOOGLE_ROUTES_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _googleRoutesKey(),
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration,routes.polyline.encodedPolyline',
+        },
+        body: JSON.stringify({
+          origin: _googleWaypoint(points[0]),
+          destination: _googleWaypoint(points[points.length - 1]),
+          intermediates: points.slice(1, -1).map(_googleWaypoint),
+          travelMode: 'DRIVE',
+          routingPreference: 'TRAFFIC_UNAWARE',
+          polylineQuality: 'OVERVIEW',
+          polylineEncoding: 'ENCODED_POLYLINE',
+          languageCode: 'es-419',
+          regionCode: 'PY',
+          units: 'METRIC',
+        }),
+        signal: controller.signal,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.error) throw new Error(data.error?.message || `Google Routes HTTP ${response.status}`);
+      const route = data.routes?.[0] || {};
+      const encoded = route.polyline?.encodedPolyline || '';
+      const result = {
+        latlngs: encoded ? _decodeGooglePolyline(encoded) : [],
+        distanceMeters: Number(route.distanceMeters || 0),
+        durationSeconds: _durationSeconds(route.duration),
+      };
+      if (!result.latlngs.length) throw new Error('Google Routes no devolvio polilinea.');
+      _googleRouteCache.set(key, result);
+      if (_googleRouteCache.size > 260) _googleRouteCache.delete(_googleRouteCache.keys().next().value);
+      return result;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function _computeGoogleRoute(points = []) {
+    const valid = points.filter(Boolean);
+    const totals = { latlngs: [], distanceMeters: 0, durationSeconds: 0 };
+    for (let start = 0; start < valid.length - 1; start += GOOGLE_ROUTES_MAX_POINTS - 1) {
+      const chunk = valid.slice(start, Math.min(valid.length, start + GOOGLE_ROUTES_MAX_POINTS));
+      if (chunk.length < 2) continue;
+      const result = await _computeGoogleRouteChunk(chunk);
+      const latlngs = [...(result.latlngs || [])];
+      if (latlngs.length) {
+        if (totals.latlngs.length) latlngs.shift();
+        totals.latlngs.push(...latlngs);
+      }
+      totals.distanceMeters += Number(result.distanceMeters || 0);
+      totals.durationSeconds += Number(result.durationSeconds || 0);
+    }
+    return totals;
+  }
+
+  async function _upgradeRouteToGoogle(name, route, fallbackLine, token) {
+    if (!_googleRoutesEnabled()) return;
+    try {
+      const points = route.map(_validPoint).filter(Boolean);
+      const result = await _computeGoogleRoute(points);
+      if (token !== _routeRenderToken || !_routeLayer || !_routesVisible || result.latlngs.length < 2) return;
+      if (fallbackLine) _routeLayer.removeLayer(fallbackLine);
+      const distance = _formatRouteDistance(result.distanceMeters);
+      const duration = _formatRouteDuration(result.durationSeconds);
+      const detail = [distance, duration].filter(Boolean).join(' · ');
+      L.polyline(result.latlngs, {
+        color: _surveyorColor(name),
+        weight: 4,
+        opacity: .82,
+        lineJoin: 'round',
+      }).bindTooltip(`${name}: ruta real Google · ${route.length} puntos${detail ? ` · ${detail}` : ''}`).addTo(_routeLayer);
+    } catch (err) {
+      console.warn('[Mapa] No se pudo calcular ruta Google:', err);
+      _googleRoutesUnavailable = true;
+      if (!_googleRoutesNoticeShown) {
+        _googleRoutesNoticeShown = true;
+        UI.showToast('No se pudo calcular rutas reales de Google. Se mantienen lineas directas como respaldo.', 'warning', 7200);
+      }
+    }
+  }
+
   function _renderRoutes(escuelas) {
     if (!_routeLayer) return;
+    const token = ++_routeRenderToken;
     _routeLayer.clearLayers();
     if (!_routesVisible) return;
+    if (APP_CONFIG.MAP_REAL_ROUTES_ENABLED !== false && !_googleRoutesKey() && !_googleRoutesNoticeShown) {
+      _googleRoutesNoticeShown = true;
+      UI.showToast('Rutas reales Google no configuradas. Se muestran lineas directas como respaldo.', 'info', 6400);
+    }
     const groups = _groupBySurveyor(escuelas.filter(e => e.encuestador_asignado));
     Object.entries(groups).forEach(([name, rows]) => {
       const route = _nearestRoute(rows);
       const latlngs = route.map(_validPoint).filter(Boolean).map(p => [p.lat, p.lng]);
       if (latlngs.length < 2) return;
-      L.polyline(latlngs, {
+      const fallbackLine = L.polyline(latlngs, {
         color: _surveyorColor(name),
         weight: 3,
         opacity: .55,
         dashArray: '8 8',
-      }).bindTooltip(`${name}: ${route.length} puntos · ${route.reduce((s, e) => s + _estimateMinutes(e), 0)} min estimados`).addTo(_routeLayer);
+      }).bindTooltip(`${name}: linea directa - ${route.length} puntos - ${route.reduce((s, e) => s + _estimateMinutes(e), 0)} min estimados`).addTo(_routeLayer);
+      _upgradeRouteToGoogle(name, route, fallbackLine, token);
     });
   }
 
