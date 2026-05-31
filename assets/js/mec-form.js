@@ -1119,11 +1119,15 @@ const MecFormModule = (() => {
     };
   }
 
+  function _preferredPlanBaseMapSource() {
+    return _hasGoogleSatelliteSource() ? PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE : PLAN_BASEMAP_SOURCE_SATELLITE;
+  }
+
   function _planBaseMapDefaults() {
     const coords = _schoolCoordinateDefaults();
     return {
-      enabled: false,
-      source: PLAN_BASEMAP_SOURCE_STREET,
+      enabled: coords.lat !== '' && coords.lng !== '',
+      source: _preferredPlanBaseMapSource(),
       lat: coords.lat,
       lng: coords.lng,
       zoom: PLAN_BASEMAP_DEFAULT_ZOOM,
@@ -1676,6 +1680,36 @@ const MecFormModule = (() => {
     return _latLngFromWorldPixel(worldX, worldY, zoom);
   }
 
+  function _baseMapLatLngToPlanPoint(lat, lng, logicalWidth = 900, logicalHeight = _planCanvasHeight(), baseMap = _data.__planBaseMap) {
+    if (!_planBaseMapHasCoords(baseMap)) return null;
+    const safeLat = _numberInRange(lat, NaN, -85, 85);
+    const safeLng = _numberInRange(lng, NaN, -180, 180);
+    if (!Number.isFinite(safeLat) || !Number.isFinite(safeLng)) return null;
+    const zoom = Math.round(Number(baseMap.zoom) || PLAN_BASEMAP_DEFAULT_ZOOM);
+    const centerWorld = _worldPixelFromLatLng(baseMap.lat, baseMap.lng, zoom);
+    const targetWorld = _worldPixelFromLatLng(safeLat, safeLng, zoom);
+    const centerCanvas = {
+      x: logicalWidth / 2 + Number(baseMap.offsetX || 0),
+      y: logicalHeight / 2 + Number(baseMap.offsetY || 0),
+    };
+    const mapScale = Math.max(.01, Number(baseMap.scale || 1));
+    const point = {
+      x: centerCanvas.x + (targetWorld.x - centerWorld.x) * mapScale,
+      y: centerCanvas.y + (targetWorld.y - centerWorld.y) * mapScale,
+    };
+    const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
+    return rotation
+      ? _rotatePointAround({ x: logicalWidth / 2, y: logicalHeight / 2 }, point, rotation)
+      : point;
+  }
+
+  function _schoolCoordinateMarkerPoint(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapVisible(baseMap)) return null;
+    const coords = _schoolCoordinateDefaults();
+    return _baseMapLatLngToPlanPoint(coords.lat, coords.lng, logicalWidth, logicalHeight, baseMap);
+  }
+
   function _formatDmsPart(value, positive, negative) {
     const number = Number(value);
     if (!Number.isFinite(number)) return '';
@@ -1886,6 +1920,9 @@ const MecFormModule = (() => {
     const dragHint = _planBaseMapDragMode
       ? 'Arrastre sobre el plano para mover la base. Use la rueda sin Ctrl para escalar la base.'
       : 'Active Mover base para arrastrar calles y lineas sin mover bloques.';
+    const sourceNotice = source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE
+      ? 'Google satelite se usa solo como fondo online para dibujar. La app guarda el perimetro, accesos, bloques y otros vectores propios; la imagen de Google no se descarga ni funciona offline.'
+      : 'La base mapa es una referencia visual. Para trabajo offline se conservan los vectores y fichas guardadas en el borrador.';
     return `
       <section class="school-plan-basemap-panel" aria-label="Configuracion de base mapa">
         <div class="school-plan-basemap-panel__header">
@@ -1897,6 +1934,7 @@ const MecFormModule = (() => {
           </div>
           <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.useSchoolCoordinatesForBaseMap()">Usar coordenadas escuela</button>
         </div>
+        <div class="school-plan-basemap-panel__notice">${_escape(sourceNotice)}</div>
         <div class="school-plan-basemap-panel__grid">
           <label>Fuente visual
             <select onchange="MecFormModule.setPlanBaseMapSource(this.value)">
@@ -2199,7 +2237,7 @@ const MecFormModule = (() => {
     _planBaseMapDragMode = false;
     _saveDraft(false);
     renderSchoolPlan();
-    UI.showToast('Base mapa guardada para construir el plano sobre satelite, calles o lineas de referencia.', 'success', 5600);
+    UI.showToast('Base mapa y vectores del plano guardados. La imagen Google queda como fondo online; offline se conservan perimetro, bloques y fichas.', 'success', 6800);
   }
 
   function _fieldVisible(field) {
@@ -13140,13 +13178,18 @@ const MecFormModule = (() => {
       const hasSelectedSanitary = sel.startsWith('sanitary::');
       const hasRoom = hasSelectedRoom || Boolean(_selectedPlanRoomId());
       const hasSanitary = hasSelectedSanitary || Boolean(_selectedPlanSanitaryId());
+      const propertyTools = SITE_ELEMENT_TYPES.filter(tool => tool.id === 'property_boundary');
+      const exteriorTools = SITE_ELEMENT_TYPES.filter(tool => tool.id !== 'property_boundary');
       const groups = [
         _renderPlanRibbonGroup('Ambientes', [
           _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Aula', onClick: 'MecFormModule.newPlanClassroom()', tone: 'btn-primary', title: 'Crear nueva aula' }),
           _renderPlanRibbonButton({ icon: '&#x25A7;', label: 'Espacio', onClick: "MecFormModule.openOtherSpacePicker('plan')", title: 'Crear otro tipo de espacio' }),
           _renderPlanRibbonButton({ icon: '&#x2300;', label: 'Sanitario', onClick: 'MecFormModule.addPlanSanitary()', title: 'Crear sanitario' }),
         ].join('')),
-        _renderPlanRibbonGroup('Exteriores', SITE_ELEMENT_TYPES.map(tool =>
+        _renderPlanRibbonGroup('Predio', propertyTools.map(tool =>
+          _renderPlanRibbonButton({ icon: tool.icon || tool.short, label: tool.ribbonLabel || tool.label, onClick: 'MecFormModule.ensurePropertyBoundary()', tone: 'btn-primary', title: 'Crear o seleccionar el perimetro del predio escolar' })
+        ).join('')),
+        _renderPlanRibbonGroup('Exteriores', exteriorTools.map(tool =>
           _renderPlanRibbonButton({ icon: tool.icon || tool.short, label: tool.ribbonLabel || tool.label, onClick: `MecFormModule.addPlanSiteElement('${tool.id}', 'plan')`, title: tool.label })
         ).join('')),
       ];
@@ -14850,6 +14893,7 @@ const MecFormModule = (() => {
       ctx.font = _canvasFont(700, 18);
       ctx.textAlign = 'center';
       ctx.fillText(waitText, logical.width / 2, logical.height / 2);
+      _drawSchoolCoordinateMarker(ctx, logical);
       return;
     }
 
@@ -15022,6 +15066,7 @@ const MecFormModule = (() => {
     _drawPlanDistanceGuides(ctx, distanceItems);
     _drawGeoBlockLabels(ctx, geoBlockLabels);
     _drawPropertyBoundaryGeoOverlay(ctx, logical);
+    _drawSchoolCoordinateMarker(ctx, logical);
   }
 
   function _planFloorRect(blockX, blockY, blockW, blockH, floorIndex, floorCount, hasSanitaries) {
@@ -15487,6 +15532,42 @@ const MecFormModule = (() => {
     });
   }
 
+  function _drawSchoolCoordinateMarker(ctx, logical) {
+    if (!ctx || !logical) return;
+    const point = _schoolCoordinateMarkerPoint(logical.width, logical.height);
+    if (!point) return;
+    const margin = 22;
+    if (point.x < -margin || point.y < -margin || point.x > logical.width + margin || point.y > logical.height + margin) return;
+    ctx.save();
+    ctx.shadowColor = 'rgba(15,23,42,.36)';
+    ctx.shadowBlur = 7;
+    ctx.shadowOffsetY = 2;
+    ctx.fillStyle = '#dc2626';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(220,38,38,.72)';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 16, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 2.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    _drawOutlinedCanvasText(ctx, 'Punto escuela', Math.min(logical.width - 8, point.x + 18), Math.max(14, point.y - 15), {
+      font: _canvasFont(900, 12),
+      align: point.x > logical.width - 130 ? 'right' : 'left',
+      strokeWidth: 4.5,
+      fill: '#b91c1c',
+    });
+  }
+
   function _blockGeoLabel(block, index = 0) {
     const raw = String(block?.bloque_codigo || block?.codigo || block?.name || '').trim();
     if (/^B\s*\d+/i.test(raw)) return raw.toUpperCase().replace(/\s+/g, '');
@@ -15548,6 +15629,23 @@ const MecFormModule = (() => {
       const fontSize = Math.max(24, Math.min(54, Math.min(rect.w, rect.h) * .38));
       return `<text x="${_cssNumber(rect.x + rect.w / 2)}" y="${_cssNumber(rect.y + rect.h / 2)}" font-family="system-ui" font-size="${_cssNumber(fontSize)}" font-weight="900" text-anchor="middle" dominant-baseline="middle" stroke="#ffffff" stroke-width="${_cssNumber(Math.max(5, fontSize * .13))}" paint-order="stroke fill" fill="#111827">${_escape(label)}</text>`;
     }).join('');
+  }
+
+  function _schoolCoordinateMarkerSvg(width = _planCanvasWidth(), height = _planCanvasHeight()) {
+    const point = _schoolCoordinateMarkerPoint(width, height);
+    if (!point) return '';
+    const margin = 22;
+    if (point.x < -margin || point.y < -margin || point.x > width + margin || point.y > height + margin) return '';
+    const textX = Math.min(width - 8, point.x + 18);
+    const textY = Math.max(14, point.y - 15);
+    const anchor = point.x > width - 130 ? 'end' : 'start';
+    return `
+      <g class="school-coordinate-marker">
+        <circle cx="${_cssNumber(point.x)}" cy="${_cssNumber(point.y)}" r="16" fill="none" stroke="rgba(220,38,38,.72)" stroke-width="2.2"/>
+        <circle cx="${_cssNumber(point.x)}" cy="${_cssNumber(point.y)}" r="8" fill="#dc2626" stroke="#ffffff" stroke-width="3"/>
+        <circle cx="${_cssNumber(point.x)}" cy="${_cssNumber(point.y)}" r="2.7" fill="#ffffff"/>
+        <text x="${_cssNumber(textX)}" y="${_cssNumber(textY)}" font-family="system-ui" font-size="12" font-weight="900" text-anchor="${anchor}" dominant-baseline="middle" stroke="#ffffff" stroke-width="4.5" paint-order="stroke fill" fill="#b91c1c">Punto escuela</text>
+      </g>`;
   }
 
   function _planRectCenter(rect) {
@@ -22730,6 +22828,7 @@ const MecFormModule = (() => {
     });
     parts.push(_geoBlockLabelsSvg(geoBlockLabelItems));
     parts.push(_propertyBoundaryGeoOverlaySvg(width, height));
+    parts.push(_schoolCoordinateMarkerSvg(width, height));
     parts.push('</svg>');
     return parts.join('');
   }

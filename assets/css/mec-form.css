@@ -2395,6 +2395,17 @@
   font-weight: 750;
 }
 
+.school-plan-basemap-panel__notice {
+  padding: .48rem .58rem;
+  border: 1px solid #bdd7c8;
+  border-radius: 7px;
+  background: #eef8f2;
+  color: #0b4b32;
+  font-size: .76rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .school-plan-basemap-panel__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));

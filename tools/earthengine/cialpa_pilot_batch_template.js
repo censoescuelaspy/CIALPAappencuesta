@@ -1,15 +1,12 @@
-// CIALPA - Exportacion por lote para imagenes de escuelas piloto.
+// CIALPA - Visor satelital para escuelas piloto.
 // Ejecutar en Google Earth Engine Code Editor.
 //
 // IMPORTANTE:
-// - El fondo SATELLITE de Google visible en Earth Engine NO es un ee.Image
-//   exportable. Este script exporta NICFI/Planet, que si es exportable desde EE.
-// - Para tener la nitidez de Google dentro de la app, usar la capa Google online
-//   ya configurada en la app. No usar este script para descargar/cachar Google.
-// - Si Earth Engine muestra "caller does not have access", falta habilitar
-//   acceso Planet/NICFI en la cuenta.
-//   Pasos: Planet Account Settings -> Access NICFI Data in Google Earth Engine
-//   -> Add to Earth Engine -> ingresar el email exacto de esta cuenta GEE.
+// - Este script NO exporta imagenes ni usa NICFI/Planet.
+// - Usa el fondo SATELLITE del visor de Google Earth Engine, igual que el
+//   ensayo de la escuela 101095.
+// - Ese fondo sirve para inspeccion visual y dibujo manual de perimetros.
+// - El fondo SATELLITE no es un ee.Image exportable desde Earth Engine.
 
 // ---------------------------------------------------------------------------
 // 1) ESCUELAS PILOTO
@@ -22,8 +19,7 @@
 // { order: 1, code: '1005052', name: 'NOMBRE', department: '...', district: '...',
 //   locality: '...', lat: -25.123456, lon: -55.123456 }
 //
-// Si preferis subir un CSV como Asset de Earth Engine, dejar SCHOOLS vacio,
-// poner USE_TABLE_ASSET = true y completar TABLE_ASSET_ID mas abajo.
+// La lista esta embebida para que el script se pueda copiar y ejecutar directo.
 var SCHOOLS = [
   { order: 1, code: "1005052", name: "ESCUELA B\u00c1SICA N\u00b0 2678 CRISTO REY", department: "ALTO PARAN\u00c1", district: "SANTA FE DEL PARAN\u00c1", locality: "PYKYRY", lat: -25.19381222, lon: -54.5903325 },
   { order: 2, code: "1004017", name: "ESCUELA B\u00c1SICA N\u00b0 632 ADELA SPERATTI", department: "ALTO PARAN\u00c1", district: "DR. JUAN LE\u00d3N MALLORQU\u00cdN", locality: "VENECIA'I", lat: -25.49057306, lon: -55.16097472 },
@@ -114,250 +110,130 @@ var SCHOOLS = [
 ];
 
 // ---------------------------------------------------------------------------
-// 2) OPCION ALTERNATIVA: USAR TABLA ASSET EN EARTH ENGINE
+// 2) VISOR SATELITAL GOOGLE EARTH ENGINE
 // ---------------------------------------------------------------------------
-// La tabla puede tener columnas code/codigo/codigo_local, name/nombre,
-// lat/latitud/LAT_DEC y lon/lng/longitud/LNG_DEC, o geometria de punto.
-var USE_TABLE_ASSET = false;
-var TABLE_ASSET_ID = 'users/TU_USUARIO/cialpa_muestra_piloto_escuelas';
+var BUFFER_METERS = 650;
+var DEFAULT_ZOOM = 20;
+var ROI_COLOR = 'yellow';
+var POINT_COLOR = 'red';
 
-// ---------------------------------------------------------------------------
-// 3) PARAMETROS DE EXPORTACION
-// ---------------------------------------------------------------------------
-var BUFFER_METERS = 650; // contexto amplio: predio, caminos y entorno.
-var DRIVE_FOLDER = 'CIALPA_EE_PILOTO_ESCUELAS';
-var EXPORT_PREFIX = 'CIALPA_PILOTO';
-var EXPORT_START_INDEX = 0;
-var EXPORT_LIMIT = 0; // 0 = todas las escuelas restantes.
-var PREVIEW_COUNT = 3;
+Map.setOptions('SATELLITE');
 
-var NICFI_START_DATE = '2024-01-01';
-var NICFI_END_DATE = '2026-01-01';
-var EXPORT_NICFI = true; // requiere acceso Planet/NICFI habilitado en esta cuenta.
-var EXPORT_SCALE_METERS = 4.77;
-var EXPORT_RAW_RGB = true; // true recomendado para convertir luego a tiles.
-var NICFI_VIS = { bands: ['R', 'G', 'B'], min: 64, max: 5454, gamma: 1.4 };
-
-// Sentinel-2 queda solo como emergencia tecnica. Es de 10 m y no sirve para
-// bloques finos. Si NICFI no esta habilitado, se puede poner EXPORT_NICFI=false
-// y EXPORT_SENTINEL2_FALLBACK=true para probar el lote, pero no sera alta res.
-var EXPORT_SENTINEL2_FALLBACK = false;
-var S2_START_DATE = '2024-01-01';
-var S2_END_DATE = '2026-05-30';
-
-// ---------------------------------------------------------------------------
-// 4) HELPERS
-// ---------------------------------------------------------------------------
-function firstValue(obj, keys) {
-  for (var i = 0; i < keys.length; i += 1) {
-    var value = obj[keys[i]];
-    if (value !== undefined && value !== null && String(value).trim() !== '') {
-      return value;
-    }
-  }
-  return '';
+function schoolLabel(school) {
+  return school.order + ' / ' + school.code + ' - ' + school.name;
 }
 
-function numberValue(value) {
-  if (value === undefined || value === null || String(value).trim() === '') {
-    return null;
-  }
-  var parsed = parseFloat(String(value).replace(',', '.'));
-  return isFinite(parsed) ? parsed : null;
+function makePoint(school) {
+  return ee.Geometry.Point([school.lon, school.lat]);
 }
 
-function slug(value) {
-  return String(value || 'ESCUELA')
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 48) || 'ESCUELA';
+function makeRoi(school) {
+  return makePoint(school).buffer(BUFFER_METERS).bounds();
 }
 
-function normalizeSchool(item, index) {
-  var row = item || {};
-  var code = String(firstValue(row, ['code', 'codigo', 'codigo_local', 'CODIGO', 'CODIGO_LOCAL', 'id_escuela'])).replace(/\D+/g, '');
-  var name = String(firstValue(row, ['name', 'nombre', 'institucion', 'NOMBRE_INSTITUCION']));
-  var lat = numberValue(firstValue(row, ['lat', 'latitud', 'LAT_DEC', 'lat_dec', 'latitude', 'Y', 'y']));
-  var lon = numberValue(firstValue(row, ['lon', 'lng', 'longitud', 'LNG_DEC', 'lng_dec', 'longitude', 'X', 'x']));
-
-  return {
-    order: numberValue(firstValue(row, ['order', 'orden', 'orden_muestra_piloto', 'orden_visita', 'ENUMERA'])) || (index + 1),
-    code: code || String(index + 1),
-    name: name || 'ESCUELA',
-    department: String(firstValue(row, ['department', 'departamento', 'DEPARTAMENTO'])),
-    district: String(firstValue(row, ['district', 'distrito', 'DISTRITO'])),
-    locality: String(firstValue(row, ['locality', 'localidad', 'LOCALIDAD'])),
-    lat: lat,
-    lon: lon
-  };
-}
-
-function featureToSchool(feature, index) {
-  var props = feature.properties || {};
-  var geometry = feature.geometry || {};
-  var coords = geometry.coordinates || [];
-  var row = {};
-  for (var key in props) {
-    row[key] = props[key];
-  }
-  if (coords.length >= 2) {
-    row.lon = row.lon || row.lng || row.longitud || coords[0];
-    row.lat = row.lat || row.latitud || coords[1];
-  }
-  return normalizeSchool(row, index);
-}
-
-function fileNameForSchool(school) {
-  return [
-    EXPORT_PREFIX,
-    school.order,
-    school.code,
-    slug(school.name),
-    'NICFI_RGB',
-    NICFI_START_DATE.slice(0, 4) + '_' + NICFI_END_DATE.slice(0, 4)
-  ].join('_').slice(0, 120);
-}
-
-function maskS2Clouds(image) {
-  var scl = image.select('SCL');
-  var keep = scl.neq(3)
-    .and(scl.neq(8))
-    .and(scl.neq(9))
-    .and(scl.neq(10))
-    .and(scl.neq(11));
-  return image.updateMask(keep);
-}
-
-// ---------------------------------------------------------------------------
-// 5) EXPORTADOR PRINCIPAL
-// ---------------------------------------------------------------------------
-function runExports(rawSchools) {
-  var normalized = [];
-  for (var i = 0; i < rawSchools.length; i += 1) {
-    var school = normalizeSchool(rawSchools[i], i);
-    if (school.lat !== null && school.lon !== null) {
-      normalized.push(school);
-    } else {
-      print('Escuela omitida sin coordenadas', rawSchools[i]);
-    }
-  }
-
-  normalized.sort(function(a, b) {
-    return a.order - b.order;
+function makeRoiOutline(roi) {
+  return ee.Image().byte().paint({
+    featureCollection: ee.FeatureCollection([ee.Feature(roi)]),
+    color: 1,
+    width: 2
   });
+}
 
-  var endIndex = EXPORT_LIMIT > 0
-    ? Math.min(normalized.length, EXPORT_START_INDEX + EXPORT_LIMIT)
-    : normalized.length;
-  var selectedSchools = normalized.slice(EXPORT_START_INDEX, endIndex);
+function drawSchoolByIndex(indexValue) {
+  var index = Number(indexValue || 0);
+  if (!isFinite(index) || index < 0 || index >= SCHOOLS.length) index = 0;
 
-  print('Escuelas recibidas', rawSchools.length);
-  print('Escuelas con coordenadas', normalized.length);
-  print('Escuelas seleccionadas para exportar', selectedSchools.length);
-  print('Rango indices', EXPORT_START_INDEX, endIndex - 1);
-  print('Drive folder destino', DRIVE_FOLDER);
-  print('Accion requerida', 'Luego de Run, abrir Tasks y pulsar Run en cada export.');
+  var school = SCHOOLS[index];
+  var point = makePoint(school);
+  var roi = makeRoi(school);
+  var outline = makeRoiOutline(roi);
 
+  Map.layers().reset();
   Map.setOptions('SATELLITE');
+  Map.centerObject(point, DEFAULT_ZOOM);
+  Map.addLayer(outline, { palette: [ROI_COLOR] }, 'Entorno ' + BUFFER_METERS + ' m');
+  Map.addLayer(point, { color: POINT_COLOR }, school.code + ' - punto escuela');
 
-  var nicfiBase = null;
-  if (EXPORT_NICFI) {
-    nicfiBase = ee.ImageCollection('projects/planet-nicfi/assets/basemaps/americas')
-      .filterDate(NICFI_START_DATE, NICFI_END_DATE)
-      .sort('system:time_start', false);
-  }
+  selectedLabel.setValue('Seleccionada: ' + schoolLabel(school));
+  detailLabel.setValue(
+    school.department + ' / ' + school.district + ' / ' + school.locality +
+    ' | lat ' + school.lat + ', lon ' + school.lon
+  );
 
-  var s2Base = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
-    .filterDate(S2_START_DATE, S2_END_DATE)
-    .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 40))
-    .map(maskS2Clouds);
-
-  var featureList = [];
-  selectedSchools.forEach(function(school) {
-    featureList.push(ee.Feature(ee.Geometry.Point([school.lon, school.lat]), {
-      code: school.code,
-      name: school.name,
-      order: school.order
-    }));
-  });
-  var selectedFeatures = ee.FeatureCollection(featureList);
-  Map.addLayer(selectedFeatures, { color: 'red' }, 'Escuelas seleccionadas');
-
-  if (selectedSchools.length > 0) {
-    Map.centerObject(ee.Geometry.Point([selectedSchools[0].lon, selectedSchools[0].lat]), 16);
-  }
-
-  selectedSchools.forEach(function(school, localIndex) {
-    var point = ee.Geometry.Point([school.lon, school.lat]);
-    var roi = point.buffer(BUFFER_METERS).bounds();
-    var exportName = fileNameForSchool(school);
-
-    if (localIndex < PREVIEW_COUNT) {
-      var roiOutline = ee.Image().byte().paint({
-        featureCollection: ee.FeatureCollection([ee.Feature(roi)]),
-        color: 1,
-        width: 2
-      });
-      Map.addLayer(roiOutline, { palette: ['yellow'] }, 'ROI ' + school.code, false);
-    }
-
-    if (EXPORT_NICFI) {
-      var nicfi = nicfiBase.filterBounds(roi);
-      var latest = ee.Image(nicfi.first()).clip(roi);
-      var rgb = latest.select(['R', 'G', 'B']);
-      var exportImage = EXPORT_RAW_RGB ? rgb : rgb.visualize(NICFI_VIS);
-
-      if (localIndex < PREVIEW_COUNT) {
-        Map.addLayer(latest, NICFI_VIS, 'NICFI preview ' + school.code, localIndex === 0);
-        print('NICFI cantidad imagenes ' + school.code, nicfi.size());
-      }
-
-      Export.image.toDrive({
-        image: exportImage,
-        description: exportName,
-        folder: DRIVE_FOLDER,
-        fileNamePrefix: exportName,
-        region: roi,
-        scale: EXPORT_SCALE_METERS,
-        maxPixels: 1e9,
-        fileFormat: 'GeoTIFF',
-        formatOptions: {
-          cloudOptimized: true
-        }
-      });
-    }
-
-    if (EXPORT_SENTINEL2_FALLBACK) {
-      var s2 = s2Base.filterBounds(roi).median().clip(roi).select(['B4', 'B3', 'B2']);
-      Export.image.toDrive({
-        image: s2,
-        description: exportName.replace('_NICFI_', '_S2_'),
-        folder: DRIVE_FOLDER,
-        fileNamePrefix: exportName.replace('_NICFI_', '_S2_'),
-        region: roi,
-        scale: 10,
-        maxPixels: 1e9,
-        fileFormat: 'GeoTIFF',
-        formatOptions: {
-          cloudOptimized: true
-        }
-      });
-    }
-  });
+  print('Escuela seleccionada', school);
+  print('ROI ' + BUFFER_METERS + ' m', roi);
+  print('Nota', 'El fondo SATELLITE del visor es visual y no se exporta desde Earth Engine.');
 }
 
-// ---------------------------------------------------------------------------
-// 6) ENTRADA
-// ---------------------------------------------------------------------------
-if (USE_TABLE_ASSET) {
-  ee.FeatureCollection(TABLE_ASSET_ID).toList(500).evaluate(function(features) {
-    var schools = [];
-    for (var i = 0; i < features.length; i += 1) {
-      schools.push(featureToSchool(features[i], i));
-    }
-    runExports(schools);
-  });
-} else {
-  runExports(SCHOOLS);
+var schoolItems = SCHOOLS.map(function(school) {
+  return schoolLabel(school);
+});
+
+var selectedLabel = ui.Label('Seleccionada: -', { fontWeight: 'bold' });
+var detailLabel = ui.Label('-', { fontSize: '11px', color: '#444' });
+
+function schoolIndexFromLabel(label) {
+  var index = schoolItems.indexOf(label);
+  return index >= 0 ? index : 0;
 }
+
+var selector = ui.Select({
+  items: schoolItems,
+  value: schoolItems[0],
+  placeholder: 'Seleccione una escuela piloto',
+  onChange: function(label) {
+    drawSchoolByIndex(schoolIndexFromLabel(label));
+  },
+  style: { stretch: 'horizontal' }
+});
+
+var prevButton = ui.Button({
+  label: 'Anterior',
+  onClick: function() {
+    var current = schoolIndexFromLabel(selector.getValue());
+    var nextIndex = Math.max(0, current - 1);
+    selector.setValue(schoolItems[nextIndex]);
+    drawSchoolByIndex(nextIndex);
+  },
+  style: { stretch: 'horizontal' }
+});
+
+var nextButton = ui.Button({
+  label: 'Siguiente',
+  onClick: function() {
+    var current = schoolIndexFromLabel(selector.getValue());
+    var nextIndex = Math.min(SCHOOLS.length - 1, current + 1);
+    selector.setValue(schoolItems[nextIndex]);
+    drawSchoolByIndex(nextIndex);
+  },
+  style: { stretch: 'horizontal' }
+});
+
+var centerButton = ui.Button({
+  label: 'Centrar escuela',
+  onClick: function() {
+    drawSchoolByIndex(schoolIndexFromLabel(selector.getValue()));
+  },
+  style: { stretch: 'horizontal' }
+});
+
+var panel = ui.Panel({
+  widgets: [
+    ui.Label('CIALPA - Escuelas piloto', { fontWeight: 'bold', fontSize: '16px' }),
+    ui.Label('Fondo: SATELLITE de Google Earth Engine. Uso: inspeccion visual y dibujo manual.'),
+    selector,
+    ui.Panel([prevButton, nextButton], ui.Panel.Layout.flow('horizontal')),
+    centerButton,
+    selectedLabel,
+    detailLabel,
+    ui.Label('Total de escuelas: ' + SCHOOLS.length, { fontSize: '11px', color: '#555' })
+  ],
+  style: {
+    position: 'top-left',
+    width: '430px',
+    padding: '8px'
+  }
+});
+
+Map.add(panel);
+drawSchoolByIndex('0');
