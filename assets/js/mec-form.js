@@ -45,6 +45,7 @@ const MecFormModule = (() => {
   let _planTransformStack = [];
   let _activePlanDrag = null;
   let _planMoveMode = false;
+  let _propertyBoundaryEditId = '';
   let _planRibbonTab = 'editar';
   let _planBaseMapPanelOpen = false;
   let _planBaseMapDragMode = false;
@@ -2393,6 +2394,7 @@ const MecFormModule = (() => {
     baseMap.savedAt = new Date().toISOString();
     _saveBaseMapCoordinatesToSchool(baseMap);
     _syncPropertyBoundaryGeoVertices();
+    _propertyBoundaryEditId = '';
     _planBaseMapDragMode = false;
     _saveDraft(false);
     renderSchoolPlan();
@@ -13453,11 +13455,15 @@ const MecFormModule = (() => {
       const _siteId = _selForma.replace('site::', '');
       const _siteItem = _ensureSiteElements().find(item => item.id === _siteId);
       if (_siteItem?.type === 'property_boundary') {
+        const _propertyEditActive = _propertyBoundaryEditActive(_siteItem);
         _formaGroupContent = [
-          _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'l')`, title: 'Cambiar a forma en L igual que un aula' }),
-          _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Agregar vertice al perimetro' }),
-          _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Eliminar vertice del perimetro' }),
-          _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'rect')`, title: 'Restablecer perimetro rectangular' }),
+          _renderPlanRibbonButton({ icon: _propertyEditActive ? '&#10003;' : '&#9998;', label: _propertyEditActive ? 'Fijar' : 'Editar', onClick: `MecFormModule.togglePropertyBoundaryEdit('${_escape(_siteId)}')`, tone: _propertyEditActive ? 'btn-success' : 'btn-warning', active: _propertyEditActive, title: _propertyEditActive ? 'Fijar el perimetro para trabajar con bloques' : 'Activar edicion del perimetro' }),
+          ...(_propertyEditActive ? [
+            _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'l')`, title: 'Cambiar a forma en L igual que un aula' }),
+            _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Agregar vertice al perimetro' }),
+            _renderPlanRibbonButton({ icon: '-', label: '- Vertice', onClick: `MecFormModule.removePlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Eliminar vertice del perimetro' }),
+            _renderPlanRibbonButton({ icon: '&#x25A1;', label: 'Rect.', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'rect')`, title: 'Restablecer perimetro rectangular' }),
+          ] : []),
         ].join('');
       }
     }
@@ -13668,7 +13674,15 @@ const MecFormModule = (() => {
     return `<button class="btn ${_escape(action.tone)} ${_escape(sizeClass)}" type="button" onclick="${_escape(action.onClick)}">${_escape(action.label)}</button>`;
   }
 
+  function _selectedPlanPropertyBoundary(id = _selectedPlanId) {
+    const raw = String(id || '');
+    if (!raw.startsWith('site::')) return null;
+    return _ensureSiteElements().find(item => item.id === raw.replace('site::', '') && item.type === 'property_boundary') || null;
+  }
+
   function _isSelectedPlanOrientationTarget(id = _selectedPlanId) {
+    const property = _selectedPlanPropertyBoundary(id);
+    if (property && !_propertyBoundaryEditActive(property)) return false;
     const raw = String(id || '');
     return Boolean(raw && (
       raw.startsWith('block::') ||
@@ -13681,6 +13695,8 @@ const MecFormModule = (() => {
   }
 
   function _isSelectedPlanNudgeTarget(id = _selectedPlanId) {
+    const property = _selectedPlanPropertyBoundary(id);
+    if (property && !_propertyBoundaryEditActive(property)) return false;
     const raw = String(id || '');
     return Boolean(raw && (
       raw.startsWith('block::') ||
@@ -13899,27 +13915,33 @@ const MecFormModule = (() => {
       const isTank = element.type === 'water_tank';
       const isRamp = element.type === 'ramp';
       const isPropertyBoundary = element.type === 'property_boundary';
+      const propertyEditActive = _propertyBoundaryEditActive(element);
       const rampFall = isRamp ? _rampFallDirection(element) : '';
       return {
         title: element.ficha?.codigo || _siteElementLabel(element.type),
-        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · ${isPropertyBoundary ? 'vertices editables' : (isRamp ? `caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : (isTank ? 'infraestructura especial' : 'otro espacio editable'))}`,
+        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · ${isPropertyBoundary ? (propertyEditActive ? 'edicion activa' : 'fijo por vertices lat/lon') : (isRamp ? `caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : (isTank ? 'infraestructura especial' : 'otro espacio editable'))}`,
         actions: [
           { label: isPropertyBoundary ? 'Editar predio' : (isTank ? 'Editar tanque' : 'Editar espacio'), tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
           ...(isPropertyBoundary ? [
+            { label: propertyEditActive ? 'Fijar perimetro' : 'Editar perimetro', tone: propertyEditActive ? 'btn-success' : 'btn-warning', onClick: `MecFormModule.togglePropertyBoundaryEdit('${_escape(element.id)}')` },
+            ...(propertyEditActive ? [
             { label: 'Forma L', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(element.id)}', 'l')` },
             { label: '+ Vertice', onClick: `MecFormModule.addPlanSiteElementVertex('${_escape(element.id)}')` },
             { label: '- Vertice', onClick: `MecFormModule.removePlanSiteElementVertex('${_escape(element.id)}')` },
             { label: 'Rectangular', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(element.id)}', 'rect')` },
+            ] : []),
           ] : []),
           ...(isRamp ? [
             { label: 'Caida izq.', tone: rampFall === 'left' ? 'btn-primary' : 'btn-outline', onClick: `MecFormModule.setRampFallDirection('${_escape(element.id)}', 'left')` },
             { label: 'Caida der.', tone: rampFall === 'right' ? 'btn-primary' : 'btn-outline', onClick: `MecFormModule.setRampFallDirection('${_escape(element.id)}', 'right')` },
           ] : []),
-          { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', -15)` },
-          { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', 15)` },
-          { label: '0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', ${-_siteElementRotationDeg(element)})` },
-          { label: 'Voltear H', onClick: "MecFormModule.flipSelectedPlanItem('horizontal')" },
-          { label: 'Voltear V', onClick: "MecFormModule.flipSelectedPlanItem('vertical')" },
+          ...(!isPropertyBoundary || propertyEditActive ? [
+            { label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', -15)` },
+            { label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', 15)` },
+            { label: '0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(element.id)}', ${-_siteElementRotationDeg(element)})` },
+            { label: 'Voltear H', onClick: "MecFormModule.flipSelectedPlanItem('horizontal')" },
+            { label: 'Voltear V', onClick: "MecFormModule.flipSelectedPlanItem('vertical')" },
+          ] : []),
           { label: '+ Exterior', onClick: "MecFormModule.openSiteElementTypePicker('plan')" },
         ],
       };
@@ -14253,11 +14275,12 @@ const MecFormModule = (() => {
     const isTank = item.type === 'water_tank';
     const isRamp = item.type === 'ramp';
     const isPropertyBoundary = item.type === 'property_boundary';
+    const propertyEditActive = _propertyBoundaryEditActive(item);
     const rampFall = isRamp ? _rampFallDirection(item) : '';
     const label = item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`;
     const detail = [
       _siteElementLabel(item.type),
-      isPropertyBoundary ? 'vertices editables' : '',
+      isPropertyBoundary ? (propertyEditActive ? 'edicion activa' : 'fijo') : '',
       item.type === 'recreation' ? _recreationShapeLabel(item.shape || item.ficha?.forma) : '',
       isRamp ? `Caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : '',
       item.ficha?.estado || 'Sin estado',
@@ -14269,7 +14292,7 @@ const MecFormModule = (() => {
         <button class="school-plan-object school-plan-object--site ${locked ? 'school-plan-object--locked' : ''} ${active ? 'school-plan-object--active' : ''}" type="button"
           ondblclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')"
           onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
-          <span class="school-plan-object__type">${locked ? 'Espacio bloqueado' : (isPropertyBoundary ? 'Predio editable' : (isTank ? 'Infraestructura especial' : 'Otro espacio'))}</span>
+          <span class="school-plan-object__type">${locked ? 'Espacio bloqueado' : (isPropertyBoundary ? (propertyEditActive ? 'Predio en edicion' : 'Predio fijo') : (isTank ? 'Infraestructura especial' : 'Otro espacio'))}</span>
           <strong>${_escape(label)}</strong>
           <small>${_escape(detail || 'Sin ficha cargada')}</small>
         </button>
@@ -14277,16 +14300,19 @@ const MecFormModule = (() => {
           <div class="school-plan-group__children school-plan-group__children--actions">
             <button class="btn btn-primary btn-sm" type="button" onclick="MecFormModule.openSiteElementFicha('${_escape(item.id)}')">${isPropertyBoundary ? 'Editar predio' : (isTank ? 'Editar tanque' : 'Editar espacio')}</button>
             ${isPropertyBoundary ? `
+              <button class="btn ${propertyEditActive ? 'btn-success' : 'btn-warning'} btn-sm" type="button" onclick="MecFormModule.togglePropertyBoundaryEdit('${_escape(item.id)}')">${propertyEditActive ? 'Fijar perimetro' : 'Editar perimetro'}</button>
+              ${propertyEditActive ? `
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setPlanSiteElementShape('${_escape(item.id)}', 'l')">Forma L</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.addPlanSiteElementVertex('${_escape(item.id)}')">+ Vertice</button>
               <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.removePlanSiteElementVertex('${_escape(item.id)}')">- Vertice</button>
-              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setPlanSiteElementShape('${_escape(item.id)}', 'rect')">Rect.</button>` : ''}
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.setPlanSiteElementShape('${_escape(item.id)}', 'rect')">Rect.</button>` : ''}` : ''}
             ${isRamp ? `
               <button class="btn ${rampFall === 'left' ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setRampFallDirection('${_escape(item.id)}', 'left')">Caida izq.</button>
               <button class="btn ${rampFall === 'right' ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setRampFallDirection('${_escape(item.id)}', 'right')">Caida der.</button>` : ''}
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', -15)">Girar -15</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', 15)">Girar +15</button>
-            <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', ${-_siteElementRotationDeg(item)})">0 grados</button>
+            ${!isPropertyBoundary || propertyEditActive ? `
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', -15)">Girar -15</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', 15)">Girar +15</button>
+              <button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.rotatePlanSiteElement('${_escape(item.id)}', ${-_siteElementRotationDeg(item)})">0 grados</button>` : ''}
             <button class="btn ${locked ? 'btn-warning' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setSiteElementLocked('${_escape(item.id)}', ${locked ? 'false' : 'true'})">${locked ? 'Desbloquear' : 'Bloquear'}</button>
           </div>` : ''}
       </article>`;
@@ -16376,6 +16402,8 @@ const MecFormModule = (() => {
       const cfg = _siteElementConfig(item.type);
       const shapePoints = _planShapePoints(item, rect);
       const propertyPolygonActive = Boolean(isPropertyBoundary && shapePoints);
+      const propertyEditActive = !isPropertyBoundary || _propertyBoundaryEditActive(item);
+      const showEditControls = selected && propertyEditActive;
       _pushPlanHitArea({
         id: `site::${item.id}`,
         type: 'site-element',
@@ -16399,7 +16427,7 @@ const MecFormModule = (() => {
         h: hitRect.h,
         metersPerPx: 1,
       });
-      if (selected) {
+      if (showEditControls) {
         const handle = propertyPolygonActive ? null : _siteElementRotateHandle(item, rect);
         if (handle) {
           _pushPlanHitArea({
@@ -16430,6 +16458,8 @@ const MecFormModule = (() => {
       if (selected) {
         const dims = _siteElementDimensionPair(item);
         _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
+      }
+      if (showEditControls) {
         _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
         if (propertyPolygonActive) {
           ctx.save();
@@ -16583,6 +16613,60 @@ const MecFormModule = (() => {
 
   function _propertyBoundaryElement() {
     return _ensureSiteElements().find(item => item.type === 'property_boundary') || null;
+  }
+
+  function _propertyBoundaryEditElementId(value = _propertyBoundaryElement()) {
+    if (!value) return '';
+    const raw = typeof value === 'string' ? value : (value.id || '');
+    return String(raw || '').replace(/^site::/, '');
+  }
+
+  function _propertyBoundaryEditActive(value = _propertyBoundaryElement()) {
+    const id = _propertyBoundaryEditElementId(value);
+    return Boolean(id && _propertyBoundaryEditId === id && _selectedPlanId === `site::${id}`);
+  }
+
+  function _setPropertyBoundaryEdit(element, enabled = true, options = {}) {
+    if (!element || element.type !== 'property_boundary') return false;
+    if (enabled && !_assertSiteElementUnlocked(element, 'editar el perimetro')) return false;
+    _propertyBoundaryEditId = enabled ? element.id : '';
+    _selectedPlanId = `site::${element.id}`;
+    if (enabled) {
+      _planMoveMode = true;
+      _planRibbonTab = 'editar';
+    }
+    if (!options.silent) {
+      UI.showToast(enabled
+        ? 'Edicion del perimetro activa. Ahora puede mover, redimensionar y ajustar vertices del predio.'
+        : 'Edicion del perimetro desactivada. El predio queda fijo para trabajar con bloques y aulas.',
+        enabled ? 'info' : 'success',
+        6200);
+    }
+    _saveDraft(false);
+    renderSchoolPlan();
+    return true;
+  }
+
+  function _clearPropertyBoundaryEditIfSelectionChanged(id = _selectedPlanId) {
+    if (!_propertyBoundaryEditId) return;
+    if (String(id || '') !== `site::${_propertyBoundaryEditId}`) _propertyBoundaryEditId = '';
+  }
+
+  function _requirePropertyBoundaryEdit(element, action = 'modificar el perimetro') {
+    if (!element || element.type !== 'property_boundary') return true;
+    if (_propertyBoundaryEditActive(element)) return true;
+    UI.showToast(`Active Editar perimetro para ${action}.`, 'info', 5600);
+    return false;
+  }
+
+  function togglePropertyBoundaryEdit(elementId = '') {
+    const id = _propertyBoundaryEditElementId(elementId || _selectedPlanId || _propertyBoundaryElement());
+    const element = _ensureSiteElements().find(item => item.id === id && item.type === 'property_boundary');
+    if (!element) {
+      UI.showToast('Seleccione o inserte primero el perimetro del predio.', 'warning', 5200);
+      return false;
+    }
+    return _setPropertyBoundaryEdit(element, !_propertyBoundaryEditActive(element));
   }
 
   function _propertyBoundaryDimensions(element = _propertyBoundaryElement()) {
@@ -17710,6 +17794,7 @@ const MecFormModule = (() => {
   }
 
   function selectPlanItem(id) {
+    _clearPropertyBoundaryEditIfSelectionChanged(id);
     _selectedPlanId = id;
     _activatePlanSelection(id);
     _saveDraft(false);
@@ -18786,6 +18871,7 @@ const MecFormModule = (() => {
     };
     if (type === 'property_boundary') {
       element.planShape = _defaultPlanShape('l');
+      _propertyBoundaryEditId = element.id;
     }
     if (guided) _prepareSiteElementForGuided(element);
     _updateSiteElementDerivedFields(element);
@@ -18873,9 +18959,11 @@ const MecFormModule = (() => {
       element.planShape = _normalizePropertyBoundaryShape(element.planShape) || element.planShape;
       delete element.boundaryShapeMode;
       _selectedPlanId = `site::${element.id}`;
+      _propertyBoundaryEditId = element.id;
+      _planMoveMode = true;
       _planLayers.exteriores = true;
       renderSchoolPlan();
-      UI.showToast('Perimetro del predio seleccionado. Use Forma L o + Vertice igual que en aulas y arrastre los puntos.', 'info', 6200);
+      UI.showToast('Edicion del perimetro activa. Use Forma L o + Vertice y arrastre los puntos; luego guarde base/perimetro.', 'info', 7200);
     }
     return element || null;
   }
@@ -19309,6 +19397,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
     if (!_assertSiteElementUnlocked(element, 'moverlo')) return null;
+    if (!_requirePropertyBoundaryEdit(element, 'mover el perimetro')) return null;
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const desired = _clampPlanRect({ x: targetX, y: targetY, w: rect.w, h: rect.h }, logicalWidth, logicalHeight);
@@ -19799,6 +19888,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || !rect) return null;
     if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
+    if (!_requirePropertyBoundaryEdit(element, 'redimensionar el perimetro')) return null;
     const logicalWidth = _planCanvasWidth();
     const logicalHeight = _planCanvasHeight();
     const clamped = _clampPlanRect(rect, logicalWidth, logicalHeight);
@@ -19923,6 +20013,7 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
       if (!element) return null;
       if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
+      if (!_requirePropertyBoundaryEdit(element, 'redimensionar el perimetro')) return null;
       return { type: 'site-element', selectedId: `site::${area.siteId}`, siteId: area.siteId, handle: area.handle, rect, bounds: { x: 8, y: 8, w: _planCanvasWidth() - 16, h: _planCanvasHeight() - 16 }, rotation: _siteElementRotationDeg(element), elementType: element.type };
     }
     if (area.type === 'class-object-resize') {
@@ -20020,6 +20111,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'rotarlo')) return;
+    if (!_requirePropertyBoundaryEdit(element, 'rotar el perimetro')) return;
     _pushPlanHistory();
     _setSiteElementRotation(element, _siteElementRotationDeg(element) + Number(delta || 0));
     _selectedPlanId = `site::${element.id}`;
@@ -20455,6 +20547,7 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'cambiar su forma')) return;
+    if (!_requirePropertyBoundaryEdit(element, 'cambiar la forma del perimetro')) return;
     _pushPlanHistory();
     if (shape === 'rect') delete element.planShape;
     else element.planShape = _defaultPlanShape(shape === 'polygon' ? 'l' : shape);
@@ -20470,6 +20563,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') return;
     if (!_assertSiteElementUnlocked(element, 'editar vertices')) return;
+    if (!_requirePropertyBoundaryEdit(element, 'agregar vertices al perimetro')) return;
     _pushPlanHistory();
     _insertPlanShapeVertex(element);
     delete element.boundaryShapeMode;
@@ -20484,6 +20578,7 @@ const MecFormModule = (() => {
     const element = _ensureSiteElements().find(item => item.id === elementId);
     if (!element || element.type !== 'property_boundary') return;
     if (!_assertSiteElementUnlocked(element, 'editar vertices')) return;
+    if (!_requirePropertyBoundaryEdit(element, 'eliminar vertices del perimetro')) return;
     _pushPlanHistory();
     _removePlanShapeVertex(element);
     delete element.boundaryShapeMode;
@@ -20512,6 +20607,7 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
       if (!element || !_clonePlanShape(element.planShape)) return null;
       if (!_assertSiteElementUnlocked(element, 'editar vertices')) return null;
+      if (!_requirePropertyBoundaryEdit(element, 'editar vertices del perimetro')) return null;
       return {
         type: 'site',
         selectedId: `site::${element.id}`,
@@ -20723,6 +20819,7 @@ const MecFormModule = (() => {
       const elementId = raw.replace('site::', '');
       const element = _ensureSiteElements().find(el => el.id === elementId);
       if (!element) return false;
+      if (!_requirePropertyBoundaryEdit(element, 'mover el perimetro')) return false;
       const rect = _siteElementRect(element, logicalWidth, logicalHeight);
       return _savePlanNudge(_movePlanSiteElement(elementId, rect.x + dx, rect.y + dy, rect));
     }
@@ -20918,6 +21015,7 @@ const MecFormModule = (() => {
       const shouldReset = Boolean(_selectedPlanId);
       if (!shouldReset) return;
       _selectedPlanId = null;
+      _propertyBoundaryEditId = '';
       _activePlanDrag = null;
       lastTap = null;
       _hideCanvasHoverTooltip();
@@ -20932,8 +21030,14 @@ const MecFormModule = (() => {
       isSanitaryObjectArea(area)
     ));
     const directDragTypes = ['site-element', 'floor', 'room', 'sanitary'];
+    const canEditPropertyBoundaryArea = area => {
+      if (!area || area.type !== 'site-element') return true;
+      const element = _ensureSiteElements().find(item => item.id === area.siteId);
+      return !element || element.type !== 'property_boundary' || _propertyBoundaryEditActive(element);
+    };
     const canDragPlanArea = area => Boolean(
       isPlanMovableArea(area) &&
+      canEditPropertyBoundaryArea(area) &&
       (_planMoveMode || directDragTypes.includes(area.type) || area.id === _selectedPlanId)
     );
     const movedTooFar = (start, current) => !start || Math.hypot(current.x - start.x, current.y - start.y) > 10;
@@ -21436,7 +21540,7 @@ const MecFormModule = (() => {
       const dir = ARROWS[event.key];
       if (!dir) return;
       event.preventDefault();
-      const step = event.shiftKey ? 1 : (event.altKey ? 20 : 5);
+      const step = (event.ctrlKey || event.metaKey || event.shiftKey) ? 1 : (event.altKey ? 20 : 5);
       nudgeSelectedPlanItem(dir[0] * step, dir[1] * step);
     });
   }
@@ -23450,6 +23554,7 @@ const MecFormModule = (() => {
     removePlanSanitaryVertex,
     addPlanSiteElement,
     ensurePropertyBoundary,
+    togglePropertyBoundaryEdit,
     setPlanSiteElementShape,
     addPlanSiteElementVertex,
     removePlanSiteElementVertex,
