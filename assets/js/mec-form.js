@@ -17120,6 +17120,34 @@ const MecFormModule = (() => {
       .sort((a, b) => _rectDistance(a, target) - _rectDistance(b, target))[0] || null;
   }
 
+  function _nearestRectWithCenterInsidePolygon(rect, polygon, bounds, desired = rect) {
+    const clamped = _clampRectToBounds(rect, bounds);
+    if (_pointInPolygon(_planRectCenter(clamped), polygon)) return clamped;
+    const step = Math.max(8, Math.min(22, Math.round(Math.min(clamped.w, clamped.h) / 4)));
+    const candidates = [
+      clamped,
+      {
+        ...clamped,
+        x: bounds.x + Math.max(0, (bounds.w - clamped.w) / 2),
+        y: bounds.y + Math.max(0, (bounds.h - clamped.h) / 2),
+      },
+      { ...clamped, x: bounds.x, y: bounds.y },
+      { ...clamped, x: bounds.x + bounds.w - clamped.w, y: bounds.y },
+      { ...clamped, x: bounds.x, y: bounds.y + bounds.h - clamped.h },
+      { ...clamped, x: bounds.x + bounds.w - clamped.w, y: bounds.y + bounds.h - clamped.h },
+    ];
+    for (let y = bounds.y; y <= bounds.y + bounds.h - clamped.h; y += step) {
+      for (let x = bounds.x; x <= bounds.x + bounds.w - clamped.w; x += step) {
+        candidates.push({ ...clamped, x, y });
+      }
+    }
+    const target = desired || clamped;
+    return candidates
+      .map(candidate => _clampRectToBounds(candidate, bounds))
+      .filter(candidate => _pointInPolygon(_planRectCenter(candidate), polygon))
+      .sort((a, b) => _rectDistance(a, target) - _rectDistance(b, target))[0] || null;
+  }
+
   function _clampBlockRectToPropertyBoundary(rect, logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
     const polygon = _propertyBoundaryCanvasPoints(logicalWidth, logicalHeight);
     if (!polygon?.length) return _clampPlanRect(rect, logicalWidth, logicalHeight);
@@ -17132,7 +17160,10 @@ const MecFormModule = (() => {
     };
     const desired = { ...rect, ...size };
     const clamped = _clampRectToBounds(desired, bounds);
-    return _nearestRectInsidePolygon(clamped, polygon, bounds, desired) || clamped;
+    if (_rectInsidePolygon(clamped, polygon, 1) || _pointInPolygon(_planRectCenter(clamped), polygon)) return clamped;
+    return _nearestRectWithCenterInsidePolygon(clamped, polygon, bounds, desired)
+      || _nearestRectInsidePolygon(clamped, polygon, bounds, desired)
+      || clamped;
   }
 
   function _persistBlocksWithinPropertyBoundary(logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {

@@ -4,6 +4,24 @@
 
 ---
 
+## Bloques movibles dentro del perimetro - 2026-05-31
+
+### Objetivo
+- Corregir que un bloque ajustado dentro del perimetro se pegara al borde superior del predio y luego no pudiera bajarse.
+- Hacer que la restriccion del predio sea operativa para dibujo satelital, sin saltos bruscos al mover bloques en perimetros rotados o irregulares.
+
+### Cambios implementados
+- El ajuste de bloques dentro del perimetro ahora respeta la posicion mientras el centro del bloque permanezca dentro del predio.
+- Si el bloque queda fuera, la app busca la posicion mas cercana con centro dentro del perimetro antes de recurrir a una ubicacion completamente contenida.
+- Esto evita que el buscador de posiciones empuje el bloque al borde superior cuando el rectangulo completo no entra matematicamente en un poligono rotado o irregular.
+- Version publicada preparada como `v2.6.155`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+
 ## Perimetro visible al estirar predio - 2026-05-31
 
 ### Objetivo
