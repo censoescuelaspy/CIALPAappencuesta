@@ -13626,6 +13626,9 @@ const MecFormModule = (() => {
         const _propertyEditActive = _propertyBoundaryEditActive(_siteItem);
         _formaGroupContent = [
           _renderPlanRibbonButton({ icon: _propertyEditActive ? '&#10003;' : '&#9998;', label: _propertyEditActive ? 'Fijar' : 'Editar', onClick: `MecFormModule.togglePropertyBoundaryEdit('${_escape(_siteId)}')`, tone: _propertyEditActive ? 'btn-success' : 'btn-warning', active: _propertyEditActive, title: _propertyEditActive ? 'Fijar el perimetro para trabajar con bloques' : 'Activar edicion del perimetro' }),
+          _renderPlanRibbonButton({ icon: '&#8634;', label: 'Girar -15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(_siteId)}', -15)`, title: 'Rotar el perimetro 15 grados a la izquierda' }),
+          _renderPlanRibbonButton({ icon: '&#8635;', label: 'Girar +15', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(_siteId)}', 15)`, title: 'Rotar el perimetro 15 grados a la derecha' }),
+          _renderPlanRibbonButton({ icon: '0', label: '0 grados', onClick: `MecFormModule.rotatePlanSiteElement('${_escape(_siteId)}', ${-_siteElementRotationDeg(_siteItem)})`, title: 'Restablecer rotacion del perimetro' }),
           ...(_propertyEditActive ? [
             _renderPlanRibbonButton({ icon: '&#x2514;', label: 'Forma L', onClick: `MecFormModule.setPlanSiteElementShape('${_escape(_siteId)}', 'l')`, title: 'Cambiar a forma en L igual que un aula' }),
             _renderPlanRibbonButton({ icon: '+', label: '+ Vertice', onClick: `MecFormModule.addPlanSiteElementVertex('${_escape(_siteId)}')`, title: 'Agregar vertice al perimetro' }),
@@ -13851,7 +13854,7 @@ const MecFormModule = (() => {
 
   function _isSelectedPlanOrientationTarget(id = _selectedPlanId) {
     const property = _selectedPlanPropertyBoundary(id);
-    if (property && !_propertyBoundaryEditActive(property)) return false;
+    if (property) return true;
     const raw = String(id || '');
     if (raw === SCHOOL_MARKER_PLAN_ID) return false;
     return Boolean(raw && (
@@ -16641,6 +16644,7 @@ const MecFormModule = (() => {
       const propertyPolygonActive = Boolean(isPropertyBoundary && shapePoints);
       const propertyEditActive = !isPropertyBoundary || _propertyBoundaryEditActive(item);
       const showEditControls = selected && propertyEditActive;
+      const showRotateControl = selected;
       _pushPlanHitArea({
         id: `site::${item.id}`,
         type: 'site-element',
@@ -16664,8 +16668,8 @@ const MecFormModule = (() => {
         h: hitRect.h,
         metersPerPx: 1,
       });
-      if (showEditControls) {
-        const handle = propertyPolygonActive ? null : _siteElementRotateHandle(item, rect);
+      if (showRotateControl) {
+        const handle = _siteElementRotateHandle(item, rect);
         if (handle) {
           _pushPlanHitArea({
             id: `site::${item.id}`,
@@ -16683,6 +16687,8 @@ const MecFormModule = (() => {
             baseH: rect.h,
           });
         }
+      }
+      if (showEditControls) {
         _pushPlanResizeHitAreas({
           id: `site::${item.id}`,
           type: 'site-resize',
@@ -16697,6 +16703,7 @@ const MecFormModule = (() => {
         _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
       }
       if (showEditControls) {
+        _drawPlanRotateHandle(ctx, rect, _siteElementRotationDeg(item));
         _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
         if (propertyPolygonActive) {
           ctx.save();
@@ -16709,6 +16716,8 @@ const MecFormModule = (() => {
           if (transform) _planTransformStack.pop();
           ctx.restore();
         }
+      } else if (showRotateControl) {
+        _drawPlanRotateHandle(ctx, rect, _siteElementRotationDeg(item));
       }
     });
   }
@@ -20326,6 +20335,7 @@ const MecFormModule = (() => {
 
   function _keepSiteElementRotatedBoundsInCanvas(element, logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
     if (!element) return;
+    if (element.type === 'property_boundary') return;
     const rect = _siteElementRect(element, logicalWidth, logicalHeight);
     const bounds = _rotatedSiteElementBounds(rect, element);
     const margin = 8;
@@ -20350,6 +20360,7 @@ const MecFormModule = (() => {
     element.rotacion_grados = String(element.rotationDeg);
     element.ficha = { ...(element.ficha || {}), rotacion_grados: String(element.rotationDeg) };
     _keepSiteElementRotatedBoundsInCanvas(element, logicalWidth, logicalHeight);
+    if (element.type === 'property_boundary') _syncPropertyBoundaryGeoVertices(element, logicalWidth, logicalHeight);
   }
 
   function rotatePlanSiteElement(elementId, delta = 15) {
@@ -20359,7 +20370,6 @@ const MecFormModule = (() => {
       return;
     }
     if (!_assertSiteElementUnlocked(element, 'rotarlo')) return;
-    if (!_requirePropertyBoundaryEdit(element, 'rotar el perimetro')) return;
     _pushPlanHistory();
     _setSiteElementRotation(element, _siteElementRotationDeg(element) + Number(delta || 0));
     _selectedPlanId = `site::${element.id}`;
