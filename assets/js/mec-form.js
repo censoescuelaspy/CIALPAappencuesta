@@ -71,6 +71,7 @@ const MecFormModule = (() => {
     sanitarios: true,
     aberturas: true,
     electricidad: true,
+    cableado: true,
     danos: true,
     exteriores: true,
     etiquetas: true,
@@ -6991,6 +6992,10 @@ const MecFormModule = (() => {
         ficha: _defaultSketchFicha(type),
       };
     }
+    if (type === 'switchboard' && object?.w !== undefined) {
+      object.x = Math.round(room.x);
+      object.y = Math.round(center.y - object.h / 2);
+    }
     if (guided) _markGuidedObjectReview(object);
     if (object.type === 'wall') _snapWallObject(object);
     else if (object.type !== 'pencil') _clampSanitaryChildToRoom(item, object);
@@ -10562,6 +10567,9 @@ const MecFormModule = (() => {
     if (object.type === 'wall') return object;
     if (_isPointSketchObject(object)) {
       return _snapPointToRoomWall(object, room);
+    }
+    if (WALL_RECT_TYPES.includes(object.type)) {
+      return _snapRectToRoomWall(object, room);
     }
     if (object.type !== 'stall' && !['door', 'window'].includes(object.type) && object.w !== undefined) {
       const cx = object.x + (object.w || 0) / 2;
@@ -14323,6 +14331,7 @@ const MecFormModule = (() => {
       sanitarios: 'Sanitarios',
       aberturas: 'Puertas/Ventanas',
       electricidad: 'Electricidad/equipos',
+      cableado: 'Cableado',
       danos: 'Daños/obs.',
       exteriores: 'Exteriores',
       etiquetas: 'Etiquetas',
@@ -15446,6 +15455,7 @@ const MecFormModule = (() => {
 
     const distanceItems = [];
     const geoBlockLabels = [];
+    const electricalNodes = [];
     if (_planLayers.exteriores) _drawSiteElements(ctx, logical, distanceItems, { onlyPropertyBoundary: true });
     const layout = _planBlockLayout(blocks, logical.width, logical.height);
     layout.forEach(({ block, x, y, w, h, scale }, blockIndex) => {
@@ -15553,6 +15563,14 @@ const MecFormModule = (() => {
         }
         const roomItems = _planRoomItemsFromSketch(floorRooms, floorContentRect);
         const sanitaryItems = _planSanitaryItemsFromSketch(floorSanitaries, floorContentRect);
+        if (_planLayers.electricidad && _planLayers.cableado) {
+          const rotations = [
+            { rect: floorRect, deg: floorRotation },
+            { rect: blockRect, deg: blockRotation },
+          ];
+          electricalNodes.push(..._collectPlanRoomElectricalNodes(roomItems, rotations));
+          electricalNodes.push(..._collectPlanSanitaryElectricalNodes(sanitaryItems, rotations));
+        }
         const floorMetersPerPx = _planFloorMetersPerPx({ ...block, largo_m: floor.largo_m || block.largo_m, ancho_m: floor.ancho_m || block.ancho_m }, floorContentRect);
         roomItems.forEach(item => _pushPlanDistanceItem(distanceItems, {
           id: `room::${item.room.id}`,
@@ -15610,6 +15628,7 @@ const MecFormModule = (() => {
       ctx.restore();
     });
     if (_planLayers.exteriores) _drawSiteElements(ctx, logical, distanceItems, { excludePropertyBoundary: true });
+    _drawPlanElectricalBackbone(ctx, logical, electricalNodes);
     _drawPlanDistanceGuides(ctx, distanceItems);
     _drawGeoBlockLabels(ctx, geoBlockLabels);
     _drawPropertyBoundaryGeoOverlay(ctx, logical);
@@ -17241,11 +17260,89 @@ const MecFormModule = (() => {
     };
   }
 
+  function _drawPlanSizeReferenceGuides(ctx, source, candidates = []) {
+    if (!ctx || !source || !['room', 'sanitary'].includes(source.type)) return false;
+    const peers = (candidates || []).filter(item =>
+      item.id !== source.id &&
+      ['room', 'sanitary'].includes(item.type) &&
+      Number.isFinite(item.w) &&
+      Number.isFinite(item.h)
+    );
+    if (!peers.length) return false;
+    const snapPx = 8;
+    const widthPeer = peers
+      .map(item => ({ item, delta: Math.abs((item.w || 0) - (source.w || 0)) }))
+      .filter(match => match.delta <= snapPx)
+      .sort((a, b) => a.delta - b.delta)[0]?.item || null;
+    const heightPeer = peers
+      .map(item => ({ item, delta: Math.abs((item.h || 0) - (source.h || 0)) }))
+      .filter(match => match.delta <= snapPx)
+      .sort((a, b) => a.delta - b.delta)[0]?.item || null;
+    if (!widthPeer && !heightPeer) return false;
+
+    const drawLabel = (label, x, y, color) => {
+      ctx.save();
+      ctx.font = _canvasFont(800, 9);
+      ctx.textAlign = 'center';
+      const width = ctx.measureText(label).width + 10;
+      ctx.fillStyle = 'rgba(239,246,255,.94)';
+      ctx.fillRect(x - width / 2, y - 8, width, 16);
+      ctx.fillStyle = color;
+      ctx.fillText(label, x, y + 2);
+      ctx.restore();
+    };
+    const drawHorizontalGuide = (item, y) => {
+      ctx.beginPath();
+      ctx.moveTo(item.x, y);
+      ctx.lineTo(item.x + item.w, y);
+      ctx.moveTo(item.x, y - 4);
+      ctx.lineTo(item.x, y + 4);
+      ctx.moveTo(item.x + item.w, y - 4);
+      ctx.lineTo(item.x + item.w, y + 4);
+      ctx.stroke();
+    };
+    const drawVerticalGuide = (item, x) => {
+      ctx.beginPath();
+      ctx.moveTo(x, item.y);
+      ctx.lineTo(x, item.y + item.h);
+      ctx.moveTo(x - 4, item.y);
+      ctx.lineTo(x + 4, item.y);
+      ctx.moveTo(x - 4, item.y + item.h);
+      ctx.lineTo(x + 4, item.y + item.h);
+      ctx.stroke();
+    };
+
+    ctx.save();
+    ctx.lineWidth = 1.3;
+    ctx.setLineDash([4, 3]);
+    if (widthPeer) {
+      const color = '#1d4ed8';
+      ctx.strokeStyle = 'rgba(37,99,235,.82)';
+      drawHorizontalGuide(source, source.y - 10);
+      drawHorizontalGuide(widthPeer, widthPeer.y - 10);
+      drawLabel('mismo largo', source.x + source.w / 2, source.y - 20, color);
+    }
+    if (heightPeer) {
+      const color = '#047857';
+      ctx.strokeStyle = 'rgba(5,150,105,.82)';
+      drawVerticalGuide(source, source.x - 10);
+      drawVerticalGuide(heightPeer, heightPeer.x - 10);
+      drawLabel('mismo ancho', source.x - 32, source.y + source.h / 2, color);
+    }
+    ctx.setLineDash([]);
+    ctx.restore();
+    return true;
+  }
+
   function _drawPlanDistanceGuides(ctx, items) {
     const selectedId = _activePlanDrag?.id || _selectedPlanId;
     if (!selectedId) return;
     const source = items.find(item => item.id === selectedId);
     if (!source) return;
+    if (['room', 'sanitary'].includes(source.type)) {
+      _drawPlanSizeReferenceGuides(ctx, source, items);
+      return;
+    }
     if (source.type !== 'block') return;
     const candidates = items.filter(item => item.type === 'block');
     const nearest = _nearestPlanDistance(source, candidates);
@@ -17351,6 +17448,61 @@ const MecFormModule = (() => {
     ];
   }
 
+  function _planSpaceSizeSnapPeers(kind, id, floorRect) {
+    if (!floorRect) return [];
+    const rooms = _data.__classrooms || [];
+    const sanitaries = _data.__sanitaries || [];
+    let blockId = '';
+    let floorLabel = '';
+    if (kind === 'room') {
+      const room = _classroomById(id);
+      if (!room) return [];
+      blockId = room.blockId || 'sin_bloque';
+      floorLabel = _normalizeFloor(room.floor || _activeFloor() || 'Piso 1');
+    } else {
+      const sanitary = sanitaries.find(item => item.id === id);
+      if (!sanitary) return [];
+      const block = _blockForSanitary(sanitary);
+      blockId = block?.id || 'sin_bloque';
+      floorLabel = _normalizeFloor(sanitary.planta || _activeFloor() || 'Piso 1');
+    }
+    const peerRooms = rooms.filter(room =>
+      (kind !== 'room' || room.id !== id) &&
+      (room.blockId || 'sin_bloque') === blockId &&
+      _normalizeFloor(room.floor || 'Piso 1') === floorLabel
+    );
+    const peerSanitaries = sanitaries.filter(sanitary => {
+      const block = _blockForSanitary(sanitary);
+      return (kind !== 'sanitary' || sanitary.id !== id) &&
+        (block?.id || 'sin_bloque') === blockId &&
+        _normalizeFloor(sanitary.planta || 'Piso 1') === floorLabel;
+    });
+    return [
+      ..._planRoomItemsFromSketch(peerRooms, floorRect).map(item => ({ id: `room::${item.room.id}`, type: 'room', w: item.w, h: item.h })),
+      ..._planSanitaryItemsFromSketch(peerSanitaries, floorRect).map(item => ({ id: `sanitary::${item.sanitary.id}`, type: 'sanitary', w: item.w, h: item.h })),
+    ];
+  }
+
+  function _snapPlanSpaceRectToPeerSizes(kind, id, rect, floorRect) {
+    if (!rect || !floorRect) return rect;
+    const peers = _planSpaceSizeSnapPeers(kind, id, floorRect)
+      .filter(item => Number.isFinite(item.w) && Number.isFinite(item.h));
+    if (!peers.length) return rect;
+    const threshold = 10;
+    const next = { ...rect };
+    const widthMatch = peers
+      .map(item => ({ item, delta: Math.abs((item.w || 0) - (next.w || 0)) }))
+      .filter(match => match.delta <= threshold)
+      .sort((a, b) => a.delta - b.delta)[0]?.item || null;
+    const heightMatch = peers
+      .map(item => ({ item, delta: Math.abs((item.h || 0) - (next.h || 0)) }))
+      .filter(match => match.delta <= threshold)
+      .sort((a, b) => a.delta - b.delta)[0]?.item || null;
+    if (widthMatch) next.w = widthMatch.w;
+    if (heightMatch) next.h = heightMatch.h;
+    return _clampRectToBounds(next, floorRect);
+  }
+
   function _sanitariesForBlock(block) {
     return (_data.__sanitaries || []).filter(item => _matchesBlockReference(item.bloque, block));
   }
@@ -17436,7 +17588,7 @@ const MecFormModule = (() => {
       x: x + (object.x - roomObject.x) * sx,
       y: y + (object.y - roomObject.y) * sy,
     }), 6);
-    if (_planLayers.electricidad) {
+    if (_planLayers.electricidad && _planLayers.cableado) {
       _drawPlanElectricalConnections(ctx, visibleObjects, object => {
         const offset = pointOffsets.get(object.id);
         return _planChildCenter(roomObject, object, parentRect, sx, sy, offset);
@@ -17782,7 +17934,7 @@ const MecFormModule = (() => {
       x: x + (object.x - roomObject.x) * sx,
       y: y + (object.y - roomObject.y) * sy,
     }), 7);
-    if (_planLayers.electricidad) {
+    if (_planLayers.electricidad && _planLayers.cableado) {
       _drawPlanElectricalConnections(ctx, visibleObjects, object => {
         const offset = pointOffsets.get(object.id);
         return _planChildCenter(roomObject, object, parentRect, sx, sy, offset);
@@ -18005,6 +18157,143 @@ const MecFormModule = (() => {
       ctx.lineTo(bendX, bendY);
       ctx.lineTo(target.x, target.y);
       ctx.stroke();
+    });
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
+  function _planElectricalNodeCenter(roomObject, object, parentRect, offset = null) {
+    if (!roomObject || !object || !parentRect) return null;
+    const sx = parentRect.w / roomObject.w;
+    const sy = parentRect.h / roomObject.h;
+    return _planChildCenter(roomObject, object, parentRect, sx, sy, offset);
+  }
+
+  function _applyPlanRotationsToPoint(point, rotations = []) {
+    return (rotations || []).reduce((current, item) => {
+      const deg = Number(item?.deg || 0);
+      if (!deg || !item?.rect) return current;
+      return _rotatePointAround(_planRectCenter(item.rect), current, deg);
+    }, point);
+  }
+
+  function _collectPlanRoomElectricalNodes(roomItems = [], rotations = []) {
+    const nodes = [];
+    roomItems.forEach(item => {
+      const roomObject = _roomObjectForClassroom(item.room);
+      if (!roomObject) return;
+      const visibleObjects = (item.room.objects || [])
+        .filter(object => ['switchboard', ...POINT_SKETCH_TYPES].includes(object.type));
+      const offsets = _planPointOffsetMap(visibleObjects, object => _planElectricalNodeCenter(roomObject, object, item), 7);
+      visibleObjects.forEach(object => {
+        const center = _planElectricalNodeCenter(roomObject, object, item, offsets.get(object.id));
+        if (!center) return;
+        const point = _applyPlanRotationsToPoint(center, [
+          { rect: item, deg: _roomRotationDeg(item.room) },
+          ...rotations,
+        ]);
+        nodes.push({
+          id: `${item.room.id}::${object.id}`,
+          type: object.type === 'switchboard' ? 'switchboard' : 'consumer',
+          objectType: object.type,
+          point,
+          label: object.ficha?.codigo || _sketchLabel(object.type),
+        });
+      });
+    });
+    return nodes;
+  }
+
+  function _collectPlanSanitaryElectricalNodes(sanitaryItems = [], rotations = []) {
+    const nodes = [];
+    sanitaryItems.forEach(item => {
+      const roomObject = _sanitaryRoomObject(item.sanitary);
+      if (!roomObject) return;
+      const visibleObjects = (item.sanitary.objects || [])
+        .filter(object => ['switchboard', ...POINT_SKETCH_TYPES].includes(object.type));
+      const offsets = _planPointOffsetMap(visibleObjects, object => _planElectricalNodeCenter(roomObject, object, item), 6);
+      visibleObjects.forEach(object => {
+        const center = _planElectricalNodeCenter(roomObject, object, item, offsets.get(object.id));
+        if (!center) return;
+        const point = _applyPlanRotationsToPoint(center, [
+          { rect: item, deg: _sanitaryRotationDeg(item.sanitary) },
+          ...rotations,
+        ]);
+        nodes.push({
+          id: `${item.sanitary.id}::${object.id}`,
+          type: object.type === 'switchboard' ? 'switchboard' : 'consumer',
+          objectType: object.type,
+          point,
+          label: object.ficha?.codigo || _sketchLabel(object.type),
+        });
+      });
+    });
+    return nodes;
+  }
+
+  function _nearestNode(point, nodes = []) {
+    if (!point || !nodes.length) return null;
+    return nodes
+      .map(node => ({ ...node, distance: Math.hypot(node.point.x - point.x, node.point.y - point.y) }))
+      .sort((a, b) => a.distance - b.distance)[0] || null;
+  }
+
+  function _drawCablePolyline(ctx, from, to, options = {}) {
+    if (!ctx || !from || !to) return;
+    const midX = Number.isFinite(options.midX) ? options.midX : from.x;
+    const midY = Number.isFinite(options.midY) ? options.midY : to.y;
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(midX, midY);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+  }
+
+  function _drawPlanElectricalBackbone(ctx, logical, nodes = []) {
+    if (!ctx || !logical || !_planLayers.electricidad || !_planLayers.cableado) return;
+    const siteNodes = _ensureSiteElements()
+      .filter(item => ['service_connection', 'meter', 'main_switchboard', 'grounding'].includes(item.type))
+      .map(item => {
+        const rect = _siteElementRect(item, logical.width, logical.height);
+        return {
+          id: item.id,
+          type: item.type,
+          point: _planRectCenter(rect),
+          label: item.ficha?.codigo || _siteElementConfig(item.type).short,
+        };
+      });
+    const consumers = nodes.filter(node => node.type === 'consumer');
+    const localPanels = nodes.filter(node => node.type === 'switchboard');
+    const service = siteNodes.find(node => node.type === 'service_connection');
+    const meter = siteNodes.find(node => node.type === 'meter');
+    const mainPanel = siteNodes.find(node => node.type === 'main_switchboard');
+    const grounding = siteNodes.find(node => node.type === 'grounding');
+    const source = mainPanel || meter || service || localPanels[0] || null;
+    if (!source || (!consumers.length && !localPanels.length && !meter && !grounding)) return;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(180,83,9,.74)';
+    ctx.lineWidth = 1.4;
+    ctx.setLineDash([8, 5]);
+    if (service && meter) _drawCablePolyline(ctx, service.point, meter.point, { midX: service.point.x, midY: meter.point.y });
+    if ((meter || service) && mainPanel) {
+      const upstream = meter || service;
+      _drawCablePolyline(ctx, upstream.point, mainPanel.point, { midX: upstream.point.x, midY: mainPanel.point.y });
+    }
+    if (mainPanel && grounding) {
+      ctx.strokeStyle = 'rgba(21,128,61,.74)';
+      _drawCablePolyline(ctx, mainPanel.point, grounding.point, { midX: grounding.point.x, midY: mainPanel.point.y });
+      ctx.strokeStyle = 'rgba(180,83,9,.74)';
+    }
+
+    localPanels.forEach(panel => {
+      if (panel.id === source.id) return;
+      _drawCablePolyline(ctx, source.point, panel.point, { midX: source.point.x, midY: panel.point.y });
+    });
+    consumers.forEach(consumer => {
+      const panel = _nearestNode(consumer.point, localPanels) || source;
+      if (!panel) return;
+      _drawCablePolyline(ctx, panel.point, consumer.point, { midX: panel.point.x, midY: consumer.point.y });
     });
     ctx.setLineDash([]);
     ctx.restore();
@@ -18557,7 +18846,7 @@ const MecFormModule = (() => {
     if (type === 'window') return { x: center.x, y: roomObject.y + 4 };
     if (type === 'board') return { x: center.x, y: roomObject.y + 22 };
     if (type === 'outlet') return { x: roomObject.x + 22, y: center.y };
-    if (type === 'switchboard') return { x: roomObject.x + 32, y: roomObject.y + 32 };
+    if (type === 'switchboard') return { x: roomObject.x, y: center.y };
     if (type === 'light') return { x: center.x, y: center.y };
     if (type === 'fan') return { x: Math.min(roomObject.x + roomObject.w - 28, center.x + 28), y: center.y };
     if (type === 'ac') return { x: roomObject.x + roomObject.w - 28, y: center.y };
@@ -20215,6 +20504,7 @@ const MecFormModule = (() => {
     if (!room || !rect || !floorRect) return null;
     if (!_assertClassroomUnlocked(room, 'redimensionarlo')) return null;
     _activatePlanClassroom(room.id);
+    rect = _snapPlanSpaceRectToPeerSizes('room', roomId, rect, floorRect);
     const activeRoom = _data.__classroomSketch || room;
     activeRoom.objects = Array.isArray(activeRoom.objects) ? activeRoom.objects : [];
     let object = _roomObjectForClassroom(activeRoom);
@@ -20255,6 +20545,7 @@ const MecFormModule = (() => {
     if (!item || !rect || !floorRect) return null;
     if (!_assertSanitaryUnlocked(item, 'redimensionarlo')) return null;
     _activatePlanSanitary(item.id);
+    rect = _snapPlanSpaceRectToPeerSizes('sanitary', sanitaryId, rect, floorRect);
     const object = _ensureSanitaryRoomObject(item);
     const target = _planRectToSketchRect(rect, floorRect, 28, 22);
     if (!object || !target) return null;

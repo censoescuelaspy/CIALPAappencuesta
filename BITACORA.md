@@ -4,6 +4,29 @@
 
 ---
 
+## Plano vivo: tableros, guias y cableado - 2026-05-31
+
+### Objetivo
+- Hacer que el tablero electrico se incruste en la pared del aula o sanitario seleccionado, igual que otros elementos de pared.
+- Facilitar que dos ambientes puedan igualar largo o ancho con referencias visuales y ajuste automatico al redimensionar.
+- Representar el sistema electrico con lineas de cableado que puedan mostrarse u ocultarse desde capas.
+
+### Cambios implementados
+- Los tableros de aulas y sanitarios se anclan a la pared mas cercana al insertarlos o moverlos.
+- Se agrega la capa `Cableado`, separada de `Electricidad/equipos`, para mostrar u ocultar las conexiones.
+- El plano dibuja cableado desde acometida, medidor, tablero principal y puesta a tierra hacia tableros locales.
+- Las luces, enchufes, ventiladores y aires se conectan al tablero local mas cercano, o a la fuente electrica disponible.
+- Al redimensionar aulas o sanitarios, el largo y ancho se ajustan a medidas similares de otros ambientes del mismo piso/bloque cuando estan cerca.
+- Se muestran guias `mismo largo` y `mismo ancho` al seleccionar o redimensionar ambientes con dimensiones coincidentes.
+- Version publicada preparada como `v2.6.157`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
 ## Rutas reales Google en mapa - 2026-05-31
 
 ### Objetivo
