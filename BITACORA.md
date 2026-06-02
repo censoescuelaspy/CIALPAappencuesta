@@ -4,6 +4,37 @@
 
 ---
 
+## Plano vivo: paneo tactil, perimetro y Mover base - 2026-06-02
+
+### Objetivo
+- Permitir mover el mapa/plano arrastrando con dedo o cursor sobre una zona libre.
+- Reducir la confusion entre pines geograficos del perimetro y tiradores reales de ajuste.
+- Hacer mas visible y accesible el boton `Mover base` desde el primer control.
+
+### Cambios implementados
+- `assets/js/mec-form.js` agrega paneo directo del viewport del plano vivo: arrastrar espacio libre desplaza el mapa sin tocar zoom ni objetos.
+- El paneo por dedo queda separado del gesto de cambio de etapa en Registro guiado.
+- El perimetro muestra tiradores cuadrados mas grandes y con borde naranja solo cuando su edicion esta activa.
+- Los puntos de coordenadas del perimetro se dibujan como referencias desplazadas y mas pequenas durante la edicion, evitando solaparse con los tiradores.
+- `Mover base` queda renombrado y destacado en la cinta del plano, y tambien aparece dentro del mapa del paso `Ubicacion escuela`.
+- Version visible y cache del Service Worker actualizados a `v2.6.161`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+### Publicacion
+- Commit de implementacion publicado: `bef7b37`.
+- Push confirmado en `origin/main`.
+- GitHub Pages verificado con cache-busting: `index.html`, `config.js`, `guided-register.js`, `mec-form.js`, `app.css` y `sw.js` responden HTTP 200 y entregan `v2.6.161`.
+- `assets/js/guided-register.js` publicado contiene `moveBase`.
+- `assets/js/mec-form.js` publicado contiene `planPanDrag`.
+- `assets/css/app.css` publicado contiene `school-plan__canvas--panning`.
+
 ## Registro guiado: mapa de ubicacion en primer control - 2026-06-02
 
 ### Objetivo
