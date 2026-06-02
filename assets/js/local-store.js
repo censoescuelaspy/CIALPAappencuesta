@@ -202,6 +202,36 @@ const CialpaLocalStore = (() => {
     return 'pendiente';
   }
 
+  function _normText(value) {
+    return String(value ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function _isTrueish(value) {
+    return ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(_normText(value));
+  }
+
+  function _isPilotSchool(item) {
+    return _isTrueish(item?.en_muestra_piloto)
+      || _isTrueish(item?.muestra_piloto)
+      || _normText(item?.prioridad_operativa).includes('piloto')
+      || String(item?.orden_muestra_piloto ?? '').trim() !== '';
+  }
+
+  function _schoolMatchesStatsFilters(item, filters = {}) {
+    const stage = _normText(filters.etapa || filters.etapa_operativa || filters.muestra || '');
+    if (stage === 'piloto' && !_isPilotSchool(item)) return false;
+    if (stage === 'censal' && _isPilotSchool(item)) return false;
+    if (filters.departamento && String(item.departamento || '') !== String(filters.departamento)) return false;
+    if (filters.distrito && String(item.distrito || '') !== String(filters.distrito)) return false;
+    const encFilter = filters.encuestador || filters.usuario || '';
+    if (encFilter && String(item.encuestador_asignado || item.encuestador || '') !== String(encFilter)) return false;
+    return true;
+  }
+
   function _pct(part, total) {
     if (!total) return 0;
     return Math.round((part / total) * 100);
@@ -262,12 +292,13 @@ const CialpaLocalStore = (() => {
     };
   }
 
-  function statsFromSchools(escuelas = []) {
+  function statsFromSchools(escuelas = [], filters = {}) {
+    const filteredSchools = (escuelas || []).filter(item => _schoolMatchesStatsFilters(item, filters));
     const stats = _blankStats();
-    stats.total = escuelas.length;
+    stats.total = filteredSchools.length;
     const dep = {};
     const enc = {};
-    escuelas.forEach(item => {
+    filteredSchools.forEach(item => {
       const state = _normalState(item.estado_relevamiento || item.estado);
       if (state === 'finalizada') stats.finalizadas++;
       else if (state === 'en_curso') stats.en_curso++;
@@ -427,14 +458,17 @@ const CialpaLocalStore = (() => {
     return buckets;
   }
 
-  async function buildLocalAnalytics(remoteStats = null) {
+  async function buildLocalAnalytics(remoteStats = null, filters = {}) {
     const [schoolsCache, queue] = await Promise.all([
       getApi('getEscuelas', {}),
       getQueue(),
     ]);
     const schools = schoolsCache?.response?.data || [];
-    const schoolStats = schools.length ? statsFromSchools(schools) : _blankStats();
-    const stats = normalizeStats(remoteStats || schoolStats);
+    const schoolStats = schools.length ? statsFromSchools(schools, filters) : _blankStats();
+    const hasInteractiveFilters = Boolean(filters && (
+      filters.etapa || filters.etapa_operativa || filters.muestra || filters.departamento || filters.distrito || filters.encuestador || filters.usuario
+    ));
+    const stats = normalizeStats((schools.length && hasInteractiveFilters) ? schoolStats : (remoteStats || schoolStats));
     return {
       stats,
       schoolsCachedAt: schoolsCache?.savedAt || null,

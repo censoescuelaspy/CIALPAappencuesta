@@ -4,6 +4,38 @@
 
 ---
 
+## Rendimiento de tableros y mapa MEC coropletico - 2026-06-02
+
+### Objetivo
+- Reducir la latencia al abrir vistas y al usar botones de filtro de tableros.
+- Reemplazar el mapa MEC poco util por una lectura territorial tipo coropletica.
+- Permitir filtrar resultados y estadisticas por `Piloto muestral` y `Etapa censal`.
+
+### Problema reportado
+- Las vistas y filtros de dashboards cargaban lento porque cada cambio podia volver a consultar/calcular estadisticas completas.
+- La vista `Infraestructura MEC` no daba una lectura territorial clara y el mapa dependia de puntos/tiles.
+- Los tableros no distinguian claramente etapa piloto muestral vs etapa censal.
+
+### Cambios implementados
+- `assets/js/stats.js`: cache de tablero base, reentrada rapida a Estadisticas/Infraestructura y filtros locales instantaneos cuando ya hay datos.
+- `assets/js/stats.js`: Chart.js queda diferido; primero se pintan KPIs, tablas y fallbacks CSS, luego se mejoran los graficos en segundo plano.
+- `assets/js/local-store.js`: analitica local filtrable por etapa, departamento, distrito y encuestador usando el padron cacheado.
+- `assets/js/api.js`: fallback offline de `getStats` respeta los filtros solicitados.
+- `assets/js/stats.js` y `assets/css/app.css`: mapa MEC reemplazado por coropleta territorial por departamento/distrito con capas de riesgo, fallas, escuelas, evidencia y area.
+- `index.html`: filtro `Etapa` agregado al tablero estadistico.
+- `assets/js/config.js`, `index.html`, `sw.js`: version actualizada a `2.6.165` para cache-busting y trazabilidad.
+
+### Validaciones ejecutadas
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/local-store.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local: `http://127.0.0.1:8765/index.html` responde `200` con `v2.6.165`.
+
+---
+
 ## Registro guiado: contenedores ajustables y mapa activo - 2026-06-02
 
 ### Objetivo

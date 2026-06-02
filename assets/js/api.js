@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.135
+ * Version: 2.6.165
  */
 
 const API = (() => {
@@ -534,7 +534,7 @@ const API = (() => {
 
     if (endpoint === 'getStats') {
       const cachedStats = await CialpaLocalStore.getApi(endpoint, request).catch(() => null);
-      const analytics = await CialpaLocalStore.buildLocalAnalytics(cachedStats?.response?.data || null).catch(() => null);
+      const analytics = await CialpaLocalStore.buildLocalAnalytics(cachedStats?.response?.data || null, request).catch(() => null);
       if (!analytics) return null;
       return {
         status: 'ok',

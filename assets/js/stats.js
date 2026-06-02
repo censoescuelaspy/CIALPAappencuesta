@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.6.159
+ * Version: 2.6.165
  */
 
 const StatsModule = (() => {
@@ -9,22 +9,40 @@ const StatsModule = (() => {
 
   let _charts = {};
   let _statsData = null;
+  let _statsBaseData = null;
   let _localAnalytics = null;
+  let _statsBaseLocal = null;
   let _statsCache = {};
   let _infraCache = null;
   let _infraData = null;
   let _infraMap = null;
+  let _statsInitialized = false;
+  let _mecInitialized = false;
   let _infraFilters = {
+    etapa: '',
     departamento: '',
     distrito: '',
     nivel: '',
     tipoBloque: '',
     falla: '',
+    metric: 'risk',
   };
   let _chartLoader = null;
   const STATS_CACHE_TTL = 5 * 60 * 1000;
+  const PILOT_STAGE_SHARE = 0.086;
   const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
   const DEMO_INFRA_URL = 'assets/data/demo-infraestructura-mec.json';
+  const STAGE_LABELS = {
+    piloto: 'Piloto muestral',
+    censal: 'Etapa censal',
+  };
+  const MEC_MAP_METRICS = {
+    risk: { label: 'Riesgo tecnico', unit: '%', key: 'risk', tone: 'risk', invert: false },
+    damages: { label: 'Fallas', unit: '', key: 'damages', tone: 'risk', invert: false },
+    schools: { label: 'Escuelas', unit: '', key: 'schools', tone: 'volume', invert: false },
+    evidencePct: { label: 'Evidencia', unit: '%', key: 'evidencePct', tone: 'evidence', invert: true },
+    area: { label: 'Area relevada', unit: ' m2', key: 'area', tone: 'volume', invert: false },
+  };
   const PARAGUAY_TERRITORY_CENTERS = {
     capital: [-25.2867, -57.3333],
     asuncion: [-25.2867, -57.3333],
@@ -54,7 +72,12 @@ const StatsModule = (() => {
       return;
     }
     _bindFilterEvents();
-    await loadStats();
+    if (_statsInitialized && _statsBaseData) {
+      await _applyStatsFilters();
+      return;
+    }
+    _statsInitialized = true;
+    await loadStats({ forceNetwork: false, preferCache: true });
   }
 
   function _bindFilterEvents() {
@@ -64,7 +87,7 @@ const StatsModule = (() => {
       let timer = null;
       const schedule = () => {
         clearTimeout(timer);
-        timer = setTimeout(loadStats, 140);
+        timer = setTimeout(_applyStatsFilters, 80);
       };
       form.addEventListener('change', schedule);
       form.addEventListener('click', event => {
@@ -77,7 +100,7 @@ const StatsModule = (() => {
     const applyBtn = document.getElementById('stats-filter-apply');
     if (applyBtn && applyBtn.dataset.bound !== 'true') {
       applyBtn.dataset.bound = 'true';
-      applyBtn.addEventListener('click', loadStats);
+      applyBtn.addEventListener('click', _applyStatsFilters);
     }
 
     const resetBtn = document.getElementById('stats-filter-reset');
@@ -87,20 +110,41 @@ const StatsModule = (() => {
         const form = document.getElementById('stats-filter-form');
         form?.reset();
         UI.refreshButtonChoices(form);
-        loadStats();
+        _applyStatsFilters();
       });
     }
   }
 
-  async function loadStats() {
+  async function loadStats(options = {}) {
+    const { forceNetwork = true, preferCache = false } = options || {};
     const filters = _getFilters();
     const cacheKey = JSON.stringify(filters);
     const cached = _statsCache[cacheKey];
-    if (cached && (Date.now() - cached.time < STATS_CACHE_TTL)) {
+    if (!forceNetwork && cached && (Date.now() - cached.time < STATS_CACHE_TTL)) {
       _statsData = cached.stats;
       _localAnalytics = cached.local;
+      if (!Object.keys(filters).length) {
+        _statsBaseData = cached.stats;
+        _statsBaseLocal = cached.local;
+      }
       await _renderStatsView();
       return;
+    }
+
+    if (!forceNetwork && preferCache) {
+      const cachedApi = await _getCachedStats(filters);
+      if (cachedApi) {
+        _statsData = cachedApi.stats;
+        _localAnalytics = cachedApi.local;
+        if (!Object.keys(filters).length) {
+          _statsBaseData = cachedApi.stats;
+          _statsBaseLocal = cachedApi.local;
+        }
+        _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
+        await _renderStatsView();
+        _refreshStatsInBackground();
+        return;
+      }
     }
 
     let remoteStats = null;
@@ -119,7 +163,7 @@ const StatsModule = (() => {
       if (remoteResult?.localAnalytics) {
         _localAnalytics = remoteResult.localAnalytics;
       } else if (typeof CialpaLocalStore !== 'undefined') {
-        _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats);
+        _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats, filters);
       }
     } catch (err) {
       console.warn('No se pudo construir analitica local:', err);
@@ -134,8 +178,154 @@ const StatsModule = (() => {
     }
 
     _statsData = _normalizeStats(remoteStats);
+    if (_localAnalytics?.stats && _hasInteractiveStatsFilters(filters)) {
+      _statsData = _normalizeStats(_localAnalytics.stats);
+    }
+    if (!Object.keys(filters).length) {
+      _statsBaseData = _statsData;
+      _statsBaseLocal = _localAnalytics;
+    }
     if (!remoteError) _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
     await _renderStatsView();
+  }
+
+  async function _getCachedStats(filters = {}) {
+    if (typeof CialpaLocalStore === 'undefined') return null;
+    try {
+      const cached = await CialpaLocalStore.getApi('getStats', filters);
+      const savedAt = cached?.savedAt ? Date.parse(cached.savedAt) : 0;
+      const requestMatches = _sameFilters(cached?.request || {}, filters);
+      if (!cached?.response?.data || !requestMatches || (savedAt && Date.now() - savedAt > STATS_CACHE_TTL)) return null;
+      const local = await CialpaLocalStore.buildLocalAnalytics(cached.response.data, filters).catch(() => null);
+      return {
+        stats: _normalizeStats(local?.stats || cached.response.data),
+        local,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function _refreshStatsInBackground() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    setTimeout(() => {
+      loadStats({ forceNetwork: true }).catch(err =>
+        console.warn('No se pudo refrescar estadisticas en segundo plano:', err)
+      );
+    }, 60);
+  }
+
+  async function _applyStatsFilters() {
+    const filters = _getFilters();
+    const baseStats = _statsBaseData || _statsData;
+    if (!baseStats) {
+      await loadStats({ forceNetwork: false, preferCache: true });
+      return;
+    }
+
+    let local = _statsBaseLocal || _localAnalytics;
+    if (typeof CialpaLocalStore !== 'undefined' && _hasInteractiveStatsFilters(filters)) {
+      try {
+        local = await CialpaLocalStore.buildLocalAnalytics(baseStats, filters);
+      } catch (err) {
+        console.warn('No se pudo recalcular analitica filtrada:', err);
+      }
+    }
+
+    _localAnalytics = local || _statsBaseLocal || _localAnalytics;
+    _statsData = _normalizeStats(local?.stats || _deriveStatsForFilters(baseStats, filters));
+    await _renderStatsView();
+  }
+
+  function _hasInteractiveStatsFilters(filters = {}) {
+    return Boolean(filters.etapa || filters.etapa_operativa || filters.muestra || filters.departamento || filters.distrito || filters.encuestador || filters.usuario);
+  }
+
+  function _deriveStatsForFilters(baseStats, filters = {}) {
+    const data = _normalizeStats(_clone(baseStats || {}));
+    const hasStageOnly = (filters.etapa || filters.etapa_operativa || filters.muestra) && !filters.departamento && !filters.encuestador;
+    if (hasStageOnly) return _scaleStatsByStage(data, filters.etapa || filters.etapa_operativa || filters.muestra);
+
+    if (filters.departamento) {
+      const row = (baseStats?.por_departamento || []).find(item => String(item.departamento || '') === String(filters.departamento));
+      if (row) {
+        data.total = Number(row.total || 0);
+        data.finalizadas = Number(row.finalizadas || 0);
+        data.en_curso = Number(row.en_curso || 0);
+        data.pendientes = Number(row.pendientes || 0);
+        data.con_incidencia = Number(row.incidencias || row.con_incidencia || 0);
+        data.pct_avance = _pct(data.finalizadas, data.total);
+        data.por_departamento = [row];
+      }
+    }
+
+    if (filters.encuestador) {
+      const row = (baseStats?.por_encuestador || []).find(item => String(item.encuestador || '') === String(filters.encuestador));
+      if (row) {
+        const finished = Math.max(Number(row.finalizadas || 0), Number(row.registros_completados || 0));
+        data.total = Math.max(Number(row.total_asignadas || 0), finished);
+        data.finalizadas = finished;
+        data.en_curso = Number(row.sesiones || 0);
+        data.con_incidencia = Number(row.incidencias || 0);
+        data.pendientes = Math.max(0, data.total - data.finalizadas);
+        data.pct_avance = _pct(data.finalizadas, data.total);
+        data.por_encuestador = [row];
+      }
+    }
+
+    if (filters.etapa || filters.etapa_operativa || filters.muestra) {
+      return _scaleStatsByStage(data, filters.etapa || filters.etapa_operativa || filters.muestra);
+    }
+    return data;
+  }
+
+  function _scaleStatsByStage(data, stageValue) {
+    const stage = _normalizeToken(stageValue);
+    if (!stage) return data;
+    const factor = stage === 'piloto' ? PILOT_STAGE_SHARE : (stage === 'censal' ? 1 - PILOT_STAGE_SHARE : 1);
+    if (factor >= 0.999) return data;
+    const scaled = _clone(data);
+    ['total', 'finalizadas', 'en_curso', 'pendientes', 'con_incidencia'].forEach(key => {
+      scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
+    });
+    scaled.pct_avance = _pct(scaled.finalizadas, scaled.total);
+    scaled.por_departamento = (scaled.por_departamento || []).map(row => _scaleStatsRow(row, factor));
+    scaled.por_encuestador = (scaled.por_encuestador || []).map(row => _scaleStatsRow(row, factor));
+    return scaled;
+  }
+
+  function _scaleStatsRow(row, factor) {
+    const scaled = { ...row };
+    ['total', 'finalizadas', 'finalizada', 'en_curso', 'pendientes', 'pendiente', 'incidencias', 'con_incidencia', 'total_asignadas', 'sesiones', 'registros_completados'].forEach(key => {
+      if (scaled[key] !== undefined && scaled[key] !== null && scaled[key] !== '') {
+        scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
+      }
+    });
+    return scaled;
+  }
+
+  function _sameFilters(a = {}, b = {}) {
+    return JSON.stringify(_compactObject(a)) === JSON.stringify(_compactObject(b));
+  }
+
+  function _compactObject(obj = {}) {
+    return Object.fromEntries(Object.keys(obj || {})
+      .sort()
+      .filter(key => obj[key] !== undefined && obj[key] !== null && obj[key] !== '')
+      .map(key => [key, String(obj[key])]));
+  }
+
+  function _clone(value) {
+    try { return JSON.parse(JSON.stringify(value || {})); }
+    catch { return { ...(value || {}) }; }
+  }
+
+  function _normalizeToken(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
   }
 
   async function initMecInfrastructure() {
@@ -144,14 +334,20 @@ const StatsModule = (() => {
       if (root) root.innerHTML = '<p class="access-denied">Acceso restringido a supervisores y administradores.</p>';
       return;
     }
-    await loadMecInfrastructure();
+    if (_mecInitialized && _infraData) {
+      _renderMecInfrastructurePanel(_infraData);
+      return;
+    }
+    _mecInitialized = true;
+    await loadMecInfrastructure({ forceNetwork: false });
   }
 
-  async function loadMecInfrastructure() {
+  async function loadMecInfrastructure(options = {}) {
+    const { forceNetwork = true } = options || {};
     const root = document.getElementById('mec-infra-root');
     if (!root) return;
     root.innerHTML = '<div class="loading-state">Preparando tablero de infraestructura MEC...</div>';
-    if (_infraCache && Date.now() - _infraCache.time < STATS_CACHE_TTL) {
+    if (!forceNetwork && _infraCache && Date.now() - _infraCache.time < STATS_CACHE_TTL) {
       _infraData = _infraCache.data;
       _renderMecInfrastructurePanel(_infraData);
       return;
@@ -169,7 +365,7 @@ const StatsModule = (() => {
       remoteError = err;
       if (!_localAnalytics && typeof CialpaLocalStore !== 'undefined') {
         try {
-          _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats);
+          _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats, _getFilters());
         } catch (localErr) {
           console.warn('No se pudo construir analitica local MEC:', localErr);
         }
@@ -212,21 +408,30 @@ const StatsModule = (() => {
   }
 
   async function _renderStatsView() {
-    _renderFilterChoices(_statsData);
+    _renderFilterChoices(_statsBaseData || _statsData);
     _renderExecutiveDashboard(_statsData, _localAnalytics);
     _renderInsightCards(_statsData, _localAnalytics);
     _renderTerritoryBoard(_statsData.por_departamento || []);
     _renderOfflineDashboard(_localAnalytics);
     _renderInfrastructureDashboard(_localAnalytics);
     _renderKPIs(_statsData);
-    try {
-      await _ensureChartLibrary();
-    } catch (err) {
-      console.warn('No se pudo cargar Chart.js, se usaran vistas compactas:', err);
-    }
     _renderCharts(_statsData);
+    _scheduleChartUpgrade(_statsData);
     _renderEncuestadoresTable(_statsData.por_encuestador || []);
     _renderRecentActivity(_statsData.actividad_reciente || []);
+  }
+
+  function _scheduleChartUpgrade(data) {
+    if (window.Chart) return;
+    const run = () => {
+      _ensureChartLibrary()
+        .then(() => {
+          if (data === _statsData) _renderCharts(_statsData);
+        })
+        .catch(err => console.warn('No se pudo cargar Chart.js, se usaran vistas compactas:', err));
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1800 });
+    else setTimeout(run, 120);
   }
 
   function _ensureChartLibrary() {
@@ -674,11 +879,13 @@ const StatsModule = (() => {
             <p>La misma base puede verse por departamento, distrito, nivel educativo, tipología edilicia o criticidad técnica.</p>
           </div>
           <div class="mec-intel-filter-grid">
+            ${_infraSelect('mec-infra-filter-etapa', 'Etapa', _infraStageOptions(), view.filters.etapa, 'etapa')}
             ${_infraSelect('mec-infra-filter-departamento', 'Departamento', _infraOptions(['Todos los departamentos', ''], view.departments), view.filters.departamento, 'departamento')}
             ${_infraSelect('mec-infra-filter-distrito', 'Distrito', _infraOptions(['Todos los distritos', ''], view.districts), view.filters.distrito, 'distrito')}
             ${_infraSelect('mec-infra-filter-nivel', 'Nivel educativo', _infraOptions(['Todos los niveles', ''], infra.educationLevels.map(row => row.label)), view.filters.nivel, 'nivel')}
             ${_infraSelect('mec-infra-filter-bloque', 'Tipo de bloque', _infraOptions(['Todos los bloques', ''], infra.blockTypes.map(row => row.label)), view.filters.tipoBloque, 'tipoBloque')}
             ${_infraSelect('mec-infra-filter-falla', 'Fallas', _infraOptions(['Todos los estados', ''], infra.failureSegments.map(row => row.label)), view.filters.falla, 'falla')}
+            ${_infraSelect('mec-infra-filter-metric', 'Capa mapa', _infraMetricOptions(), view.filters.metric, 'metric')}
             <button class="btn btn-sm btn-outline" type="button" data-mec-infra-reset>Limpiar</button>
           </div>
         </section>
@@ -905,6 +1112,14 @@ const StatsModule = (() => {
     return fallback;
   }
 
+  function _normalizeInfraStage(value) {
+    const token = _normalizeToken(value);
+    if (!token) return '';
+    if (token.includes('piloto') || token.includes('muestra')) return 'piloto';
+    if (token.includes('censal') || token.includes('censo')) return 'censal';
+    return token;
+  }
+
   function _normalizeInfraTerritories(raw, infra) {
     const rows = _asArray(raw.territorios || raw.territories || raw.por_territorio || raw.por_departamento);
     if (!rows.length) return [_aggregateTerritory(infra)];
@@ -918,6 +1133,7 @@ const StatsModule = (() => {
       return {
         departamento: _pickText(row, ['departamento', 'department'], 'Sin departamento'),
         distrito: _pickText(row, ['distrito', 'district'], ''),
+        etapa: _normalizeInfraStage(_pickText(row, ['etapa', 'etapa_operativa', 'stage', 'muestra'], '')),
         schools,
         classrooms,
         sanitaries,
@@ -936,6 +1152,7 @@ const StatsModule = (() => {
     return {
       departamento: 'Todo el pais',
       distrito: '',
+      etapa: '',
       schools: Number(infra.schools || 0),
       classrooms: Number(infra.classrooms || 0) + Number(infra.otherSpaces || 0),
       sanitaries: Number(infra.sanitaries || 0),
@@ -1037,23 +1254,27 @@ const StatsModule = (() => {
   function _mecInfraView(infra) {
     const departments = [...new Set((infra.territories || []).map(row => row.departamento).filter(Boolean))].sort();
     const filters = { ..._infraFilters };
+    filters.etapa = _normalizeInfraStage(filters.etapa);
+    filters.metric = MEC_MAP_METRICS[filters.metric] ? filters.metric : 'risk';
     if (filters.departamento && !departments.includes(filters.departamento)) {
       filters.departamento = '';
       _infraFilters.departamento = '';
     }
-    let territories = (infra.territories || []).filter(row => !filters.departamento || row.departamento === filters.departamento);
+    let territories = _filterInfraByStage(infra.territories || [], filters.etapa)
+      .filter(row => !filters.departamento || row.departamento === filters.departamento);
     const districts = [...new Set(territories.map(row => row.distrito).filter(Boolean))].sort();
     if (filters.distrito && !districts.includes(filters.distrito)) {
       filters.distrito = '';
       _infraFilters.distrito = '';
     }
     territories = territories.filter(row => !filters.distrito || row.distrito === filters.distrito);
-    if (!territories.length) territories = infra.territories || [];
+    if (!territories.length && !filters.etapa && !filters.departamento && !filters.distrito) territories = infra.territories || [];
     const level = (infra.educationLevels || []).find(row => row.label === filters.nivel) || null;
     const blockType = (infra.blockTypes || []).find(row => row.label === filters.tipoBloque) || null;
     const failure = (infra.failureSegments || []).find(row => row.label === filters.falla) || null;
     const scope = _sumTerritoryRows(territories);
     const scopePieces = [
+      STAGE_LABELS[filters.etapa],
       filters.departamento || 'Todo el pais',
       filters.distrito,
       filters.nivel,
@@ -1071,6 +1292,25 @@ const StatsModule = (() => {
       scope,
       scopeLabel: scopePieces.join(' / '),
     };
+  }
+
+  function _filterInfraByStage(rows, stage) {
+    const normalizedStage = _normalizeInfraStage(stage);
+    if (!normalizedStage) return rows || [];
+    const hasExplicitStage = (rows || []).some(row => _normalizeInfraStage(row.etapa));
+    const explicit = (rows || []).filter(row => _normalizeInfraStage(row.etapa) === normalizedStage);
+    if (hasExplicitStage) return explicit;
+    if (explicit.length) return explicit;
+    const factor = normalizedStage === 'piloto' ? PILOT_STAGE_SHARE : (normalizedStage === 'censal' ? 1 - PILOT_STAGE_SHARE : 1);
+    return (rows || []).map(row => _scaleInfraTerritory(row, factor, normalizedStage));
+  }
+
+  function _scaleInfraTerritory(row, factor, stage) {
+    const scaled = { ...row, etapa: stage };
+    ['schools', 'classrooms', 'sanitaries', 'blocks', 'damages', 'area'].forEach(key => {
+      scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
+    });
+    return scaled;
   }
 
   function _sumTerritoryRows(rows) {
@@ -1097,6 +1337,18 @@ const StatsModule = (() => {
     return [{ label, value }, ...unique.map(item => ({ label: item, value: item }))];
   }
 
+  function _infraStageOptions() {
+    return [
+      { label: 'Todas las etapas', value: '' },
+      { label: STAGE_LABELS.piloto, value: 'piloto' },
+      { label: STAGE_LABELS.censal, value: 'censal' },
+    ];
+  }
+
+  function _infraMetricOptions() {
+    return Object.entries(MEC_MAP_METRICS).map(([value, item]) => ({ label: item.label, value }));
+  }
+
   function _infraSelect(id, label, options, value, filterKey) {
     return `
       <label class="mec-intel-select" for="${_escape(id)}">
@@ -1119,7 +1371,7 @@ const StatsModule = (() => {
       });
     });
     root.querySelector('[data-mec-infra-reset]')?.addEventListener('click', () => {
-      _infraFilters = { departamento: '', distrito: '', nivel: '', tipoBloque: '', falla: '' };
+      _infraFilters = { etapa: '', departamento: '', distrito: '', nivel: '', tipoBloque: '', falla: '', metric: 'risk' };
       _renderMecInfrastructurePanel(infra);
     });
   }
@@ -1186,47 +1438,134 @@ const StatsModule = (() => {
       try { _infraMap.remove(); } catch { /* ignore stale Leaflet container */ }
       _infraMap = null;
     }
+    const metric = MEC_MAP_METRICS[view.filters.metric] || MEC_MAP_METRICS.risk;
     const sourceRows = (view.territories && view.territories.length ? view.territories : (infra.territories || []));
-    const rows = sourceRows
-      .map((row, index) => ({ ...row, _point: _territoryPoint(row, index, sourceRows.length) }))
-      .filter(row => row._point);
-    if (!rows.length || !window.L) {
-      el.innerHTML = _fallbackMecMap(rows.length ? rows : sourceRows);
+    const level = view.filters.departamento ? 'distrito' : 'departamento';
+    const rows = _choroplethRows(sourceRows, level);
+    if (!rows.length) {
+      el.innerHTML = '<div class="mec-map-empty">Sin datos territoriales para el mapa.</div>';
       return;
     }
-    try {
-      _infraMap = L.map(el, {
-        zoomControl: true,
-        attributionControl: false,
-        scrollWheelZoom: true,
-        dragging: true,
-        touchZoom: true,
-      });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        crossOrigin: true,
-      }).addTo(_infraMap);
-      const bounds = [];
-      rows.slice(0, 60).forEach(row => {
-        const latLng = [row._point.lat, row._point.lng];
-        bounds.push(latLng);
-        L.circleMarker(latLng, {
-          radius: Math.max(7, Math.min(22, 6 + Math.sqrt(Number(row.schools || 0)))),
-          color: '#ffffff',
-          weight: 2,
-          fillColor: _riskColor(row.risk),
-          fillOpacity: .88,
-        })
-          .bindPopup(`<strong>${_escape(row.departamento)}${row.distrito ? ' / ' + _escape(row.distrito) : ''}</strong><br>${Number(row.schools || 0)} escuelas - ${Number(row.damages || 0)} fallas - riesgo ${Number(row.risk || 0)}%`)
-          .addTo(_infraMap);
-      });
-      if (bounds.length > 1) _infraMap.fitBounds(bounds, { padding: [22, 22] });
-      else _infraMap.setView(bounds[0] || [-23.45, -58.44], 6);
-      setTimeout(() => _infraMap?.invalidateSize(), 120);
-    } catch (err) {
-      console.warn('No se pudo renderizar mapa MEC con Leaflet:', err);
-      el.innerHTML = _fallbackMecMap(rows);
+    const max = Math.max(...rows.map(row => _metricValue(row, metric.key)), 1);
+    const sorted = rows.sort((a, b) => _metricValue(b, metric.key) - _metricValue(a, metric.key));
+    el.innerHTML = `
+      <div class="mec-choropleth-map">
+        <div class="mec-choropleth-head">
+          <div>
+            <strong>Coropleta por ${level === 'distrito' ? 'distrito' : 'departamento'}</strong>
+            <span>${_escape(_metricDescription(metric, view.filters.etapa))}</span>
+          </div>
+          <em>${_escape(metric.label)}</em>
+        </div>
+        <div class="mec-choropleth-grid">
+          ${sorted.map(row => {
+            const value = _metricValue(row, metric.key);
+            const intensity = metric.unit === '%' ? Math.max(0, Math.min(1, value / 100)) : Math.max(0, Math.min(1, value / max));
+            const visualIntensity = metric.invert ? 1 - intensity : intensity;
+            const color = _metricColor(metric, value, max);
+            const bg = _blendHex('#f8fafc', color, Math.max(.18, visualIntensity * .78));
+            const label = level === 'distrito' ? (row.distrito || row.departamento || 'Sin dato') : (row.departamento || 'Sin dato');
+            return `
+              <button class="mec-choropleth-cell" type="button" title="${_escape(label)}" style="background:${bg};border-color:${color};">
+                <span>${_escape(label)}</span>
+                <strong>${_escape(_formatMetricValue(value, metric))}</strong>
+                <small>${Number(row.schools || 0)} escuelas · ${Number(row.damages || 0)} fallas · ${Number(row.evidencePct || 0)}% evidencia</small>
+              </button>`;
+          }).join('')}
+        </div>
+        <div class="mec-choropleth-scale">
+          <span>Bajo</span><i></i><span>Alto</span>
+        </div>
+      </div>`;
+  }
+
+  function _choroplethRows(rows, level) {
+    const grouped = {};
+    (rows || []).forEach(row => {
+      const key = level === 'distrito'
+        ? `${row.departamento || 'Sin departamento'} / ${row.distrito || row.departamento || 'Sin distrito'}`
+        : (row.departamento || 'Sin departamento');
+      if (!grouped[key]) {
+        grouped[key] = {
+          departamento: row.departamento || 'Sin departamento',
+          distrito: level === 'distrito' ? (row.distrito || row.departamento || 'Sin distrito') : '',
+          schools: 0,
+          classrooms: 0,
+          sanitaries: 0,
+          blocks: 0,
+          damages: 0,
+          area: 0,
+          riskWeight: 0,
+          evidenceWeight: 0,
+        };
+      }
+      grouped[key].schools += Number(row.schools || 0);
+      grouped[key].classrooms += Number(row.classrooms || 0);
+      grouped[key].sanitaries += Number(row.sanitaries || 0);
+      grouped[key].blocks += Number(row.blocks || 0);
+      grouped[key].damages += Number(row.damages || 0);
+      grouped[key].area += Number(row.area || 0);
+      grouped[key].riskWeight += Number(row.risk || 0) * Math.max(1, Number(row.schools || 0));
+      grouped[key].evidenceWeight += Number(row.evidencePct || 0) * Math.max(1, Number(row.schools || 0));
+    });
+    return Object.values(grouped).map(row => {
+      const weight = Math.max(1, Number(row.schools || 0));
+      return {
+        ...row,
+        risk: Math.round(row.riskWeight / weight),
+        evidencePct: Math.round(row.evidenceWeight / weight),
+      };
+    });
+  }
+
+  function _metricDescription(metric, stage) {
+    const stageLabel = STAGE_LABELS[_normalizeInfraStage(stage)] || 'todas las etapas';
+    return `${metric.label} para ${stageLabel}`;
+  }
+
+  function _metricValue(row, key) {
+    return Number(row?.[key] || 0);
+  }
+
+  function _formatMetricValue(value, metric) {
+    if (metric.unit === '%') return `${Math.round(Number(value || 0))}%`;
+    if (metric.key === 'area') return _formatArea(value);
+    return Number(value || 0);
+  }
+
+  function _metricColor(metric, value, max) {
+    const numeric = Number(value || 0);
+    if (metric.tone === 'evidence') {
+      if (numeric >= 85) return '#0b5d3b';
+      if (numeric >= 60) return '#c8a24a';
+      return '#b42318';
     }
+    if (metric.tone === 'volume') {
+      const pct = Math.max(0, Math.min(1, numeric / Math.max(1, Number(max || 1))));
+      if (pct >= .67) return '#1d4ed8';
+      if (pct >= .34) return '#0b5d3b';
+      return '#c8a24a';
+    }
+    return _riskColor(numeric);
+  }
+
+  function _blendHex(base, accent, amount) {
+    const a = Math.max(0, Math.min(1, Number(amount || 0)));
+    const b = _hexToRgb(base);
+    const c = _hexToRgb(accent);
+    if (!b || !c) return accent;
+    const mix = channel => Math.round(b[channel] + (c[channel] - b[channel]) * a);
+    return `rgb(${mix('r')}, ${mix('g')}, ${mix('b')})`;
+  }
+
+  function _hexToRgb(hex) {
+    const value = String(hex || '').replace('#', '').trim();
+    if (!/^[a-f0-9]{6}$/i.test(value)) return null;
+    return {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16),
+    };
   }
 
   function _fallbackMecMap(rows) {
