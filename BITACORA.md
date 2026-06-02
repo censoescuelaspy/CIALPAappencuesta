@@ -4,6 +4,36 @@
 
 ---
 
+## Registro guiado: contenedores ajustables y mapa activo - 2026-06-02
+
+### Objetivo
+- Recuperar el dato visible de la escuela activa dentro del paso `Ubicacion escuela`.
+- Evitar que el mapa del paso 1 aparezca apagado cuando ya existen coordenadas de la escuela.
+- Reducir el desperdicio vertical de pantalla y permitir que el usuario ajuste los contenedores de preguntas y mapa.
+
+### Cambios implementados
+- `assets/js/guided-register.js` agrega una barra de identidad dentro del mapa con escuela, codigo/localidad, coordenadas y estado de la base mapa.
+- El paso `Ubicacion escuela` activa automaticamente la base mapa si existen coordenadas, sin pedir al usuario que pulse primero `Satelite`.
+- Se agregan separadores arrastrables: uno vertical para cambiar el ancho del panel de preguntas y uno horizontal para cambiar el alto del mapa.
+- Las preferencias de tamano del panel de preguntas y del mapa se conservan en `localStorage`.
+- `assets/css/app.css` cambia el layout del paso 1 a una grilla ajustable y hace que el mapa use mas alto visible de pantalla.
+- Version visible y cache del Service Worker actualizados a `v2.6.162`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+### Publicacion
+- Commit de implementacion publicado: `741e6c4`.
+- Push confirmado en `origin/main`.
+- GitHub Pages verificado con cache-busting: `index.html`, `guided-register.js`, `mec-form.js`, `app.css` y `sw.js` responden HTTP 200 y entregan `v2.6.162`.
+- `assets/js/guided-register.js` publicado contiene `guided-school-resize`, `data-guided-inline-school-name` y `ensureGuidedLocationBaseMap`.
+- `assets/js/mec-form.js` publicado contiene y exporta `ensureGuidedLocationBaseMap`.
+
 ## Plano vivo: paneo tactil, perimetro y Mover base - 2026-06-02
 
 ### Objetivo
