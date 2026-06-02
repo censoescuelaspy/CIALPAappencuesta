@@ -4,6 +4,33 @@
 
 ---
 
+## Perimetro: vertices independientes - 2026-06-02 - v2.6.172
+
+### Objetivo
+- Evitar que el perimetro del predio se deforme cuando el usuario arrastra un solo vertice del poligono.
+- Hacer que cada ajuste de vertice parta de la geometria actualizada del perimetro.
+
+### Problema reportado
+- Al estirar un vertice del poligono amarillo, otros vertices tambien parecian moverse.
+- El perimetro se deformaba porque el arrastre seguia usando una referencia geometrica anterior despues del primer movimiento.
+
+### Cambios implementados
+- `assets/js/mec-form.js`: al mover un vertice de `property_boundary`, se recalcula el rectangulo logico y la rotacion usada por el arrastre antes del siguiente movimiento.
+- `index.html`, `assets/js/config.js`, `sw.js`: version actualizada a `2.6.172` para forzar cache nuevo.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion estatica: `drag.rect = _siteElementRect(...)` presente en el flujo de arrastre de vertices del perimetro.
+- Verificacion estatica de version: `index.html`, `assets/js/config.js` y `sw.js` contienen `2.6.172`.
+
+### Estado
+- Listo para commit y push. No se tocaron los MP4 sin seguimiento de `tools/earthengine/`.
+
+---
+
 ## Comentarios y sugerencias de usuarios - 2026-06-02 - v2.6.171
 
 ### Objetivo

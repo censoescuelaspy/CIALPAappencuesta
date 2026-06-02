@@ -21848,7 +21848,10 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === drag.siteId);
       if (!element) return false;
       if (element.type === 'property_boundary') {
-        _setPropertyBoundaryShapeVertex(element, drag.index, localPoint, drag.rect);
+        const updatedShape = _setPropertyBoundaryShapeVertex(element, drag.index, localPoint, drag.rect);
+        if (!updatedShape) return false;
+        drag.rect = _siteElementRect(element, _planCanvasWidth(), _planCanvasHeight());
+        drag.rotation = _siteElementRotationDeg(element);
       } else {
         _setPlanShapeVertex(element, drag.index, localPoint, drag.rect);
       }
