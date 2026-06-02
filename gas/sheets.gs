@@ -2639,22 +2639,70 @@ const SheetsService = (() => {
 
   function _groupEncuestador(escuelas, sesiones) {
     const m = {};
+    function rowFor(k) {
+      const key = k || 'Sin usuario';
+      if (!m[key]) {
+        m[key] = {
+          encuestador: key,
+          total_asignadas: 0,
+          finalizadas: 0,
+          incidencias: 0,
+          sesiones: 0,
+          registros_completados: 0,
+          total_min: 0,
+          count_fin: 0,
+          _finalizadas: {},
+          _incidencias: {},
+        };
+      }
+      return m[key];
+    }
     escuelas.forEach(e => {
       const k = e.encuestador_asignado || 'Sin asignar';
-      if (!m[k]) m[k] = { encuestador: k, total_asignadas: 0, finalizadas: 0, incidencias: 0, total_min: 0, count_fin: 0 };
-      m[k].total_asignadas++;
-      if (e.estado_relevamiento === 'finalizada') m[k].finalizadas++;
-      if (e.estado_relevamiento === 'incidencia') m[k].incidencias++;
+      const row = rowFor(k);
+      const schoolKey = _sessionSchoolKey_(e) || _txt(e.id_escuela) || _txt(e.codigo_local) || ('asignada-' + row.total_asignadas);
+      row.total_asignadas++;
+      if (e.estado_relevamiento === 'finalizada') {
+        row.finalizadas++;
+        row._finalizadas[schoolKey] = true;
+      }
+      if (e.estado_relevamiento === 'incidencia') {
+        row.incidencias++;
+        row._incidencias[schoolKey] = true;
+      }
     });
     sesiones.forEach(s => {
       const k = s.usuario || 'Sin usuario';
-      if (!m[k]) m[k] = { encuestador: k, total_asignadas: 0, finalizadas: 0, incidencias: 0, total_min: 0, count_fin: 0 };
+      const row = rowFor(k);
+      const state = _sessionState_(s);
+      const schoolKey = _sessionSchoolKey_(s) || _txt(s.id_sesion) || ('sesion-' + row.sesiones);
+      row.sesiones++;
       if (s.duracion_minutos) {
-        m[k].total_min += parseFloat(s.duracion_minutos) || 0;
-        m[k].count_fin++;
+        row.total_min += parseFloat(s.duracion_minutos) || 0;
+        row.count_fin++;
+      }
+      if (['finalizada', 'completada', 'completo', 'cerrada', 'validada'].includes(state)) {
+        row.registros_completados++;
+        row._finalizadas[schoolKey] = true;
+      }
+      if (state === 'incidencia') {
+        row.incidencias++;
+        row._incidencias[schoolKey] = true;
       }
     });
-    return Object.values(m).map(e => ({ ...e, promedio_minutos: e.count_fin ? Math.round(e.total_min / e.count_fin) : null })).sort((a, b) => b.finalizadas - a.finalizadas);
+    return Object.values(m).map(e => {
+      const finalizadas = Math.max(Object.keys(e._finalizadas || {}).length, Number(e.registros_completados || 0));
+      const incidencias = Object.keys(e._incidencias || {}).length;
+      return {
+        encuestador: e.encuestador,
+        total_asignadas: e.total_asignadas,
+        finalizadas,
+        incidencias,
+        sesiones: e.sesiones,
+        registros_completados: e.registros_completados,
+        promedio_minutos: e.count_fin ? Math.round(e.total_min / e.count_fin) : null,
+      };
+    }).sort((a, b) => b.finalizadas - a.finalizadas);
   }
 
   function _groupSesionesDia(sesiones) {
@@ -2993,6 +3041,7 @@ const SheetsService = (() => {
   function _canOperateSchool_(session, escuela) {
     if (!session || !escuela) return false;
     if (_same(escuela.id_escuela, 'ESC_DEMO_CIALPA')) return true;
+    if (_txt(session.rol).toLowerCase() === 'admin') return true;
     if (_isAuthorizedAdmin(session)) return true;
     const assigned = _identityKey_(_schoolAssignmentText_(escuela));
     if (!assigned) return false;

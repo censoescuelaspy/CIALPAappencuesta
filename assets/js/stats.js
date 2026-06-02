@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.6.135
+ * Version: 2.6.158
  */
 
 const StatsModule = (() => {
@@ -25,6 +25,27 @@ const StatsModule = (() => {
   const STATS_CACHE_TTL = 5 * 60 * 1000;
   const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
   const DEMO_INFRA_URL = 'assets/data/demo-infraestructura-mec.json';
+  const PARAGUAY_TERRITORY_CENTERS = {
+    capital: [-25.2867, -57.3333],
+    asuncion: [-25.2867, -57.3333],
+    concepcion: [-23.4064, -57.4344],
+    sanpedro: [-24.1067, -56.5206],
+    cordillera: [-25.2289, -57.0111],
+    guaira: [-25.7829, -56.4487],
+    caaguazu: [-25.4646, -56.0139],
+    caazapa: [-26.1828, -56.3719],
+    itapua: [-27.3306, -55.8667],
+    misiones: [-26.8434, -57.1018],
+    paraguari: [-25.6333, -57.1500],
+    altoparana: [-25.5167, -54.6167],
+    central: [-25.3200, -57.5200],
+    neembucu: [-26.8569, -58.2933],
+    amambay: [-22.9200, -56.4700],
+    canindeyu: [-24.0500, -55.7000],
+    presidentehayes: [-23.7500, -58.9000],
+    boqueron: [-21.6000, -60.9000],
+    altoparaguay: [-20.8000, -59.9000],
+  };
 
   async function init() {
     if (!Auth.canAccess('supervisor')) {
@@ -249,16 +270,32 @@ const StatsModule = (() => {
       const current = encInput?.value || '';
       const rows = (data?.por_encuestador || [])
         .filter(row => row.encuestador)
-        .sort((a, b) => (b.total_asignadas || 0) - (a.total_asignadas || 0))
+        .sort((a, b) => _encuestadorActivity(b) - _encuestadorActivity(a))
         .slice(0, 8);
       encStrip.innerHTML = _choiceButton('stats-filter-encuestador', '', 'Todos', current === '')
-        + rows.map(row => _choiceButton('stats-filter-encuestador', row.encuestador, `${_shortLabel(row.encuestador)} (${row.total_asignadas || 0})`, current === row.encuestador)).join('');
+        + rows.map(row => _choiceButton('stats-filter-encuestador', row.encuestador, `${_shortLabel(row.encuestador)} (${_encuestadorCount(row)})`, current === row.encuestador)).join('');
     }
     UI.refreshButtonChoices?.(form);
   }
 
   function _choiceButton(target, value, label, active) {
     return `<button class="choice-button ${active ? 'choice-button--active' : ''}" type="button" data-choice-target="${_escape(target)}" data-choice-value="${_escape(value)}">${_escape(label)}</button>`;
+  }
+
+  function _encuestadorActivity(row) {
+    return Number(row?.total_asignadas || 0)
+      + Number(row?.finalizadas || 0)
+      + Number(row?.registros_completados || 0)
+      + Number(row?.sesiones || 0);
+  }
+
+  function _encuestadorCount(row) {
+    return Math.max(
+      Number(row?.total_asignadas || 0),
+      Number(row?.finalizadas || 0),
+      Number(row?.registros_completados || 0),
+      Number(row?.sesiones || 0)
+    );
   }
 
   function _normalizeStats(data) {
@@ -285,7 +322,7 @@ const StatsModule = (() => {
     if (!container) return;
     const total = Number(data?.total || 0);
     const pct = Math.max(0, Math.min(100, Number(data?.pct_avance || 0)));
-    const activeTeam = (data?.por_encuestador || []).filter(row => Number(row.total_asignadas || 0) > 0).length;
+    const activeTeam = (data?.por_encuestador || []).filter(row => _encuestadorActivity(row) > 0).length;
     const territoryCount = (data?.por_departamento || []).filter(row => Number(row.total || 0) > 0).length;
     const riskPct = total ? Math.round((Number(data?.con_incidencia || 0) / total) * 100) : 0;
     const synced = Number(local?.queuePending || 0) === 0;
@@ -587,6 +624,13 @@ const StatsModule = (() => {
     const accessibilityScore = infra.sanitaries ? _pct(infra.sanitaryAccessible + infra.ramps, infra.sanitaries + infra.blocks) : _pct(infra.ramps, infra.blocks);
     const failurePct = infra.blocks ? _pct(infra.damages + infra.sanitaryBad, infra.blocks + infra.sanitaries) : _pct(infra.damages, infra.classrooms + infra.otherSpaces + infra.sanitaries);
     const view = _mecInfraView(infra);
+    const areaPerSchool = infra.schools ? Math.round((Number(infra.areaTotal || 0) / Math.max(1, Number(infra.schools || 0))) * 10) / 10 : 0;
+    const classroomDensity = infra.schools ? Math.round(((Number(infra.classrooms || 0) + Number(infra.otherSpaces || 0)) / Math.max(1, Number(infra.schools || 0))) * 10) / 10 : 0;
+    const highRiskTerritories = (infra.territories || []).filter(row => Number(row.risk || 0) >= 55).length;
+    const dataDepth = _pct(
+      Number(infra.blocks || 0) + Number(infra.classrooms || 0) + Number(infra.sanitaries || 0) + Number(infra.siteElements || 0),
+      Math.max(1, Number(infra.schools || 0) * 12)
+    );
 
     root.innerHTML = `
       <div class="mec-infra-page">
@@ -597,8 +641,7 @@ const StatsModule = (() => {
           </div>
           <div class="mec-infra-copy">
             <span class="eyebrow">Infraestructura escolar MEC</span>
-            <h3>Centro de inteligencia edilicia para consultar, segmentar y decidir en minutos.</h3>
-            <p>KPIs, mapas, ranking territorial, tablas dinámicas y figuras técnicas para convertir cada visita de campo en información ejecutiva lista para el MEC.</p>
+            <p>KPIs, mapas, ranking territorial, tablas y figuras tecnicas para priorizar mantenimiento, inversion y recorridos.</p>
             <div class="mec-infra-chips">
               ${infra.demo ? '<span class="mec-demo-chip">Modo demo</span>' : ''}
               <span>${infra.schools} escuelas con ficha MEC</span>
@@ -613,6 +656,15 @@ const StatsModule = (() => {
             ${_infraMiniMetric('Riesgo técnico', `${failurePct}%`, 'Fallas, daños y servicios críticos')}
             ${_infraMiniMetric('Evidencias', infra.evidences, `${infra.evidencePending} campos pendientes`)}
           </div>
+        </section>
+
+        <section class="mec-diagnostic-grid" aria-label="Diagnostico ejecutivo MEC">
+          ${_mecDiagnosticCard('Profundidad de carga', `${dataDepth}%`, 'Objetos tecnicos registrados por escuela', dataDepth >= 70 ? 'success' : dataDepth >= 35 ? 'warning' : 'danger')}
+          ${_mecDiagnosticCard('Area media', _formatArea(areaPerSchool), 'm2 relevados por escuela', 'info')}
+          ${_mecDiagnosticCard('Ambientes/escuela', classroomDensity, 'Aulas y otros ambientes declarados', 'success')}
+          ${_mecDiagnosticCard('Territorios criticos', highRiskTerritories, 'Con prioridad tecnica alta', highRiskTerritories ? 'danger' : 'success')}
+          ${_mecDiagnosticCard('Cobertura evidencia', `${evidencePct}%`, `${infra.evidenceCovered || 0} de ${infra.evidenceFields || 0} campos`, evidencePct >= 80 ? 'success' : evidencePct >= 50 ? 'warning' : 'danger')}
+          ${_mecDiagnosticCard('Seguridad electrica', `${electricalCoverage}%`, 'Puesta a tierra, diferencial y circuitos', electricalCoverage >= 70 ? 'success' : electricalCoverage >= 35 ? 'warning' : 'danger')}
         </section>
 
         <section class="mec-intel-filters" aria-label="Segmentación de infraestructura">
@@ -755,6 +807,42 @@ const StatsModule = (() => {
             </div>
             <div class="mec-segment-bars">
               ${_segmentBars(infra.blockTypes, 'blocks', infra.blocks, 'bloques')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Prioridad territorial</span>
+                <h4>Top de riesgo por fallas y evidencia</h4>
+              </div>
+            </div>
+            <div class="mec-risk-bars">
+              ${_territoryRiskBars(view.territories)}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Coberturas criticas</span>
+                <h4>Evidencia, electricidad y accesibilidad</h4>
+              </div>
+            </div>
+            <div class="mec-coverage-stack">
+              ${_coverageMeter('Evidencia fotografica', evidencePct, `${infra.evidencePending || 0} pendientes`, '#0b5d3b')}
+              ${_coverageMeter('Seguridad electrica', electricalCoverage, `${infra.switchboards || 0} tableros registrados`, '#b7791f')}
+              ${_coverageMeter('Accesibilidad', accessibilityScore, `${infra.ramps || 0} rampas / ${infra.sanitaryAccessible || 0} sanitarios`, '#1d4ed8')}
+              ${_coverageMeter('Fallas tecnicas', failurePct, `${infra.damages + infra.sanitaryBad} alertas`, '#b42318')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Matriz territorial</span>
+                <h4>Escuelas, fallas y evidencia</h4>
+              </div>
+            </div>
+            <div class="mec-risk-matrix">
+              ${_riskMatrix(view.territories)}
             </div>
           </article>
           <article class="mec-infra-board">
@@ -1098,54 +1186,97 @@ const StatsModule = (() => {
       try { _infraMap.remove(); } catch { /* ignore stale Leaflet container */ }
       _infraMap = null;
     }
-    const rows = (view.territories || []).filter(row => Number(row.lat) && Number(row.lng));
+    const sourceRows = (view.territories && view.territories.length ? view.territories : (infra.territories || []));
+    const rows = sourceRows
+      .map((row, index) => ({ ...row, _point: _territoryPoint(row, index, sourceRows.length) }))
+      .filter(row => row._point);
     if (!rows.length || !window.L) {
-      el.innerHTML = _fallbackMecMap(rows.length ? rows : (infra.territories || []));
+      el.innerHTML = _fallbackMecMap(rows.length ? rows : sourceRows);
       return;
     }
-    _infraMap = L.map(el, { zoomControl: false, attributionControl: false, scrollWheelZoom: false });
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 18,
-      crossOrigin: true,
-    }).addTo(_infraMap);
-    const bounds = [];
-    rows.slice(0, 60).forEach(row => {
-      const latLng = [Number(row.lat), Number(row.lng)];
-      bounds.push(latLng);
-      L.circleMarker(latLng, {
-        radius: Math.max(6, Math.min(18, 5 + Math.sqrt(Number(row.schools || 0)))),
-        color: '#ffffff',
-        weight: 2,
-        fillColor: _riskColor(row.risk),
-        fillOpacity: .86,
-      })
-        .bindPopup(`<strong>${_escape(row.departamento)}${row.distrito ? ' / ' + _escape(row.distrito) : ''}</strong><br>${Number(row.schools || 0)} escuelas - ${Number(row.damages || 0)} fallas - riesgo ${Number(row.risk || 0)}%`)
-        .addTo(_infraMap);
-    });
-    if (bounds.length > 1) _infraMap.fitBounds(bounds, { padding: [20, 20] });
-    else _infraMap.setView(bounds[0] || [-23.45, -58.44], 6);
-    setTimeout(() => _infraMap?.invalidateSize(), 80);
+    try {
+      _infraMap = L.map(el, {
+        zoomControl: true,
+        attributionControl: false,
+        scrollWheelZoom: true,
+        dragging: true,
+        touchZoom: true,
+      });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        crossOrigin: true,
+      }).addTo(_infraMap);
+      const bounds = [];
+      rows.slice(0, 60).forEach(row => {
+        const latLng = [row._point.lat, row._point.lng];
+        bounds.push(latLng);
+        L.circleMarker(latLng, {
+          radius: Math.max(7, Math.min(22, 6 + Math.sqrt(Number(row.schools || 0)))),
+          color: '#ffffff',
+          weight: 2,
+          fillColor: _riskColor(row.risk),
+          fillOpacity: .88,
+        })
+          .bindPopup(`<strong>${_escape(row.departamento)}${row.distrito ? ' / ' + _escape(row.distrito) : ''}</strong><br>${Number(row.schools || 0)} escuelas - ${Number(row.damages || 0)} fallas - riesgo ${Number(row.risk || 0)}%`)
+          .addTo(_infraMap);
+      });
+      if (bounds.length > 1) _infraMap.fitBounds(bounds, { padding: [22, 22] });
+      else _infraMap.setView(bounds[0] || [-23.45, -58.44], 6);
+      setTimeout(() => _infraMap?.invalidateSize(), 120);
+    } catch (err) {
+      console.warn('No se pudo renderizar mapa MEC con Leaflet:', err);
+      el.innerHTML = _fallbackMecMap(rows);
+    }
   }
 
   function _fallbackMecMap(rows) {
-    const pins = (rows || []).filter(row => Number(row.lat) && Number(row.lng)).slice(0, 28);
+    const sourceRows = rows || [];
+    const pins = sourceRows
+      .map((row, index) => ({ ...row, _point: row._point || _territoryPoint(row, index, sourceRows.length) }))
+      .filter(row => row._point)
+      .slice(0, 28);
     return `
       <div class="mec-map-fallback">
         <span class="mec-map-country">Paraguay</span>
         ${pins.map(row => {
-          const point = _mapPoint(row);
-          return `<i title="${_escape(row.departamento)} ${_escape(row.distrito || '')}" style="left:${point.x}%;top:${point.y}%;background:${_riskColor(row.risk)}"></i>`;
+          const point = _mapPoint(row._point);
+          const label = `${row.departamento || 'Territorio'}${row.distrito ? ' / ' + row.distrito : ''}`;
+          return `<button type="button" title="${_escape(label)}" style="left:${point.x}%;top:${point.y}%;background:${_riskColor(row.risk)}"><span>${Number(row.risk || 0)}%</span></button>`;
         }).join('')}
       </div>`;
   }
 
-  function _mapPoint(row) {
+  function _territoryPoint(row, index = 0, total = 1) {
+    const lat = Number(row?.lat || 0);
+    const lng = Number(row?.lng || row?.lon || 0);
+    if (lat && lng) return { lat, lng };
+    const key = _normalizeTerritoryKey(row?.departamento || row?.department || row?.distrito || row?.district);
+    const center = PARAGUAY_TERRITORY_CENTERS[key];
+    if (center) return { lat: center[0], lng: center[1] };
+    const angle = (index / Math.max(1, total)) * Math.PI * 2;
+    return {
+      lat: -23.45 + Math.sin(angle) * 2.8,
+      lng: -58.44 + Math.cos(angle) * 3.25,
+    };
+  }
+
+  function _normalizeTerritoryKey(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ñ/g, 'n')
+      .replace(/Ñ/g, 'n')
+      .replace(/[^a-zA-Z0-9]+/g, '')
+      .toLowerCase();
+  }
+
+  function _mapPoint(point) {
     const west = -62.8;
     const east = -54.2;
     const north = -19.0;
     const south = -27.7;
-    const x = Math.max(5, Math.min(95, ((Number(row.lng || west) - west) / (east - west)) * 100));
-    const y = Math.max(5, Math.min(95, ((Number(row.lat || north) - north) / (south - north)) * 100));
+    const x = Math.max(5, Math.min(95, ((Number(point.lng || west) - west) / (east - west)) * 100));
+    const y = Math.max(5, Math.min(95, ((Number(point.lat || north) - north) / (south - north)) * 100));
     return { x: Math.round(x), y: Math.round(y) };
   }
 
@@ -1174,6 +1305,66 @@ const StatsModule = (() => {
           `).join('')}
         </div>
       </article>`;
+  }
+
+  function _mecDiagnosticCard(label, value, note, tone = 'info') {
+    return `
+      <article class="mec-diagnostic-card mec-diagnostic-card--${_safeClass(tone)}">
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note || '')}</small>
+      </article>`;
+  }
+
+  function _coverageMeter(label, pct, note, color) {
+    const safePct = Math.max(0, Math.min(100, Number(pct || 0)));
+    return `
+      <div class="mec-coverage-meter">
+        <div>
+          <strong>${_escape(label)}</strong>
+          <span>${safePct}%</span>
+        </div>
+        <i><b style="width:${safePct}%;background:${color}"></b></i>
+        <small>${_escape(note || '')}</small>
+      </div>`;
+  }
+
+  function _territoryRiskBars(rows) {
+    const top = [...(rows || [])]
+      .sort((a, b) => Number(b.risk || 0) - Number(a.risk || 0))
+      .slice(0, 6);
+    if (!top.length) return '<p class="text-muted">Sin territorios para calcular riesgo.</p>';
+    return top.map(row => {
+      const risk = Math.max(0, Math.min(100, Number(row.risk || 0)));
+      const label = row.distrito ? `${row.departamento} / ${row.distrito}` : row.departamento;
+      return `
+        <div class="mec-risk-bar">
+          <div>
+            <strong>${_escape(label || 'Sin territorio')}</strong>
+            <span>${Number(row.schools || 0)} escuelas - ${Number(row.damages || 0)} fallas</span>
+          </div>
+          <i><b style="width:${Math.max(4, risk)}%;background:${_riskColor(risk)}"></b></i>
+          <em>${risk}%</em>
+        </div>`;
+    }).join('');
+  }
+
+  function _riskMatrix(rows) {
+    const top = [...(rows || [])]
+      .sort((a, b) => Number(b.schools || 0) - Number(a.schools || 0))
+      .slice(0, 12);
+    if (!top.length) return '<p class="text-muted">Sin datos territoriales.</p>';
+    const maxSchools = Math.max(...top.map(row => Number(row.schools || 0)), 1);
+    return top.map(row => {
+      const label = row.distrito || row.departamento || 'Sin dato';
+      const size = 28 + Math.round((Number(row.schools || 0) / maxSchools) * 42);
+      const evidence = Math.max(0, Math.min(100, Number(row.evidencePct || 0)));
+      return `
+        <span
+          title="${_escape(label)}: ${Number(row.schools || 0)} escuelas, ${Number(row.risk || 0)}% riesgo"
+          style="width:${size}px;height:${size}px;background:${_riskColor(row.risk)};opacity:${Math.max(.45, evidence / 100)}"
+        >${_escape(_shortLabel(label))}</span>`;
+    }).join('');
   }
 
   function _infraMiniMetric(label, value, note) {
@@ -1489,13 +1680,13 @@ const StatsModule = (() => {
 
     tbody.innerHTML = rows.map((r, i) => {
       const assigned = Number(r.total_asignadas || 0);
-      const finished = Number(r.finalizadas || 0);
-      const pct = _pct(finished, assigned);
+      const finished = Math.max(Number(r.finalizadas || 0), Number(r.registros_completados || 0));
+      const pct = _pct(finished, Math.max(assigned, finished));
       return `
       <tr>
         <td><span class="rank-badge">${i + 1}</span></td>
         <td><strong>${_escape(r.encuestador || 'Sin asignar')}</strong></td>
-        <td>${assigned}</td>
+        <td>${assigned}${!assigned && Number(r.sesiones || 0) ? `<small class="text-muted" style="display:block">${Number(r.sesiones || 0)} sesiones</small>` : ''}</td>
         <td>
           <div class="table-progress">
             <span>${finished} (${pct}%)</span>

@@ -2136,6 +2136,49 @@ td {
   text-align: right;
 }
 
+.mec-diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .75rem;
+}
+
+.mec-diagnostic-card {
+  min-height: 104px;
+  border: 1px solid #d8e4df;
+  border-top: 4px solid #1d4ed8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+  padding: .82rem .9rem;
+}
+
+.mec-diagnostic-card--success { border-top-color: #0b5d3b; }
+.mec-diagnostic-card--warning { border-top-color: #c8a24a; }
+.mec-diagnostic-card--danger { border-top-color: #b42318; }
+.mec-diagnostic-card--info { border-top-color: #1d4ed8; }
+
+.mec-diagnostic-card span {
+  display: block;
+  color: #64748b;
+  font-size: .7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.mec-diagnostic-card strong {
+  display: block;
+  color: #073b28;
+  font-size: 1.42rem;
+  line-height: 1.1;
+  margin: .25rem 0 .32rem;
+}
+
+.mec-diagnostic-card small {
+  color: #64748b;
+  font-size: .75rem;
+  font-weight: 750;
+}
+
 .mec-infra-section-grid {
   display: grid;
   grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
@@ -2401,14 +2444,26 @@ td {
   text-transform: uppercase;
 }
 
-.mec-map-fallback i {
+.mec-map-fallback button {
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 34px;
+  height: 34px;
   border: 2px solid #ffffff;
   border-radius: 999px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, .24);
   transform: translate(-50%, -50%);
+  color: #ffffff;
+  cursor: default;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  padding: 0;
+}
+
+.mec-map-fallback button span {
+  font-size: .64rem;
+  font-weight: 950;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
 }
 
 .mec-map-legend {
@@ -2521,6 +2576,92 @@ td {
   height: 100%;
   border-radius: var(--radius-full);
   background: linear-gradient(90deg, #0b5d3b, #1d4ed8);
+}
+
+.mec-risk-bars,
+.mec-coverage-stack {
+  display: grid;
+  gap: .7rem;
+}
+
+.mec-risk-bar {
+  display: grid;
+  grid-template-columns: minmax(145px, .55fr) minmax(0, 1fr) 46px;
+  gap: .7rem;
+  align-items: center;
+}
+
+.mec-risk-bar strong,
+.mec-coverage-meter strong {
+  display: block;
+  color: #17352a;
+  font-size: .84rem;
+}
+
+.mec-risk-bar span,
+.mec-coverage-meter span,
+.mec-coverage-meter small {
+  display: block;
+  color: #64748b;
+  font-size: .74rem;
+  font-weight: 750;
+}
+
+.mec-risk-bar i,
+.mec-coverage-meter i {
+  display: block;
+  height: 13px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: #e7efeb;
+}
+
+.mec-risk-bar b,
+.mec-coverage-meter b {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+}
+
+.mec-risk-bar em {
+  color: #073b28;
+  font-size: .78rem;
+  font-style: normal;
+  font-weight: 900;
+  text-align: right;
+}
+
+.mec-coverage-meter {
+  display: grid;
+  gap: .32rem;
+}
+
+.mec-coverage-meter > div {
+  display: flex;
+  justify-content: space-between;
+  gap: .7rem;
+}
+
+.mec-risk-matrix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+}
+
+.mec-risk-matrix span {
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .14);
+  font-size: .6rem;
+  font-weight: 900;
+  line-height: 1.05;
+  padding: .25rem;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .28);
 }
 
 .mec-territory-table strong {
@@ -3103,6 +3244,9 @@ td {
   .mec-figures-grid {
     grid-template-columns: 1fr;
   }
+  .mec-diagnostic-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
   .mec-intel-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -3137,11 +3281,16 @@ td {
   .ops-actions .btn { flex: 1 1 100%; }
   .offline-metric-grid { grid-template-columns: 1fr 1fr; }
   .mec-decision-grid,
+  .mec-diagnostic-grid,
   .mec-infra-topline,
   .mec-intel-filter-grid,
   .mec-scope-metrics,
-  .mec-segment-bar {
+  .mec-segment-bar,
+  .mec-risk-bar {
     grid-template-columns: 1fr;
+  }
+  .mec-risk-bar em {
+    text-align: left;
   }
   .mec-infra-map {
     min-height: 300px;

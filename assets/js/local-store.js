@@ -245,13 +245,18 @@ const CialpaLocalStore = (() => {
         pendientes: Number(row.pendientes ?? row.pendiente ?? 0),
         incidencias: Number(row.incidencias ?? row.con_incidencia ?? row.incidencia ?? 0),
       })),
-      por_encuestador: (raw.por_encuestador || []).map(row => ({
-        encuestador: row.encuestador || 'Sin asignar',
-        total_asignadas: Number(row.total_asignadas ?? row.asignadas ?? row.total ?? 0),
-        finalizadas: Number(row.finalizadas ?? row.finalizada ?? 0),
-        incidencias: Number(row.incidencias ?? row.con_incidencia ?? 0),
-        promedio_minutos: row.promedio_minutos || row.tiempo_promedio || '',
-      })),
+      por_encuestador: (raw.por_encuestador || []).map(row => {
+        const completadas = Number(row.registros_completados ?? row.completadas ?? row.completados ?? 0);
+        return {
+          encuestador: row.encuestador || 'Sin asignar',
+          total_asignadas: Number(row.total_asignadas ?? row.asignadas ?? row.total ?? 0),
+          finalizadas: Math.max(Number(row.finalizadas ?? row.finalizada ?? 0), completadas),
+          incidencias: Number(row.incidencias ?? row.con_incidencia ?? 0),
+          sesiones: Number(row.sesiones ?? row.sessions ?? 0),
+          registros_completados: completadas,
+          promedio_minutos: row.promedio_minutos || row.tiempo_promedio || '',
+        };
+      }),
       por_dia: raw.por_dia || raw.historico || [],
       actividad_reciente: raw.actividad_reciente || [],
     };
@@ -278,10 +283,11 @@ const CialpaLocalStore = (() => {
       else dep[depKey].pendientes++;
 
       const encKey = item.encuestador_asignado || 'Sin asignar';
-      enc[encKey] = enc[encKey] || { encuestador: encKey, total_asignadas: 0, finalizadas: 0, incidencias: 0, promedio_minutos: '' };
+      enc[encKey] = enc[encKey] || { encuestador: encKey, total_asignadas: 0, finalizadas: 0, incidencias: 0, sesiones: 0, registros_completados: 0, promedio_minutos: '' };
       enc[encKey].total_asignadas++;
       if (state === 'finalizada') enc[encKey].finalizadas++;
       if (state === 'incidencia') enc[encKey].incidencias++;
+      enc[encKey].registros_completados = enc[encKey].finalizadas;
     });
     stats.pct_avance = _pct(stats.finalizadas, stats.total);
     stats.por_departamento = Object.values(dep).sort((a, b) => b.total - a.total);

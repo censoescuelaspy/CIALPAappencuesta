@@ -4,6 +4,42 @@
 
 ---
 
+## Infraestructura MEC: tablero, mapa y recuento admin - 2026-06-01
+
+### Objetivo
+- Quitar el texto innecesario de la vista MEC infraestructura.
+- Mejorar de forma sustantiva KPIs, tablas, figuras y mapa del tablero MEC.
+- Corregir el recuento por usuario para que los registros completados por `admin` se reflejen como los de cualquier usuario operativo.
+
+### Cambios implementados
+- Se simplifica el encabezado de infraestructura MEC y se agrega una fila de diagnostico ejecutivo con profundidad de carga, area media, ambientes por escuela, territorios criticos, evidencia y seguridad electrica.
+- El tablero agrega figuras nuevas: ranking territorial de riesgo, coberturas criticas y matriz territorial por escuelas/fallas/evidencia.
+- El mapa MEC usa coordenadas reales cuando existen y centroides conocidos por departamento cuando faltan latitud/longitud; si Leaflet falla, muestra un mapa sintetico con puntos de riesgo.
+- El mapa MEC habilita zoom, arrastre y touch para exploracion directa.
+- El resumen por encuestador ahora considera sesiones completadas por el usuario real, incluyendo `admin`, y expone `sesiones` y `registros_completados`.
+- El backend permite operar escuelas a usuarios con rol `admin`, alineado con el comportamiento del frontend.
+- `APP_CONFIG.GAS_URL` vuelve a apuntar al Web App publico estable `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ`, porque el deployment `AKfycbyt-TH...` responde HTTP 403 anonimo.
+- Version publicada preparada como `v2.6.158`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/stats.js`.
+- `node --check assets/js/local-store.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `node --check` sobre copia temporal `.js` de `gas/sheets.gs`.
+- `git diff --check`.
+- `clasp push -f` desde `gas/`: sube 8 archivos a Apps Script HEAD.
+- `clasp version`: crea version Apps Script `27`.
+- `clasp deploy -i AKfycbyt-TH...`: intento de publicacion queda en `@28`, pero la URL responde HTTP 403 `Necesitas acceso`.
+- `clasp deploy -i AKfycbyt-TH... -V 26`: rollback a `@26`, pero esa URL continua respondiendo HTTP 403 anonimo.
+- Prueba HTTP del Web App publico estable `AKfycbzr...` para `diagnosticoPadron`: responde `status: ok`, `source: official_sheet`, `total: 5462`, `muestra_piloto: 86`.
+- Prueba HTTP del Web App publico estable `AKfycbzr...` para `login` sin datos: responde `Usuario y contraseña son requeridos`.
+- Prueba HTTP del Web App publico estable `AKfycbzr...` para `getEscuelas` sin token: responde `Token invalido o expirado`, confirmando proteccion de endpoints privados.
+
+### Pendiente operativo
+- Publicar Apps Script desde la cuenta propietaria/aceptada para que el arreglo backend del recuento admin quede activo en el Web App publico sin generar HTTP 403.
+
 ## Plano vivo: tableros, guias y cableado - 2026-05-31
 
 ### Objetivo
