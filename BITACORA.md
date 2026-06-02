@@ -33,7 +33,7 @@
 - Verificacion local de contenido: `index.html` y `config.js` contienen `2.6.170`; `mec-form.js` contiene `_rememberSchoolPlanViewport` y `_lockEmbeddedElectricAttachment`.
 
 ### Estado
-- Pendiente de commit y push.
+- Commit funcional publicado: `2e1c266 fix: estabilizar zoom y anclar elementos`.
 
 ---
 
