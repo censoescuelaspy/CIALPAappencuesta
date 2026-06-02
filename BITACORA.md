@@ -30,7 +30,7 @@
 - Verificacion local HTTP: `index.html` contiene `v2.6.168`; `app.css` contiene el mapa guiado extendido y `transform-origin: top left`; `mec-form.js` contiene `_topLeftAnchoredPlanResizeRect` y ya no contiene `_centeredPlanResizeRect`.
 
 ### Estado
-- Pendiente de commit y verificacion publica.
+- Commit publicado: `dd92daa fix: aprovechar mapa guiado y anclar ajustes`.
 
 ---
 
