@@ -4,6 +4,41 @@
 
 ---
 
+## Comentarios y sugerencias de usuarios - 2026-06-02 - v2.6.171
+
+### Objetivo
+- Agregar una vista para que cualquier usuario autenticado pueda reportar comentarios, errores o sugerencias de mejora de la app.
+- Permitir que el administrador vea la bandeja completa, filtre por estado/prioridad y marque comentarios como en revision, resueltos o descartados.
+
+### Problema reportado
+- No existia un canal interno dentro de la app para que los usuarios dejaran sugerencias o reportaran arreglos pendientes.
+- El administrador necesitaba una vista unica para revisar esos comentarios y proceder a correcciones.
+
+### Cambios implementados
+- `index.html`: nuevo modulo `Comentarios y mejoras` con formulario, clasificacion por categoria/prioridad, contexto de vista y bandeja de seguimiento.
+- `assets/js/app.js`: nuevo `FeedbackModule`, menu lateral `Comentarios app`, carga por router y acciones admin.
+- `assets/js/api.js`: endpoints cliente `saveComentarioApp`, `getComentariosApp`, `resolverComentarioApp`, soporte demo y cola offline para envios.
+- `assets/css/app.css`: layout responsive de dos columnas, tabla de bandeja, filtros y badges de prioridad/estado.
+- `gas/Code.gs`: rutas GAS y acciones con lock para guardar/resolver comentarios.
+- `gas/sheets.gs`: hoja `comentarios_app`, guardado idempotente para sincronizacion offline, listado por rol y resolucion admin.
+- `gas/setup.gs`: alta de la hoja `comentarios_app` en instalaciones nuevas.
+- `index.html`, `assets/js/config.js`, `assets/js/app.js`, `assets/js/api.js`, `sw.js`: version actualizada a `2.6.171`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/app.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- Validacion temporal de GAS como JS: `gas/Code.gs`, `gas/sheets.gs`, `gas/setup.gs`.
+- `git diff --check`.
+- Verificacion estatica de presencia: `module-comentarios`, `feedback-form`, `Comentarios app`, `case 'comentarios'`, `saveComentarioApp`, `getComentariosApp`, `resolverComentarioApp`, `SHEET_NAMES.APP_FEEDBACK`.
+- Intento de verificacion Playwright local no ejecutado porque `@playwright/test` no esta instalado en `node_modules` en esta copia.
+
+### Estado
+- Commit funcional: `e13cb7e feat: agregar comentarios de usuarios`.
+
+---
+
 ## Registro guiado: viewport estable y electricos anclados - 2026-06-02 - v2.6.170
 
 ### Objetivo
