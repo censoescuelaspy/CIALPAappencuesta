@@ -4,6 +4,22 @@
 
 ---
 
+## Apunte a GAS propietario actualizado - 2026-06-02
+
+### Objetivo
+- Volver a apuntar la app al Web App actualizado por la cuenta propietaria/autorizada.
+- Confirmar que el deployment `AKfycbyt-TH...` ya responde publico sin HTTP 403.
+- Forzar cache nuevo para que los usuarios tomen el backend con el recuento admin corregido.
+
+### Cambios implementados
+- `APP_CONFIG.GAS_URL` apunta a `https://script.google.com/macros/s/AKfycbyt-THSOSgFwvH8Oxl8ojpfJR_8gNhezYA1N7JPmgG0L2RyEtfHq9E58BgfcG33yD2voA/exec`.
+- Version visible y cache del Service Worker actualizados a `v2.6.159`.
+
+### Validaciones ejecutadas
+- Prueba HTTP del Web App propietario para `diagnosticoPadron`: responde `status: ok`, `source: official_sheet`, `total: 5462`, `muestra_piloto: 86`.
+- Prueba HTTP del Web App propietario para `login` sin datos: responde `Usuario y contraseña son requeridos`.
+- Prueba HTTP del Web App propietario para `getEscuelas` sin token: responde `Token invalido o expirado`, confirmando proteccion de endpoints privados.
+
 ## Infraestructura MEC: tablero, mapa y recuento admin - 2026-06-01
 
 ### Objetivo

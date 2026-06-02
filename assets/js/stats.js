@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * stats.js — Panel estadistico con fallback offline/local.
- * Version: 2.6.158
+ * Version: 2.6.159
  */
 
 const StatsModule = (() => {
