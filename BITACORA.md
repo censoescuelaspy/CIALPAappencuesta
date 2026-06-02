@@ -33,9 +33,12 @@
 - `git diff --check`.
 - Verificacion estatica de presencia: `module-comentarios`, `feedback-form`, `Comentarios app`, `case 'comentarios'`, `saveComentarioApp`, `getComentariosApp`, `resolverComentarioApp`, `SHEET_NAMES.APP_FEEDBACK`.
 - Intento de verificacion Playwright local no ejecutado porque `@playwright/test` no esta instalado en `node_modules` en esta copia.
+- Verificacion GitHub Pages con cache-busting: `index.html`, `assets/js/app.js`, `assets/js/api.js` y `sw.js` sirven `2.6.171`/`FeedbackModule`/`saveComentarioApp`.
+- `clasp.cmd push -f` desde `gas/`: sube 8 archivos GAS a HEAD del proyecto Apps Script.
 
 ### Estado
-- Commit funcional: `e13cb7e feat: agregar comentarios de usuarios`.
+- Commits publicados: `e13cb7e feat: agregar comentarios de usuarios`, `c9adbfb docs: registrar comentarios de usuarios`.
+- Pendiente operativo: si se necesita que el Web App activo tome los nuevos endpoints inmediatamente, publicar una nueva version/deployment desde la cuenta propietaria del Apps Script para evitar el riesgo historico de HTTP 403.
 
 ---
 
