@@ -4,6 +4,30 @@
 
 ---
 
+## Registro guiado: mapa de ubicacion en primer control - 2026-06-02
+
+### Objetivo
+- Mover el mapa del plano vivo a la zona amplia del paso `Ubicacion escuela`.
+- Eliminar la fila horizontal de comandos marcada por el usuario con X y reubicar sus acciones dentro del mapa.
+- Reducir desperdicio de pantalla en el primer control sin perder los comandos de georreferencia.
+
+### Cambios implementados
+- `assets/js/guided-register.js` deja de renderizar la fila de acciones `Mapa / Calles / Usar coords / Guardar base` en el paso 1.
+- El contenedor real del plano `guided-school-plan-root` se mueve dinamicamente: queda dentro del paso `Ubicacion escuela` y vuelve al panel inferior al pasar a las demas etapas.
+- Se agrega una botonera compacta dentro del mapa para `Satelite`, `Calles`, `Usar coords`, `Guardar base` y `Elegir escuela`.
+- `assets/css/app.css` define una grilla especial para el paso 1: formulario compacto a la izquierda y mapa vivo a la derecha, con adaptacion movil.
+- Version visible y cache del Service Worker actualizados a `v2.6.160`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+### Publicacion
+- Pendiente de commit, push y verificacion de GitHub Pages.
+
 ## Apunte a GAS propietario actualizado - 2026-06-02
 
 ### Objetivo

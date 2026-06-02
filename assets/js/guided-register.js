@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.124
+ * Version: 2.6.160
  */
 
 const GuidedRegisterModule = (() => {
@@ -117,12 +117,7 @@ const GuidedRegisterModule = (() => {
       kicker: 'Primer control',
       summary: 'Identificar la escuela, posicionarla sobre la base mapa y guardar las coordenadas corregidas antes de dibujar.',
       checks: ['Escuela identificada', 'Ubicacion posicionada', 'Georreferencia guardada'],
-      actions: [
-        { label: 'Mapa', icon: 'MAP', action: 'module', value: 'mapa' },
-        { label: 'Calles', icon: 'MAP', action: 'basemap' },
-        { label: 'Usar coords', icon: 'GPS', action: 'coords' },
-        { label: 'Guardar base', icon: 'OK', action: 'saveBasemap' },
-      ],
+      actions: [],
     },
     {
       id: 'predio',
@@ -240,6 +235,7 @@ const GuidedRegisterModule = (() => {
     _bind(root);
     _ensureMecReady();
     requestAnimationFrame(() => {
+      _movePlanSurfaceForActiveStep(root);
       _refreshPlan();
       _updateSlide();
       _updateSnapshot();
@@ -284,16 +280,20 @@ const GuidedRegisterModule = (() => {
               </div>
             </div>
             <div class="guided-time-strip" data-guided-time-strip></div>
-            <div id="guided-school-plan-root" class="guided-plan-surface" data-school-plan-root></div>
+            <div class="guided-plan-panel__surface-slot" data-guided-plan-slot="panel">
+              <div id="guided-school-plan-root" class="guided-plan-surface" data-school-plan-root></div>
+            </div>
           </aside>
         </section>
       </section>`;
+    _movePlanSurfaceForActiveStep(root);
   }
 
   function _renderSlide(step) {
     const sequenced = _isSequencedStep(step.id);
+    const schoolLocation = step.id === 'escuela';
     return `
-      <article class="guided-slide ${sequenced ? 'guided-slide--sequenced' : ''}" data-guided-slide="${step.id}">
+      <article class="guided-slide ${sequenced ? 'guided-slide--sequenced' : ''} ${schoolLocation ? 'guided-slide--school-location' : ''}" data-guided-slide="${step.id}">
         <div class="guided-slide__body">
           <p class="guided-slide__kicker">${_escape(step.kicker)}</p>
           <h3>${_escape(step.title)}</h3>
@@ -302,7 +302,7 @@ const GuidedRegisterModule = (() => {
           <div class="guided-slide__checks">
             ${step.checks.map(check => `<span>${_escape(check)}</span>`).join('')}
           </div>
-          ${sequenced ? '' : `<div class="guided-slide__actions">
+          ${schoolLocation ? _renderSchoolLocationMapSlot() : (sequenced ? '' : `<div class="guided-slide__actions">
             ${step.actions.map(action => `
               <button class="guided-action ${action.primary ? 'guided-action--primary' : ''}" type="button"
                 data-guided-action="${_escape(action.action)}"
@@ -310,7 +310,7 @@ const GuidedRegisterModule = (() => {
                 <span>${_escape(action.icon)}</span>
                 <strong>${_escape(action.label)}</strong>
               </button>`).join('')}
-          </div>`}
+          </div>`)}
         </div>
         <footer class="guided-slide__footer">
           <button class="btn btn-outline btn-sm" type="button" data-guided-action="prev">Anterior</button>
@@ -318,6 +318,20 @@ const GuidedRegisterModule = (() => {
           <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="next">Siguiente</button>
         </footer>
       </article>`;
+  }
+
+  function _renderSchoolLocationMapSlot() {
+    return `
+      <section class="guided-school-map-shell" aria-label="Mapa de ubicacion de la escuela">
+        <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
+          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite">Satelite</button>
+          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemap">Calles</button>
+          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
+          <button class="btn btn-guided-selected btn-sm" type="button" data-guided-action="saveBasemap">Guardar base</button>
+          <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Elegir escuela</button>
+        </div>
+        <div class="guided-school-map-shell__slot" data-guided-plan-slot="escuela"></div>
+      </section>`;
   }
 
   function _isSequencedStep(stepId) {
@@ -885,7 +899,26 @@ const GuidedRegisterModule = (() => {
     });
     const progress = root.querySelector('[data-guided-progress]');
     if (progress) progress.style.width = `${((_activeIndex + 1) / STEPS.length) * 100}%`;
-    requestAnimationFrame(() => _syncDeckHeight(root));
+    const moved = _movePlanSurfaceForActiveStep(root);
+    requestAnimationFrame(() => {
+      _syncDeckHeight(root);
+      if (moved) _refreshPlan();
+    });
+  }
+
+  function _movePlanSurfaceForActiveStep(root = document.getElementById('guided-register-root')) {
+    if (!root) return false;
+    const planRoot = root.querySelector('#guided-school-plan-root');
+    if (!planRoot) return false;
+    const activeStep = STEPS[_activeIndex]?.id || 'escuela';
+    const targetName = activeStep === 'escuela' ? 'escuela' : 'panel';
+    const targetSlot = root.querySelector(`[data-guided-plan-slot="${targetName}"]`);
+    if (!targetSlot) return false;
+    const moved = planRoot.parentElement !== targetSlot;
+    if (moved) targetSlot.appendChild(planRoot);
+    root.querySelector('.guided-register')?.classList.toggle('guided-register--map-inline', targetName === 'escuela');
+    root.querySelector('.guided-plan-panel')?.classList.toggle('guided-plan-panel--parked', targetName === 'escuela');
+    return moved;
   }
 
   function _updateSnapshot() {
