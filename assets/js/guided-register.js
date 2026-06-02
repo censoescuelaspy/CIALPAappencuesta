@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.168
+ * Version: 2.6.169
  */
 
 const GuidedRegisterModule = (() => {
@@ -279,7 +279,7 @@ const GuidedRegisterModule = (() => {
         <section class="guided-workbench">
           <div class="guided-deck" data-guided-deck>
             <div class="guided-track" data-guided-track>
-              ${STEPS.map(step => _renderSlide(step)).join('')}
+              ${STEPS.map((step, index) => _renderSlide(step, index)).join('')}
             </div>
           </div>
 
@@ -314,11 +314,12 @@ const GuidedRegisterModule = (() => {
     _movePlanSurfaceForActiveStep(root);
   }
 
-  function _renderSlide(step) {
+  function _renderSlide(step, index = 0) {
     const sequenced = _isSequencedStep(step.id);
     const mapInline = _stepUsesInlineMap(step.id);
+    const active = index === _activeIndex;
     return `
-      <article class="guided-slide ${sequenced ? 'guided-slide--sequenced' : ''} ${mapInline ? 'guided-slide--school-location guided-slide--with-map' : ''}" data-guided-slide="${step.id}">
+      <article class="guided-slide ${active ? 'guided-slide--active' : ''} ${sequenced ? 'guided-slide--sequenced' : ''} ${mapInline ? 'guided-slide--school-location guided-slide--with-map' : ''}" data-guided-slide="${step.id}" ${active ? '' : 'hidden'} aria-hidden="${active ? 'false' : 'true'}">
         <div class="guided-slide__body">
           <p class="guided-slide__kicker">${_escape(step.kicker)}</p>
           <h3>${_escape(step.title)}</h3>
@@ -1099,7 +1100,13 @@ const GuidedRegisterModule = (() => {
     const root = document.getElementById('guided-register-root');
     if (!root) return;
     const track = root.querySelector('[data-guided-track]');
-    if (track) track.style.transform = `translate3d(-${_activeIndex * 100}%, 0, 0)`;
+    if (track) track.style.transform = 'none';
+    root.querySelectorAll('[data-guided-slide]').forEach((slide, index) => {
+      const active = index === _activeIndex;
+      slide.hidden = !active;
+      slide.classList.toggle('guided-slide--active', active);
+      slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+    });
     root.querySelectorAll('[data-guided-step]').forEach((button, index) => {
       const active = index === _activeIndex;
       button.classList.toggle('guided-step--active', active);

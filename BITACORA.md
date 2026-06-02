@@ -4,6 +4,32 @@
 
 ---
 
+## Registro guiado: sin efecto de diapositiva - 2026-06-02 - v2.6.169
+
+### Objetivo
+- Eliminar el efecto visual de transicion tipo diapositiva al cambiar de etapa en el registro guiado.
+
+### Problema reportado
+- El cambio entre secciones se percibia como un carrusel horizontal, con movimiento de diapositiva.
+
+### Cambios implementados
+- `assets/js/guided-register.js`: el registro guiado deja de desplazar un track con `translate3d` y muestra solo la etapa activa.
+- `assets/js/guided-register.js`: las etapas inactivas quedan ocultas con `hidden` y `aria-hidden`.
+- `assets/css/app.css`: se eliminan las transiciones de altura del deck y de transformacion del track.
+- `assets/css/app.css`: el track deja de comportarse como carrusel flex horizontal.
+- `index.html`, `assets/js/config.js`, `assets/js/guided-register.js`, `sw.js`: version actualizada a `2.6.169`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+### Estado
+- Pendiente de commit y verificacion publica.
+
+---
+
 ## Registro guiado: aprovechamiento de mapa y ajuste superior izquierdo - 2026-06-02 - v2.6.168
 
 ### Objetivo
