@@ -6220,6 +6220,34 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - `git diff --check`.
 - Verificacion local: `http://127.0.0.1:8765/` responde `200`.
 
+---
+
+## Separadores jalables y vertices directos del perimetro - 2026-06-02
+
+### Objetivo
+- Ignorar los timelapse MP4 sin seguimiento y concentrar el ajuste en la app web.
+- Permitir ajustar segmentos/paneles jalando separadores donde corresponda.
+- Hacer que el perimetro amarillo se edite desde sus vertices visibles, sin la sensacion de estar encerrado dentro de otro objeto.
+
+### Problema reportado
+- Los separadores entre preguntas, mapa y paneles no podian reajustarse con arrastre.
+- El perimetro seguia siendo dificil de manipular porque los vertices visibles se solapaban con una caja de control y parecia existir un doble poligono.
+
+### Cambios implementados
+- `assets/js/guided-register.js` y `assets/css/app.css`: se agrego separador horizontal jalable para el alto del plano vivo del registro guiado.
+- `assets/js/mec-form.js`, `assets/css/mec-form.css` y `assets/css/app.css`: se agrego separador vertical jalable para el ancho del panel lateral del plano.
+- `assets/js/mec-form.js`: los vertices del perimetro del predio ahora tienen tiradores amarillos mas grandes y area tactil ampliada.
+- `assets/js/mec-form.js`: al jalar un vertice del perimetro, el contorno expande/recalcula su caja interna automaticamente en vez de quedar limitado.
+- `assets/js/mec-form.js`: se evito la doble linea del perimetro durante la edicion; la capa georreferenciada conserva etiquetas/pines sin crear un segundo poligono encima.
+- `assets/js/config.js`, `index.html`, `sw.js`: version actualizada a `2.6.163` para cache-busting y trazabilidad.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
 ### Estado
 - Commit publicado en este cambio: `feat: habilitar estirado del perimetro`.
 

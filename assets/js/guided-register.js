@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.162
+ * Version: 2.6.163
  */
 
 const GuidedRegisterModule = (() => {
@@ -13,12 +13,15 @@ const GuidedRegisterModule = (() => {
   const GUIDED_LAYOUT_DEFAULTS = {
     schoolSidebarWidth: 210,
     schoolMapHeight: 0,
+    planPanelHeight: 0,
   };
   const GUIDED_LAYOUT_LIMITS = {
     schoolSidebarMin: 160,
     schoolSidebarMaxRatio: .42,
     schoolMapMin: 420,
     schoolMapMax: 1100,
+    planPanelMin: 360,
+    planPanelMax: 1200,
   };
   let _activeIndex = 0;
   let _bound = false;
@@ -280,6 +283,8 @@ const GuidedRegisterModule = (() => {
             </div>
           </div>
 
+          <div class="guided-layout-resize guided-layout-resize--workbench" data-guided-resize="plan-panel-height" role="separator" aria-orientation="horizontal" aria-label="Ajustar alto del plano vivo"><span></span></div>
+
           <aside class="guided-plan-panel" aria-label="Plano vivo del registro">
             <div class="guided-plan-panel__header">
               <div class="guided-plan-panel__identity">
@@ -429,6 +434,7 @@ const GuidedRegisterModule = (() => {
         ...GUIDED_LAYOUT_DEFAULTS,
         schoolSidebarWidth: _boundedNumber(saved.schoolSidebarWidth, GUIDED_LAYOUT_DEFAULTS.schoolSidebarWidth, 150, 520),
         schoolMapHeight: _boundedNumber(saved.schoolMapHeight, GUIDED_LAYOUT_DEFAULTS.schoolMapHeight, 0, GUIDED_LAYOUT_LIMITS.schoolMapMax),
+        planPanelHeight: _boundedNumber(saved.planPanelHeight, GUIDED_LAYOUT_DEFAULTS.planPanelHeight, 0, GUIDED_LAYOUT_LIMITS.planPanelMax),
       };
     } catch {
       return { ...GUIDED_LAYOUT_DEFAULTS };
@@ -440,6 +446,7 @@ const GuidedRegisterModule = (() => {
       localStorage.setItem(LAYOUT_KEY, JSON.stringify({
         schoolSidebarWidth: Math.round(_guidedLayout.schoolSidebarWidth || GUIDED_LAYOUT_DEFAULTS.schoolSidebarWidth),
         schoolMapHeight: Math.round(_guidedLayout.schoolMapHeight || 0),
+        planPanelHeight: Math.round(_guidedLayout.planPanelHeight || 0),
         updatedAt: new Date().toISOString(),
       }));
     } catch {
@@ -455,6 +462,9 @@ const GuidedRegisterModule = (() => {
     const mapHeight = _boundedNumber(_guidedLayout.schoolMapHeight, 0, 0, GUIDED_LAYOUT_LIMITS.schoolMapMax);
     if (mapHeight > 0) register.style.setProperty('--guided-school-map-height', `${Math.round(mapHeight)}px`);
     else register.style.removeProperty('--guided-school-map-height');
+    const planPanelHeight = _boundedNumber(_guidedLayout.planPanelHeight, 0, 0, GUIDED_LAYOUT_LIMITS.planPanelMax);
+    if (planPanelHeight > 0) register.style.setProperty('--guided-plan-panel-height', `${Math.round(planPanelHeight)}px`);
+    else register.style.removeProperty('--guided-plan-panel-height');
   }
 
   function _startGuidedResize(root, event, handle) {
@@ -464,6 +474,7 @@ const GuidedRegisterModule = (() => {
     if (!register) return false;
     const body = root.querySelector('.guided-slide--school-location .guided-slide__body');
     const shell = root.querySelector('.guided-school-map-shell');
+    const planPanel = root.querySelector('.guided-plan-panel');
     if (type === 'school-sidebar') {
       const bodyRect = body?.getBoundingClientRect();
       if (!bodyRect?.width) return false;
@@ -490,6 +501,19 @@ const GuidedRegisterModule = (() => {
         min: GUIDED_LAYOUT_LIMITS.schoolMapMin,
         max: GUIDED_LAYOUT_LIMITS.schoolMapMax,
       };
+    } else if (type === 'plan-panel-height') {
+      const panelRect = planPanel?.getBoundingClientRect();
+      if (!panelRect?.height) return false;
+      const current = _boundedNumber(_guidedLayout.planPanelHeight, panelRect.height, GUIDED_LAYOUT_LIMITS.planPanelMin, GUIDED_LAYOUT_LIMITS.planPanelMax);
+      _guidedResizeDrag = {
+        type,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startValue: current,
+        min: GUIDED_LAYOUT_LIMITS.planPanelMin,
+        max: GUIDED_LAYOUT_LIMITS.planPanelMax,
+      };
     } else {
       return false;
     }
@@ -511,6 +535,7 @@ const GuidedRegisterModule = (() => {
     const nextValue = _boundedNumber(drag.startValue + delta, drag.startValue, drag.min, drag.max);
     if (drag.type === 'school-sidebar') _guidedLayout.schoolSidebarWidth = nextValue;
     if (drag.type === 'school-map-height') _guidedLayout.schoolMapHeight = nextValue;
+    if (drag.type === 'plan-panel-height') _guidedLayout.planPanelHeight = nextValue;
     _applyGuidedLayout(root);
     _syncDeckHeight(root);
     event.preventDefault();

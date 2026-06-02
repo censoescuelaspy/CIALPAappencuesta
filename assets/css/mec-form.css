@@ -1909,8 +1909,8 @@
 
 .school-plan__layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(170px, var(--plan-side-width, 220px));
-  gap: .6rem;
+  grid-template-columns: minmax(0, 1fr) 8px minmax(170px, var(--plan-side-width, 220px));
+  gap: .6rem .35rem;
   align-items: start;
 }
 
@@ -1922,8 +1922,34 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.school-plan__layout--side-hidden .school-plan__layout-resize,
 .school-plan__layout--side-hidden .school-plan__side {
   display: none;
+}
+
+.school-plan__layout-resize {
+  align-self: stretch;
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.school-plan__layout-resize span {
+  width: 4px;
+  height: min(100%, 120px);
+  border-radius: 999px;
+  background: #c9d9ef;
+  transition: background .16s ease, box-shadow .16s ease;
+}
+
+.school-plan__layout-resize:hover span,
+.school-plan__layout-resize:focus-visible span,
+.school-plan__layout-resize--active span {
+  background: #e84c22;
+  box-shadow: 0 0 0 4px rgba(232, 76, 34, .14);
 }
 
 .school-plan__board,
@@ -2751,6 +2777,10 @@
     grid-template-columns: 1fr;
   }
 
+  .school-plan__layout-resize {
+    display: none;
+  }
+
   .mec-rail {
     display: none;
   }
@@ -3197,6 +3227,10 @@
 
   .school-plan__layout {
     gap: .7rem;
+  }
+
+  .school-plan__layout-resize {
+    display: none;
   }
 
   .school-plan__board,

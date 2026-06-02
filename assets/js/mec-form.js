@@ -89,6 +89,8 @@ const MecFormModule = (() => {
   const PLAN_WALL_THICKNESS = 5;
   const PLAN_OPENING_STROKE = 1.5;
   const PLAN_VERTEX_HANDLE_SIZE = 9;
+  const PLAN_PROPERTY_BOUNDARY_VERTEX_HANDLE_SIZE = 18;
+  const PLAN_PROPERTY_BOUNDARY_VERTEX_HIT_SIZE = 34;
   const PLAN_PROPERTY_BOUNDARY_RESIZE_HANDLE_SIZE = 30;
   const SCHOOL_MARKER_PLAN_ID = 'school::coordinate';
   const PROPERTY_BOUNDARY_MAX_WIDTH_RATIO = .9;
@@ -2183,7 +2185,9 @@ const MecFormModule = (() => {
   function _ensurePlanUi() {
     const current = _data.__planUi && typeof _data.__planUi === 'object' ? _data.__planUi : {};
     const side = ['compact', 'wide', 'hidden'].includes(current.side) ? current.side : 'compact';
-    _data.__planUi = { ...current, side };
+    const fallbackWidth = side === 'wide' ? 300 : 220;
+    const sideWidth = _numberInRange(current.sideWidth, fallbackWidth, 145, 520);
+    _data.__planUi = { ...current, side, sideWidth };
     return _data.__planUi;
   }
 
@@ -2195,12 +2199,72 @@ const MecFormModule = (() => {
     return `school-plan__layout school-plan__layout--side-${_planSideMode()}`;
   }
 
+  function _planSideWidth() {
+    const ui = _ensurePlanUi();
+    const fallbackWidth = ui.side === 'wide' ? 300 : 220;
+    return Math.round(_numberInRange(ui.sideWidth, fallbackWidth, 145, 520));
+  }
+
+  function _planLayoutStyle() {
+    return _planSideMode() === 'hidden'
+      ? ''
+      : ` style="--plan-side-width:${_planSideWidth()}px"`;
+  }
+
   function setPlanSideMode(mode = 'compact') {
     const nextMode = ['compact', 'wide', 'hidden'].includes(String(mode || '')) ? String(mode) : 'compact';
     const ui = _ensurePlanUi();
     ui.side = nextMode;
+    if (nextMode === 'wide' && (!ui.sideWidth || ui.sideWidth < 260)) ui.sideWidth = 300;
+    if (nextMode === 'compact' && (!ui.sideWidth || ui.sideWidth > 340)) ui.sideWidth = 220;
     _saveDraft(false);
     renderSchoolPlan();
+  }
+
+  function _bindPlanLayoutResizers(root = _activeSchoolPlanRoot()) {
+    root?.querySelectorAll?.('[data-plan-layout-resize]').forEach(handle => {
+      if (handle.dataset.bound === '1') return;
+      handle.dataset.bound = '1';
+      handle.addEventListener('pointerdown', event => _startPlanLayoutResize(event, root, handle));
+    });
+  }
+
+  function _startPlanLayoutResize(event, root, handle) {
+    const type = handle?.dataset?.planLayoutResize || '';
+    if (type !== 'side') return false;
+    const layout = handle.closest('.school-plan__layout');
+    if (!layout || layout.classList.contains('school-plan__layout--side-hidden')) return false;
+    const layoutRect = layout.getBoundingClientRect();
+    const startWidth = _planSideWidth();
+    const min = 145;
+    const max = Math.max(min + 20, Math.min(520, layoutRect.width - 360));
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const move = moveEvent => {
+      if (moveEvent.pointerId !== pointerId) return;
+      const nextWidth = Math.round(_numberInRange(startWidth - (moveEvent.clientX - startX), startWidth, min, max));
+      _ensurePlanUi().sideWidth = nextWidth;
+      layout.style.setProperty('--plan-side-width', `${nextWidth}px`);
+      moveEvent.preventDefault();
+    };
+    const end = endEvent => {
+      if (endEvent.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
+      handle.classList.remove('school-plan__layout-resize--active');
+      _saveDraft(false);
+      _notifyGuidedPlanSync();
+      endEvent.preventDefault();
+    };
+    handle.classList.add('school-plan__layout-resize--active');
+    handle.setPointerCapture?.(pointerId);
+    document.addEventListener('pointermove', move, { passive: false });
+    document.addEventListener('pointerup', end, { passive: false });
+    document.addEventListener('pointercancel', end, { passive: false });
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
   }
 
   function _bindSchoolPlanResize() {
@@ -4083,6 +4147,53 @@ const MecFormModule = (() => {
     };
     record.planShape = shape;
     return shape;
+  }
+
+  function _setPropertyBoundaryShapeVertex(element, index, point, rect, logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const shape = _clonePlanShape(element?.planShape);
+    if (!element || element.type !== 'property_boundary' || !shape || !rect?.w || !rect?.h || !shape.points[index] || !point) {
+      return null;
+    }
+    let points = shape.points.map(vertex => ({
+      x: rect.x + Number(vertex.x || 0) * rect.w,
+      y: rect.y + Number(vertex.y || 0) * rect.h,
+    }));
+    points[index] = { x: Number(point.x), y: Number(point.y) };
+    if (!Number.isFinite(points[index].x) || !Number.isFinite(points[index].y)) return null;
+
+    const boundingRect = () => {
+      const xs = points.map(item => item.x).filter(Number.isFinite);
+      const ys = points.map(item => item.y).filter(Number.isFinite);
+      if (xs.length < 3 || ys.length < 3) return null;
+      const x = Math.min(...xs);
+      const y = Math.min(...ys);
+      return { x, y, w: Math.max(8, Math.max(...xs) - x), h: Math.max(8, Math.max(...ys) - y) };
+    };
+    let bounds = boundingRect();
+    if (!bounds) return null;
+    const expansion = _ensurePlanCanvasContainsRect(bounds, { padding: 96 });
+    if (expansion) {
+      const shiftX = Number(expansion.shiftX || 0);
+      const shiftY = Number(expansion.shiftY || 0);
+      points = points.map(item => ({ x: item.x + shiftX, y: item.y + shiftY }));
+      logicalWidth = _planCanvasWidth();
+      logicalHeight = _planCanvasHeight();
+      bounds = boundingRect();
+      if (!bounds) return null;
+    }
+    element.xRatio = bounds.x / logicalWidth;
+    element.yRatio = bounds.y / logicalHeight;
+    element.wRatio = Math.max(.006, bounds.w / logicalWidth);
+    element.hRatio = Math.max(.006, bounds.h / logicalHeight);
+    element.planShape = {
+      ...shape,
+      points: points.map(item => ({
+        x: Math.max(0, Math.min(1, (item.x - bounds.x) / bounds.w)),
+        y: Math.max(0, Math.min(1, (item.y - bounds.y) / bounds.h)),
+      })),
+    };
+    _syncSiteElementMeasuresFromRect(element, bounds, logicalWidth, logicalHeight);
+    return element.planShape;
   }
 
   function _sketchRoomsForActiveBlockFloor() {
@@ -10186,6 +10297,7 @@ const MecFormModule = (() => {
     const height = logical.height || SKETCH_CANVAS.height;
     for (const item of [..._ensureSiteElements()].reverse()) {
       if (item.type === 'property_boundary' && !_propertyBoundaryEditActive(item)) continue;
+      if (item.type === 'property_boundary' && _clonePlanShape(item.planShape)) continue;
       const rect = _siteElementRect(item, width, height);
       const prominent = item.type === 'property_boundary' &&
         (_selectedPlanId === `site::${item.id}` || _propertyBoundaryEditActive(item));
@@ -13398,7 +13510,7 @@ const MecFormModule = (() => {
         ${root.id === 'guided-school-plan-root' ? '' : _renderSchoolContextBar(true)}
         ${_renderPlanBuilderPanel()}
 
-        <section class="${_planLayoutClass()}">
+        <section class="${_planLayoutClass()}"${_planLayoutStyle()}>
           <div class="school-plan__board">
             <div class="school-plan__toolbar">
               ${_renderSchoolPlanRibbon()}
@@ -13412,6 +13524,7 @@ const MecFormModule = (() => {
               </div>
             </div>
           </div>
+          ${_planSideMode() === 'hidden' ? '' : '<div class="school-plan__layout-resize" data-plan-layout-resize="side" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del panel lateral"><span></span></div>'}
           <aside class="school-plan__side">
             <h3>Resumen</h3>
             ${sideKpis}
@@ -13437,6 +13550,7 @@ const MecFormModule = (() => {
     _drawSchoolPlan();
     _applySchoolPlanZoom();
     _bindSchoolPlanCanvas();
+    _bindPlanLayoutResizers(root);
     _restoreSchoolPlanViewport(root, viewport);
   }
 
@@ -15360,17 +15474,20 @@ const MecFormModule = (() => {
   function _drawPlanShapeVertices(ctx, record, rect, selectedId, type, extra = {}) {
     const points = _planShapePoints(record, rect);
     if (!points?.length) return;
+    const isPropertyBoundary = Boolean(extra.propertyBoundary);
+    const visualSize = isPropertyBoundary ? PLAN_PROPERTY_BOUNDARY_VERTEX_HANDLE_SIZE : PLAN_VERTEX_HANDLE_SIZE;
+    const hitSize = isPropertyBoundary ? PLAN_PROPERTY_BOUNDARY_VERTEX_HIT_SIZE : (PLAN_VERTEX_HANDLE_SIZE * 2);
     ctx.save();
     points.forEach((point, index) => {
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#111827';
-      ctx.lineWidth = 1.6;
+      ctx.fillStyle = isPropertyBoundary ? '#ffeb3b' : '#ffffff';
+      ctx.strokeStyle = isPropertyBoundary ? '#7c2d12' : '#111827';
+      ctx.lineWidth = isPropertyBoundary ? 2.2 : 1.6;
       ctx.beginPath();
-      ctx.arc(point.x, point.y, PLAN_VERTEX_HANDLE_SIZE / 2, 0, Math.PI * 2);
+      ctx.arc(point.x, point.y, visualSize / 2, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#111827';
-      ctx.font = _canvasFont(800, 7);
+      ctx.fillStyle = isPropertyBoundary ? '#111827' : '#111827';
+      ctx.font = _canvasFont(900, isPropertyBoundary ? 8 : 7);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(String(index + 1), point.x, point.y);
@@ -15379,14 +15496,14 @@ const MecFormModule = (() => {
         id: selectedId,
         type,
         vertexIndex: index,
-        x: point.x - PLAN_VERTEX_HANDLE_SIZE,
-        y: point.y - PLAN_VERTEX_HANDLE_SIZE,
-        w: PLAN_VERTEX_HANDLE_SIZE * 2,
-        h: PLAN_VERTEX_HANDLE_SIZE * 2,
-        baseX: point.x - PLAN_VERTEX_HANDLE_SIZE,
-        baseY: point.y - PLAN_VERTEX_HANDLE_SIZE,
-        baseW: PLAN_VERTEX_HANDLE_SIZE * 2,
-        baseH: PLAN_VERTEX_HANDLE_SIZE * 2,
+        x: point.x - hitSize / 2,
+        y: point.y - hitSize / 2,
+        w: hitSize,
+        h: hitSize,
+        baseX: point.x - hitSize / 2,
+        baseY: point.y - hitSize / 2,
+        baseW: hitSize,
+        baseH: hitSize,
         rect,
       });
     });
@@ -16135,18 +16252,20 @@ const MecFormModule = (() => {
       y: acc.y + item.point.y / vertices.length,
     }), { x: 0, y: 0 });
     ctx.save();
-    ctx.strokeStyle = editActive ? 'rgba(255,216,77,.62)' : '#ffd84d';
-    ctx.lineWidth = editActive ? 2.2 : 4;
-    ctx.lineJoin = 'round';
-    ctx.shadowColor = 'rgba(0,0,0,.35)';
-    ctx.shadowBlur = editActive ? 1.5 : 3;
-    ctx.beginPath();
-    vertices.forEach((item, index) => {
-      if (index) ctx.lineTo(item.point.x, item.point.y);
-      else ctx.moveTo(item.point.x, item.point.y);
-    });
-    ctx.closePath();
-    ctx.stroke();
+    if (!editActive) {
+      ctx.strokeStyle = '#ffd84d';
+      ctx.lineWidth = 4;
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(0,0,0,.35)';
+      ctx.shadowBlur = 3;
+      ctx.beginPath();
+      vertices.forEach((item, index) => {
+        if (index) ctx.lineTo(item.point.x, item.point.y);
+        else ctx.moveTo(item.point.x, item.point.y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+    }
     ctx.restore();
     vertices.forEach(item => {
       const dx = item.point.x - center.x;
@@ -16550,10 +16669,10 @@ const MecFormModule = (() => {
     ctx.lineWidth = selected ? 3 : 2;
     if (isPropertyBoundary) {
       propertyBoundaryPoints = _planShapePoints(item, local);
-      ctx.fillStyle = selected ? 'rgba(232,243,238,.18)' : 'rgba(11,93,59,.045)';
-      ctx.strokeStyle = selected ? '#0b5d3b' : 'rgba(11,93,59,.86)';
-      ctx.lineWidth = selected ? 3 : 2.2;
-      ctx.setLineDash([10, 6]);
+      ctx.fillStyle = selected ? 'rgba(255,216,77,.10)' : 'rgba(255,216,77,.045)';
+      ctx.strokeStyle = selected ? '#ffd84d' : 'rgba(255,216,77,.88)';
+      ctx.lineWidth = selected ? 3.4 : 2.4;
+      ctx.setLineDash(selected ? [] : [10, 6]);
       if (propertyBoundaryPoints && _drawPlanShapePath(ctx, propertyBoundaryPoints)) {
         ctx.fill();
         ctx.stroke();
@@ -16562,11 +16681,6 @@ const MecFormModule = (() => {
         ctx.strokeRect(local.x, local.y, local.w, local.h);
       }
       ctx.setLineDash([]);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(11,93,59,.45)';
-      ctx.lineWidth = 1;
-      if (propertyBoundaryPoints && _drawPlanShapePath(ctx, propertyBoundaryPoints)) ctx.stroke();
-      ctx.restore();
     } else if (item.type === 'water_tank') {
       ctx.beginPath();
       ctx.ellipse(0, 0, local.w / 2, local.h / 2, 0, 0, Math.PI * 2);
@@ -16880,9 +16994,9 @@ const MecFormModule = (() => {
       const shapePoints = _planShapePoints(item, rect);
       const propertyPolygonActive = Boolean(isPropertyBoundary && shapePoints);
       const propertyEditActive = !isPropertyBoundary || _propertyBoundaryEditActive(item);
-      const showEditControls = selected && propertyEditActive;
+      const showEditControls = (selected || (isPropertyBoundary && propertyEditActive)) && propertyEditActive;
       const showRotateControl = selected && propertyEditActive;
-      const showResizeControls = selected && propertyEditActive;
+      const showResizeControls = selected && propertyEditActive && !propertyPolygonActive;
       const resizeHandleOptions = isPropertyBoundary && selected ? { prominent: true } : {};
       _pushPlanHitArea({
         id: `site::${item.id}`,
@@ -16937,8 +17051,9 @@ const MecFormModule = (() => {
           handleOptions: resizeHandleOptions,
         });
       }
-      _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
-      if (selected) {
+      const skipPropertyShell = isPropertyBoundary && _planBaseMapVisible(_data.__planBaseMap) && !propertyEditActive;
+      if (!skipPropertyShell) _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
+      if (selected && !propertyPolygonActive) {
         const dims = _siteElementDimensionPair(item);
         _drawPlanDimensionLabels(ctx, rect, dims.length, dims.width, '#065f46');
       }
@@ -16956,6 +17071,7 @@ const MecFormModule = (() => {
           _drawPlanShapeVertices(ctx, item, rect, `site::${item.id}`, 'site-vertex', {
             siteId: item.id,
             rotation: _siteElementRotationDeg(item),
+            propertyBoundary: isPropertyBoundary,
           });
           if (transform) _planTransformStack.pop();
           ctx.restore();
@@ -21519,7 +21635,11 @@ const MecFormModule = (() => {
     if (drag.type === 'site') {
       const element = _ensureSiteElements().find(item => item.id === drag.siteId);
       if (!element) return false;
-      _setPlanShapeVertex(element, drag.index, localPoint, drag.rect);
+      if (element.type === 'property_boundary') {
+        _setPropertyBoundaryShapeVertex(element, drag.index, localPoint, drag.rect);
+      } else {
+        _setPlanShapeVertex(element, drag.index, localPoint, drag.rect);
+      }
       _selectedPlanId = `site::${element.id}`;
       if (element.type === 'property_boundary') {
         _persistBlocksWithinPropertyBoundary();
@@ -22033,9 +22153,12 @@ const MecFormModule = (() => {
       const selectedBlockArea = String(_selectedPlanId || '').startsWith('block::')
         ? reversedAreas.find(candidate => candidate?.type === 'block' && candidate.id === _selectedPlanId && containsPoint(candidate))
         : null;
+      const directAreaType = String(directArea?.type || '');
+      const directPropertyControl = isPropertyBoundaryArea(directArea) &&
+        (directAreaType.endsWith('-vertex') || directAreaType.endsWith('-resize') || directAreaType.endsWith('-rotate'));
       const area = selectedBlockArea && ['floor', 'room', 'sanitary'].includes(directArea?.type || '')
         ? selectedBlockArea
-        : (isPropertyBoundaryArea(directArea) && structuralArea ? structuralArea : directArea);
+        : (isPropertyBoundaryArea(directArea) && structuralArea && !directPropertyControl ? structuralArea : directArea);
       if (siteResizeShouldPreferBody(area)) return siteAreaFromPoint(point) || area;
       if (area && !['block', 'floor', 'room', 'sanitary'].includes(area.type)) return area;
       return siteAreaFromPoint(point, { includePropertyBoundary: !area }) || area;
@@ -22503,10 +22626,6 @@ const MecFormModule = (() => {
       }
       if (rotateDrag) {
         const selectedId = rotateDrag.selectedId;
-        const focusSiteId = rotateDrag.kind === 'site' &&
-          _ensureSiteElements().find(item => item.id === rotateDrag.id)?.type === 'property_boundary'
-          ? rotateDrag.id
-          : '';
         rotateDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -22515,7 +22634,6 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
-        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -22524,10 +22642,6 @@ const MecFormModule = (() => {
       if (resizeDrag) {
         const selectedId = resizeDrag.selectedId;
         const finishedResize = { ...resizeDrag };
-        const focusSiteId = finishedResize.type === 'site-element' &&
-          _ensureSiteElements().find(item => item.id === finishedResize.siteId)?.type === 'property_boundary'
-          ? finishedResize.siteId
-          : '';
         resizeDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -22536,7 +22650,6 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
-        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedResizeDrag(finishedResize);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -22544,10 +22657,6 @@ const MecFormModule = (() => {
       }
       if (vertexDrag) {
         const selectedId = vertexDrag.selectedId;
-        const focusSiteId = vertexDrag.type === 'site' &&
-          _ensureSiteElements().find(item => item.id === vertexDrag.siteId)?.type === 'property_boundary'
-          ? vertexDrag.siteId
-          : '';
         if (vertexDrag.type === 'room') {
           const room = _classroomById(vertexDrag.roomId);
           if (room && _activeClassroomId === room.id && _data.__classroomSketch) _syncActiveClassroomFromSketch();
@@ -22565,7 +22674,6 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
-        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
@@ -22579,10 +22687,6 @@ const MecFormModule = (() => {
         const sanitaryId = blockDrag.sanitaryId;
         const objectId = blockDrag.objectId;
         const dragType = blockDrag.type;
-        const focusSiteId = dragType === 'site-element' &&
-          _ensureSiteElements().find(item => item.id === siteId)?.type === 'property_boundary'
-          ? siteId
-          : '';
         blockDrag = null;
         pointerCandidate = null;
         pointerStart = null;
@@ -22603,7 +22707,6 @@ const MecFormModule = (() => {
         _activatePlanSelection(_selectedPlanId);
         _saveDraft(false);
         renderSchoolPlan();
-        if (focusSiteId) _focusPlanSiteElement(focusSiteId, { fit: true, padding: 70 });
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();

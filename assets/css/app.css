@@ -5090,6 +5090,7 @@ textarea.form-control {
 .guided-register {
   --guided-school-sidebar-width: 210px;
   --guided-school-map-height: clamp(520px, calc(100vh - 235px), 860px);
+  --guided-plan-panel-height: clamp(520px, calc(100vh - 260px), 900px);
   display: flex;
   flex-direction: column;
   gap: .45rem;
@@ -5258,6 +5259,16 @@ textarea.form-control {
   gap: .55rem;
   align-items: start;
   min-height: 0;
+}
+
+.guided-plan-panel__surface-slot {
+  height: var(--guided-plan-panel-height);
+  min-height: 360px;
+  overflow: hidden;
+}
+
+.guided-plan-panel__surface-slot > .guided-plan-surface {
+  height: 100%;
 }
 
 .guided-deck {
@@ -5798,7 +5809,8 @@ textarea.form-control {
   overflow: auto;
 }
 
-.guided-school-resize {
+.guided-school-resize,
+.guided-layout-resize {
   position: relative;
   z-index: 4;
   display: grid;
@@ -5809,7 +5821,8 @@ textarea.form-control {
   user-select: none;
 }
 
-.guided-school-resize span {
+.guided-school-resize span,
+.guided-layout-resize span {
   display: block;
   background: #c9d9ef;
   border-radius: 999px;
@@ -5818,7 +5831,10 @@ textarea.form-control {
 
 .guided-school-resize:hover span,
 .guided-school-resize:focus-visible span,
-.guided-register--resizing .guided-school-resize span {
+.guided-layout-resize:hover span,
+.guided-layout-resize:focus-visible span,
+.guided-register--resizing .guided-school-resize span,
+.guided-register--resizing .guided-layout-resize span {
   background: #e84c22;
   box-shadow: 0 0 0 4px rgba(232, 76, 34, .14);
 }
@@ -5845,12 +5861,28 @@ textarea.form-control {
   height: 4px;
 }
 
+.guided-layout-resize--workbench {
+  cursor: row-resize;
+  border: 1px solid #d8e2ee;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.guided-layout-resize--workbench span {
+  width: min(58%, 620px);
+  height: 4px;
+}
+
 .guided-register--resizing {
   cursor: grabbing;
   user-select: none;
 }
 
 .guided-register--map-inline .guided-plan-panel {
+  display: none;
+}
+
+.guided-register--map-inline .guided-layout-resize--workbench {
   display: none;
 }
 
@@ -6199,8 +6231,8 @@ textarea.form-control {
 }
 
 #module-registro .school-plan__layout {
-  grid-template-columns: minmax(0, 1fr) minmax(148px, var(--plan-side-width, 186px));
-  gap: .42rem;
+  grid-template-columns: minmax(0, 1fr) 8px minmax(148px, var(--plan-side-width, 186px));
+  gap: .42rem .28rem;
 }
 
 #module-registro .school-plan__layout--side-wide {
@@ -6211,6 +6243,7 @@ textarea.form-control {
   grid-template-columns: minmax(0, 1fr);
 }
 
+#module-registro .school-plan__layout--side-hidden .school-plan__layout-resize,
 #module-registro .school-plan__layout--side-hidden .school-plan__side {
   display: none;
 }
@@ -6350,6 +6383,10 @@ textarea.form-control {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  #module-registro .school-plan__layout-resize {
+    display: none;
+  }
+
   #module-registro .school-plan__side {
     max-height: 190px;
   }
@@ -6402,6 +6439,15 @@ textarea.form-control {
 
   .guided-school-resize--columns {
     display: none;
+  }
+
+  .guided-layout-resize--workbench {
+    display: none;
+  }
+
+  .guided-plan-panel__surface-slot {
+    height: auto;
+    min-height: 0;
   }
 
   .guided-school-map-shell {
