@@ -2528,6 +2528,35 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function ensureGuidedLocationBaseMap(options = {}) {
+    const coords = _schoolCoordinateDefaults();
+    const baseMap = _ensurePlanBaseMap();
+    let changed = false;
+    if (coords.lat === '' || coords.lng === '') return false;
+    if (!_planBaseMapHasCoords(baseMap)) {
+      baseMap.lat = coords.lat;
+      baseMap.lng = coords.lng;
+      changed = true;
+    }
+    if (baseMap.schoolLat === '' || baseMap.schoolLat === undefined || baseMap.schoolLat === null) {
+      baseMap.schoolLat = baseMap.lat;
+      changed = true;
+    }
+    if (baseMap.schoolLng === '' || baseMap.schoolLng === undefined || baseMap.schoolLng === null) {
+      baseMap.schoolLng = baseMap.lng;
+      changed = true;
+    }
+    if (!baseMap.enabled) {
+      baseMap.enabled = true;
+      changed = true;
+    }
+    if (changed && options.focus !== false) _preferClosePlanBaseMapView(baseMap);
+    if (!changed) return false;
+    _saveDraft(false, { skipRemoteSync: true });
+    if (options.render !== false) renderSchoolPlan();
+    return true;
+  }
+
   function setPlanBaseMapSource(source = PLAN_BASEMAP_SOURCE_STREET) {
     const baseMap = _ensurePlanBaseMap();
     const requested = String(source || '').toLowerCase();
@@ -24744,6 +24773,7 @@ const MecFormModule = (() => {
     resetPlanBaseMapOffset,
     resetPlanBaseMapTransform,
     useSchoolCoordinatesForBaseMap,
+    ensureGuidedLocationBaseMap,
     savePlanBaseMap,
     exportPlanJson,
     exportPlanDxf,

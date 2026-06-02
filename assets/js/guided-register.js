@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.161
+ * Version: 2.6.162
  */
 
 const GuidedRegisterModule = (() => {
@@ -9,10 +9,23 @@ const GuidedRegisterModule = (() => {
 
   const STATE_KEY = 'cialpa_guided_register_state_v1';
   const DRAFT_KEY = 'cialpa_mec_form_draft_v1';
+  const LAYOUT_KEY = 'cialpa_guided_register_layout_v1';
+  const GUIDED_LAYOUT_DEFAULTS = {
+    schoolSidebarWidth: 210,
+    schoolMapHeight: 0,
+  };
+  const GUIDED_LAYOUT_LIMITS = {
+    schoolSidebarMin: 160,
+    schoolSidebarMaxRatio: .42,
+    schoolMapMin: 420,
+    schoolMapMax: 1100,
+  };
   let _activeIndex = 0;
   let _bound = false;
   let _touchStartX = 0;
   let _touchStartY = 0;
+  let _guidedResizeDrag = null;
+  let _guidedLayout = _loadGuidedLayout();
   let _guidedState = { targets: {}, flags: {} };
   let _guidedHistory = [];
   let _guidedQuestionHistory = [];
@@ -236,6 +249,7 @@ const GuidedRegisterModule = (() => {
     _ensureMecReady();
     requestAnimationFrame(() => {
       _movePlanSurfaceForActiveStep(root);
+      _ensureGuidedLocationBaseMap();
       _refreshPlan();
       _updateSlide();
       _updateSnapshot();
@@ -286,6 +300,7 @@ const GuidedRegisterModule = (() => {
           </aside>
         </section>
       </section>`;
+    _applyGuidedLayout(root);
     _movePlanSurfaceForActiveStep(root);
   }
 
@@ -302,6 +317,7 @@ const GuidedRegisterModule = (() => {
           <div class="guided-slide__checks">
             ${step.checks.map(check => `<span>${_escape(check)}</span>`).join('')}
           </div>
+          ${schoolLocation ? `<div class="guided-school-resize guided-school-resize--columns" data-guided-resize="school-sidebar" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del panel de preguntas"><span></span></div>` : ''}
           ${schoolLocation ? _renderSchoolLocationMapSlot() : (sequenced ? '' : `<div class="guided-slide__actions">
             ${step.actions.map(action => `
               <button class="guided-action ${action.primary ? 'guided-action--primary' : ''}" type="button"
@@ -323,15 +339,24 @@ const GuidedRegisterModule = (() => {
   function _renderSchoolLocationMapSlot() {
     return `
       <section class="guided-school-map-shell" aria-label="Mapa de ubicacion de la escuela">
-        <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
-          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite">Satelite</button>
-          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemap">Calles</button>
-          <button class="btn btn-guided-selected btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase">Mover base</button>
-          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
-          <button class="btn btn-guided-selected btn-sm" type="button" data-guided-action="saveBasemap">Guardar base</button>
-          <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Elegir escuela</button>
+        <div class="guided-school-map-shell__top">
+          <div class="guided-school-map-shell__identity">
+            <span>Escuela cargada</span>
+            <strong data-guided-inline-school-name>Sin escuela seleccionada</strong>
+            <small data-guided-inline-school-meta>Seleccione una escuela para cargar la base satelital.</small>
+            <em data-guided-inline-school-status>Base mapa pendiente</em>
+          </div>
+          <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite">Satelite</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemap">Calles</button>
+            <button class="btn btn-guided-selected btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase">Mover base</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
+            <button class="btn btn-guided-selected btn-sm" type="button" data-guided-action="saveBasemap">Guardar base</button>
+            <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Elegir escuela</button>
+          </div>
         </div>
         <div class="guided-school-map-shell__slot" data-guided-plan-slot="escuela"></div>
+        <div class="guided-school-resize guided-school-resize--map-height" data-guided-resize="school-map-height" role="separator" aria-orientation="horizontal" aria-label="Ajustar alto del mapa"><span></span></div>
       </section>`;
   }
 
@@ -358,6 +383,8 @@ const GuidedRegisterModule = (() => {
       _runAction(actionButton.dataset.guidedAction, actionButton.dataset.guidedValue || '');
     });
     root.addEventListener('pointerdown', event => {
+      const resizeHandle = event.target.closest('[data-guided-resize]');
+      if (resizeHandle && _startGuidedResize(root, event, resizeHandle)) return;
       if (!event.target.closest('[data-guided-deck]')) return;
       if (event.target.closest('.guided-school-map-shell, [data-school-plan-canvas], .school-plan__canvas-wrap')) {
         _touchStartX = 0;
@@ -367,7 +394,15 @@ const GuidedRegisterModule = (() => {
       _touchStartX = event.clientX;
       _touchStartY = event.clientY;
     });
+    root.addEventListener('pointermove', event => {
+      if (!_guidedResizeDrag) return;
+      _moveGuidedResize(root, event);
+    });
     root.addEventListener('pointerup', event => {
+      if (_guidedResizeDrag) {
+        _endGuidedResize(root, event);
+        return;
+      }
       if (event.target.closest('.guided-school-map-shell, [data-school-plan-canvas], .school-plan__canvas-wrap')) {
         _touchStartX = 0;
         _touchStartY = 0;
@@ -382,6 +417,120 @@ const GuidedRegisterModule = (() => {
       if (dx < 0) next();
       else previous();
     });
+    root.addEventListener('pointercancel', event => {
+      if (_guidedResizeDrag) _endGuidedResize(root, event);
+    });
+  }
+
+  function _loadGuidedLayout() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || '{}') || {};
+      return {
+        ...GUIDED_LAYOUT_DEFAULTS,
+        schoolSidebarWidth: _boundedNumber(saved.schoolSidebarWidth, GUIDED_LAYOUT_DEFAULTS.schoolSidebarWidth, 150, 520),
+        schoolMapHeight: _boundedNumber(saved.schoolMapHeight, GUIDED_LAYOUT_DEFAULTS.schoolMapHeight, 0, GUIDED_LAYOUT_LIMITS.schoolMapMax),
+      };
+    } catch {
+      return { ...GUIDED_LAYOUT_DEFAULTS };
+    }
+  }
+
+  function _saveGuidedLayout() {
+    try {
+      localStorage.setItem(LAYOUT_KEY, JSON.stringify({
+        schoolSidebarWidth: Math.round(_guidedLayout.schoolSidebarWidth || GUIDED_LAYOUT_DEFAULTS.schoolSidebarWidth),
+        schoolMapHeight: Math.round(_guidedLayout.schoolMapHeight || 0),
+        updatedAt: new Date().toISOString(),
+      }));
+    } catch {
+      // Layout preferences are helpful, not critical.
+    }
+  }
+
+  function _applyGuidedLayout(root = document.getElementById('guided-register-root')) {
+    const register = root?.querySelector('.guided-register');
+    if (!register) return;
+    const sidebarWidth = _boundedNumber(_guidedLayout.schoolSidebarWidth, GUIDED_LAYOUT_DEFAULTS.schoolSidebarWidth, 150, 520);
+    register.style.setProperty('--guided-school-sidebar-width', `${Math.round(sidebarWidth)}px`);
+    const mapHeight = _boundedNumber(_guidedLayout.schoolMapHeight, 0, 0, GUIDED_LAYOUT_LIMITS.schoolMapMax);
+    if (mapHeight > 0) register.style.setProperty('--guided-school-map-height', `${Math.round(mapHeight)}px`);
+    else register.style.removeProperty('--guided-school-map-height');
+  }
+
+  function _startGuidedResize(root, event, handle) {
+    const type = handle?.dataset.guidedResize || '';
+    if (!type) return false;
+    const register = root.querySelector('.guided-register');
+    if (!register) return false;
+    const body = root.querySelector('.guided-slide--school-location .guided-slide__body');
+    const shell = root.querySelector('.guided-school-map-shell');
+    if (type === 'school-sidebar') {
+      const bodyRect = body?.getBoundingClientRect();
+      if (!bodyRect?.width) return false;
+      const current = _boundedNumber(_guidedLayout.schoolSidebarWidth, GUIDED_LAYOUT_DEFAULTS.schoolSidebarWidth, 150, 520);
+      const maxWidth = Math.max(220, Math.min(520, bodyRect.width * GUIDED_LAYOUT_LIMITS.schoolSidebarMaxRatio));
+      _guidedResizeDrag = {
+        type,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startValue: current,
+        min: GUIDED_LAYOUT_LIMITS.schoolSidebarMin,
+        max: Math.max(GUIDED_LAYOUT_LIMITS.schoolSidebarMin + 20, maxWidth),
+      };
+    } else if (type === 'school-map-height') {
+      const shellRect = shell?.getBoundingClientRect();
+      const current = _boundedNumber(_guidedLayout.schoolMapHeight, shellRect?.height || 560, GUIDED_LAYOUT_LIMITS.schoolMapMin, GUIDED_LAYOUT_LIMITS.schoolMapMax);
+      _guidedResizeDrag = {
+        type,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        startValue: current,
+        min: GUIDED_LAYOUT_LIMITS.schoolMapMin,
+        max: GUIDED_LAYOUT_LIMITS.schoolMapMax,
+      };
+    } else {
+      return false;
+    }
+    try { handle.setPointerCapture?.(event.pointerId); } catch { /* non-fatal */ }
+    register.classList.add('guided-register--resizing');
+    _touchStartX = 0;
+    _touchStartY = 0;
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
+  }
+
+  function _moveGuidedResize(root, event) {
+    const drag = _guidedResizeDrag;
+    if (!drag) return;
+    const delta = drag.type === 'school-sidebar'
+      ? event.clientX - drag.startX
+      : event.clientY - drag.startY;
+    const nextValue = _boundedNumber(drag.startValue + delta, drag.startValue, drag.min, drag.max);
+    if (drag.type === 'school-sidebar') _guidedLayout.schoolSidebarWidth = nextValue;
+    if (drag.type === 'school-map-height') _guidedLayout.schoolMapHeight = nextValue;
+    _applyGuidedLayout(root);
+    _syncDeckHeight(root);
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  function _endGuidedResize(root, event) {
+    _saveGuidedLayout();
+    root.querySelector('.guided-register')?.classList.remove('guided-register--resizing');
+    _guidedResizeDrag = null;
+    _syncDeckHeight(root);
+    _refreshSoon(80);
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+  }
+
+  function _boundedNumber(value, fallback = 0, min = -Infinity, max = Infinity) {
+    const number = Number(value);
+    const safe = Number.isFinite(number) ? number : Number(fallback);
+    return Math.max(min, Math.min(max, Number.isFinite(safe) ? safe : 0));
   }
 
   function _ensureMecReady() {
@@ -919,10 +1068,23 @@ const GuidedRegisterModule = (() => {
     const progress = root.querySelector('[data-guided-progress]');
     if (progress) progress.style.width = `${((_activeIndex + 1) / STEPS.length) * 100}%`;
     const moved = _movePlanSurfaceForActiveStep(root);
+    const baseMapChanged = _ensureGuidedLocationBaseMap();
     requestAnimationFrame(() => {
       _syncDeckHeight(root);
-      if (moved) _refreshPlan();
+      if (moved || baseMapChanged) _refreshPlan();
     });
+  }
+
+  function _ensureGuidedLocationBaseMap() {
+    if (STEPS[_activeIndex]?.id !== 'escuela') return false;
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    if (!mec?.ensureGuidedLocationBaseMap) return false;
+    try {
+      return Boolean(mec.ensureGuidedLocationBaseMap({ render: false }));
+    } catch (err) {
+      console.warn('No se pudo activar automaticamente la base mapa del paso 1:', err);
+      return false;
+    }
   }
 
   function _movePlanSurfaceForActiveStep(root = document.getElementById('guided-register-root')) {
@@ -958,6 +1120,20 @@ const GuidedRegisterModule = (() => {
     if (schoolName) schoolName.textContent = snap.school.name || 'Sin escuela seleccionada';
     const schoolMeta = root.querySelector('[data-guided-school-meta]');
     if (schoolMeta) schoolMeta.textContent = snap.school.meta || 'Seleccione una escuela desde el mapa antes de iniciar la carga.';
+    const inlineSchoolName = root.querySelector('[data-guided-inline-school-name]');
+    if (inlineSchoolName) inlineSchoolName.textContent = snap.school.name || 'Sin escuela seleccionada';
+    const inlineMeta = root.querySelector('[data-guided-inline-school-meta]');
+    if (inlineMeta) {
+      const coords = [snap.school.latitud, snap.school.longitud].filter(value => value !== undefined && value !== null && String(value).trim() !== '').join(', ');
+      inlineMeta.textContent = [snap.school.meta, coords ? `Coords ${coords}` : ''].filter(Boolean).join(' | ') ||
+        'Seleccione una escuela para cargar la base satelital.';
+    }
+    const inlineStatus = root.querySelector('[data-guided-inline-school-status]');
+    if (inlineStatus) {
+      inlineStatus.textContent = snap.baseMapSaved
+        ? 'Base georreferenciada guardada'
+        : ((snap.school.latitud && snap.school.longitud) ? 'Base mapa activa con coordenadas de escuela' : 'Base mapa pendiente');
+    }
     _refreshTimeTracking(root, snap);
     root.querySelectorAll('[data-guided-step-state]').forEach(label => {
       const step = STEPS.find(item => item.id === label.dataset.guidedStepState);
@@ -1002,7 +1178,10 @@ const GuidedRegisterModule = (() => {
     const body = slide.querySelector('.guided-slide__body');
     const footer = slide.querySelector('.guided-slide__footer');
     const desiredHeight = (body?.scrollHeight || 0) + (footer?.scrollHeight || 0);
-    deck.style.height = `${Math.max(84, desiredHeight)}px`;
+    const viewportFill = activeStep?.id === 'escuela'
+      ? Math.max(520, window.innerHeight - deck.getBoundingClientRect().top - 18)
+      : 84;
+    deck.style.height = `${Math.max(viewportFill, desiredHeight)}px`;
   }
 
   function _setCount(root, key, value) {
