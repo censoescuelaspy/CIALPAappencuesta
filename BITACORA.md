@@ -27,9 +27,10 @@
 - `node --check sw.js`.
 - `git diff --check`.
 - Verificacion local HTTP: `index.html` contiene `v2.6.167`; `guided-register.js` y `app.css` ya no contienen `guided-school-resize--map-height`; `app.css` contiene la grilla del mapa ajustada.
+- Verificacion publica GitHub Pages: `index.html` sirve `v2.6.167`; `guided-register.js` y `app.css` ya no contienen `guided-school-resize--map-height`; `app.css` contiene la grilla del mapa ajustada.
 
 ### Estado
-- Pendiente publicar commit/push.
+- Commit publicado: `a96cab8 fix: quitar divisor inferior del mapa guiado`.
 
 ---
 
