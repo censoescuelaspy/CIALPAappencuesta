@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.164
+ * Version: 2.6.166
  */
 
 const GuidedRegisterModule = (() => {
@@ -362,7 +362,7 @@ const GuidedRegisterModule = (() => {
           </div>
           <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite" aria-pressed="false">Satelite</button>
-            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapStreet" aria-pressed="false">Calles</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapStreet" aria-pressed="false">Calles encima</button>
             <button class="btn btn-guided-soft btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase" aria-pressed="false">Mover base</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="saveBasemap" aria-pressed="false">Guardar base</button>
@@ -1219,11 +1219,13 @@ const GuidedRegisterModule = (() => {
       ? MecFormModule.getPlanBaseMapState()
       : null;
     const baseMap = fromMec || snap?.values?.__planBaseMap || {};
-    const source = String(baseMap.source || 'street').toLowerCase();
+    const source = String(baseMap.source || 'satellite').toLowerCase();
     const enabled = Boolean(baseMap.enabled);
+    const streetOverlay = Boolean(baseMap.streetOverlay);
     return {
       enabled,
       source: source === 'satellite' || source === 'google_satellite' || source === 'highres' ? source : 'street',
+      streetOverlay,
       confirmed: Boolean(baseMap.confirmed || baseMap.savedAt),
       dragMode: Boolean(baseMap.dragMode),
       hasCoords: Boolean(baseMap.hasCoords || (baseMap.lat !== undefined && baseMap.lat !== '' && baseMap.lng !== undefined && baseMap.lng !== '')),
@@ -1235,7 +1237,7 @@ const GuidedRegisterModule = (() => {
     const base = _guidedBaseMapState(snap);
     const activeFor = action => {
       if (action === 'basemapSatellite') return base.enabled && ['satellite', 'google_satellite', 'highres'].includes(base.source);
-      if (action === 'basemapStreet') return base.enabled && base.source === 'street';
+      if (action === 'basemapStreet') return base.enabled && base.streetOverlay;
       if (action === 'basemap') return base.enabled;
       if (action === 'moveBase') return base.dragMode;
       if (action === 'saveBasemap') return base.confirmed;
@@ -1249,9 +1251,9 @@ const GuidedRegisterModule = (() => {
       button.classList.toggle('btn-guided-active', active);
       button.setAttribute('aria-pressed', String(active));
     });
-    const sourceLabel = base.source === 'street'
-      ? 'Calles activas'
-      : (base.source === 'google_satellite' ? 'Google satelital activo' : 'Satelite activo');
+    const sourceLabel = base.streetOverlay
+      ? (base.source === 'google_satellite' ? 'Alta res. + calles' : 'Satelite + calles')
+      : (base.source === 'google_satellite' ? 'Alta resolucion activa' : 'Satelite activo');
     const stateText = !base.hasCoords
       ? 'Sin coordenadas: use "Usar coords"'
       : (base.enabled ? sourceLabel : 'Base apagada');
@@ -1841,7 +1843,7 @@ const GuidedRegisterModule = (() => {
           { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
           { label: 'Usar coordenadas MEC', action: 'coords' },
           { label: 'Ver satelite', action: 'basemapSatellite' },
-          { label: 'Ver calles', action: 'basemapStreet' },
+          { label: 'Calles encima', action: 'basemapStreet' },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
           { label: 'Reiniciar escuela', action: 'resetSchoolData' },
         ],
@@ -1855,17 +1857,17 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Paso 1: ubicacion base',
         'Guarde una sola ubicacion de partida',
-        'Primero pulse Usar coordenadas MEC. Luego elija Ver satelite o Ver calles para verificar la ubicacion. Cuando el punto este correcto, pulse Guardar ubicacion.',
+        'Primero pulse Usar coordenadas MEC. Luego elija Ver satelite o Calles encima para verificar la ubicacion. Cuando el punto este correcto, pulse Guardar ubicacion.',
         [
           { label: 'Usar coordenadas MEC', action: 'coords', primary: true },
           { label: 'Ver satelite', action: 'basemapSatellite' },
-          { label: 'Ver calles', action: 'basemapStreet' },
+          { label: 'Calles encima', action: 'basemapStreet' },
           { label: 'Guardar ubicacion', action: 'saveBasemap' },
           { label: 'Corregir datos', action: 'resetSchoolIdentity' },
         ],
         false,
         '',
-        'Use Ver calles para confirmar nombre y trazado de calles cercanas. Use Ver satelite para ubicar techos y accesos. El boton activo queda marcado en verde.',
+        'Use Calles encima para confirmar nombre y trazado de calles cercanas sin perder la satelital. Use Ver satelite para ubicar techos y accesos. El boton activo queda marcado en verde.',
         true
       );
     }
@@ -1875,7 +1877,7 @@ const GuidedRegisterModule = (() => {
       'La escuela ya tiene identidad y posicion de partida. Ahora corresponde delinear los bordes aproximados de la propiedad escolar.',
       [
         { label: 'Siguiente', action: 'next', primary: true },
-        { label: 'Revisar calles', action: 'basemapStreet' },
+        { label: 'Calles encima', action: 'basemapStreet' },
         { label: 'Corregir datos escuela', action: 'resetSchoolIdentity' },
         { label: 'Reiniciar escuela', action: 'resetSchoolData' },
       ],
@@ -1945,7 +1947,7 @@ const GuidedRegisterModule = (() => {
         { label: 'Siguiente', action: 'next', primary: true },
         { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
         { label: 'Acometida', action: 'site', value: 'service_connection' },
-        { label: 'Revisar calles', action: 'basemapStreet' },
+        { label: 'Calles encima', action: 'basemapStreet' },
       ],
       true,
       '',

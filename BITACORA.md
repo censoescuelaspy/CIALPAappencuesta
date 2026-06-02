@@ -4,6 +4,39 @@
 
 ---
 
+## Base mapa alta resolucion con calles superpuestas - 2026-06-02 - v2.6.166
+
+### Objetivo
+- Hacer mas accesible la base de alta resolucion del plano vivo.
+- Permitir que `Calles` muestre nombres y trazados por encima de la base satelital/Google, sin reemplazarla.
+
+### Problema reportado
+- El boton mas importante para trabajar sobre imagen nitida quedaba poco destacado.
+- Al usar `Calles`, la app cambiaba de base y se perdia claridad para identificar techos y accesos.
+
+### Cambios implementados
+- `assets/js/mec-form.js`: `Calles` deja de actuar como fuente base y pasa a ser una capa superpuesta (`streetOverlay`) con opacidad propia.
+- `assets/js/mec-form.js`: el render del plano dibuja dos capas sincronizadas: base satelital/Google y etiquetas transparentes de calles encima.
+- `assets/js/config.js`: se agrega `PLAN_BASEMAP_STREET_OVERLAY_TILE_URL`, atribucion y opacidad por defecto.
+- `assets/js/guided-register.js`: los botones y textos pasan a decir `Calles encima`, y el estado activo se lee desde el overlay.
+- `assets/css/mec-form.css` y `assets/css/app.css`: se destaca el boton `Alta res.` y se agregan estilos para el overlay de calles.
+- `index.html`, `assets/js/config.js`, `assets/js/guided-register.js`, `sw.js`: version actualizada a `2.6.166`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local HTTP: `http://127.0.0.1:8765/index.html?qa=<timestamp>` contiene `v2.6.166`.
+- Verificacion local HTTP de assets: `mec-form.js` contiene `togglePlanStreetOverlay` y `PLAN_BASEMAP_STREET_OVERLAY`; `guided-register.js` contiene `Calles encima`; `mec-form.css` contiene `school-plan-basemap__tiles--street-overlay`.
+
+### Estado
+- Pendiente publicar commit/push.
+- Archivos MP4 sin seguimiento en `tools/earthengine/` se mantienen fuera de este cambio.
+
+---
+
 ## Rendimiento de tableros y mapa MEC coropletico - 2026-06-02
 
 ### Objetivo

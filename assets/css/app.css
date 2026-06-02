@@ -6485,6 +6485,16 @@ textarea.form-control {
   flex: 0 0 44px;
 }
 
+#module-registro .school-plan-ribbon__button--primary-basemap {
+  flex-basis: 68px;
+  min-width: 68px;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .18);
+}
+
+#module-registro .school-plan-ribbon__button--street-overlay.school-plan-ribbon__button--active {
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .22);
+}
+
 #module-registro .school-plan-ribbon__label {
   max-width: 50px;
   white-space: normal;

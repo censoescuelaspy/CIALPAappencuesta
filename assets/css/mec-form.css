@@ -2075,6 +2075,16 @@
   min-width: 70px;
 }
 
+.school-plan-ribbon__button--primary-basemap {
+  min-width: 64px;
+  border-color: #e84c22 !important;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .16);
+}
+
+.school-plan-ribbon__button--street-overlay.school-plan-ribbon__button--active {
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .18);
+}
+
 .school-plan-ribbon__icon {
   min-height: 15px;
   font-size: .92rem;
@@ -2330,6 +2340,13 @@
   -webkit-user-drag: none;
 }
 
+.school-plan-basemap__tiles--street-overlay {
+  z-index: 1;
+  filter: contrast(1.2) saturate(.85);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
 .school-plan-basemap::after {
   content: '';
   position: absolute;
@@ -2390,6 +2407,12 @@
   color: #526071;
   font-size: .68rem;
   font-weight: 850;
+}
+
+.school-plan-basemap-actions__primary-source {
+  border-color: #e84c22 !important;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .14);
+  font-weight: 950;
 }
 
 .school-plan-basemap-panel {
@@ -2473,6 +2496,22 @@
 
 .school-plan-basemap-panel input[type="range"] {
   padding: 0;
+}
+
+.school-plan-basemap-panel__check span {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: .38rem;
+  padding: .34rem .48rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.school-plan-basemap-panel__check input {
+  width: 16px;
+  height: 16px;
 }
 
 .school-plan-basemap-panel b {

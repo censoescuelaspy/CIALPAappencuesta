@@ -18,6 +18,7 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_DEFAULT_OPACITY = .84;
   const PLAN_BASEMAP_DEFAULT_CONTRAST = 1.18;
   const PLAN_BASEMAP_DEFAULT_SATURATION = 1.08;
+  const PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY = .9;
   const PLAN_BASEMAP_SOURCE_STREET = 'street';
   const PLAN_BASEMAP_SOURCE_SATELLITE = 'satellite';
   const PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE = 'google_satellite';
@@ -1191,6 +1192,8 @@ const MecFormModule = (() => {
       schoolCoordinateCorrected: false,
       contrast: PLAN_BASEMAP_DEFAULT_CONTRAST,
       saturation: PLAN_BASEMAP_DEFAULT_SATURATION,
+      streetOverlay: false,
+      streetOverlayOpacity: PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY,
       savedAt: '',
       confirmed: false,
     };
@@ -1331,7 +1334,8 @@ const MecFormModule = (() => {
     if (source === PLAN_BASEMAP_SOURCE_HIGHRES) return PLAN_BASEMAP_SOURCE_SATELLITE;
     if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE && _hasGoogleSatelliteSource()) return PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
     if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return PLAN_BASEMAP_SOURCE_SATELLITE;
-    return source === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
+    if (source === PLAN_BASEMAP_SOURCE_STREET) return _preferredPlanBaseMapSource();
+    return source === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : _preferredPlanBaseMapSource();
   }
 
   function _planBaseMapSourceConfig(baseMap = _data.__planBaseMap) {
@@ -1370,6 +1374,28 @@ const MecFormModule = (() => {
         || 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
       attribution: (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_ATTRIBUTION || APP_CONFIG.TILE_ATTRIBUTION))
         || '&copy; OpenStreetMap contributors, HOT',
+    };
+  }
+
+  function _planBaseMapStreetOverlayOpacity(baseMap = _data.__planBaseMap) {
+    const configured = typeof APP_CONFIG !== 'undefined'
+      ? APP_CONFIG.PLAN_BASEMAP_STREET_OVERLAY_OPACITY
+      : PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY;
+    return _numberInRange(baseMap?.streetOverlayOpacity, configured || PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY, .15, 1);
+  }
+
+  function _planBaseMapStreetOverlayConfig() {
+    const fallbackTileUrl = (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_TILE_URL || APP_CONFIG.TILE_URL))
+      || 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png';
+    const fallbackAttribution = (typeof APP_CONFIG !== 'undefined' && (APP_CONFIG.PLAN_BASEMAP_ATTRIBUTION || APP_CONFIG.TILE_ATTRIBUTION))
+      || '&copy; OpenStreetMap contributors, HOT';
+    return {
+      id: 'street_overlay',
+      label: 'Calles',
+      tileUrl: (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.PLAN_BASEMAP_STREET_OVERLAY_TILE_URL)
+        || fallbackTileUrl,
+      attribution: (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.PLAN_BASEMAP_STREET_OVERLAY_ATTRIBUTION)
+        || fallbackAttribution,
     };
   }
 
@@ -1597,6 +1623,8 @@ const MecFormModule = (() => {
     merged.schoolCoordinateCorrected = Boolean(merged.schoolCoordinateCorrected);
     merged.contrast = _numberInRange(merged.contrast, PLAN_BASEMAP_DEFAULT_CONTRAST, .75, 1.75);
     merged.saturation = _numberInRange(merged.saturation, PLAN_BASEMAP_DEFAULT_SATURATION, .5, 1.8);
+    merged.streetOverlay = Boolean(merged.streetOverlay);
+    merged.streetOverlayOpacity = _planBaseMapStreetOverlayOpacity(merged);
     merged.enabled = Boolean(merged.enabled);
     merged.confirmed = Boolean(merged.confirmed);
     _data.__planBaseMap = merged;
@@ -1660,7 +1688,7 @@ const MecFormModule = (() => {
     return Number(number.toFixed(2)).toString();
   }
 
-  function _planBaseMapTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1) {
+  function _planBaseMapTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1, sourceConfig = _planBaseMapSourceConfig(_data.__planBaseMap)) {
     const baseMap = _ensurePlanBaseMap();
     if (!_planBaseMapVisible(baseMap)) return [];
     const zoom = Math.round(baseMap.zoom);
@@ -1688,7 +1716,7 @@ const MecFormModule = (() => {
     const maxTileX = Math.ceil(maxWorldX / PLAN_BASEMAP_TILE_SIZE) + 1;
     const minTileY = Math.floor(minWorldY / PLAN_BASEMAP_TILE_SIZE) - 1;
     const maxTileY = Math.ceil(maxWorldY / PLAN_BASEMAP_TILE_SIZE) + 1;
-    const template = _planBaseMapTileTemplate();
+    const template = sourceConfig?.tileUrl || _planBaseMapTileTemplate();
     const items = [];
     for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
       if (tileY < 0 || tileY >= tileCount) continue;
@@ -1999,6 +2027,8 @@ const MecFormModule = (() => {
       baseMap.rotationDeg,
       baseMap.contrast,
       baseMap.saturation,
+      baseMap.streetOverlay ? 1 : 0,
+      baseMap.streetOverlayOpacity,
       _planBaseMapDragMode ? 1 : 0,
       logicalWidth,
       logicalHeight,
@@ -2012,26 +2042,38 @@ const MecFormModule = (() => {
     if (!_planBaseMapVisible(baseMap)) {
       return '<div class="school-plan-basemap school-plan-basemap--empty" data-plan-basemap aria-hidden="true"></div>';
     }
-    const items = _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale);
+    const sourceConfig = _planBaseMapSourceConfig(baseMap);
+    const items = _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale, sourceConfig);
+    const overlayConfig = baseMap.streetOverlay ? _planBaseMapStreetOverlayConfig() : null;
+    const overlayItems = overlayConfig ? _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale, overlayConfig) : [];
     const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
     const originX = (logicalWidth * displayScale) / 2;
     const originY = (logicalHeight * displayScale) / 2;
     const filter = _planBaseMapCssFilter(baseMap);
-    const images = items.map(item => `
+    const renderImages = tileItems => tileItems.map(item => `
       <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="${_escape(item.referrerPolicy || 'no-referrer')}"
         style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`).join('');
+    const images = renderImages(items);
+    const overlayImages = renderImages(overlayItems);
+    const attribution = overlayConfig && overlayItems.length
+      ? `${sourceConfig.attribution} / ${overlayConfig.attribution}`
+      : sourceConfig.attribution;
     return `
       <div class="school-plan-basemap" data-plan-basemap aria-hidden="true">
         <div class="school-plan-basemap__tiles" style="opacity:${_cssNumber(baseMap.opacity)};filter:${filter};transform:rotate(${_cssNumber(rotation)}deg);transform-origin:${_cssNumber(originX)}px ${_cssNumber(originY)}px;">${images}</div>
-        <span class="school-plan-basemap__attribution">${_planBaseMapAttribution()}</span>
+        ${overlayImages ? `<div class="school-plan-basemap__tiles school-plan-basemap__tiles--street-overlay" style="opacity:${_cssNumber(_planBaseMapStreetOverlayOpacity(baseMap))};transform:rotate(${_cssNumber(rotation)}deg);transform-origin:${_cssNumber(originX)}px ${_cssNumber(originY)}px;">${overlayImages}</div>` : ''}
+        <span class="school-plan-basemap__attribution">${attribution}</span>
       </div>`;
   }
 
   function _planBaseMapSvgImages(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
     const baseMap = _ensurePlanBaseMap();
     if (!_planBaseMapVisible(baseMap)) return '';
-    const items = _planBaseMapTileItems(logicalWidth, logicalHeight, 1);
+    const sourceConfig = _planBaseMapSourceConfig(baseMap);
+    const items = _planBaseMapTileItems(logicalWidth, logicalHeight, 1, sourceConfig);
     if (!items.length) return '';
+    const overlayConfig = baseMap.streetOverlay ? _planBaseMapStreetOverlayConfig() : null;
+    const overlayItems = overlayConfig ? _planBaseMapTileItems(logicalWidth, logicalHeight, 1, overlayConfig) : [];
     const id = `plan-basemap-clip-${Date.now().toString(36)}`;
     const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
     const transform = rotation ? ` transform="rotate(${_cssNumber(rotation)} ${_cssNumber(logicalWidth / 2)} ${_cssNumber(logicalHeight / 2)})"` : '';
@@ -2039,7 +2081,10 @@ const MecFormModule = (() => {
       <defs><clipPath id="${id}"><rect x="0" y="0" width="${_cssNumber(logicalWidth)}" height="${_cssNumber(logicalHeight)}"/></clipPath></defs>
       <g clip-path="url(#${id})" opacity="${_cssNumber(baseMap.opacity)}"${transform}>
         ${items.map(item => `<image href="${_escape(item.url)}" x="${_cssNumber(item.x)}" y="${_cssNumber(item.y)}" width="${_cssNumber(item.w)}" height="${_cssNumber(item.h)}" preserveAspectRatio="none"/>`).join('')}
-      </g>`;
+      </g>
+      ${overlayItems.length ? `<g clip-path="url(#${id})" opacity="${_cssNumber(_planBaseMapStreetOverlayOpacity(baseMap))}"${transform}>
+        ${overlayItems.map(item => `<image href="${_escape(item.url)}" x="${_cssNumber(item.x)}" y="${_cssNumber(item.y)}" width="${_cssNumber(item.w)}" height="${_cssNumber(item.h)}" preserveAspectRatio="none"/>`).join('')}
+      </g>` : ''}`;
   }
 
   function _schoolPlanStageStyle(logicalWidth = 900, logicalHeight = _planCanvasHeight()) {
@@ -2295,6 +2340,7 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     const active = _planBaseMapVisible(baseMap);
     const source = _planBaseMapSource(baseMap);
+    const streetsActive = Boolean(baseMap.streetOverlay);
     const highres = _planBaseMapHighresSource();
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const coords = _planBaseMapHasCoords(baseMap)
@@ -2303,10 +2349,10 @@ const MecFormModule = (() => {
     return `
       <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
         <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Base activa' : 'Base mapa'}</button>
-        ${highres ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('highres')">${_escape(_planBaseMapHighresLabel(highres))}</button>` : ''}
+        ${highres ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline'} btn-sm school-plan-basemap-actions__primary-source" type="button" onclick="MecFormModule.setPlanBaseMapSource('highres')" title="Usar imagen local de alta resolucion">${_escape(_planBaseMapHighresLabel(highres))}</button>` : ''}
+        ${hasGoogleSatellite ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm school-plan-basemap-actions__primary-source" type="button" onclick="MecFormModule.setPlanBaseMapSource('google_satellite')" title="Usar Google satelital de alta resolucion">Alta res.</button>` : ''}
         <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')">Satelite</button>
-        ${hasGoogleSatellite ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('google_satellite')">Google sat.</button>` : ''}
-        <button class="btn ${source === PLAN_BASEMAP_SOURCE_STREET ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('street')">Calles</button>
+        <button class="btn ${streetsActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanStreetOverlay()" aria-pressed="${streetsActive ? 'true' : 'false'}" title="Mostrar nombres de calles encima de la satelital">Calles encima</button>
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
         <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base/perimetro</button>
@@ -2318,6 +2364,7 @@ const MecFormModule = (() => {
     if (!_planBaseMapPanelOpen) return '';
     const baseMap = _ensurePlanBaseMap();
     const source = _planBaseMapSource(baseMap);
+    const streetsActive = Boolean(baseMap.streetOverlay);
     const highres = _planBaseMapHighresSource();
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
@@ -2345,8 +2392,17 @@ const MecFormModule = (() => {
               ${highres ? `<option value="highres" ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'selected' : ''}>${_escape(_planBaseMapHighresLabel(highres))}</option>` : ''}
               <option value="satellite" ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'selected' : ''}>Satelite</option>
               ${hasGoogleSatellite ? `<option value="google_satellite" ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'selected' : ''}>Google satelite</option>` : ''}
-              <option value="street" ${source === PLAN_BASEMAP_SOURCE_STREET ? 'selected' : ''}>Calles y lineas</option>
             </select>
+          </label>
+          <label class="school-plan-basemap-panel__check">Calles encima
+            <span>
+              <input type="checkbox" ${streetsActive ? 'checked' : ''} onchange="MecFormModule.togglePlanStreetOverlay(this.checked)">
+              <b>${streetsActive ? 'Activas' : 'Apagadas'}</b>
+            </span>
+          </label>
+          <label>Opacidad calles
+            <input type="range" min="0.15" max="1" step="0.05" value="${_escape(_planBaseMapStreetOverlayOpacity(baseMap))}" onchange="MecFormModule.setPlanStreetOverlayOpacity(this.value)">
+            <b>${Math.round(_planBaseMapStreetOverlayOpacity(baseMap) * 100)}%</b>
           </label>
           <label>Latitud
             <input type="number" step="0.000001" value="${_escape(baseMap.lat)}" onchange="MecFormModule.setPlanBaseMapValue('lat', this.value)">
@@ -2456,6 +2512,8 @@ const MecFormModule = (() => {
       savedAt: baseMap.savedAt || '',
       dragMode: Boolean(_planBaseMapDragMode),
       panelOpen: Boolean(_planBaseMapPanelOpen),
+      streetOverlay: Boolean(baseMap.streetOverlay),
+      streetOverlayOpacity: _planBaseMapStreetOverlayOpacity(baseMap),
       hasCoords: _planBaseMapHasCoords(baseMap),
       lat: baseMap.lat,
       lng: baseMap.lng,
@@ -2469,6 +2527,7 @@ const MecFormModule = (() => {
     if (key === 'zoom') baseMap.zoom = _clampPlanBaseMapZoom(value, baseMap.zoom);
     if (key === 'scale') baseMap.scale = _clampPlanBaseMapScale(value, baseMap.scale);
     if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, 1);
+    if (key === 'streetOverlayOpacity') baseMap.streetOverlayOpacity = _planBaseMapStreetOverlayOpacity({ streetOverlayOpacity: value });
     if (key === 'rotationDeg') baseMap.rotationDeg = _planBaseMapRotationDeg(value);
     if (key === 'contrast') baseMap.contrast = _numberInRange(value, baseMap.contrast, .75, 1.75);
     if (key === 'saturation') baseMap.saturation = _numberInRange(value, baseMap.saturation, .5, 1.8);
@@ -2636,9 +2695,43 @@ const MecFormModule = (() => {
     return true;
   }
 
+  function setPlanStreetOverlayOpacity(value = PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY) {
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.streetOverlayOpacity = _planBaseMapStreetOverlayOpacity({ streetOverlayOpacity: value });
+    baseMap.streetOverlay = true;
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function togglePlanStreetOverlay(force = undefined) {
+    const baseMap = _ensurePlanBaseMap();
+    const next = force === undefined ? !baseMap.streetOverlay : Boolean(force);
+    baseMap.streetOverlay = next;
+    baseMap.streetOverlayOpacity = _planBaseMapStreetOverlayOpacity(baseMap);
+    if (next && String(baseMap.source || '').toLowerCase() === PLAN_BASEMAP_SOURCE_STREET) {
+      baseMap.source = _preferredPlanBaseMapSource();
+    }
+    if (_planBaseMapHasCoords(baseMap)) {
+      baseMap.enabled = true;
+      _applyPropertyBoundaryGeoLock();
+    } else if (next) {
+      _planBaseMapPanelOpen = true;
+      UI.showToast('Cargue coordenadas para superponer las calles sobre la base satelital.', 'warning', 5200);
+    }
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function setPlanBaseMapSource(source = PLAN_BASEMAP_SOURCE_STREET) {
     const baseMap = _ensurePlanBaseMap();
     const requested = String(source || '').toLowerCase();
+    if (requested === PLAN_BASEMAP_SOURCE_STREET) {
+      togglePlanStreetOverlay();
+      return;
+    }
     const previousSource = _planBaseMapSource(baseMap);
     const previousZoom = _clampPlanBaseMapZoom(baseMap.zoom, PLAN_BASEMAP_DEFAULT_ZOOM, previousSource);
     const previousScale = _clampPlanBaseMapScale(baseMap.scale, PLAN_BASEMAP_DEFAULT_SCALE);
@@ -2656,7 +2749,7 @@ const MecFormModule = (() => {
       baseMap.source = PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
       _requestGoogleMapTilesSession();
     } else {
-      baseMap.source = requested === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : PLAN_BASEMAP_SOURCE_STREET;
+      baseMap.source = requested === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : _preferredPlanBaseMapSource();
     }
     const nextSource = _planBaseMapSource(baseMap);
     const nextZoom = _clampPlanBaseMapZoom(previousZoom, PLAN_BASEMAP_DEFAULT_ZOOM, nextSource);
@@ -13699,6 +13792,7 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     const active = _planBaseMapVisible(baseMap);
     const source = _planBaseMapSource(baseMap);
+    const streetsActive = Boolean(baseMap.streetOverlay);
     const highres = _planBaseMapHighresSource();
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const coords = _planBaseMapHasCoords(baseMap)
@@ -13720,9 +13814,19 @@ const MecFormModule = (() => {
           onClick: "MecFormModule.setPlanBaseMapSource('highres')",
           tone: source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline',
           active: source === PLAN_BASEMAP_SOURCE_HIGHRES,
+          className: 'school-plan-ribbon__button--primary-basemap',
           title: highres.status === 'earth_engine_export_pending'
             ? 'Capa piloto configurada; falta colocar tiles exportados desde Earth Engine'
             : 'Usar imagen local de alta resolucion',
+        }) : ''}
+        ${hasGoogleSatellite ? _renderPlanRibbonButton({
+          icon: '&#128506;',
+          label: 'Alta res.',
+          onClick: "MecFormModule.setPlanBaseMapSource('google_satellite')",
+          tone: source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline',
+          active: source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE,
+          className: 'school-plan-ribbon__button--primary-basemap',
+          title: 'Usar Google satelital de alta resolucion',
         }) : ''}
         ${_renderPlanRibbonButton({
           icon: '&#128506;',
@@ -13732,21 +13836,14 @@ const MecFormModule = (() => {
           active: source === PLAN_BASEMAP_SOURCE_SATELLITE,
           title: 'Usar imagen satelital como base del plano',
         })}
-        ${hasGoogleSatellite ? _renderPlanRibbonButton({
-          icon: '&#128506;',
-          label: 'Google',
-          onClick: "MecFormModule.setPlanBaseMapSource('google_satellite')",
-          tone: source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline',
-          active: source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE,
-          title: 'Usar Google Map Tiles satelital',
-        }) : ''}
         ${_renderPlanRibbonButton({
           icon: '&#9776;',
           label: 'Calles',
-          onClick: "MecFormModule.setPlanBaseMapSource('street')",
-          tone: source === PLAN_BASEMAP_SOURCE_STREET ? 'btn-primary' : 'btn-outline',
-          active: source === PLAN_BASEMAP_SOURCE_STREET,
-          title: 'Usar base de calles y lineas',
+          onClick: 'MecFormModule.togglePlanStreetOverlay()',
+          tone: streetsActive ? 'btn-primary' : 'btn-outline',
+          active: streetsActive,
+          className: 'school-plan-ribbon__button--street-overlay',
+          title: 'Superponer nombres de calles sobre la satelital',
         })}
         ${_renderPlanRibbonButton({
           icon: '&#9881;',
@@ -24876,6 +24973,8 @@ const MecFormModule = (() => {
     togglePlanMoveMode,
     togglePlanBaseMap,
     setPlanBaseMapSource,
+    togglePlanStreetOverlay,
+    setPlanStreetOverlayOpacity,
     getPlanBaseMapState,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
