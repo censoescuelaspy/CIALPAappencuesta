@@ -19,6 +19,18 @@
 - Prueba HTTP del Web App propietario para `diagnosticoPadron`: responde `status: ok`, `source: official_sheet`, `total: 5462`, `muestra_piloto: 86`.
 - Prueba HTTP del Web App propietario para `login` sin datos: responde `Usuario y contraseña son requeridos`.
 - Prueba HTTP del Web App propietario para `getEscuelas` sin token: responde `Token invalido o expirado`, confirmando proteccion de endpoints privados.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/stats.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+### Publicacion
+- Commit publicado: `a7d2caf`.
+- Push confirmado en `origin/main`.
+- GitHub Pages verificado con cache-busting: `config.js`, `index.html` y `sw.js` responden HTTP 200 y entregan `v2.6.159`.
+- `assets/js/config.js` publicado contiene el deployment propietario `AKfycbyt-TH...`.
+- Prueba HTTP final del Web App propietario para `diagnosticoPadron`: HTTP 200 con `official_sheet`.
 
 ## Infraestructura MEC: tablero, mapa y recuento admin - 2026-06-01
 
