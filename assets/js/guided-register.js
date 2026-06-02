@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.166
+ * Version: 2.6.167
  */
 
 const GuidedRegisterModule = (() => {
@@ -371,7 +371,6 @@ const GuidedRegisterModule = (() => {
           </div>
         </div>
         <div class="guided-school-map-shell__slot" data-guided-plan-slot="${_escape(slotName)}"></div>
-        <div class="guided-school-resize guided-school-resize--map-height" data-guided-resize="school-map-height" role="separator" aria-orientation="horizontal" aria-label="Ajustar alto del mapa"><span></span></div>
       </section>`;
   }
 

@@ -5831,7 +5831,7 @@ textarea.form-control {
 .guided-school-map-shell {
   grid-area: map;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) 9px;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -5966,24 +5966,15 @@ textarea.form-control {
 
 .guided-school-resize--columns {
   grid-area: splitter;
-  align-self: stretch;
+  align-self: start;
+  height: min(100%, 240px);
+  margin-top: .7rem;
   cursor: col-resize;
 }
 
 .guided-school-resize--columns span {
   width: 4px;
   height: min(100%, 110px);
-}
-
-.guided-school-resize--map-height {
-  cursor: row-resize;
-  border-top: 1px solid #d8e2ee;
-  background: #f8fbff;
-}
-
-.guided-school-resize--map-height span {
-  width: min(56%, 640px);
-  height: 4px;
 }
 
 .guided-layout-resize--workbench {
@@ -6016,14 +6007,30 @@ textarea.form-control {
 }
 
 .guided-register--map-inline #guided-school-plan-root .school-plan__layout {
+  height: 100%;
+  min-height: 0;
   grid-template-columns: minmax(0, 1fr);
 }
 
+.guided-register--map-inline #guided-school-plan-root,
+.guided-register--map-inline #guided-school-plan-root .school-plan {
+  height: 100%;
+  min-height: 0;
+}
+
+.guided-register--map-inline #guided-school-plan-root .school-plan {
+  grid-template-rows: minmax(0, 1fr);
+}
+
 .guided-register--map-inline #guided-school-plan-root .school-plan__board {
+  display: flex;
+  flex-direction: column;
   min-height: 100%;
 }
 
 .guided-register--map-inline #guided-school-plan-root .school-plan__canvas-wrap {
+  flex: 1 1 auto;
+  max-height: none;
   min-height: 100%;
   height: 100%;
 }

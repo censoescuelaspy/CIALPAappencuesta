@@ -4,6 +4,35 @@
 
 ---
 
+## Registro guiado: mapa sin divisor inferior - 2026-06-02 - v2.6.167
+
+### Objetivo
+- Eliminar la divisoria que aparecia debajo del mapa en `Ubicacion escuela`.
+- Permitir que el mapa incrustado use el espacio vertical que quedaba vacio bajo la imagen.
+
+### Problema reportado
+- El separador inferior del mapa no aportaba una accion clara y dejaba una zona desperdiciada debajo del plano.
+- El separador vertical de panel podia quedar visualmente centrado en esa zona vacia, confundiendo la manipulacion del mapa.
+
+### Cambios implementados
+- `assets/js/guided-register.js`: se elimina el separador inferior `school-map-height` del mapa incrustado.
+- `assets/css/app.css`: la grilla del mapa deja de reservar una fila para esa divisoria.
+- `assets/css/app.css`: el plano incrustado en el paso de ubicacion usa todo el alto disponible del slot.
+- `assets/css/app.css`: el separador vertical del panel de preguntas queda acotado arriba, sin proyectarse debajo del mapa.
+- `index.html`, `assets/js/config.js`, `assets/js/guided-register.js`, `sw.js`: version actualizada a `2.6.167`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local HTTP: `index.html` contiene `v2.6.167`; `guided-register.js` y `app.css` ya no contienen `guided-school-resize--map-height`; `app.css` contiene la grilla del mapa ajustada.
+
+### Estado
+- Pendiente publicar commit/push.
+
+---
+
 ## Base mapa alta resolucion con calles superpuestas - 2026-06-02 - v2.6.166
 
 ### Objetivo
