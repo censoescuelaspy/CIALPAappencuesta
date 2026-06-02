@@ -5095,7 +5095,7 @@ textarea.form-control {
   flex-direction: column;
   gap: .45rem;
   min-height: 100%;
-  padding: .55rem .75rem .85rem;
+  padding: .55rem .75rem 4.25rem;
   color: #172033;
 }
 
@@ -5791,6 +5791,15 @@ textarea.form-control {
   font-size: .66rem;
 }
 
+.guided-school-map-shell__toolbar-state {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: #526173;
+  font-size: .62rem;
+  font-weight: 850;
+  text-align: right;
+}
+
 .guided-school-map-shell__move-base {
   min-width: 88px;
   box-shadow: 0 0 0 2px rgba(232, 76, 34, .16);
@@ -5886,7 +5895,6 @@ textarea.form-control {
   display: none;
 }
 
-.guided-register--map-inline #guided-school-plan-root .school-plan__toolbar,
 .guided-register--map-inline #guided-school-plan-root .school-plan__side {
   display: none;
 }
@@ -5960,6 +5968,28 @@ textarea.form-control {
   border-color: #fed7aa;
 }
 
+.btn-guided-active,
+.guided-school-map-shell__toolbar .btn[aria-pressed="true"],
+.guided-next-card .btn[aria-pressed="true"] {
+  background: #0f766e !important;
+  color: #ffffff !important;
+  border-color: #0f766e !important;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .20) !important;
+}
+
+.btn-guided-active::after,
+.guided-school-map-shell__toolbar .btn[aria-pressed="true"]::after {
+  content: "activo";
+  margin-left: .28rem;
+  padding: .05rem .24rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  color: #ffffff;
+  font-size: .52rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
 #module-registro .school-plan-ribbon__button.btn-guided-soft,
 #module-registro .guided-plan-panel__actions .btn-guided-soft {
   background: #fff7ed;
@@ -5999,7 +6029,7 @@ textarea.form-control {
 }
 
 .guided-slide__footer {
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: space-between;
   gap: .45rem;
@@ -6012,6 +6042,37 @@ textarea.form-control {
   color: #64748b;
   font-size: .68rem;
   font-weight: 900;
+}
+
+.guided-floating-nav {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 1300;
+  display: grid;
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr) minmax(92px, auto);
+  gap: .55rem;
+  align-items: center;
+  width: min(760px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: .45rem;
+  border: 1px solid #d8e2ee;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, .96);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .22);
+  backdrop-filter: blur(10px);
+}
+
+.guided-floating-nav span {
+  min-width: 0;
+  color: #1f3864;
+  font-size: .72rem;
+  font-weight: 950;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .guided-plan-panel {

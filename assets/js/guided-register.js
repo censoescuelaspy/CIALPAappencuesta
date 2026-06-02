@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.163
+ * Version: 2.6.164
  */
 
 const GuidedRegisterModule = (() => {
@@ -304,6 +304,11 @@ const GuidedRegisterModule = (() => {
             </div>
           </aside>
         </section>
+        <nav class="guided-floating-nav" aria-label="Navegacion del registro guiado">
+          <button class="btn btn-outline btn-sm" type="button" data-guided-action="prev">Anterior</button>
+          <span data-guided-floating-step>01 / 07</span>
+          <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="next">Siguiente</button>
+        </nav>
       </section>`;
     _applyGuidedLayout(root);
     _movePlanSurfaceForActiveStep(root);
@@ -311,9 +316,9 @@ const GuidedRegisterModule = (() => {
 
   function _renderSlide(step) {
     const sequenced = _isSequencedStep(step.id);
-    const schoolLocation = step.id === 'escuela';
+    const mapInline = _stepUsesInlineMap(step.id);
     return `
-      <article class="guided-slide ${sequenced ? 'guided-slide--sequenced' : ''} ${schoolLocation ? 'guided-slide--school-location' : ''}" data-guided-slide="${step.id}">
+      <article class="guided-slide ${sequenced ? 'guided-slide--sequenced' : ''} ${mapInline ? 'guided-slide--school-location guided-slide--with-map' : ''}" data-guided-slide="${step.id}">
         <div class="guided-slide__body">
           <p class="guided-slide__kicker">${_escape(step.kicker)}</p>
           <h3>${_escape(step.title)}</h3>
@@ -322,8 +327,8 @@ const GuidedRegisterModule = (() => {
           <div class="guided-slide__checks">
             ${step.checks.map(check => `<span>${_escape(check)}</span>`).join('')}
           </div>
-          ${schoolLocation ? `<div class="guided-school-resize guided-school-resize--columns" data-guided-resize="school-sidebar" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del panel de preguntas"><span></span></div>` : ''}
-          ${schoolLocation ? _renderSchoolLocationMapSlot() : (sequenced ? '' : `<div class="guided-slide__actions">
+          ${mapInline ? `<div class="guided-school-resize guided-school-resize--columns" data-guided-resize="school-sidebar" role="separator" aria-orientation="vertical" aria-label="Ajustar ancho del panel de preguntas"><span></span></div>` : ''}
+          ${mapInline ? _renderSchoolLocationMapSlot(step.id) : (sequenced ? '' : `<div class="guided-slide__actions">
             ${step.actions.map(action => `
               <button class="guided-action ${action.primary ? 'guided-action--primary' : ''}" type="button"
                 data-guided-action="${_escape(action.action)}"
@@ -341,7 +346,11 @@ const GuidedRegisterModule = (() => {
       </article>`;
   }
 
-  function _renderSchoolLocationMapSlot() {
+  function _stepUsesInlineMap(stepId) {
+    return STEPS.some(step => step.id === stepId);
+  }
+
+  function _renderSchoolLocationMapSlot(slotName = 'escuela') {
     return `
       <section class="guided-school-map-shell" aria-label="Mapa de ubicacion de la escuela">
         <div class="guided-school-map-shell__top">
@@ -352,15 +361,16 @@ const GuidedRegisterModule = (() => {
             <em data-guided-inline-school-status>Base mapa pendiente</em>
           </div>
           <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
-            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite">Satelite</button>
-            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemap">Calles</button>
-            <button class="btn btn-guided-selected btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase">Mover base</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite" aria-pressed="false">Satelite</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapStreet" aria-pressed="false">Calles</button>
+            <button class="btn btn-guided-soft btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase" aria-pressed="false">Mover base</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
-            <button class="btn btn-guided-selected btn-sm" type="button" data-guided-action="saveBasemap">Guardar base</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="saveBasemap" aria-pressed="false">Guardar base</button>
             <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Elegir escuela</button>
+            <small class="guided-school-map-shell__toolbar-state" data-guided-basemap-state>Base pendiente</small>
           </div>
         </div>
-        <div class="guided-school-map-shell__slot" data-guided-plan-slot="escuela"></div>
+        <div class="guided-school-map-shell__slot" data-guided-plan-slot="${_escape(slotName)}"></div>
         <div class="guided-school-resize guided-school-resize--map-height" data-guided-resize="school-map-height" role="separator" aria-orientation="horizontal" aria-label="Ajustar alto del mapa"><span></span></div>
       </section>`;
   }
@@ -472,8 +482,8 @@ const GuidedRegisterModule = (() => {
     if (!type) return false;
     const register = root.querySelector('.guided-register');
     if (!register) return false;
-    const body = root.querySelector('.guided-slide--school-location .guided-slide__body');
-    const shell = root.querySelector('.guided-school-map-shell');
+    const body = handle.closest('.guided-slide__body') || root.querySelector('.guided-slide--with-map .guided-slide__body');
+    const shell = handle.closest('.guided-school-map-shell') || root.querySelector('.guided-slide--with-map .guided-school-map-shell');
     const planPanel = root.querySelector('.guided-plan-panel');
     if (type === 'school-sidebar') {
       const bodyRect = body?.getBoundingClientRect();
@@ -640,7 +650,13 @@ const GuidedRegisterModule = (() => {
         case 'basemap':
           mec.togglePlanBaseMap();
           break;
+        case 'basemapStreet':
+          if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
+          if (mec.setPlanBaseMapSource) mec.setPlanBaseMapSource('street');
+          else mec.togglePlanBaseMap();
+          break;
         case 'basemapSatellite':
+          if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
           if (mec.setPlanBaseMapSource) mec.setPlanBaseMapSource('satellite');
           break;
         case 'coords':
@@ -1092,6 +1108,8 @@ const GuidedRegisterModule = (() => {
     });
     const progress = root.querySelector('[data-guided-progress]');
     if (progress) progress.style.width = `${((_activeIndex + 1) / STEPS.length) * 100}%`;
+    const floatingStep = root.querySelector('[data-guided-floating-step]');
+    if (floatingStep) floatingStep.textContent = `${String(_activeIndex + 1).padStart(2, '0')} / ${String(STEPS.length).padStart(2, '0')} - ${STEPS[_activeIndex]?.title || ''}`;
     const moved = _movePlanSurfaceForActiveStep(root);
     const baseMapChanged = _ensureGuidedLocationBaseMap();
     requestAnimationFrame(() => {
@@ -1117,13 +1135,14 @@ const GuidedRegisterModule = (() => {
     const planRoot = root.querySelector('#guided-school-plan-root');
     if (!planRoot) return false;
     const activeStep = STEPS[_activeIndex]?.id || 'escuela';
-    const targetName = activeStep === 'escuela' ? 'escuela' : 'panel';
-    const targetSlot = root.querySelector(`[data-guided-plan-slot="${targetName}"]`);
+    const targetName = _stepUsesInlineMap(activeStep) ? activeStep : 'panel';
+    const targetSlot = root.querySelector(`[data-guided-plan-slot="${targetName}"]`) || root.querySelector('[data-guided-plan-slot="panel"]');
     if (!targetSlot) return false;
     const moved = planRoot.parentElement !== targetSlot;
     if (moved) targetSlot.appendChild(planRoot);
-    root.querySelector('.guided-register')?.classList.toggle('guided-register--map-inline', targetName === 'escuela');
-    root.querySelector('.guided-plan-panel')?.classList.toggle('guided-plan-panel--parked', targetName === 'escuela');
+    const inline = targetName !== 'panel';
+    root.querySelector('.guided-register')?.classList.toggle('guided-register--map-inline', inline);
+    root.querySelector('.guided-plan-panel')?.classList.toggle('guided-plan-panel--parked', inline);
     return moved;
   }
 
@@ -1183,6 +1202,7 @@ const GuidedRegisterModule = (() => {
         if (el && !el.value) el.value = _preserved[sel];
       });
     });
+    _updateGuidedActionStates(root, snap);
     requestAnimationFrame(() => _syncDeckHeight(root));
   }
 
@@ -1194,6 +1214,52 @@ const GuidedRegisterModule = (() => {
     panel.innerHTML = _timeStripHtml(current.timeTracking);
   }
 
+  function _guidedBaseMapState(snap = _snapshot()) {
+    const fromMec = typeof MecFormModule !== 'undefined' && MecFormModule.getPlanBaseMapState
+      ? MecFormModule.getPlanBaseMapState()
+      : null;
+    const baseMap = fromMec || snap?.values?.__planBaseMap || {};
+    const source = String(baseMap.source || 'street').toLowerCase();
+    const enabled = Boolean(baseMap.enabled);
+    return {
+      enabled,
+      source: source === 'satellite' || source === 'google_satellite' || source === 'highres' ? source : 'street',
+      confirmed: Boolean(baseMap.confirmed || baseMap.savedAt),
+      dragMode: Boolean(baseMap.dragMode),
+      hasCoords: Boolean(baseMap.hasCoords || (baseMap.lat !== undefined && baseMap.lat !== '' && baseMap.lng !== undefined && baseMap.lng !== '')),
+    };
+  }
+
+  function _updateGuidedActionStates(root = document.getElementById('guided-register-root'), snap = _snapshot()) {
+    if (!root) return;
+    const base = _guidedBaseMapState(snap);
+    const activeFor = action => {
+      if (action === 'basemapSatellite') return base.enabled && ['satellite', 'google_satellite', 'highres'].includes(base.source);
+      if (action === 'basemapStreet') return base.enabled && base.source === 'street';
+      if (action === 'basemap') return base.enabled;
+      if (action === 'moveBase') return base.dragMode;
+      if (action === 'saveBasemap') return base.confirmed;
+      return false;
+    };
+    root.querySelectorAll('[data-guided-action]').forEach(button => {
+      const action = button.dataset.guidedAction || '';
+      const tracked = ['basemapSatellite', 'basemapStreet', 'basemap', 'moveBase', 'saveBasemap'].includes(action);
+      if (!tracked) return;
+      const active = activeFor(action);
+      button.classList.toggle('btn-guided-active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const sourceLabel = base.source === 'street'
+      ? 'Calles activas'
+      : (base.source === 'google_satellite' ? 'Google satelital activo' : 'Satelite activo');
+    const stateText = !base.hasCoords
+      ? 'Sin coordenadas: use "Usar coords"'
+      : (base.enabled ? sourceLabel : 'Base apagada');
+    root.querySelectorAll('[data-guided-basemap-state]').forEach(item => {
+      item.textContent = `${stateText}${base.dragMode ? ' | Mover base activo' : ''}${base.confirmed ? ' | Guardada' : ''}`;
+    });
+  }
+
   function _syncDeckHeight(root = document.getElementById('guided-register-root')) {
     if (!root) return;
     const deck = root.querySelector('[data-guided-deck]');
@@ -1203,8 +1269,8 @@ const GuidedRegisterModule = (() => {
     const body = slide.querySelector('.guided-slide__body');
     const footer = slide.querySelector('.guided-slide__footer');
     const desiredHeight = (body?.scrollHeight || 0) + (footer?.scrollHeight || 0);
-    const viewportFill = activeStep?.id === 'escuela'
-      ? Math.max(520, window.innerHeight - deck.getBoundingClientRect().top - 18)
+    const viewportFill = _stepUsesInlineMap(activeStep?.id)
+      ? Math.max(520, window.innerHeight - deck.getBoundingClientRect().top - 78)
       : 84;
     deck.style.height = `${Math.max(viewportFill, desiredHeight)}px`;
   }
@@ -1773,9 +1839,9 @@ const GuidedRegisterModule = (() => {
         'Revise y corrija codigo, nombre, departamento, distrito, localidad y coordenadas antes de dibujar. Esta confirmacion vincula todo el plano, fotos y cierre con la escuela correcta.',
         [
           { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
-          { label: 'Usar coordenadas', action: 'coords' },
-          { label: 'Satelite', action: 'basemapSatellite' },
-          { label: 'Base mapa', action: 'basemap' },
+          { label: 'Usar coordenadas MEC', action: 'coords' },
+          { label: 'Ver satelite', action: 'basemapSatellite' },
+          { label: 'Ver calles', action: 'basemapStreet' },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
           { label: 'Reiniciar escuela', action: 'resetSchoolData' },
         ],
@@ -1789,17 +1855,17 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Paso 1: ubicacion base',
         'Guarde una sola ubicacion de partida',
-        'Use las coordenadas de la escuela, ajuste la base de calles si hace falta y toque Guardar georef. Despues la guia pasara al perimetro del predio.',
+        'Primero pulse Usar coordenadas MEC. Luego elija Ver satelite o Ver calles para verificar la ubicacion. Cuando el punto este correcto, pulse Guardar ubicacion.',
         [
-          { label: 'Usar coordenadas', action: 'coords', primary: true },
-          { label: 'Satelite', action: 'basemapSatellite' },
-          { label: 'Calles/lineas', action: 'basemap' },
-          { label: 'Guardar georef.', action: 'saveBasemap' },
+          { label: 'Usar coordenadas MEC', action: 'coords', primary: true },
+          { label: 'Ver satelite', action: 'basemapSatellite' },
+          { label: 'Ver calles', action: 'basemapStreet' },
+          { label: 'Guardar ubicacion', action: 'saveBasemap' },
           { label: 'Corregir datos', action: 'resetSchoolIdentity' },
         ],
         false,
         '',
-        'Este paso cierra la referencia inicial. El paso siguiente ya no pedira escuela ni georreferencia: solo dibujar el contorno del predio con la misma edicion de forma que las aulas.',
+        'Use Ver calles para confirmar nombre y trazado de calles cercanas. Use Ver satelite para ubicar techos y accesos. El boton activo queda marcado en verde.',
         true
       );
     }
@@ -1809,7 +1875,7 @@ const GuidedRegisterModule = (() => {
       'La escuela ya tiene identidad y posicion de partida. Ahora corresponde delinear los bordes aproximados de la propiedad escolar.',
       [
         { label: 'Siguiente', action: 'next', primary: true },
-        { label: 'Revisar base', action: 'basemap' },
+        { label: 'Revisar calles', action: 'basemapStreet' },
         { label: 'Corregir datos escuela', action: 'resetSchoolIdentity' },
         { label: 'Reiniciar escuela', action: 'resetSchoolData' },
       ],
@@ -1839,7 +1905,7 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Bordes del predio',
         'Dibuje el perimetro como un aula editable',
-        'Agregue el perimetro del predio. Se comportara como las aulas: puede pasar a Forma L, sumar vertices y arrastrar puntos numerados.',
+        'Agregue el contorno amarillo del predio. Luego arrastre directamente sus vertices numerados para ajustarlo sobre la imagen o las calles.',
         [
           { label: 'Dibujar perimetro', action: 'addPropertyBoundary', primary: true },
           { label: 'Extender abajo', action: 'extendPlanDown' },
@@ -1848,7 +1914,7 @@ const GuidedRegisterModule = (() => {
         ],
         false,
         '',
-        'Si el borde real queda fuera del area visible, use Extender abajo antes de arrastrar vertices. Tambien puede registrar acometida desde este paso cuando quede alejada de los bloques.',
+        'El perimetro queda en el mismo plano visible del paso anterior. Si necesita verificar calles, active Calles en la barra del mapa; si necesita ver techos, active Satelite.',
         true
       );
     }
@@ -1856,7 +1922,7 @@ const GuidedRegisterModule = (() => {
       return _question(
         'Bordes del predio',
         'Mueva los vertices del perimetro',
-        'Seleccione el perimetro. Use Forma L o + Vertice igual que en aulas; despues arrastre los puntos numerados para ajustar la forma.',
+        'Seleccione el perimetro y arrastre directamente los puntos amarillos numerados. + Vertice agrega un nuevo punto al contorno; Confirmar perimetro bloquea esta etapa.',
         [
           { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}`, primary: true },
           { label: '+ Vertice', action: 'propertyBoundaryAddVertex', value: snap.propertyBoundary.id },
@@ -1867,7 +1933,7 @@ const GuidedRegisterModule = (() => {
         ],
         false,
         _guidedRequirementList(_siteElementRequirementItems(snap.propertyBoundary)),
-        'Este paso solo ajusta el borde del predio. Si el contorno toca el limite inferior del plano, primero extienda el lienzo y luego arrastre los puntos numerados.',
+        'El boton activo queda marcado en verde. Si el contorno toca el limite inferior del plano, primero extienda el lienzo y luego arrastre los puntos amarillos.',
         true
       );
     }
@@ -1879,7 +1945,7 @@ const GuidedRegisterModule = (() => {
         { label: 'Siguiente', action: 'next', primary: true },
         { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
         { label: 'Acometida', action: 'site', value: 'service_connection' },
-        { label: 'Revisar base', action: 'basemap' },
+        { label: 'Revisar calles', action: 'basemapStreet' },
       ],
       true,
       '',

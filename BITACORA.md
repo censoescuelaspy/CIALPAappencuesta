@@ -26,6 +26,40 @@
 - `node --check assets/js/config.js`.
 - `node --check sw.js`.
 - `git diff --check`.
+- Verificacion local: `http://127.0.0.1:8765/index.html` responde `200` con `v2.6.164`.
+
+---
+
+## Flujo guiado estable y botones claros - 2026-06-02
+
+### Objetivo
+- Evitar que al pasar de `Ubicacion escuela` a `Perimetro predio` se reordenen los contenedores de preguntas y mapa.
+- Hacer funcional el boton `Calles` para revisar nombres/trazados de calles.
+- Marcar con claridad que botones estan activos.
+- Mantener `Anterior` y `Siguiente` siempre visibles como navegacion flotante.
+- Dejar disponibles los controles del plano desde la primera vista.
+
+### Problema reportado
+- El paso 2 recuperaba una distribucion vieja y movia el plano a otro contenedor.
+- `Calles` actuaba como interruptor generico de base mapa y no seleccionaba la capa de calles.
+- Los estados activo/inactivo de los botones no eran faciles de distinguir.
+- La navegacion anterior/siguiente podia quedar fuera de la vista.
+
+### Cambios implementados
+- `assets/js/guided-register.js`: todos los pasos del registro guiado usan la misma estructura con preguntas a la izquierda y plano a la derecha.
+- `assets/js/guided-register.js`: `Calles` usa ahora `setPlanBaseMapSource('street')` mediante la accion `basemapStreet`.
+- `assets/js/guided-register.js`: se agrego navegacion flotante fija para `Anterior` y `Siguiente`.
+- `assets/js/guided-register.js`: los botones Satelite, Calles, Mover base y Guardar base reflejan estado con `aria-pressed` y clase activa.
+- `assets/js/mec-form.js`: se expone `getPlanBaseMapState()` para que el registro guiado pueda leer fuente, estado, guardado y modo mover base.
+- `assets/css/app.css`: se habilitan los controles del plano dentro de la vista guiada y se refuerza el contraste del estado activo.
+- `assets/js/config.js`, `index.html`, `sw.js`: version actualizada a `2.6.164` para cache-busting y trazabilidad.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
 
 ### Publicacion
 - Commit de implementacion publicado: `741e6c4`.

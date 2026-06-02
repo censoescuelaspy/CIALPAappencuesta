@@ -2447,6 +2447,21 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function getPlanBaseMapState() {
+    const baseMap = _ensurePlanBaseMap();
+    return {
+      enabled: _planBaseMapVisible(baseMap),
+      source: _planBaseMapSource(baseMap),
+      confirmed: Boolean(baseMap.confirmed || baseMap.savedAt),
+      savedAt: baseMap.savedAt || '',
+      dragMode: Boolean(_planBaseMapDragMode),
+      panelOpen: Boolean(_planBaseMapPanelOpen),
+      hasCoords: _planBaseMapHasCoords(baseMap),
+      lat: baseMap.lat,
+      lng: baseMap.lng,
+    };
+  }
+
   function setPlanBaseMapValue(key, value) {
     const baseMap = _ensurePlanBaseMap();
     if (key === 'lat') baseMap.lat = value === '' ? '' : _numberInRange(value, baseMap.lat || 0, -85, 85);
@@ -24861,6 +24876,7 @@ const MecFormModule = (() => {
     togglePlanMoveMode,
     togglePlanBaseMap,
     setPlanBaseMapSource,
+    getPlanBaseMapState,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
     setPlanSideMode,
