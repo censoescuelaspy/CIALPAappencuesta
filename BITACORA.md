@@ -26,7 +26,11 @@
 - `git diff --check`.
 
 ### Publicacion
-- Pendiente de commit, push y verificacion de GitHub Pages.
+- Commit de implementacion publicado: `d259296`.
+- Push confirmado en `origin/main`.
+- GitHub Pages verificado con cache-busting: `index.html`, `config.js`, `guided-register.js`, `app.css` y `sw.js` responden HTTP 200 y entregan `v2.6.160`.
+- `assets/js/guided-register.js` publicado contiene `guided-school-map-shell` y `_movePlanSurfaceForActiveStep`.
+- `assets/css/app.css` publicado contiene `guided-slide--school-location` y `guided-register--map-inline`.
 
 ## Apunte a GAS propietario actualizado - 2026-06-02
 
