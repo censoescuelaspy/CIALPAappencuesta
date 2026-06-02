@@ -40,6 +40,13 @@
 ### Pendiente operativo
 - Publicar Apps Script desde la cuenta propietaria/aceptada para que el arreglo backend del recuento admin quede activo en el Web App publico sin generar HTTP 403.
 
+### Publicacion
+- Commit de implementacion publicado: `8f0d375`.
+- Push confirmado en `origin/main`.
+- GitHub Pages verificado con cache-busting: `config.js`, `stats.js`, `index.html` y `sw.js` responden HTTP 200 y entregan `v2.6.158`.
+- `assets/js/config.js` publicado apunta al Web App publico estable `AKfycbzr...`.
+- `assets/js/stats.js` publicado contiene `mec-diagnostic-grid` y ya no contiene `Centro de inteligencia edilicia`.
+
 ## Plano vivo: tableros, guias y cableado - 2026-05-31
 
 ### Objetivo
