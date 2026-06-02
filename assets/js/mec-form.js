@@ -46,6 +46,7 @@ const MecFormModule = (() => {
   let _planHitAreas = [];
   let _planTransformStack = [];
   let _activePlanDrag = null;
+  let _lastSchoolPlanViewport = null;
   let _planMoveMode = false;
   let _propertyBoundaryEditId = '';
   let _planRibbonTab = 'editar';
@@ -138,6 +139,7 @@ const MecFormModule = (() => {
   const CEILING_OR_WALL_POINT_TYPES = ['light', 'fan'];
   const WALL_POINT_SNAP_DISTANCE = 18;
   const WALL_RECT_TYPES = ['switchboard', 'board'];
+  const EMBEDDED_ELECTRIC_TYPES = ['outlet', 'switchboard', 'light', 'fan', 'ac'];
 
   const SITE_ELEMENT_TYPES = [
     { id: 'water_tank',        label: 'Tanque de agua',               short: 'TQ',  icon: '&#x25CB;', ribbonLabel: 'Tanque',     tone: '#0e7490' },
@@ -7272,7 +7274,8 @@ const MecFormModule = (() => {
     _markGuidedObjectReviewed(object);
     if (key === 'ubicacion' && _isCeilingOrWallPointObject(object)) {
       const room = _sanitaryRoomObject(item);
-      if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
+      if (room && _isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, room);
+      else if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
       else if (room) {
         object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
         _clampPointInsideRoom(object, room, 10);
@@ -9282,9 +9285,16 @@ const MecFormModule = (() => {
     const w = Math.max(24, Math.abs(end.x - start.x));
     const h = Math.max(18, Math.abs(end.y - start.y));
     if (_isPointSketchObject(type)) {
-      return _clampSketchPointToActiveRoom({ id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: _defaultSketchFicha(type) });
+      const pointObject = { id, type, start, x: end.x, y: end.y, r: _sketchPointRadius(type), ficha: _defaultSketchFicha(type) };
+      return _isEmbeddedElectricSketchType(pointObject)
+        ? _lockEmbeddedElectricAttachment(pointObject, _activeSketchRoomObject())
+        : _clampSketchPointToActiveRoom(pointObject);
     }
-    return _clampOpeningToRoom({ id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: _defaultSketchFicha(type) });
+    const object = { id, type, start, x, y, w, h: type === 'door' ? 8 : h, ficha: _defaultSketchFicha(type) };
+    if (['door', 'window'].includes(type)) return _clampOpeningToRoom(object);
+    if (_isEmbeddedElectricSketchType(object)) return _lockEmbeddedElectricAttachment(object, _activeSketchRoomObject());
+    if (WALL_RECT_TYPES.includes(type)) return _snapRectToActiveRoomWall(object);
+    return _snapSketchObjectToRoomOrBlock(object);
   }
 
   function _createSketchObjectAt(point, options = {}) {
@@ -9334,7 +9344,8 @@ const MecFormModule = (() => {
         ficha: _defaultSketchFicha(_sketchTool),
       };
     }
-    if (_isPointSketchObject(object)) object = _clampSketchPointToActiveRoom(object);
+    if (_isEmbeddedElectricSketchType(object)) object = _lockEmbeddedElectricAttachment(object, _activeSketchRoomObject());
+    else if (_isPointSketchObject(object)) object = _clampSketchPointToActiveRoom(object);
     else if (WALL_RECT_TYPES.includes(object.type)) object = _snapRectToActiveRoomWall(object);
     else object = _clampOpeningToRoom(object);
     _data.__classroomSketch.objects.push(object);
@@ -10819,10 +10830,14 @@ const MecFormModule = (() => {
     if (!room || !object || object.type === 'sanitary-room') return object;
     if (object.type === 'wall') return object;
     if (_isPointSketchObject(object)) {
-      return _snapPointToRoomWall(object, room);
+      return _isEmbeddedElectricSketchType(object)
+        ? _lockEmbeddedElectricAttachment(object, room)
+        : _snapPointToRoomWall(object, room);
     }
     if (WALL_RECT_TYPES.includes(object.type)) {
-      return _snapRectToRoomWall(object, room);
+      return _isEmbeddedElectricSketchType(object)
+        ? _lockEmbeddedElectricAttachment(object, room)
+        : _snapRectToRoomWall(object, room);
     }
     if (object.type !== 'stall' && !['door', 'window'].includes(object.type) && object.w !== undefined) {
       const cx = object.x + (object.w || 0) / 2;
@@ -11384,6 +11399,8 @@ const MecFormModule = (() => {
     object.x = point.x - offset.x;
     object.y = point.y - offset.y;
     if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else if (_isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, _activeSketchRoomObject());
+    else if (_isPointSketchObject(object)) _clampSketchPointToActiveRoom(object);
     else if (WALL_RECT_TYPES.includes(object.type)) _snapRectToActiveRoomWall(object);
     else _snapSketchObjectToRoomOrBlock(object);
   }
@@ -11423,12 +11440,31 @@ const MecFormModule = (() => {
     if (WALL_ONLY_POINT_TYPES.includes(type)) return true;
     if (!CEILING_OR_WALL_POINT_TYPES.includes(type)) return false;
     if (typeof objectOrType === 'string') return true;
-    return objectOrType?.attached?.type === 'wall-point' || objectOrType?.ficha?.ubicacion === 'Pared';
+    return objectOrType?.attached?.type === 'wall-point' || objectOrType?.ficha?.ubicacion === 'Pared' || objectOrType?.ficha?.ubicacion === 'Pared fija';
   }
 
   function _isCeilingOrWallPointObject(objectOrType) {
     const type = typeof objectOrType === 'string' ? objectOrType : objectOrType?.type;
     return CEILING_OR_WALL_POINT_TYPES.includes(type);
+  }
+
+  function _isEmbeddedElectricSketchType(objectOrType) {
+    const type = typeof objectOrType === 'string' ? objectOrType : objectOrType?.type;
+    return EMBEDDED_ELECTRIC_TYPES.includes(type);
+  }
+
+  function _lockEmbeddedElectricAttachment(object, room) {
+    if (!object || !_isEmbeddedElectricSketchType(object)) return object;
+    object.ficha = object.ficha || _defaultSketchFicha(object.type);
+    if (_isPointSketchObject(object)) {
+      return room ? _snapPointToRoomWall(object, room, { forceWall: true, lockWallAnchor: true }) : object;
+    }
+    if (WALL_RECT_TYPES.includes(object.type) && room) {
+      _snapRectToRoomWall(object, room);
+      object.attached = { ...(object.attached || {}), target: room.id, locked: true };
+      object.ficha.ubicacion = 'Pared fija';
+    }
+    return object;
   }
 
   function _setPointPlacement(object, placement) {
@@ -11447,7 +11483,8 @@ const MecFormModule = (() => {
   function _snapPointToRoomWall(object, room, options = {}) {
     if (!object || !room) return object;
     const forceWall = Boolean(options.forceWall);
-    const wallOnly = WALL_ONLY_POINT_TYPES.includes(object.type);
+    const lockedWall = Boolean(object.attached?.locked || object.ficha?.ubicacion === 'Pared fija');
+    const wallOnly = WALL_ONLY_POINT_TYPES.includes(object.type) || lockedWall;
     const wallOrCeiling = _isCeilingOrWallPointObject(object);
     if (!wallOnly && !wallOrCeiling) {
       object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
@@ -11485,16 +11522,18 @@ const MecFormModule = (() => {
     const axisOffset = side === 'left' || side === 'right' ? object.y - room.y : object.x - room.x;
     object.attached = {
       type: 'wall-point',
+      target: room.id,
       side,
       ratio: axisSize ? Math.max(0, Math.min(1, axisOffset / axisSize)) : 0,
+      locked: Boolean(options.lockWallAnchor || lockedWall),
     };
-    _setPointPlacement(object, 'Pared');
+    _setPointPlacement(object, object.attached.locked ? 'Pared fija' : 'Pared');
     return object;
   }
 
-  function _clampSketchPointToActiveRoom(object) {
+  function _clampSketchPointToActiveRoom(object, options = {}) {
     const room = _activeSketchRoomObject();
-    return room ? _snapPointToRoomWall(object, room) : object;
+    return room ? _snapPointToRoomWall(object, room, options) : object;
   }
 
   function _snapRectToRoomWall(object, room) {
@@ -11656,6 +11695,7 @@ const MecFormModule = (() => {
       _reflowAttachedOpenings(object);
     }
     if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else if (object.type !== 'room' && _isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, _activeSketchRoomObject());
     else if (object.type !== 'room') _snapSketchObjectToRoomOrBlock(object);
     if (object.type !== 'room') _syncClassObjectFichaMeasurements(_data.__classroomSketch, object);
   }
@@ -12006,24 +12046,75 @@ const MecFormModule = (() => {
     });
   }
 
+  function _schoolPlanBaseMapViewSnapshot() {
+    const baseMap = _data.__planBaseMap || null;
+    if (!baseMap) return null;
+    return {
+      enabled: Boolean(baseMap.enabled),
+      source: baseMap.source || '',
+      scale: Number(baseMap.scale || PLAN_BASEMAP_DEFAULT_SCALE),
+      zoom: Number(baseMap.zoom || PLAN_BASEMAP_DEFAULT_ZOOM),
+      offsetX: Number(baseMap.offsetX || 0),
+      offsetY: Number(baseMap.offsetY || 0),
+      rotationDeg: Number(baseMap.rotationDeg || 0),
+      streetOverlay: Boolean(baseMap.streetOverlay),
+      streetOverlayOpacity: Number(baseMap.streetOverlayOpacity || PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY),
+    };
+  }
+
+  function _restoreSchoolPlanBaseMapView(view) {
+    if (!view) return;
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.enabled = Boolean(view.enabled);
+    if (view.source) baseMap.source = view.source;
+    if (Number.isFinite(Number(view.scale))) baseMap.scale = _clampPlanBaseMapScale(Number(view.scale), PLAN_BASEMAP_DEFAULT_SCALE);
+    if (Number.isFinite(Number(view.zoom))) baseMap.zoom = _clampPlanBaseMapZoom(Number(view.zoom), PLAN_BASEMAP_DEFAULT_ZOOM, baseMap.source);
+    if (Number.isFinite(Number(view.offsetX))) baseMap.offsetX = _numberInRange(Number(view.offsetX), 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+    if (Number.isFinite(Number(view.offsetY))) baseMap.offsetY = _numberInRange(Number(view.offsetY), 0, -PLAN_BASEMAP_OFFSET_LIMIT, PLAN_BASEMAP_OFFSET_LIMIT);
+    if (Number.isFinite(Number(view.rotationDeg))) baseMap.rotationDeg = _planBaseMapRotationDeg(Number(view.rotationDeg));
+    baseMap.streetOverlay = Boolean(view.streetOverlay);
+    if (Number.isFinite(Number(view.streetOverlayOpacity))) {
+      baseMap.streetOverlayOpacity = _numberInRange(Number(view.streetOverlayOpacity), PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY, .15, 1);
+    }
+  }
+
   function _captureSchoolPlanViewport(root = _activeSchoolPlanRoot()) {
     const wrap = root?.querySelector?.('.school-plan__canvas-wrap');
     const point = _canvasViewportCenterPoint(wrap, _schoolPlanZoom);
     if (!wrap || !point) return null;
-    return {
+    const viewport = {
+      rootId: root?.id || '',
+      zoom: Math.max(.1, Math.min(30, Number(_schoolPlanZoom) || 1)),
       point,
       viewportPoint: {
         x: wrap.clientWidth / 2,
         y: wrap.clientHeight / 2,
       },
+      scrollLeft: wrap.scrollLeft,
+      scrollTop: wrap.scrollTop,
+      baseMapView: _schoolPlanBaseMapViewSnapshot(),
     };
+    _lastSchoolPlanViewport = viewport;
+    return viewport;
+  }
+
+  function _rememberSchoolPlanViewport() {
+    requestAnimationFrame(() => _captureSchoolPlanViewport(_activeSchoolPlanRoot()));
   }
 
   function _restoreSchoolPlanViewport(root, viewport) {
     if (!viewport?.point) return;
     const wrap = root?.querySelector?.('.school-plan__canvas-wrap');
     if (!wrap) return;
+    const zoom = Math.max(.1, Math.min(30, Number(viewport.zoom) || _schoolPlanZoom || 1));
+    if (Math.abs(zoom - _schoolPlanZoom) > .0001) {
+      _schoolPlanZoom = zoom;
+      const canvas = root?.querySelector?.('[data-school-plan-canvas]');
+      _applySchoolPlanZoom(canvas);
+      if (canvas) _drawSchoolPlan();
+    }
     _scrollCanvasWrapToPoint(wrap, viewport.point, _schoolPlanZoom, viewport.viewportPoint);
+    _rememberSchoolPlanViewport();
   }
 
   function _focusSchoolPlanRect(rect, options = {}) {
@@ -12192,6 +12283,7 @@ const MecFormModule = (() => {
     _applySchoolPlanZoom(canvas);
     if (canvas) _drawSchoolPlan();
     if (point) _scrollCanvasWrapToPoint(wrap, point, _schoolPlanZoom, viewportPoint);
+    _rememberSchoolPlanViewport();
   }
 
   function setSchoolPlanZoom(delta) {
@@ -12670,7 +12762,8 @@ const MecFormModule = (() => {
     }
     if (_isCeilingOrWallPointObject(object) && data.has('ubicacion')) {
       const room = _activeSketchRoomObject();
-      if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
+      if (room && _isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, room);
+      else if (room && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, room, { forceWall: true });
       else if (room) {
         object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
         _clampPointInsideRoom(object, room, 10);
@@ -13177,7 +13270,8 @@ const MecFormModule = (() => {
     object.ficha[fieldId] = clean;
     if (fieldId === 'ubicacion' && _isCeilingOrWallPointObject(object)) {
       const sketchRoom = _activeSketchRoomObject();
-      if (sketchRoom && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, sketchRoom, { forceWall: true });
+      if (sketchRoom && _isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, sketchRoom);
+      else if (sketchRoom && object.ficha.ubicacion === 'Pared') _snapPointToRoomWall(object, sketchRoom, { forceWall: true });
       else if (sketchRoom) {
         object.attached = object.attached?.type === 'wall-point' ? null : object.attached;
         _clampPointInsideRoom(object, sketchRoom, 10);
@@ -13588,7 +13682,10 @@ const MecFormModule = (() => {
     if (!_initialized && !Object.keys(_data || {}).length) _loadDraft();
     const root = _activeSchoolPlanRoot();
     if (!root) return;
-    const viewport = _captureSchoolPlanViewport(root);
+    const capturedViewport = _captureSchoolPlanViewport(root);
+    const viewport = capturedViewport || ((_lastSchoolPlanViewport?.rootId || '') === (root.id || '') ? _lastSchoolPlanViewport : null);
+    if (Number.isFinite(Number(viewport?.zoom))) _schoolPlanZoom = Math.max(.1, Math.min(30, Number(viewport.zoom)));
+    _restoreSchoolPlanBaseMapView(viewport?.baseMapView);
     _bindSchoolPlanResize();
     const sketch = _data.__classroomSketch || {};
     _data.__classrooms = Array.isArray(_data.__classrooms) ? _data.__classrooms : [];
@@ -20555,7 +20652,8 @@ const MecFormModule = (() => {
       if (!point) return null;
       object.x = point.x;
       object.y = point.y;
-      _clampSketchPointToActiveRoom(object);
+      if (_isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, roomObject);
+      else _clampSketchPointToActiveRoom(object);
     } else if (object.type === 'pencil') {
       const target = _planChildRectToSketchRect(planRect, roomObject, parentRect, 1, 1);
       const box = _pencilBounds(object);
@@ -20578,6 +20676,7 @@ const MecFormModule = (() => {
       object.x = target.x;
       object.y = target.y;
       if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+      else if (_isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, roomObject);
       else if (WALL_RECT_TYPES.includes(object.type)) _snapRectToActiveRoomWall(object);
       else _snapSketchObjectToRoomOrBlock(object);
     }
@@ -20980,6 +21079,7 @@ const MecFormModule = (() => {
     if (object.type === 'window' && ['left', 'right'].includes(_openingSide(object))) object.w = 8;
     if (object.type === 'window' && ['top', 'bottom'].includes(_openingSide(object))) object.h = 8;
     if (['door', 'window'].includes(object.type)) _clampOpeningToRoom(object);
+    else if (_isEmbeddedElectricSketchType(object)) _lockEmbeddedElectricAttachment(object, roomObject);
     else _snapSketchObjectToRoomOrBlock(object);
     _syncClassObjectFichaMeasurements(activeRoom, object);
     _syncActiveClassroomFromSketch();

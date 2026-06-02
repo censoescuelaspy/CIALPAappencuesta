@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.169
+ * Version: 2.6.170
  */
 
 const GuidedRegisterModule = (() => {
@@ -1119,9 +1119,41 @@ const GuidedRegisterModule = (() => {
     const moved = _movePlanSurfaceForActiveStep(root);
     const baseMapChanged = _ensureGuidedLocationBaseMap();
     requestAnimationFrame(() => {
+      _resetActiveGuidedViewport(root);
       _syncDeckHeight(root);
       if (moved || baseMapChanged) _refreshPlan();
     });
+  }
+
+  function _resetScrollPosition(element) {
+    if (!element) return;
+    element.scrollTop = 0;
+    element.scrollLeft = 0;
+  }
+
+  function _resetActiveGuidedViewport(root = document.getElementById('guided-register-root')) {
+    if (!root) return;
+    const activeSlide = root.querySelector('.guided-slide--active');
+    [
+      root.querySelector('[data-guided-deck]'),
+      root.querySelector('[data-guided-track]'),
+      activeSlide,
+      activeSlide?.querySelector('.guided-slide__body'),
+      activeSlide?.querySelector('.guided-slide__next'),
+    ].forEach(_resetScrollPosition);
+  }
+
+  function _guidedNextRenderKey(stepId = '', snap = _snapshot()) {
+    const question = _activeGuidedQuestion(stepId, snap);
+    if (!question) return `done::${stepId}`;
+    return _questionHistoryKey(stepId, question, _questionFocusValue(question));
+  }
+
+  function _resetGuidedNextPanel(panel) {
+    if (!panel) return;
+    _resetScrollPosition(panel);
+    _resetScrollPosition(panel.querySelector('.guided-next-card'));
+    _resetScrollPosition(panel.querySelector('.guided-info-note'));
   }
 
   function _ensureGuidedLocationBaseMap() {
@@ -1191,6 +1223,7 @@ const GuidedRegisterModule = (() => {
       label.textContent = done ? 'Listo' : 'Pendiente';
       label.closest('.guided-step')?.classList.toggle('guided-step--done', done);
     });
+    let anyChangedQuestion = false;
     root.querySelectorAll('[data-guided-next]').forEach(panel => {
       const _measSels = [
         '[data-guided-block-length]', '[data-guided-block-width]',
@@ -1201,15 +1234,25 @@ const GuidedRegisterModule = (() => {
       ];
       const _preserved = {};
       _measSels.forEach(sel => { const el = panel.querySelector(sel); if (el?.value) _preserved[sel] = el.value; });
+      const renderKey = _guidedNextRenderKey(panel.dataset.guidedNext || '', snap);
+      const changedQuestion = panel.dataset.guidedRenderKey !== renderKey;
       panel.innerHTML = _guidedNextHtml(panel.dataset.guidedNext || '', snap);
+      panel.dataset.guidedRenderKey = renderKey;
       _measSels.forEach(sel => {
         if (!_preserved[sel]) return;
         const el = panel.querySelector(sel);
         if (el && !el.value) el.value = _preserved[sel];
       });
+      if (changedQuestion) {
+        anyChangedQuestion = true;
+        _resetGuidedNextPanel(panel);
+      }
     });
     _updateGuidedActionStates(root, snap);
-    requestAnimationFrame(() => _syncDeckHeight(root));
+    requestAnimationFrame(() => {
+      if (anyChangedQuestion) _resetActiveGuidedViewport(root);
+      _syncDeckHeight(root);
+    });
   }
 
   function _refreshTimeTracking(root = document.getElementById('guided-register-root'), snap = null) {

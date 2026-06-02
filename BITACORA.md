@@ -4,6 +4,39 @@
 
 ---
 
+## Registro guiado: viewport estable y electricos anclados - 2026-06-02 - v2.6.170
+
+### Objetivo
+- Evitar que el panel guiado quede partido entre la pregunta anterior y la siguiente despues de guardar perimetros o configurar elementos.
+- Mantener el zoom y la posicion visible del mapa/plano cuando se insertan puertas, ventanas u otros elementos.
+- Anclar los elementos electricos a paredes o estructuras para que acompanen al bloque/aula/sanitario que los contiene.
+
+### Problema reportado
+- Tras guardar perimetros o colocar puertas, el contenedor de preguntas podia quedar desfasado visualmente.
+- Al insertar elementos como puertas o ventanas, la vista del mapa/plano podia volver a otro zoom no elegido por el usuario.
+- Los elementos electricos quedaban sueltos y no se movian necesariamente con el elemento estructural al que pertenecen.
+
+### Cambios implementados
+- `assets/js/guided-register.js`: el panel guiado solo reinicia el scroll cuando cambia la pregunta activa, evitando quedar a mitad de dos preguntas.
+- `assets/js/mec-form.js`: el plano captura y restaura zoom, centro visible, scroll y configuracion de base mapa entre renders.
+- `assets/js/mec-form.js`: el zoom manual del plano queda registrado como ultima vista estable antes de futuros renders.
+- `assets/js/mec-form.js`: elementos electricos (`outlet`, `switchboard`, `light`, `fan`, `ac`) se bloquean como `Pared fija` cuando corresponde.
+- `index.html`, `assets/js/config.js`, `assets/js/guided-register.js`, `sw.js`: version actualizada a `2.6.170`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local HTTP: `index.html`, `assets/js/config.js`, `assets/js/mec-form.js`, `assets/js/guided-register.js` y `sw.js` respondieron `200`.
+- Verificacion local de contenido: `index.html` y `config.js` contienen `2.6.170`; `mec-form.js` contiene `_rememberSchoolPlanViewport` y `_lockEmbeddedElectricAttachment`.
+
+### Estado
+- Pendiente de commit y push.
+
+---
+
 ## Registro guiado: sin efecto de diapositiva - 2026-06-02 - v2.6.169
 
 ### Objetivo
