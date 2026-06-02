@@ -4,6 +4,36 @@
 
 ---
 
+## Registro guiado: aprovechamiento de mapa y ajuste superior izquierdo - 2026-06-02 - v2.6.168
+
+### Objetivo
+- Reducir espacios desperdiciados en el registro guiado, especialmente alrededor del mapa incrustado.
+- Hacer que los ajustes de tamano de elementos dentro de contenedores conserven el borde superior izquierdo como ancla.
+
+### Problema reportado
+- Persistian zonas vacias en el paso guiado con mapa, dando la sensacion de areas 1 a 7 sin uso claro.
+- Al ajustar elementos con botones de tamano, el cambio se hacia desde el centro y el elemento se desplazaba dentro de su contenedor.
+
+### Cambios implementados
+- `assets/css/app.css`: el deck guiado y sus slides pasan a ocupar alto real y a estirar el mapa dentro del espacio disponible.
+- `assets/css/app.css`: la columna de preguntas queda apilada arriba a la izquierda y el area sobrante queda absorbida por el mapa.
+- `assets/css/app.css`: el slot del mapa y el canvas incrustado quedan alineados con origen superior izquierdo.
+- `assets/js/mec-form.js`: los botones de tamano (`Menor`, `Mayor`, `A-/A+`, `H-/H+`) redimensionan conservando `x/y` y modificando solo `w/h`.
+- `index.html`, `assets/js/config.js`, `assets/js/guided-register.js`, `sw.js`: version actualizada a `2.6.168`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion local HTTP: `index.html` contiene `v2.6.168`; `app.css` contiene el mapa guiado extendido y `transform-origin: top left`; `mec-form.js` contiene `_topLeftAnchoredPlanResizeRect` y ya no contiene `_centeredPlanResizeRect`.
+
+### Estado
+- Pendiente de commit y verificacion publica.
+
+---
+
 ## Registro guiado: mapa sin divisor inferior - 2026-06-02 - v2.6.167
 
 ### Objetivo

@@ -5205,11 +5205,11 @@ textarea.form-control {
 
 .guided-register {
   --guided-school-sidebar-width: 210px;
-  --guided-school-map-height: clamp(520px, calc(100vh - 235px), 860px);
+  --guided-school-map-height: clamp(560px, calc(100vh - 175px), 1040px);
   --guided-plan-panel-height: clamp(520px, calc(100vh - 260px), 900px);
   display: flex;
   flex-direction: column;
-  gap: .45rem;
+  gap: .32rem;
   min-height: 100%;
   padding: .55rem .75rem 4.25rem;
   color: #172033;
@@ -5372,7 +5372,7 @@ textarea.form-control {
 .guided-workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: .55rem;
+  gap: .38rem;
   align-items: start;
   min-height: 0;
 }
@@ -5388,6 +5388,8 @@ textarea.form-control {
 }
 
 .guided-deck {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: #ffffff;
   border: 1px solid #d8e2ee;
@@ -5398,8 +5400,11 @@ textarea.form-control {
 }
 
 .guided-track {
+  flex: 1 1 auto;
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
+  height: 100%;
+  min-height: 100%;
   transition: transform .32s ease;
   will-change: transform;
 }
@@ -5410,10 +5415,12 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  min-height: 0;
+  min-height: 100%;
+  height: 100%;
 }
 
 .guided-slide__body {
+  flex: 1 1 auto;
   display: grid;
   grid-template-columns: minmax(170px, .3fr) minmax(0, 1fr);
   grid-template-areas:
@@ -5444,10 +5451,14 @@ textarea.form-control {
     "title splitter map"
     "summary splitter map"
     "next splitter map"
-    "checks splitter map";
+    "checks splitter map"
+    ". splitter map";
+  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
   gap: .34rem .38rem;
   min-height: var(--guided-school-map-height);
+  height: 100%;
   align-items: stretch;
+  align-content: stretch;
 }
 
 .guided-slide__kicker {
@@ -5475,6 +5486,7 @@ textarea.form-control {
 .guided-slide__next {
   grid-area: next;
   min-width: 0;
+  align-self: start;
 }
 
 .guided-slide__next:empty {
@@ -5845,7 +5857,7 @@ textarea.form-control {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: .45rem;
-  align-items: center;
+  align-items: start;
   padding: .32rem .42rem;
   border-bottom: 1px solid #d8e2ee;
   background: rgba(248, 251, 255, .96);
@@ -5922,15 +5934,20 @@ textarea.form-control {
 }
 
 .guided-school-map-shell__slot {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
 
 .guided-school-map-shell .guided-plan-surface {
+  flex: 1 1 auto;
+  align-self: stretch;
   height: 100%;
   min-height: 0;
-  padding: .35rem;
+  padding: .22rem;
   overflow: auto;
 }
 
@@ -5967,14 +5984,14 @@ textarea.form-control {
 .guided-school-resize--columns {
   grid-area: splitter;
   align-self: start;
-  height: min(100%, 240px);
-  margin-top: .7rem;
+  height: min(100%, var(--guided-school-map-height));
+  margin-top: .25rem;
   cursor: col-resize;
 }
 
 .guided-school-resize--columns span {
   width: 4px;
-  height: min(100%, 110px);
+  height: min(100%, 180px);
 }
 
 .guided-layout-resize--workbench {
@@ -6019,20 +6036,29 @@ textarea.form-control {
 }
 
 .guided-register--map-inline #guided-school-plan-root .school-plan {
+  align-items: stretch;
   grid-template-rows: minmax(0, 1fr);
 }
 
 .guided-register--map-inline #guided-school-plan-root .school-plan__board {
   display: flex;
   flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   min-height: 100%;
 }
 
 .guided-register--map-inline #guided-school-plan-root .school-plan__canvas-wrap {
   flex: 1 1 auto;
+  align-self: stretch;
   max-height: none;
   min-height: 100%;
   height: 100%;
+}
+
+.guided-register--map-inline #guided-school-plan-root .school-plan__canvas-stage,
+.guided-register--map-inline #guided-school-plan-root [data-school-plan-canvas] {
+  transform-origin: top left;
 }
 
 .guided-action {

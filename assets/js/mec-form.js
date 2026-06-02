@@ -21954,13 +21954,13 @@ const MecFormModule = (() => {
     return false;
   }
 
-  function _centeredPlanResizeRect(rect, scaleX = 1, scaleY = 1, minW = 18, minH = 14) {
+  function _topLeftAnchoredPlanResizeRect(rect, scaleX = 1, scaleY = 1, minW = 18, minH = 14) {
     if (!rect) return null;
     const nextW = Math.max(minW, Math.round(Number(rect.w || 0) * (Number(scaleX) || 1)));
     const nextH = Math.max(minH, Math.round(Number(rect.h || 0) * (Number(scaleY) || 1)));
     return {
-      x: Math.round(Number(rect.x || 0) + (Number(rect.w || 0) - nextW) / 2),
-      y: Math.round(Number(rect.y || 0) + (Number(rect.h || 0) - nextH) / 2),
+      x: Math.round(Number(rect.x || 0)),
+      y: Math.round(Number(rect.y || 0)),
       w: nextW,
       h: nextH,
     };
@@ -21994,7 +21994,7 @@ const MecFormModule = (() => {
       const elementId = raw.replace('site::', '');
       const element = _ensureSiteElements().find(el => el.id === elementId);
       const rect = element ? _siteElementRect(element, logicalWidth, logicalHeight) : null;
-      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 18, 14);
+      const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 18, 14);
       if (!element || !next) return false;
       _pushPlanHistory();
       return _savePlanResize(_resizePlanSiteElement(elementId, next), raw, { type: 'site-element', siteId: elementId });
@@ -22005,7 +22005,7 @@ const MecFormModule = (() => {
       const block = _blockById(blockId);
       const layout = _planBlockLayout(_data.__blocks || [], logicalWidth, logicalHeight).find(item => item.block?.id === blockId);
       const rect = layout ? { x: layout.x, y: layout.y, w: layout.w, h: layout.h } : null;
-      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 70, 78);
+      const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 70, 78);
       if (!block || !next) return false;
       _pushPlanHistory();
       return _savePlanResize(_resizePlanBlock(blockId, next, {
@@ -22021,7 +22021,7 @@ const MecFormModule = (() => {
       const area = _selectedPlanMoveArea(raw);
       const rect = _planAreaBaseRect(area);
       const blockRect = _planAreaBlockRect(area);
-      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 44, 32);
+      const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 44, 32);
       if (!area || !rect || !blockRect || !next) return false;
       _pushPlanHistory();
       return _savePlanResize(_resizePlanFloor(blockId || area.blockId, floorId || area.floorId, next, blockRect, { rect, blockRect }), raw, { type: 'floor', floorId: floorId || area.floorId });
@@ -22031,7 +22031,7 @@ const MecFormModule = (() => {
       const roomId = raw.replace('room::', '');
       const area = _selectedPlanMoveArea(raw);
       const rect = _planAreaBaseRect(area);
-      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 30, 24);
+      const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 30, 24);
       if (!area || !rect || !area.floorRect || !next) return false;
       _pushPlanHistory();
       return _savePlanResize(_resizePlanRoom(roomId || area.roomId, next, area.floorRect), raw, { type: 'room', roomId: roomId || area.roomId });
@@ -22043,12 +22043,12 @@ const MecFormModule = (() => {
       const rect = _planAreaBaseRect(area);
       if (!area || !rect) return false;
       if (objectId) {
-        const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 12, 10);
+        const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 12, 10);
         if (!area.parentRect || !next) return false;
         _pushPlanHistory();
         return _savePlanResize(_resizePlanSanitaryObject(sanitaryId || area.sanitaryId, objectId || area.objectId, next, area.parentRect), raw, { type: 'sanitary-object', sanitaryId: sanitaryId || area.sanitaryId });
       }
-      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 28, 22);
+      const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 28, 22);
       if (!area.floorRect || !next) return false;
       _pushPlanHistory();
       return _savePlanResize(_resizePlanSanitary(sanitaryId || area.sanitaryId, next, area.floorRect), raw, { type: 'sanitary', sanitaryId: sanitaryId || area.sanitaryId });
@@ -22058,7 +22058,7 @@ const MecFormModule = (() => {
       const [roomId, objectId] = raw.split('::');
       const area = _selectedPlanMoveArea(raw);
       const rect = _planAreaBaseRect(area);
-      const next = _centeredPlanResizeRect(rect, scaleX, scaleY, 12, 10);
+      const next = _topLeftAnchoredPlanResizeRect(rect, scaleX, scaleY, 12, 10);
       if (!area || !rect || !area.parentRect || !next) return false;
       _pushPlanHistory();
       _pushSketchHistory();
