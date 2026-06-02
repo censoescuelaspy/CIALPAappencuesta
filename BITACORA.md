@@ -26,7 +26,7 @@
 - `git diff --check`.
 
 ### Estado
-- Pendiente de commit y verificacion publica.
+- Commit publicado: `b88d2d7 fix: quitar transicion de diapositiva guiada`.
 
 ---
 
