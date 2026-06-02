@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.170" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.171" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.170" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.171" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.170</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.171</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.170</strong>
+      Edición vigente<br><strong class="app-version">v2.6.171</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -291,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.170</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.171</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -834,6 +834,133 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: COMENTARIOS Y MEJORAS DE LA APP
+           ====================================================== -->
+      <div id="module-comentarios" class="module-panel">
+        <div class="page-header">
+          <h2>Comentarios y mejoras</h2>
+          <button class="btn btn-sm btn-primary" onclick="FeedbackModule.focusForm()">
+            + Nuevo comentario
+          </button>
+        </div>
+        <div class="page-content feedback-module">
+          <section class="feedback-layout">
+            <form id="feedback-form" class="card feedback-form" autocomplete="off">
+              <div class="card__header">
+                <h3 class="card__title">Enviar comentario sobre la app</h3>
+                <span id="feedback-user-context" class="text-muted"></span>
+              </div>
+              <div class="form-row form-row--compact">
+                <div class="form-group">
+                  <label>Categoria *</label>
+                  <input id="feedback-categoria" name="categoria" type="hidden" value="mejora" />
+                  <div class="choice-button-grid feedback-choice-grid">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="feedback-categoria" data-choice-value="mejora">Mejora</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="error">Error</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="interfaz">Interfaz</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="rendimiento">Rendimiento</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="datos">Datos</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="otro">Otro</button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Prioridad *</label>
+                  <input id="feedback-prioridad" name="prioridad" type="hidden" value="media" />
+                  <div class="choice-button-strip">
+                    <button class="choice-button choice-button--success" type="button" data-choice-target="feedback-prioridad" data-choice-value="baja">Baja</button>
+                    <button class="choice-button choice-button--warning choice-button--active" type="button" data-choice-target="feedback-prioridad" data-choice-value="media">Media</button>
+                    <button class="choice-button choice-button--danger" type="button" data-choice-target="feedback-prioridad" data-choice-value="alta">Alta</button>
+                    <button class="choice-button choice-button--danger" type="button" data-choice-target="feedback-prioridad" data-choice-value="critica">Critica</button>
+                  </div>
+                </div>
+              </div>
+              <div class="form-row form-row--compact">
+                <div class="form-group">
+                  <label for="feedback-modulo">Modulo o vista</label>
+                  <select id="feedback-modulo" name="modulo" class="form-control">
+                    <option value="Actual">Vista actual</option>
+                    <option value="Inicio">Inicio</option>
+                    <option value="Mapa">Mapa</option>
+                    <option value="Registro guiado">Registro guiado</option>
+                    <option value="Plano escuela">Plano escuela</option>
+                    <option value="Infraestructura MEC">Infraestructura MEC</option>
+                    <option value="Administracion">Administracion</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="feedback-titulo">Titulo breve *</label>
+                  <input id="feedback-titulo" name="titulo" type="text" class="form-control" maxlength="140" placeholder="Ej.: Boton de calles no responde" required />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="feedback-descripcion">Comentario o sugerencia *</label>
+                <textarea id="feedback-descripcion" name="descripcion" class="form-control" rows="5" placeholder="Explique que ocurre, que esperaba que pasara o que mejora propone." required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="feedback-pasos">Pasos para reproducir o contexto</label>
+                <textarea id="feedback-pasos" name="pasos_reproduccion" class="form-control" rows="3" placeholder="Ej.: 1. Abrir Perimetro predio. 2. Insertar puerta. 3. El zoom cambia."></textarea>
+              </div>
+              <div class="feedback-form__footer">
+                <small id="feedback-context-preview" class="text-muted"></small>
+                <button class="btn btn-primary" type="submit">Enviar comentario</button>
+              </div>
+            </form>
+
+            <section class="card feedback-board">
+              <div class="card__header feedback-board__header">
+                <div>
+                  <h3 class="card__title" id="feedback-list-title">Mis comentarios</h3>
+                  <p id="feedback-list-subtitle" class="text-muted">Seguimiento de comentarios enviados.</p>
+                </div>
+                <button class="btn btn-sm btn-outline" type="button" onclick="FeedbackModule.loadList()">Actualizar</button>
+              </div>
+              <div id="feedback-admin-tools" class="feedback-admin-tools" data-min-role="admin">
+                <div class="form-group">
+                  <label for="feedback-filter-estado">Estado</label>
+                  <select id="feedback-filter-estado" class="form-control">
+                    <option value="">Todos</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_revision">En revision</option>
+                    <option value="resuelto">Resuelto</option>
+                    <option value="descartado">Descartado</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="feedback-filter-prioridad">Prioridad</label>
+                  <select id="feedback-filter-prioridad" class="form-control">
+                    <option value="">Todas</option>
+                    <option value="critica">Critica</option>
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrapper feedback-table-wrapper">
+                <table class="feedback-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Usuario</th>
+                      <th>Modulo</th>
+                      <th>Comentario</th>
+                      <th>Prioridad</th>
+                      <th>Estado</th>
+                      <th data-min-role="admin">Gestion</th>
+                    </tr>
+                  </thead>
+                  <tbody id="feedback-tbody">
+                    <tr><td colspan="7" class="text-center text-muted">Cargando comentarios...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
         </div>
       </div>
 
@@ -1461,20 +1588,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.170"></script>
-<script src="assets/js/local-store.js?v=2.6.170"></script>
-<script src="assets/js/api.js?v=2.6.170"></script>
-<script src="assets/js/auth.js?v=2.6.170"></script>
-<script src="assets/js/map.js?v=2.6.170"></script>
-<script src="assets/js/survey.js?v=2.6.170"></script>
-<script src="assets/js/stats.js?v=2.6.170"></script>
-<script src="assets/js/location-audit.js?v=2.6.170"></script>
-<script src="assets/js/planning.js?v=2.6.170"></script>
-<script src="assets/js/admin.js?v=2.6.170"></script>
-<script src="assets/js/jornada.js?v=2.6.170"></script>
-<script src="assets/js/manual.js?v=2.6.170"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.170"></script>
-<script src="assets/js/app.js?v=2.6.170"></script>
+<script src="assets/js/config.js?v=2.6.171"></script>
+<script src="assets/js/local-store.js?v=2.6.171"></script>
+<script src="assets/js/api.js?v=2.6.171"></script>
+<script src="assets/js/auth.js?v=2.6.171"></script>
+<script src="assets/js/map.js?v=2.6.171"></script>
+<script src="assets/js/survey.js?v=2.6.171"></script>
+<script src="assets/js/stats.js?v=2.6.171"></script>
+<script src="assets/js/location-audit.js?v=2.6.171"></script>
+<script src="assets/js/planning.js?v=2.6.171"></script>
+<script src="assets/js/admin.js?v=2.6.171"></script>
+<script src="assets/js/jornada.js?v=2.6.171"></script>
+<script src="assets/js/manual.js?v=2.6.171"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.171"></script>
+<script src="assets/js/app.js?v=2.6.171"></script>
 
 <script>
   // Set today's date in Inicio module

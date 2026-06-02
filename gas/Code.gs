@@ -22,6 +22,7 @@ const SHEET_NAMES = {
   MODULOS:      'modulos_relevamiento',
   EVENTOS:      'eventos_relevamiento',
   INCIDENCIAS:  'incidencias',
+  APP_FEEDBACK: 'comentarios_app',
   CONFIG:       'configuracion',
   AUDITORIA:    'auditoria',
   CATALOGOS:    'catalogos',
@@ -109,6 +110,7 @@ function _handleRequest(e) {
       'saveEncuestador',
       'deleteEncuestador',
       'saveIncidencia',
+      'saveComentarioApp',
       'solicitarRelevamiento',
       'aprobarSolicitudRelevamiento',
       'uploadEvidence',
@@ -120,6 +122,7 @@ function _handleRequest(e) {
       'reiniciarRelevamientoEscuela',
       'guardarCierreCompleto',
       'resolverIncidencia',
+      'resolverComentarioApp',
       'setConfig',
     ];
     const lock = writeActions.includes(action) ? LockService.getDocumentLock() : null;
@@ -162,6 +165,9 @@ function _handleRequest(e) {
 
       // Incidencias
       case 'saveIncidencia':  return _respond(SheetsService.saveIncidencia(params));
+      case 'saveComentarioApp': return _respond(SheetsService.saveComentarioApp(params));
+      case 'getComentariosApp': return _respond(SheetsService.getComentariosApp(params));
+      case 'resolverComentarioApp': return _respond(SheetsService.resolverComentarioApp(params));
       case 'solicitarRelevamiento': return _respond(SheetsService.solicitarRelevamiento(params));
       case 'aprobarSolicitudRelevamiento': return _respond(SheetsService.aprobarSolicitudRelevamiento(params));
       case 'uploadEvidence':  return _respond(SheetsService.uploadEvidence(params));

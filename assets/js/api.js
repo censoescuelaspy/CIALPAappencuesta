@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.165
+ * Version: 2.6.171
  */
 
 const API = (() => {
@@ -265,6 +265,7 @@ const API = (() => {
   };
   const _DEMO_INITIAL_CONTACTS = [];
   const _DEMO_INITIAL_RESPONSES = [];
+  const _DEMO_APP_FEEDBACK = [];
 
   function _demoCall(endpoint, data) {
     return new Promise(resolve => setTimeout(() => resolve(_demoDispatch(endpoint, data || {})), 180));
@@ -495,6 +496,35 @@ const API = (() => {
       }
       case 'getIncidencias': return { status: 'ok', data: [] };
       case 'resolverIncidencia': return { status: 'ok' };
+      case 'saveComentarioApp': {
+        const user = Auth.getUserInfo?.() || {};
+        const row = {
+          ...data,
+          id_comentario: data.clientMutationId || 'APPFB_DEMO_' + Date.now(),
+          fecha_hora: new Date().toISOString(),
+          usuario: user.usuario || 'demo',
+          nombre_usuario: `${user.nombres || ''} ${user.apellidos || ''}`.trim() || user.usuario || 'Usuario demo',
+          rol: user.rol || 'demo',
+          estado: 'pendiente',
+        };
+        _DEMO_APP_FEEDBACK.unshift(row);
+        return { status: 'ok', message: 'Comentario demo guardado.', data: { id_comentario: row.id_comentario, demo: true } };
+      }
+      case 'getComentariosApp': {
+        let rows = [..._DEMO_APP_FEEDBACK];
+        if (data.estado) rows = rows.filter(row => String(row.estado || '') === String(data.estado));
+        if (data.prioridad) rows = rows.filter(row => String(row.prioridad || '') === String(data.prioridad));
+        return { status: 'ok', data: rows };
+      }
+      case 'resolverComentarioApp': {
+        const row = _DEMO_APP_FEEDBACK.find(item => item.id_comentario === data.id_comentario);
+        if (row) {
+          row.estado = data.estado || 'resuelto';
+          row.respuesta_admin = data.respuesta_admin || data.resolucion || '';
+          row.fecha_resolucion = new Date().toISOString();
+        }
+        return { status: 'ok', message: 'Comentario demo actualizado.' };
+      }
       case 'getConfig': return { status: 'ok', data: Object.entries(_DEMO_CONFIG).map(([clave, valor]) => ({ clave, valor, descripcion: 'Parametro demo', editable: 'true' })) };
       case 'setConfig': _DEMO_CONFIG[data.clave] = data.valor; return { status: 'ok' };
       case 'getCatalogos': return { status: 'ok', data: [] };
@@ -566,6 +596,7 @@ const API = (() => {
       'iniciarModulo',
       'cerrarModulo',
       'saveIncidencia',
+      'saveComentarioApp',
       'solicitarRelevamiento',
       'guardarBorradorMec',
       'guardarCierreCompleto',
@@ -627,6 +658,7 @@ const API = (() => {
       return { duracion_minutos: data.duracion_minutos || 0, offline: true };
     }
     if (endpoint === 'saveIncidencia' || endpoint === 'solicitarRelevamiento') return { id_incidencia: data.clientMutationId || queued.id, offline: true };
+    if (endpoint === 'saveComentarioApp') return { id_comentario: data.clientMutationId || queued.id, offline: true };
     if (endpoint === 'guardarCierreCompleto') {
       return {
         id_entrega: data.clientMutationId || queued.id,
@@ -808,6 +840,9 @@ const API = (() => {
   async function saveIncidencia(datos) { return call('saveIncidencia', 'POST', datos); }
   async function solicitarRelevamiento(datos) { return call('solicitarRelevamiento', 'POST', datos); }
   async function aprobarSolicitudRelevamiento(datos) { return call('aprobarSolicitudRelevamiento', 'POST', datos); }
+  async function saveComentarioApp(datos) { return call('saveComentarioApp', 'POST', datos); }
+  async function getComentariosApp(filters = {}) { return call('getComentariosApp', 'GET', filters, { skipLoading: true }); }
+  async function resolverComentarioApp(id, estado, respuesta_admin = '') { return call('resolverComentarioApp', 'POST', { id_comentario: id, estado, respuesta_admin }); }
   async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
   async function reiniciarRelevamientoEscuela(datos) { return call('reiniciarRelevamientoEscuela', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
@@ -851,6 +886,9 @@ const API = (() => {
     saveIncidencia,
     solicitarRelevamiento,
     aprobarSolicitudRelevamiento,
+    saveComentarioApp,
+    getComentariosApp,
+    resolverComentarioApp,
     guardarBorradorMec,
     reiniciarRelevamientoEscuela,
     guardarCierreCompleto,

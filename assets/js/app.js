@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.160
+ * Version: 2.6.171
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -329,6 +329,218 @@ const IncidenciasModule = (() => {
 
 // ── App Controller ────────────────────────────────────────────────────────────
 
+const FeedbackModule = (() => {
+  'use strict';
+
+  let _bound = false;
+
+  function init() {
+    _bindOnce();
+    _renderContext();
+    loadList();
+  }
+
+  function _bindOnce() {
+    if (_bound) return;
+    _bound = true;
+    document.getElementById('feedback-form')?.addEventListener('submit', event => {
+      event.preventDefault();
+      save();
+    });
+    ['feedback-filter-estado', 'feedback-filter-prioridad'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', () => loadList());
+    });
+  }
+
+  function _renderContext() {
+    const user = Auth.getUserInfo() || {};
+    const context = document.getElementById('feedback-user-context');
+    if (context) {
+      const name = `${user.nombres || ''} ${user.apellidos || ''}`.trim() || user.usuario || 'Usuario';
+      context.textContent = `${name} - ${user.rol || 'usuario'}`;
+    }
+    const title = document.getElementById('feedback-list-title');
+    const subtitle = document.getElementById('feedback-list-subtitle');
+    if (title) title.textContent = Auth.canAccess('admin') ? 'Bandeja de comentarios' : 'Mis comentarios';
+    if (subtitle) {
+      subtitle.textContent = Auth.canAccess('admin')
+        ? 'Comentarios y sugerencias enviados por los usuarios para priorizar correcciones.'
+        : 'Seguimiento de los comentarios enviados al administrador.';
+    }
+    const preview = document.getElementById('feedback-context-preview');
+    if (preview) preview.textContent = `Contexto: ${_currentModuleLabel()} - ${location.pathname}${location.search || ''}`;
+    Auth.applyRoleVisibility();
+    UI.refreshButtonChoices(document.getElementById('feedback-form') || document);
+  }
+
+  function focusForm() {
+    const form = document.getElementById('feedback-form');
+    if (!form) return;
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => document.getElementById('feedback-titulo')?.focus(), 160);
+  }
+
+  async function save() {
+    const form = document.getElementById('feedback-form');
+    if (!form) return;
+    const datos = _formValues(form);
+    datos.modulo = datos.modulo === 'Actual' ? _currentModuleLabel() : datos.modulo;
+    datos.url = location.href;
+    datos.app_version = APP_CONFIG.VERSION || '';
+    datos.user_agent = navigator.userAgent || '';
+    datos.viewport = `${window.innerWidth || 0}x${window.innerHeight || 0}`;
+
+    if (!datos.titulo || !datos.descripcion) {
+      UI.showToast('Titulo y comentario son obligatorios.', 'warning');
+      return;
+    }
+
+    try {
+      const result = await API.saveComentarioApp(datos);
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo guardar el comentario.');
+      form.reset();
+      document.getElementById('feedback-categoria').value = 'mejora';
+      document.getElementById('feedback-prioridad').value = 'media';
+      UI.refreshButtonChoices(form);
+      UI.showToast(
+        result.queued ? 'Comentario guardado sin conexion; se sincronizara luego.' : 'Comentario enviado al administrador.',
+        result.queued ? 'warning' : 'success',
+        6500
+      );
+      await loadList();
+    } catch (err) {
+      UI.showToast('Error al enviar comentario: ' + err.message, 'error', 7000);
+    }
+  }
+
+  async function loadList() {
+    const tbody = document.getElementById('feedback-tbody');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Cargando comentarios...</td></tr>';
+    try {
+      const filters = {};
+      if (Auth.canAccess('admin')) {
+        filters.estado = document.getElementById('feedback-filter-estado')?.value || '';
+        filters.prioridad = document.getElementById('feedback-filter-prioridad')?.value || '';
+      }
+      const result = await API.getComentariosApp(filters);
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudieron cargar comentarios.');
+      _renderList(result.data || []);
+    } catch (err) {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted">${_escapeHtml(err.message)}</td></tr>`;
+      UI.showToast('Error al cargar comentarios: ' + err.message, 'error', 7000);
+    }
+  }
+
+  function _renderList(items) {
+    const tbody = document.getElementById('feedback-tbody');
+    if (!tbody) return;
+    if (!items.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Sin comentarios registrados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = items.map(item => {
+      const state = String(item.estado || 'pendiente');
+      return `
+        <tr class="feedback-row feedback-row--${_safeClass(state)}">
+          <td>${_escapeHtml(_shortDate(item.fecha_hora))}</td>
+          <td>${_escapeHtml(item.nombre_usuario || item.usuario || '-')}<br><small>${_escapeHtml(item.rol || '')}</small></td>
+          <td>${_escapeHtml(item.modulo || '-')}<br><small>${_escapeHtml(item.categoria || '')}</small></td>
+          <td>
+            <strong>${_escapeHtml(item.titulo || 'Sin titulo')}</strong>
+            <p>${_escapeHtml(item.descripcion || '')}</p>
+            ${item.pasos_reproduccion ? `<small>${_escapeHtml(item.pasos_reproduccion)}</small>` : ''}
+            ${item.respuesta_admin ? `<div class="feedback-response"><b>Admin:</b> ${_escapeHtml(item.respuesta_admin)}</div>` : ''}
+          </td>
+          <td><span class="badge badge--${_safeClass(item.prioridad || 'media')}">${_escapeHtml(item.prioridad || 'media')}</span></td>
+          <td><span class="badge badge--${_stateTone(state)}">${_stateLabel(state)}</span></td>
+          <td data-min-role="admin">${_adminActions(item)}</td>
+        </tr>`;
+    }).join('');
+    Auth.applyRoleVisibility();
+  }
+
+  function _adminActions(item) {
+    const id = _jsString(item.id_comentario);
+    const state = String(item.estado || 'pendiente');
+    const review = state !== 'en_revision' && state !== 'resuelto'
+      ? `<button class="btn btn-xs btn-outline" onclick="FeedbackModule.setEstado(${id}, 'en_revision')">Revisar</button>`
+      : '';
+    const done = state !== 'resuelto'
+      ? `<button class="btn btn-xs btn-success" onclick="FeedbackModule.setEstado(${id}, 'resuelto')">Resolver</button>`
+      : '';
+    const discard = state !== 'descartado' && state !== 'resuelto'
+      ? `<button class="btn btn-xs btn-outline" onclick="FeedbackModule.setEstado(${id}, 'descartado')">Descartar</button>`
+      : '';
+    return `<div class="feedback-actions">${review}${done}${discard}</div>`;
+  }
+
+  async function setEstado(id, estado) {
+    if (!Auth.canAccess('admin')) {
+      UI.showToast('Solo admin puede gestionar comentarios.', 'warning');
+      return;
+    }
+    const promptLabel = estado === 'resuelto'
+      ? 'Respuesta para el usuario o nota de correccion:'
+      : (estado === 'descartado' ? 'Motivo para descartar:' : 'Nota de revision:');
+    const respuesta = await UI.showPrompt(promptLabel, '');
+    if (respuesta === null) return;
+    try {
+      const result = await API.resolverComentarioApp(id, estado, respuesta);
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo actualizar.');
+      UI.showToast('Comentario actualizado.', 'success');
+      loadList();
+    } catch (err) {
+      UI.showToast('Error al actualizar comentario: ' + err.message, 'error', 7000);
+    }
+  }
+
+  function _formValues(form) {
+    return Object.fromEntries([...new FormData(form).entries()].map(([key, value]) => [key, String(value || '').trim()]));
+  }
+
+  function _currentModuleLabel() {
+    const active = document.querySelector('.module-panel--active');
+    const id = String(active?.id || '').replace(/^module-/, '');
+    const title = active?.querySelector('.page-header h2')?.textContent?.trim();
+    return title || id || document.title || 'Vista no identificada';
+  }
+
+  function _shortDate(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    return date.toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' });
+  }
+
+  function _stateLabel(value) {
+    return {
+      pendiente: 'Pendiente',
+      en_revision: 'En revision',
+      resuelto: 'Resuelto',
+      descartado: 'Descartado',
+    }[String(value || '').toLowerCase()] || String(value || 'Pendiente');
+  }
+
+  function _stateTone(value) {
+    return {
+      pendiente: 'warning',
+      en_revision: 'info',
+      resuelto: 'success',
+      descartado: 'muted',
+    }[String(value || '').toLowerCase()] || 'warning';
+  }
+
+  function _safeClass(value) {
+    return String(value || '').replace(/[^a-z0-9_-]/gi, '') || 'pendiente';
+  }
+
+  function _jsString(value) {
+    return JSON.stringify(String(value ?? '')).replace(/</g, '\\u003c');
+  }
+
+  return { init, focusForm, save, loadList, setEstado };
+})();
+
 const AppController = (() => {
   'use strict';
 
@@ -343,6 +555,7 @@ const AppController = (() => {
     encuestadores: { label: 'Encuestadores', icon: 'ENC', minRole: 'admin' },
     manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
     incidencias: { label: 'Solicitudes', icon: 'SOL', minRole: 'encuestador' },
+    comentarios: { label: 'Comentarios app', icon: 'COM', minRole: 'encuestador' },
     jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
     estadisticas: { label: 'Resultados globales', icon: '📊', minRole: 'supervisor' },
     infraestructura: { label: 'Infraestructura MEC', icon: 'MEC', minRole: 'supervisor' },
@@ -580,7 +793,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['inicio', 'arquitectura', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'cuestionario-inicial', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
+    const primaryModules = ['inicio', 'arquitectura', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'comentarios', 'cuestionario-inicial', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])
@@ -1329,6 +1542,9 @@ const AppController = (() => {
           break;
         case 'incidencias':
           IncidenciasModule.loadList();
+          break;
+        case 'comentarios':
+          FeedbackModule.init();
           break;
         case 'jornada':
           JornadaModule.init();

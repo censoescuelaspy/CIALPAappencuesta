@@ -31,6 +31,12 @@ const SheetsService = (() => {
     'notificacion_email_destino','notificacion_email_error','notificacion_email_fecha'
   ];
 
+  const APP_FEEDBACK_HEADERS = [
+    'id_comentario','fecha_hora','usuario','nombre_usuario','rol','categoria','modulo',
+    'prioridad','titulo','descripcion','pasos_reproduccion','url','app_version',
+    'user_agent','viewport','estado','respuesta_admin','usuario_admin','fecha_resolucion'
+  ];
+
   const MODULE_DEFAULTS = [
     ['establecimiento', 'Datos generales del establecimiento', 1],
     ['direccion_contacto', 'Dirección, contacto y llegada', 2],
@@ -1639,6 +1645,86 @@ const SheetsService = (() => {
     _setByHeader(sheet, rowIdx, headers, 'evidencia_url', params.resolucion || '');
     AuditService.log('RESOLVER_INCIDENCIA', session.usuario, `id: ${params.id_incidencia}`);
     return { status: 'ok', message: 'Incidencia resuelta.' };
+  }
+
+  function saveComentarioApp(params) {
+    const session = params._session;
+    _ensureColumns(SHEET_NAMES.APP_FEEDBACK, APP_FEEDBACK_HEADERS);
+    const requestedId = _clientMutationId(params);
+    if (requestedId) {
+      const existingIdx = _findRowIndex(SHEET_NAMES.APP_FEEDBACK, 'id_comentario', requestedId);
+      if (existingIdx !== -1) {
+        return { status: 'ok', message: 'Comentario offline ya sincronizado.', data: { id_comentario: requestedId } };
+      }
+    }
+
+    const titulo = _txt(params.titulo);
+    const descripcion = _txt(params.descripcion);
+    if (!titulo || !descripcion) return { status: 'error', message: 'Titulo y comentario son obligatorios.' };
+
+    const id = requestedId || _genId('APPFB');
+    const nombre = `${session.nombres || ''} ${session.apellidos || ''}`.trim() || session.usuario || '';
+    _appendObject(SHEET_NAMES.APP_FEEDBACK, APP_FEEDBACK_HEADERS, {
+      id_comentario: id,
+      fecha_hora: _timestamp(),
+      usuario: session.usuario,
+      nombre_usuario: nombre,
+      rol: session.rol || '',
+      categoria: _txt(params.categoria) || 'mejora',
+      modulo: _txt(params.modulo) || 'Vista no identificada',
+      prioridad: _txt(params.prioridad) || 'media',
+      titulo,
+      descripcion,
+      pasos_reproduccion: _txt(params.pasos_reproduccion),
+      url: _txt(params.url),
+      app_version: _txt(params.app_version),
+      user_agent: _txt(params.user_agent),
+      viewport: _txt(params.viewport),
+      estado: 'pendiente',
+      respuesta_admin: '',
+      usuario_admin: '',
+      fecha_resolucion: ''
+    });
+    AuditService.log('SAVE_COMENTARIO_APP', session.usuario, `id: ${id}, modulo: ${params.modulo || ''}`);
+    return { status: 'ok', message: 'Comentario registrado.', data: { id_comentario: id } };
+  }
+
+  function getComentariosApp(params) {
+    const session = params._session;
+    _ensureColumns(SHEET_NAMES.APP_FEEDBACK, APP_FEEDBACK_HEADERS);
+    let rows = _sheetToObjects(SHEET_NAMES.APP_FEEDBACK);
+    if (String(session.rol || '').toLowerCase() !== 'admin') {
+      rows = rows.filter(row => _same(row.usuario, session.usuario));
+    }
+    if (params.estado) rows = rows.filter(row => _same(row.estado, params.estado));
+    if (params.prioridad) rows = rows.filter(row => _same(row.prioridad, params.prioridad));
+    rows.sort((a, b) => String(b.fecha_hora).localeCompare(String(a.fecha_hora)));
+    return { status: 'ok', data: rows };
+  }
+
+  function resolverComentarioApp(params) {
+    const session = params._session;
+    if (String(session.rol || '').toLowerCase() !== 'admin') {
+      return { status: 'error', message: 'Solo administradores pueden gestionar comentarios de la app.' };
+    }
+    _ensureColumns(SHEET_NAMES.APP_FEEDBACK, APP_FEEDBACK_HEADERS);
+    const id = params.id_comentario || params.id;
+    if (!id) return { status: 'error', message: 'Identificador de comentario requerido.' };
+    const rowIdx = _findRowIndex(SHEET_NAMES.APP_FEEDBACK, 'id_comentario', id);
+    if (rowIdx === -1) return { status: 'error', message: 'Comentario no encontrado.' };
+
+    const allowed = ['pendiente', 'en_revision', 'resuelto', 'descartado'];
+    const estado = allowed.includes(String(params.estado || '').toLowerCase())
+      ? String(params.estado).toLowerCase()
+      : 'resuelto';
+    const sheet = _getSheet(SHEET_NAMES.APP_FEEDBACK);
+    const headers = _headers(sheet);
+    _setByHeader(sheet, rowIdx, headers, 'estado', estado);
+    _setByHeader(sheet, rowIdx, headers, 'respuesta_admin', params.respuesta_admin || params.resolucion || '');
+    _setByHeader(sheet, rowIdx, headers, 'usuario_admin', session.usuario);
+    _setByHeader(sheet, rowIdx, headers, 'fecha_resolucion', _timestamp());
+    AuditService.log('RESOLVER_COMENTARIO_APP', session.usuario, `id: ${id}, estado: ${estado}`);
+    return { status: 'ok', message: 'Comentario actualizado.' };
   }
 
   function getConfig() {
@@ -3258,6 +3344,7 @@ const SheetsService = (() => {
     getSesionesAbiertas, getMisSesiones,
     getEncuestadores, saveEncuestador, deleteEncuestador,
     saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence,
+    saveComentarioApp, getComentariosApp, resolverComentarioApp,
     guardarCuestionarioInicial, guardarCuestionarioInicialAdjunto, importarContactosCuestionarioInicial, listarContactosCuestionarioInicial, enviarCuestionarioInicial,
     guardarBorradorMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
