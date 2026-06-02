@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.160
+ * Version: 2.6.161
  */
 
 const GuidedRegisterModule = (() => {
@@ -326,6 +326,7 @@ const GuidedRegisterModule = (() => {
         <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
           <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite">Satelite</button>
           <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemap">Calles</button>
+          <button class="btn btn-guided-selected btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase">Mover base</button>
           <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
           <button class="btn btn-guided-selected btn-sm" type="button" data-guided-action="saveBasemap">Guardar base</button>
           <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Elegir escuela</button>
@@ -358,10 +359,20 @@ const GuidedRegisterModule = (() => {
     });
     root.addEventListener('pointerdown', event => {
       if (!event.target.closest('[data-guided-deck]')) return;
+      if (event.target.closest('.guided-school-map-shell, [data-school-plan-canvas], .school-plan__canvas-wrap')) {
+        _touchStartX = 0;
+        _touchStartY = 0;
+        return;
+      }
       _touchStartX = event.clientX;
       _touchStartY = event.clientY;
     });
     root.addEventListener('pointerup', event => {
+      if (event.target.closest('.guided-school-map-shell, [data-school-plan-canvas], .school-plan__canvas-wrap')) {
+        _touchStartX = 0;
+        _touchStartY = 0;
+        return;
+      }
       if (!_touchStartX) return;
       const dx = event.clientX - _touchStartX;
       const dy = event.clientY - _touchStartY;
@@ -463,6 +474,9 @@ const GuidedRegisterModule = (() => {
           break;
         case 'saveBasemap':
           mec.savePlanBaseMap();
+          break;
+        case 'moveBase':
+          if (mec.togglePlanBaseMapDragMode) mec.togglePlanBaseMapDragMode();
           break;
         case 'moveMode':
           mec.togglePlanMoveMode();
@@ -728,7 +742,9 @@ const GuidedRegisterModule = (() => {
       'stage',
       'demo',
       'basemap',
+      'basemapSatellite',
       'coords',
+      'moveBase',
       'moveMode',
       'zoomIn',
       'zoomOut',
@@ -752,6 +768,9 @@ const GuidedRegisterModule = (() => {
       'openSanitaryFicha',
       'openSanitaryObjectFicha',
       'openSiteFicha',
+      'basemap',
+      'basemapSatellite',
+      'moveBase',
       'zoomIn',
       'zoomOut',
       'fullscreen',

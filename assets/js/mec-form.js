@@ -89,6 +89,7 @@ const MecFormModule = (() => {
   const PLAN_WALL_THICKNESS = 5;
   const PLAN_OPENING_STROKE = 1.5;
   const PLAN_VERTEX_HANDLE_SIZE = 9;
+  const PLAN_PROPERTY_BOUNDARY_RESIZE_HANDLE_SIZE = 30;
   const SCHOOL_MARKER_PLAN_ID = 'school::coordinate';
   const PROPERTY_BOUNDARY_MAX_WIDTH_RATIO = .9;
   const PROPERTY_BOUNDARY_MAX_HEIGHT_RATIO = .82;
@@ -10155,8 +10156,11 @@ const MecFormModule = (() => {
     const width = logical.width || SKETCH_CANVAS.width;
     const height = logical.height || SKETCH_CANVAS.height;
     for (const item of [..._ensureSiteElements()].reverse()) {
+      if (item.type === 'property_boundary' && !_propertyBoundaryEditActive(item)) continue;
       const rect = _siteElementRect(item, width, height);
-      const handle = _planResizeHandles(rect, _siteElementRotationDeg(item))
+      const prominent = item.type === 'property_boundary' &&
+        (_selectedPlanId === `site::${item.id}` || _propertyBoundaryEditActive(item));
+      const handle = _planResizeHandles(rect, _siteElementRotationDeg(item), prominent ? { prominent: true } : {})
         .find(entry => Math.hypot(point.x - entry.x, point.y - entry.y) <= entry.size);
       if (!handle) continue;
       return {
@@ -13474,14 +13478,14 @@ const MecFormModule = (() => {
     return PLAN_RIBBON_TABS.some(item => item.id === value) ? value : 'editar';
   }
 
-  function _renderPlanRibbonButton({ icon = '', label = '', onClick = '', tone = 'btn-outline', active = false, disabled = false, title = '', wide = false } = {}) {
+  function _renderPlanRibbonButton({ icon = '', label = '', onClick = '', tone = 'btn-outline', active = false, disabled = false, title = '', wide = false, className = '' } = {}) {
     const caption = title || label;
     const effectiveTone = _guidedPlanButtonTone(tone, active);
     const state = disabled ? ` disabled title="${_escape(caption || 'Accion no disponible')}"` : ` title="${_escape(caption)}"`;
     const pressed = active ? ' aria-pressed="true"' : '';
     const click = disabled ? '' : ` onclick="${_escape(onClick)}"`;
     return `
-      <button class="btn ${_escape(effectiveTone)} btn-sm school-plan-ribbon__button ${active ? 'school-plan-ribbon__button--active' : ''} ${wide ? 'school-plan-ribbon__button--wide' : ''}" type="button"${click}${state} aria-label="${_escape(caption)}"${pressed}>
+      <button class="btn ${_escape(effectiveTone)} btn-sm school-plan-ribbon__button ${active ? 'school-plan-ribbon__button--active' : ''} ${wide ? 'school-plan-ribbon__button--wide' : ''} ${className ? _escape(className) : ''}" type="button"${click}${state} aria-label="${_escape(caption)}"${pressed}>
         ${icon ? `<span class="school-plan-ribbon__icon" aria-hidden="true">${icon}</span>` : ''}
         <span class="school-plan-ribbon__label">${_escape(label)}</span>
       </button>`;
@@ -13596,10 +13600,11 @@ const MecFormModule = (() => {
         })}
         ${_renderPlanRibbonButton({
           icon: '&#8596;',
-          label: _planBaseMapDragMode ? 'Mover on' : 'Mover',
+          label: _planBaseMapDragMode ? 'Moviendo base' : 'Mover base',
           onClick: 'MecFormModule.togglePlanBaseMapDragMode()',
-          tone: _planBaseMapDragMode ? 'btn-primary' : 'btn-outline',
+          tone: _planBaseMapDragMode ? 'btn-warning' : 'btn-outline',
           active: _planBaseMapDragMode,
+          className: 'school-plan-ribbon__button--move-base',
           title: 'Arrastrar mueve la base. Shift + arrastre o Shift + rueda gira; rueda sola acerca/aleja la base.',
         })}
         ${_renderPlanRibbonButton({ icon: '&#9633;', label: 'Terreno', onClick: 'MecFormModule.fitPlanBaseMapContext()', title: 'Ver mas terreno, calles y accesos alrededor' })}
@@ -16053,6 +16058,28 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
+  function _drawPlanGeoReferenceDot(ctx, point, index = '') {
+    if (!ctx || !point) return;
+    ctx.save();
+    ctx.translate(point.x, point.y);
+    ctx.globalAlpha = .86;
+    ctx.fillStyle = 'rgba(255,235,59,.92)';
+    ctx.strokeStyle = 'rgba(11,93,59,.78)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    if (index !== '') {
+      ctx.fillStyle = '#0b5d3b';
+      ctx.font = _canvasFont(900, 7);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(index), 0, .3);
+    }
+    ctx.restore();
+  }
+
   function _drawOutlinedCanvasText(ctx, text, x, y, options = {}) {
     if (!text) return;
     ctx.save();
@@ -16072,16 +16099,18 @@ const MecFormModule = (() => {
     if (!ctx || !logical) return;
     const vertices = _propertyBoundaryGeoVertices(logical.width, logical.height);
     if (!vertices.length) return;
+    const property = _propertyBoundaryElement();
+    const editActive = _propertyBoundaryEditActive(property);
     const center = vertices.reduce((acc, item) => ({
       x: acc.x + item.point.x / vertices.length,
       y: acc.y + item.point.y / vertices.length,
     }), { x: 0, y: 0 });
     ctx.save();
-    ctx.strokeStyle = '#ffd84d';
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = editActive ? 'rgba(255,216,77,.62)' : '#ffd84d';
+    ctx.lineWidth = editActive ? 2.2 : 4;
     ctx.lineJoin = 'round';
     ctx.shadowColor = 'rgba(0,0,0,.35)';
-    ctx.shadowBlur = 3;
+    ctx.shadowBlur = editActive ? 1.5 : 3;
     ctx.beginPath();
     vertices.forEach((item, index) => {
       if (index) ctx.lineTo(item.point.x, item.point.y);
@@ -16094,16 +16123,23 @@ const MecFormModule = (() => {
       const dx = item.point.x - center.x;
       const dy = item.point.y - center.y;
       const length = Math.max(1, Math.hypot(dx, dy));
-      const offsetX = (dx / length) * 24;
-      const offsetY = (dy / length) * 20;
+      const markerOffset = editActive ? 18 : 0;
+      const labelDistance = editActive ? 46 : 24;
+      const markerPoint = {
+        x: Math.max(8, Math.min(logical.width - 8, item.point.x + (dx / length) * markerOffset)),
+        y: Math.max(8, Math.min(logical.height - 8, item.point.y + (dy / length) * markerOffset)),
+      };
+      const offsetX = (dx / length) * labelDistance;
+      const offsetY = (dy / length) * (editActive ? 38 : 20);
       const labelX = Math.max(8, Math.min(logical.width - 8, item.point.x + offsetX));
       const labelY = Math.max(16, Math.min(logical.height - 12, item.point.y + offsetY));
-      _drawPlanGeoPin(ctx, item.point);
+      if (editActive) _drawPlanGeoReferenceDot(ctx, markerPoint, item.index + 1);
+      else _drawPlanGeoPin(ctx, item.point);
       _drawOutlinedCanvasText(ctx, item.label, labelX, labelY, {
-        font: _canvasFont(800, 12),
+        font: _canvasFont(800, editActive ? 10 : 12),
         align: offsetX < -2 ? 'right' : 'left',
-        strokeWidth: 4.5,
-        fill: '#111827',
+        strokeWidth: editActive ? 3.6 : 4.5,
+        fill: editActive ? '#475569' : '#111827',
       });
     });
   }
@@ -16325,11 +16361,15 @@ const MecFormModule = (() => {
     ctx.restore();
   }
 
-  function _planResizeHandles(rect, rotation = 0) {
+  function _planResizeHandles(rect, rotation = 0, options = {}) {
     if (!rect) return [];
     const center = _planRectCenter(rect);
     const minDim = Math.min(rect.w, rect.h);
-    const size = minDim < 14 ? 8 : (minDim < 28 ? 12 : 16);
+    const prominent = Boolean(options.prominent);
+    const customSize = Number(options.size);
+    const size = Number.isFinite(customSize) && customSize > 0
+      ? customSize
+      : (prominent ? PLAN_PROPERTY_BOUNDARY_RESIZE_HANDLE_SIZE : (minDim < 14 ? 8 : (minDim < 28 ? 12 : 16)));
     return [
       { name: 'nw', x: rect.x, y: rect.y },
       { name: 'ne', x: rect.x + rect.w, y: rect.y },
@@ -16342,27 +16382,40 @@ const MecFormModule = (() => {
     }));
   }
 
-  function _drawPlanResizeHandles(ctx, rect, rotation = 0) {
-    const handles = _planResizeHandles(rect, rotation);
+  function _drawPlanResizeHandles(ctx, rect, rotation = 0, options = {}) {
+    const handles = _planResizeHandles(rect, rotation, options);
     if (!handles.length) return;
     const minDim = Math.min(rect.w, rect.h);
-    const half = minDim < 14 ? 2.4 : (minDim < 28 ? 3 : 4);
+    const prominent = Boolean(options.prominent);
+    const half = prominent ? 6.5 : (minDim < 14 ? 2.4 : (minDim < 28 ? 3 : 4));
     ctx.save();
     ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#111827';
-    ctx.lineWidth = minDim < 14 ? .8 : (minDim < 28 ? 1 : 1.4);
+    ctx.strokeStyle = prominent ? '#e84c22' : '#111827';
+    ctx.lineWidth = prominent ? 2.2 : (minDim < 14 ? .8 : (minDim < 28 ? 1 : 1.4));
     handles.forEach(handle => {
       ctx.beginPath();
       ctx.rect(handle.x - half, handle.y - half, half * 2, half * 2);
       ctx.fill();
       ctx.stroke();
+      if (prominent) {
+        ctx.save();
+        ctx.strokeStyle = '#7c2d12';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(handle.x - 3.5, handle.y);
+        ctx.lineTo(handle.x + 3.5, handle.y);
+        ctx.moveTo(handle.x, handle.y - 3.5);
+        ctx.lineTo(handle.x, handle.y + 3.5);
+        ctx.stroke();
+        ctx.restore();
+      }
     });
     ctx.restore();
   }
 
   function _pushPlanResizeHitAreas(base) {
     if (!base?.rect || !base.type || !base.id) return;
-    _planResizeHandles(base.rect, base.rotation || 0).forEach(handle => {
+    _planResizeHandles(base.rect, base.rotation || 0, base.handleOptions || {}).forEach(handle => {
       _pushPlanHitArea({
         ...base,
         type: base.type,
@@ -16799,8 +16852,9 @@ const MecFormModule = (() => {
       const propertyPolygonActive = Boolean(isPropertyBoundary && shapePoints);
       const propertyEditActive = !isPropertyBoundary || _propertyBoundaryEditActive(item);
       const showEditControls = selected && propertyEditActive;
-      const showRotateControl = selected;
-      const showResizeControls = selected;
+      const showRotateControl = selected && propertyEditActive;
+      const showResizeControls = selected && propertyEditActive;
+      const resizeHandleOptions = isPropertyBoundary && selected ? { prominent: true } : {};
       _pushPlanHitArea({
         id: `site::${item.id}`,
         type: 'site-element',
@@ -16851,6 +16905,7 @@ const MecFormModule = (() => {
           rect,
           rotation: _siteElementRotationDeg(item),
           siteId: item.id,
+          handleOptions: resizeHandleOptions,
         });
       }
       _drawSiteElementShape(ctx, item, rect, selected, _planLayers.etiquetas);
@@ -16862,7 +16917,7 @@ const MecFormModule = (() => {
         _drawPlanRotateHandle(ctx, rect, _siteElementRotationDeg(item));
       }
       if (showResizeControls) {
-        _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item));
+        _drawPlanResizeHandles(ctx, rect, _siteElementRotationDeg(item), resizeHandleOptions);
       }
       if (showEditControls) {
         if (propertyPolygonActive) {
@@ -20758,6 +20813,7 @@ const MecFormModule = (() => {
       const element = _ensureSiteElements().find(item => item.id === area.siteId);
       if (!element) return null;
       if (!_assertSiteElementUnlocked(element, 'redimensionarlo')) return null;
+      if (element.type === 'property_boundary' && !_requirePropertyBoundaryEdit(element, 'redimensionar el perimetro')) return null;
       const boundaryBounds = element.type === 'property_boundary'
         ? {
             x: -PLAN_CANVAS_MAX_WIDTH,
@@ -21763,6 +21819,7 @@ const MecFormModule = (() => {
     let vertexDrag = null;
     let baseMapDrag = null;
     let baseMapRotateDrag = null;
+    let planPanDrag = null;
     let suppressClick = false;
     let suppressClickUntil = 0;
     let lastTap = null;
@@ -21827,6 +21884,45 @@ const MecFormModule = (() => {
       baseMap.confirmed = false;
       _refreshPlanBaseMapLayer(canvas, true);
       _drawSchoolPlan();
+    };
+    const clearPlanPanDrag = () => {
+      const moved = Boolean(planPanDrag?.moved);
+      const wrap = planPanDrag?.wrap || canvas.closest('.school-plan__canvas-wrap');
+      wrap?.classList.remove('school-plan__canvas-wrap--panning');
+      canvas.classList.remove('school-plan__canvas--panning');
+      planPanDrag = null;
+      return moved;
+    };
+    const startPlanPanDrag = event => {
+      const wrap = canvas.closest('.school-plan__canvas-wrap');
+      if (!wrap) return false;
+      const canScroll = wrap.scrollWidth > wrap.clientWidth + 2 || wrap.scrollHeight > wrap.clientHeight + 2;
+      if (!canScroll) return false;
+      planPanDrag = {
+        wrap,
+        startX: event.clientX,
+        startY: event.clientY,
+        scrollLeft: wrap.scrollLeft,
+        scrollTop: wrap.scrollTop,
+        moved: false,
+      };
+      wrap.classList.add('school-plan__canvas-wrap--panning');
+      canvas.classList.add('school-plan__canvas--panning');
+      canvas.setPointerCapture?.(event.pointerId);
+      suppressClickUntil = Date.now() + 120;
+      event.preventDefault();
+      return true;
+    };
+    const applyPlanPanDrag = event => {
+      if (!planPanDrag) return false;
+      const dx = event.clientX - planPanDrag.startX;
+      const dy = event.clientY - planPanDrag.startY;
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) planPanDrag.moved = true;
+      planPanDrag.wrap.scrollLeft = planPanDrag.scrollLeft - dx;
+      planPanDrag.wrap.scrollTop = planPanDrag.scrollTop - dy;
+      suppressClickUntil = Date.now() + 350;
+      event.preventDefault();
+      return true;
     };
     const siteAreaFromPoint = (point, options = {}) => {
       if (!_planLayers.exteriores) return null;
@@ -22050,6 +22146,7 @@ const MecFormModule = (() => {
         vertexDrag = null;
         baseMapDrag = null;
         baseMapRotateDrag = null;
+        clearPlanPanDrag();
         suppressClickUntil = Date.now() + 350;
         canvas.setPointerCapture?.(event.pointerId);
         event.preventDefault();
@@ -22086,8 +22183,11 @@ const MecFormModule = (() => {
         return;
       }
       const area = baseMapDragCandidate || hit(event);
-      if (!isSelectableArea(area)) return;
       pointerStart = pointFromEvent(event);
+      if (!isSelectableArea(area)) {
+        startPlanPanDrag(event);
+        return;
+      }
       canvas.setPointerCapture?.(event.pointerId);
       const rotateConfig = _rotationDragConfig(area);
       if (rotateConfig) {
@@ -22166,6 +22266,10 @@ const MecFormModule = (() => {
         applyBaseMapDrag(currentPoint);
         suppressClickUntil = Date.now() + 350;
         event.preventDefault();
+        return;
+      }
+      if (planPanDrag) {
+        applyPlanPanDrag(event);
         return;
       }
       if (rotateDrag) {
@@ -22333,6 +22437,7 @@ const MecFormModule = (() => {
         vertexDrag = null;
         baseMapDrag = null;
         baseMapRotateDrag = null;
+        clearPlanPanDrag();
         event.preventDefault();
         return;
       }
@@ -22355,6 +22460,15 @@ const MecFormModule = (() => {
         renderSchoolPlan();
         _notifyGuidedPlanSync();
         suppressClickUntil = Date.now() + 350;
+        event.preventDefault();
+        return;
+      }
+      if (planPanDrag) {
+        const moved = clearPlanPanDrag();
+        pointerCandidate = null;
+        pointerStart = null;
+        if (moved) suppressClickUntil = Date.now() + 350;
+        else resetPlanSelectionAndZoom(event);
         event.preventDefault();
         return;
       }
@@ -22503,6 +22617,7 @@ const MecFormModule = (() => {
       vertexDrag = null;
       baseMapDrag = null;
       baseMapRotateDrag = null;
+      clearPlanPanDrag();
       _activePlanDrag = null;
     });
     canvas.addEventListener('pointerleave', _hideCanvasHoverTooltip);

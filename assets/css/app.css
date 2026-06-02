@@ -5728,6 +5728,11 @@ textarea.form-control {
   font-size: .66rem;
 }
 
+.guided-school-map-shell__move-base {
+  min-width: 88px;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .16);
+}
+
 .guided-school-map-shell__slot {
   min-width: 0;
   min-height: 0;
@@ -6191,6 +6196,24 @@ textarea.form-control {
 #module-registro [data-school-plan-canvas],
 #module-plano [data-school-plan-canvas] {
   touch-action: none;
+  cursor: grab;
+}
+
+#module-registro [data-school-plan-canvas].school-plan__canvas--panning,
+#module-plano [data-school-plan-canvas].school-plan__canvas--panning {
+  cursor: grabbing;
+}
+
+#module-registro [data-school-plan-canvas].school-plan__canvas--basemap-drag,
+#module-plano [data-school-plan-canvas].school-plan__canvas--basemap-drag {
+  cursor: move;
+}
+
+#module-registro .school-plan-ribbon__button--move-base,
+#module-plano .school-plan-ribbon__button--move-base {
+  flex-basis: 70px;
+  min-width: 70px;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .12);
 }
 
 #module-registro .school-plan__side {
