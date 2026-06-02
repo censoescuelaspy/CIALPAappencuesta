@@ -30,9 +30,10 @@
 - `git diff --check`.
 - Verificacion local HTTP: `http://127.0.0.1:8765/index.html?qa=<timestamp>` contiene `v2.6.166`.
 - Verificacion local HTTP de assets: `mec-form.js` contiene `togglePlanStreetOverlay` y `PLAN_BASEMAP_STREET_OVERLAY`; `guided-register.js` contiene `Calles encima`; `mec-form.css` contiene `school-plan-basemap__tiles--street-overlay`.
+- Verificacion publica GitHub Pages: `index.html`, `mec-form.js`, `guided-register.js` y `mec-form.css` sirven `v2.6.166` y los cambios esperados con cache-busting.
 
 ### Estado
-- Pendiente publicar commit/push.
+- Commit publicado: `e1d6021 feat: superponer calles sobre mapa alta resolucion`.
 - Archivos MP4 sin seguimiento en `tools/earthengine/` se mantienen fuera de este cambio.
 
 ---
