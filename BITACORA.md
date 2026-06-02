@@ -33,6 +33,10 @@
 - `node --check sw.js`.
 - `git diff --check`.
 - Verificacion local: `http://127.0.0.1:8765/index.html` responde `200` con `v2.6.165`.
+- Verificacion publica: GitHub Pages responde `200`, `index.html` contiene `v2.6.165` y `assets/js/stats.js` contiene `mec-choropleth-map`.
+
+### Estado
+- Commit publicado: `7494e54 feat: acelerar tableros y mapa MEC`.
 
 ---
 
