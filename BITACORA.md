@@ -4,6 +4,35 @@
 
 ---
 
+## Registro guiado: cierre con pendientes visible - 2026-06-03 - v2.6.173
+
+### Objetivo
+- Recuperar el acceso directo para finalizar la encuesta aunque queden pendientes declarados.
+- Mantener el cierre disponible desde cualquier etapa del Registro guiado, no solo desde `Revision y salida`.
+
+### Problema reportado
+- El usuario no veia el boton para finalizar encuesta con pendientes mientras trabajaba en etapas intermedias como `Bloques y pisos`.
+- El flujo seguia teniendo la accion de cierre, pero estaba demasiado escondida dentro de la pregunta final.
+
+### Cambios implementados
+- `assets/js/guided-register.js`: la barra flotante inferior ahora muestra `Finalizar con N pendiente(s)` cuando la escuela tiene pendientes, y `Finalizar escuela` cuando el relevamiento esta completo.
+- `assets/css/app.css`: estilos compactos para ubicar el boton de cierre dentro de la barra flotante junto a `Anterior` y `Siguiente`.
+- `index.html`, `assets/js/config.js`, `assets/js/app.js`, `assets/js/guided-register.js`, `sw.js`: version actualizada a `2.6.173` para renovar cache y assets diferidos.
+
+### Validaciones ejecutadas
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/app.js`.
+- `node --check assets/js/config.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+- Verificacion estatica: `data-guided-finish-pending`, `data-guided-finish-complete` y `_updateFloatingFinishAction` presentes.
+- Verificacion estatica de version: `index.html`, `assets/js/config.js`, `assets/js/app.js`, `assets/js/guided-register.js` y `sw.js` contienen `2.6.173`.
+
+### Estado
+- Listo para commit y push. No se tocaron los MP4 sin seguimiento de `tools/earthengine/`.
+
+---
+
 ## Perimetro: vertices independientes - 2026-06-02 - v2.6.172
 
 ### Objetivo

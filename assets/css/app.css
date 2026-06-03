@@ -6227,6 +6227,20 @@ textarea.form-control {
   white-space: nowrap;
 }
 
+.guided-floating-nav__center {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: .28rem;
+}
+
+.guided-floating-nav__center .btn {
+  max-width: min(260px, 100%);
+  min-height: 32px;
+  padding-inline: .7rem;
+  white-space: nowrap;
+}
+
 .guided-plan-panel {
   position: sticky;
   top: .55rem;

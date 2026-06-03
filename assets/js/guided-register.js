@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.170
+ * Version: 2.6.173
  */
 
 const GuidedRegisterModule = (() => {
@@ -306,7 +306,11 @@ const GuidedRegisterModule = (() => {
         </section>
         <nav class="guided-floating-nav" aria-label="Navegacion del registro guiado">
           <button class="btn btn-outline btn-sm" type="button" data-guided-action="prev">Anterior</button>
-          <span data-guided-floating-step>01 / 07</span>
+          <div class="guided-floating-nav__center">
+            <span data-guided-floating-step>01 / 07</span>
+            <button class="btn btn-warning btn-sm" type="button" data-guided-action="finalizePartial" data-guided-finish-pending hidden>Finalizar con pendientes</button>
+            <button class="btn btn-success btn-sm" type="button" data-guided-action="finalizeComplete" data-guided-finish-complete hidden>Finalizar escuela</button>
+          </div>
           <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="next">Siguiente</button>
         </nav>
       </section>`;
@@ -1116,6 +1120,7 @@ const GuidedRegisterModule = (() => {
     if (progress) progress.style.width = `${((_activeIndex + 1) / STEPS.length) * 100}%`;
     const floatingStep = root.querySelector('[data-guided-floating-step]');
     if (floatingStep) floatingStep.textContent = `${String(_activeIndex + 1).padStart(2, '0')} / ${String(STEPS.length).padStart(2, '0')} - ${STEPS[_activeIndex]?.title || ''}`;
+    _updateFloatingFinishAction(root, _snapshot());
     const moved = _movePlanSurfaceForActiveStep(root);
     const baseMapChanged = _ensureGuidedLocationBaseMap();
     requestAnimationFrame(() => {
@@ -1249,9 +1254,26 @@ const GuidedRegisterModule = (() => {
       }
     });
     _updateGuidedActionStates(root, snap);
+    _updateFloatingFinishAction(root, snap);
     requestAnimationFrame(() => {
       if (anyChangedQuestion) _resetActiveGuidedViewport(root);
       _syncDeckHeight(root);
+    });
+  }
+
+  function _updateFloatingFinishAction(root = document.getElementById('guided-register-root'), snap = _snapshot()) {
+    if (!root) return;
+    const hasSchool = Boolean(snap.school?.code || snap.school?.name);
+    const completion = snap.completion || { complete: false, pending: [] };
+    const pendingCount = Array.isArray(completion.pending) ? completion.pending.length : 0;
+    root.querySelectorAll('[data-guided-finish-pending]').forEach(button => {
+      button.hidden = !hasSchool || Boolean(completion.complete);
+      button.textContent = pendingCount
+        ? `Finalizar con ${pendingCount} pendiente(s)`
+        : 'Finalizar con pendientes';
+    });
+    root.querySelectorAll('[data-guided-finish-complete]').forEach(button => {
+      button.hidden = !hasSchool || !completion.complete;
     });
   }
 
