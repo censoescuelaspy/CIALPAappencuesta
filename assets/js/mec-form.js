@@ -8,6 +8,7 @@ const MecFormModule = (() => {
 
   const STORAGE_KEY = 'cialpa_mec_form_draft_v1';
   const PLAN_CANVAS_ID = 'school-plan-canvas';
+  const TECHNICAL_REGISTER_MODE = true;
   const PLAN_BASEMAP_TILE_SIZE = 256;
   const PLAN_BASEMAP_DEFAULT_ZOOM = 19;
   const PLAN_BASEMAP_MIN_ZOOM = 14;
@@ -126,7 +127,7 @@ const MecFormModule = (() => {
     { id: 'board', label: 'Pizarron' },
     { id: 'outlet', label: 'Toma' },
     { id: 'switchboard', label: 'Tablero' },
-    { id: 'damage', label: 'Daño/obs.' },
+    { id: 'damage', label: 'Daño/falla' },
     { id: 'light', label: 'Foco' },
     { id: 'fan', label: 'Ventilador' },
     { id: 'ac', label: 'Aire acond.' },
@@ -188,17 +189,20 @@ const MecFormModule = (() => {
     { id: 'shower', field: 'duchas', label: 'Ducha', short: 'DU' },
   ];
 
+  const SANITARY_FIXTURE_DEFAULT_STATE = TECHNICAL_REGISTER_MODE ? 'Presente' : 'Bueno';
   const SANITARY_CABIN_FIXTURES = [
-    { id: 'toilet', label: 'Inodoro', defaultState: 'Bueno' },
-    { id: 'cistern_low', label: 'Cisterna baja', defaultState: 'Bueno' },
-    { id: 'cistern_high', label: 'Cisterna alta', defaultState: 'Bueno' },
-    { id: 'paper_holder', label: 'Portapapel higienico', defaultState: 'Bueno' },
-    { id: 'sink', label: 'Lavamanos', defaultState: 'Bueno' },
-    { id: 'trash_bin', label: 'Basurero', defaultState: 'Bueno' },
-    { id: 'coat_hook', label: 'Perchero / gancho', defaultState: 'Bueno' },
+    { id: 'toilet', label: 'Inodoro', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
+    { id: 'cistern_low', label: 'Cisterna baja', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
+    { id: 'cistern_high', label: 'Cisterna alta', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
+    { id: 'paper_holder', label: 'Portapapel higienico', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
+    { id: 'sink', label: 'Lavamanos', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
+    { id: 'trash_bin', label: 'Basurero', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
+    { id: 'coat_hook', label: 'Perchero / gancho', defaultState: SANITARY_FIXTURE_DEFAULT_STATE },
   ];
 
-  const SANITARY_FIXTURE_STATES = ['Bueno', 'Regular', 'Malo', 'No tiene', 'No funciona'];
+  const SANITARY_FIXTURE_STATES = TECHNICAL_REGISTER_MODE
+    ? ['Presente', 'Faltante', 'No funciona', 'No verificable']
+    : ['Bueno', 'Regular', 'Malo', 'No tiene', 'No funciona'];
 
   const SANITARY_EXTRA_TOOLS = SKETCH_TOOLS.filter(tool => tool.id !== 'select');
 
@@ -2811,7 +2815,13 @@ const MecFormModule = (() => {
   }
 
   function _fieldVisible(field) {
+    if (TECHNICAL_REGISTER_MODE && field?.technicalHidden) return false;
     return _visibleRuleMatches(field.visibleWhen);
+  }
+
+  function _sectionVisible(section) {
+    if (TECHNICAL_REGISTER_MODE && section?.technicalHidden) return false;
+    return (section.fields || []).some(_fieldVisible);
   }
 
   function _visibleRuleMatches(rule) {
@@ -3044,7 +3054,7 @@ const MecFormModule = (() => {
     if (module.kind === 'schoolPlan') return _renderSchoolPlanModule();
     if (module.id === 'bloques') return _renderBlockModule(module);
     if (!module.sections?.length) return _renderDevelopmentModule(module);
-    return module.sections.map(section => _renderSection(module, section)).join('');
+    return module.sections.filter(_sectionVisible).map(section => _renderSection(module, section)).join('');
   }
 
   function _renderSchoolPlanModule() {
@@ -3143,7 +3153,7 @@ const MecFormModule = (() => {
           <h4>${_escape(section.title)}</h4>
         </div>
         <div class="mec-field-grid">
-          ${section.fields.map(field => _renderField(module.id, field)).join('')}
+          ${section.fields.filter(_fieldVisible).map(field => _renderField(module.id, field)).join('')}
         </div>
       </section>`;
   }
@@ -3493,7 +3503,7 @@ const MecFormModule = (() => {
           <div>
             <span>Sin elemento seleccionado</span>
             <strong>Toque un elemento del plano</strong>
-            <small>Apareceran accesos rapidos para ficha, calidad, tipo, fotos y eliminacion.</small>
+            <small>Apareceran accesos rapidos para ficha tecnica, tipo, fotos y eliminacion.</small>
           </div>
         </div>`;
     }
@@ -5249,7 +5259,7 @@ const MecFormModule = (() => {
     const ficha = {
       codigo: `${cfg.short} ${index}`,
       subtipo: cfg.label,
-      estado: 'Bueno',
+      ...(TECHNICAL_REGISTER_MODE ? {} : { estado: 'Bueno' }),
       rotacion_grados: '0',
       nota_i: '',
       observacion: '',
@@ -5782,7 +5792,7 @@ const MecFormModule = (() => {
     }
     _selectedPlanId = `block::${block.id}`;
     renderSchoolPlan();
-    UI.showToast('Paso 1: responda largo, ancho y estado del bloque desde la guia superior. La ficha queda para correcciones.', 'info', 7200);
+    UI.showToast('Paso 1: responda largo, ancho y datos tecnicos del bloque desde la guia superior. La ficha queda para correcciones.', 'info', 7200);
   }
 
   function positionActiveBlockOnPlan() {
@@ -5813,7 +5823,7 @@ const MecFormModule = (() => {
     _selectedPlanId = _floorRecordPlanId(block, floor);
     _setActiveFloor(_floorRecordLabel(floor));
     renderSchoolPlan();
-    UI.showToast('Piso seleccionado. Complete medidas y estado desde la guia superior; use la ficha solo para corregir.', 'info', 6200);
+    UI.showToast('Piso seleccionado. Complete ubicacion y medidas desde la guia superior; use la ficha solo para corregir.', 'info', 6200);
   }
 
   function addFloorToActiveBlock() {
@@ -5863,7 +5873,7 @@ const MecFormModule = (() => {
     closePlanBlockFicha();
     if (!guided) setTimeout(() => openPlanFloorFicha(block.id, floor.id), 80);
     UI.showToast(guided
-      ? `${label} agregado. La guia superior pedira medidas, estado y ubicacion.`
+      ? `${label} agregado. La guia superior pedira medidas, tipo y ubicacion.`
       : `${label} agregado. Ajuste medidas y ubicacion en su ficha.`, 'success');
     return floor;
   }
@@ -6481,9 +6491,9 @@ const MecFormModule = (() => {
           <div><label class="mec-label"><span>Genero / destino</span></label>${_renderSanitaryChoice('genero', item.id, ['Mujeres', 'Varones', 'Mixto', 'Inclusivo', 'No definido'], item.genero)}</div>
           <div><label class="mec-label"><span>Accesible</span></label>${_renderSanitaryChoice('accesible', item.id, ['Si, cumple', 'Si, parcial', 'No', 'No verificable'], item.accesible)}</div>
           <div><label class="mec-label"><span>Cuenta con agua</span></label>${_renderSanitaryChoice('agua', item.id, ['Si', 'Intermitente', 'No'], item.agua)}</div>
-          <div><label class="mec-label"><span>Estado general</span></label>${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}</div>
+          ${TECHNICAL_REGISTER_MODE ? '' : `<div><label class="mec-label"><span>Estado general</span></label>${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}</div>
           <div><label class="mec-label"><span>Limpieza</span></label>${_renderSanitaryChoice('limpieza', item.id, ['Buena', 'Regular', 'Mala', 'No verificable'], item.limpieza)}</div>
-          <div><label class="mec-label"><span>Privacidad</span></label>${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}</div>
+          <div><label class="mec-label"><span>Privacidad</span></label>${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}</div>`}
           <div><label class="mec-label"><span>Desague</span></label>${_renderSanitaryChoice('desague', item.id, ['Red cloacal', 'Camara septica', 'Pozo ciego', 'Letrina', 'Otro', 'No verificable'], item.desague)}</div>
         </div>
         <label class="mec-label"><span>Observacion</span></label>
@@ -6627,7 +6637,7 @@ const MecFormModule = (() => {
             <label class="mec-label"><span>Cuenta con agua</span></label>
             ${_renderSanitaryChoice('agua', item.id, ['Si', 'Intermitente', 'No'], item.agua)}
           </div>
-          <div>
+          ${TECHNICAL_REGISTER_MODE ? '' : `<div>
             <label class="mec-label"><span>Estado general</span></label>
             ${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}
           </div>
@@ -6638,7 +6648,7 @@ const MecFormModule = (() => {
           <div>
             <label class="mec-label"><span>Privacidad</span></label>
             ${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}
-          </div>
+          </div>`}
           <div>
             <label class="mec-label"><span>Desague</span></label>
             ${_renderSanitaryChoice('desague', item.id, ['Red cloacal', 'Camara septica', 'Pozo ciego', 'Letrina', 'Otro', 'No verificable'], item.desague)}
@@ -6727,14 +6737,14 @@ const MecFormModule = (() => {
       return `
         <details class="mec-sanitary-cabin-panel">
           <summary>Objetos de cabina</summary>
-          <p class="mec-hint">Seleccione una cabina del croquis o pulse + Cbn para cargar inodoro, cisterna, portapapel y estado.</p>
+          <p class="mec-hint">Seleccione una cabina del croquis o pulse + Cbn para cargar inodoro, cisterna, portapapel y datos tecnicos.</p>
         </details>`;
     }
     const fixtures = _ensureStallFixtures(selected);
     const available = SANITARY_CABIN_FIXTURES.filter(tool => !fixtures.some(item => item.id === tool.id));
     return `
       <details class="mec-sanitary-cabin-panel" open>
-        <summary>${_escape(selected.ficha?.codigo || 'Cabina')} - objetos y estado</summary>
+        <summary>${_escape(selected.ficha?.codigo || 'Cabina')} - objetos y datos</summary>
         <div class="form-grid">
           <div class="form-group">
             <label>Codigo</label>
@@ -6742,7 +6752,7 @@ const MecFormModule = (() => {
               oninput="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'codigo', this.value, false)"
               onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(selected.id)}', 'codigo', this.value)">
           </div>
-          <div class="form-group">
+          <div class="form-group" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
             <label>Estado cabina</label>
             ${_buttonChoiceGroup(
               SANITARY_FIXTURE_STATES,
@@ -6766,7 +6776,7 @@ const MecFormModule = (() => {
         </div>
         <div class="mec-object-note" role="note">
           <span aria-hidden="true">i</span>
-          <p>Nota (i): deje asentadas particularidades de la cabina, puerta, privacidad o artefactos.</p>
+          <p>Nota (i): deje asentadas particularidades tecnicas de la cabina, puerta, medidas o artefactos.</p>
         </div>
         <label class="mec-label"><span>Nota (i)</span></label>
         <textarea class="form-control" rows="2"
@@ -6789,7 +6799,7 @@ const MecFormModule = (() => {
       return;
     }
     _selectedSanitaryObjectId = stall.id;
-    stall.ficha = { codigo: 'Cbn', estado: item.estado || 'Bueno', puerta: 'Con puerta', nota_i: '', ...(stall.ficha || {}) };
+    stall.ficha = { codigo: 'Cbn', estado: TECHNICAL_REGISTER_MODE ? '' : item.estado || 'Bueno', puerta: 'Con puerta', nota_i: '', ...(stall.ficha || {}) };
     const fixtures = _ensureStallFixtures(stall);
     const available = SANITARY_CABIN_FIXTURES.filter(tool => !fixtures.some(current => current.id === tool.id));
     const modalId = 'modal-sanitary-stall-ficha';
@@ -6813,7 +6823,7 @@ const MecFormModule = (() => {
                 oninput="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'codigo', this.value, false)"
                 onchange="MecFormModule.setSanitaryStallValue('${_escape(item.id)}', '${_escape(stall.id)}', 'codigo', this.value, false)">
             </div>
-            <div class="form-group">
+            <div class="form-group" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Estado cabina</label>
               ${_buttonChoiceGroup(
                 SANITARY_FIXTURE_STATES,
@@ -6914,7 +6924,7 @@ const MecFormModule = (() => {
       return `
         <details class="mec-sanitary-cabin-panel">
           <summary>Ficha de objeto sanitario</summary>
-          <p class="mec-hint">Seleccione un inodoro, lavamanos, puerta, ventana u otro objeto del sanitario para cargar tipo, estado, observacion y foto.</p>
+          <p class="mec-hint">Seleccione un inodoro, lavamanos, puerta, ventana u otro objeto del sanitario para cargar tipo, ubicacion, observacion y foto.</p>
         </details>`;
     }
     selected.ficha = { ..._defaultSanitaryObjectFicha(item, selected.type), ...(selected.ficha || {}) };
@@ -6935,15 +6945,15 @@ const MecFormModule = (() => {
               oninput="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(selected.id)}', 'subtipo', this.value, false)"
               onchange="MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(selected.id)}', 'subtipo', this.value)">
           </div>
-          <div class="form-group">
+          ${(!TECHNICAL_REGISTER_MODE || selected.type === 'damage') ? `<div class="form-group">
             <label>Estado</label>
             ${_buttonChoiceGroup(
-              SANITARY_FIXTURE_STATES,
+              selected.type === 'damage' ? ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'] : SANITARY_FIXTURE_STATES,
               selected.ficha.estado || '',
               state => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(selected.id)}', 'estado', '${_escape(state)}')`,
               'mec-choice-buttons--compact'
             )}
-          </div>
+          </div>` : ''}
           ${_isCeilingOrWallPointObject(selected) ? `
             <div class="form-group">
               <label>Ubicacion</label>
@@ -7002,7 +7012,7 @@ const MecFormModule = (() => {
         id: `cab_${index + 1}`,
         label: `Cbn ${index + 1}`,
         artefacto: 'Inodoro',
-        estado: item.estado || '',
+        estado: TECHNICAL_REGISTER_MODE ? '' : item.estado || '',
       }));
     }
     return item.plano;
@@ -7422,7 +7432,7 @@ const MecFormModule = (() => {
       ficha: {
         codigo: `Cbn ${next}`,
         artefacto: 'Inodoro',
-        estado: item.estado || '',
+        estado: TECHNICAL_REGISTER_MODE ? '' : item.estado || '',
         puerta: 'Con puerta',
         cabinId,
         fixtures: _defaultStallFixtures(item),
@@ -7434,14 +7444,14 @@ const MecFormModule = (() => {
     const door = _createSanitaryStallDoor(item, object);
     if (guided) _markGuidedObjectReview(door);
     item.objects.push(door);
-    item.plano.cabinas.push({ id: cabinId, label: `Cbn ${next}`, artefacto: 'Inodoro', estado: item.estado || '' });
+    item.plano.cabinas.push({ id: cabinId, label: `Cbn ${next}`, artefacto: 'Inodoro', estado: TECHNICAL_REGISTER_MODE ? '' : item.estado || '' });
     item.inodoros = String(Math.max(Number(item.inodoros || 0), item.plano.cabinas.length, (item.objects || []).filter(child => child.type === 'stall').length));
     _selectedSanitaryObjectId = object.id;
     _saveDraft(false);
     _render();
     renderSchoolPlan();
     UI.showToast(guided
-      ? 'Cabina agregada. La guia superior pedira estado, puerta y artefactos antes de continuar.'
+      ? 'Cabina agregada. La guia superior pedira puerta, componentes y fallas/faltantes antes de continuar.'
       : 'Cabina agregada con puerta y objetos basicos.', 'success');
     if (!guided) setTimeout(() => openSanitaryStallFicha(item.id, object.id), 120);
   }
@@ -7449,7 +7459,7 @@ const MecFormModule = (() => {
   function _defaultStallFixtures(item) {
     return ['toilet', 'cistern_low', 'paper_holder'].map(id => {
       const cfg = SANITARY_CABIN_FIXTURES.find(tool => tool.id === id);
-      return { id, estado: item.estado || cfg?.defaultState || 'Bueno' };
+      return { id, estado: item.estado || cfg?.defaultState || SANITARY_FIXTURE_DEFAULT_STATE };
     });
   }
 
@@ -7457,10 +7467,10 @@ const MecFormModule = (() => {
     stall.ficha = stall.ficha || {};
     stall.ficha.fixtures = Array.isArray(stall.ficha.fixtures)
       ? stall.ficha.fixtures
-      : _defaultStallFixtures({ estado: stall.ficha.estado || 'Bueno' });
+      : _defaultStallFixtures({ estado: TECHNICAL_REGISTER_MODE ? '' : stall.ficha.estado || SANITARY_FIXTURE_DEFAULT_STATE });
     stall.ficha.fixtures = stall.ficha.fixtures
       .filter(fixture => fixture && fixture.id)
-      .map(fixture => ({ id: fixture.id, estado: fixture.estado || 'Bueno' }));
+      .map(fixture => ({ id: fixture.id, estado: fixture.estado || SANITARY_FIXTURE_DEFAULT_STATE }));
     return stall.ficha.fixtures;
   }
 
@@ -7475,7 +7485,7 @@ const MecFormModule = (() => {
       ficha: {
         codigo: `Pta ${stall.ficha?.codigo || 'Cbn'}`,
         subtipo: 'Puerta',
-        estado: item.estado || 'Bueno',
+        ...(TECHNICAL_REGISTER_MODE ? {} : { estado: item.estado || 'Bueno' }),
         abre_hacia: 'Exterior',
         cabinId: stall.ficha?.cabinId || '',
         parentStallId: stall.id,
@@ -7511,7 +7521,7 @@ const MecFormModule = (() => {
     if (!item || !stall || !fixture) return;
     if (!_assertSanitaryUnlocked(item, 'agregar componentes de cabina')) return;
     const fixtures = _ensureStallFixtures(stall);
-    if (!fixtures.some(current => current.id === fixtureId)) fixtures.push({ id: fixtureId, estado: item.estado || fixture.defaultState || 'Bueno' });
+    if (!fixtures.some(current => current.id === fixtureId)) fixtures.push({ id: fixtureId, estado: item.estado || fixture.defaultState || SANITARY_FIXTURE_DEFAULT_STATE });
     _selectedSanitaryObjectId = stall.id;
     _saveDraft(false);
     _render();
@@ -7523,7 +7533,7 @@ const MecFormModule = (() => {
     const stall = item?.objects?.find(object => object.id === stallId && object.type === 'stall');
     if (!item || !stall) return;
     if (!_assertSanitaryUnlocked(item, 'editar la cabina')) return;
-    stall.ficha = { codigo: 'Cbn', estado: item.estado || 'Bueno', puerta: 'Con puerta', nota_i: '', ...(stall.ficha || {}) };
+    stall.ficha = { codigo: 'Cbn', estado: TECHNICAL_REGISTER_MODE ? '' : item.estado || 'Bueno', puerta: 'Con puerta', nota_i: '', ...(stall.ficha || {}) };
     stall.ficha[key] = String(value || '').trim();
     if (key === 'codigo') {
       const door = _sanitaryStallDoor(item, stall);
@@ -7647,14 +7657,14 @@ const MecFormModule = (() => {
             <div><label class="mec-label"><span>Genero / destino</span></label>${_renderSanitaryChoice('genero', item.id, ['Mujeres', 'Varones', 'Mixto', 'Inclusivo', 'No definido'], item.genero)}</div>
             <div><label class="mec-label"><span>Accesible</span></label>${_renderSanitaryChoice('accesible', item.id, ['Si, cumple', 'Si, parcial', 'No', 'No verificable'], item.accesible)}</div>
             <div><label class="mec-label"><span>Cuenta con agua</span></label>${_renderSanitaryChoice('agua', item.id, ['Si', 'Intermitente', 'No'], item.agua)}</div>
-            <div><label class="mec-label"><span>Estado general</span></label>${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}</div>
+            ${TECHNICAL_REGISTER_MODE ? '' : `<div><label class="mec-label"><span>Estado general</span></label>${_renderSanitaryChoice('estado', item.id, ['Bueno', 'Regular', 'Malo', 'Fuera de servicio'], item.estado)}</div>
             <div><label class="mec-label"><span>Limpieza</span></label>${_renderSanitaryChoice('limpieza', item.id, ['Buena', 'Regular', 'Mala', 'No verificable'], item.limpieza)}</div>
-            <div><label class="mec-label"><span>Privacidad</span></label>${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}</div>
+            <div><label class="mec-label"><span>Privacidad</span></label>${_renderSanitaryChoice('privacidad', item.id, ['Adecuada', 'Parcial', 'Deficiente', 'Sin puertas'], item.privacidad)}</div>`}
             <div><label class="mec-label"><span>Desague</span></label>${_renderSanitaryChoice('desague', item.id, ['Red cloacal', 'Camara septica', 'Pozo ciego', 'Letrina', 'Otro', 'No verificable'], item.desague)}</div>
           </div>
           <div class="mec-object-note" role="note">
             <span aria-hidden="true">i</span>
-            <p>Nota (i): registre excepciones, estado operativo, privacidad, agua, desague o pendientes para gabinete.</p>
+            <p>Nota (i): registre excepciones tecnicas de ubicacion, tipo, agua, desague o medidas para gabinete.</p>
           </div>
           <label class="mec-label"><span>Observacion</span></label>
           <textarea class="form-control" rows="3"
@@ -7749,16 +7759,16 @@ const MecFormModule = (() => {
                 'mec-choice-buttons--compact'
               )}
             </div>
-            <div class="form-group">
+            ${(!TECHNICAL_REGISTER_MODE || object.type === 'damage') ? `<div class="form-group">
               <label>Estado</label>
               ${_buttonChoiceGroup(
-                SANITARY_FIXTURE_STATES,
+                object.type === 'damage' ? ['Leve', 'Moderado', 'Severo', 'Riesgo inmediato'] : SANITARY_FIXTURE_STATES,
                 object.ficha.estado || '',
                 state => `MecFormModule.setSanitaryObjectValue('${_escape(item.id)}', '${_escape(object.id)}', 'estado', '${_escape(state)}', false)`,
                 'mec-choice-buttons--compact'
               )}
-            </div>
-            ${_renderSketchCriteriaHelp(object.type)}
+            </div>` : ''}
+            ${(!TECHNICAL_REGISTER_MODE || object.type === 'damage') ? _renderSketchCriteriaHelp(object.type) : ''}
             ${_isCeilingOrWallPointObject(object) ? `
               <div class="form-group">
                 <label>Ubicacion</label>
@@ -7772,7 +7782,7 @@ const MecFormModule = (() => {
           </div>
           <div class="mec-object-note" role="note">
             <span aria-hidden="true">i</span>
-            <p>Nota (i): registre condicion, ubicacion precisa, faltantes, excepciones o requerimientos de reparacion.</p>
+            <p>Nota (i): registre ubicacion precisa, tipo, medidas, excepciones tecnicas o dano/falla si corresponde.</p>
           </div>
           <label class="mec-label"><span>Observacion</span></label>
           <textarea class="form-control" rows="3"
@@ -10968,14 +10978,22 @@ const MecFormModule = (() => {
     return String(value ?? '').trim();
   }
 
-  function _tooltipRowsFromFicha(ficha = {}, extraRows = []) {
+  function _technicalStateVisible(type = '') {
+    return !TECHNICAL_REGISTER_MODE || type === 'damage';
+  }
+
+  function _technicalStateText(item = {}, fallback = '') {
+    return _technicalStateVisible(item?.type) ? (item?.ficha?.estado || fallback) : '';
+  }
+
+  function _tooltipRowsFromFicha(ficha = {}, extraRows = [], type = '') {
     const rows = [
       ...extraRows,
       { label: 'Codigo', value: ficha.codigo },
       { label: 'Tipo', value: ficha.subtipo || ficha.artefacto },
-      { label: 'Estado', value: ficha.estado },
+      { label: type === 'damage' ? 'Gravedad' : 'Estado', value: _technicalStateVisible(type) ? ficha.estado : '' },
       { label: 'Ubicacion', value: ficha.ubicacion || ficha.sector },
-      { label: 'Funcionamiento', value: ficha.funcionamiento },
+      { label: 'Funcionamiento', value: TECHNICAL_REGISTER_MODE ? '' : ficha.funcionamiento },
       { label: 'Seguridad', value: ficha.seguridad || ficha.prioridad },
       { label: 'Nota', value: ficha.nota_i },
       { label: 'Obs.', value: ficha.observacion },
@@ -11063,7 +11081,7 @@ const MecFormModule = (() => {
       subtitle: `${context} - ${typeLabel}`,
       rows: _tooltipRowsFromFicha(ficha, [
         { label: 'Medidas', value: dimensions },
-      ]),
+      ], object.type),
       photos: _tooltipPhotosFromList(ficha.evidencias || []),
     };
   }
@@ -11087,7 +11105,7 @@ const MecFormModule = (() => {
         { label: 'Medidas', value: room.length && room.width ? `${room.length} x ${room.width} m` : _sketchDimensionsText(object || {}) },
         { label: 'Area', value: _tooltipPlanArea(room.length, room.width) },
         { label: 'Rotacion', value: `${_roomRotationDeg(room)} grados` },
-        { label: 'Estado', value: room.estado || '' },
+        { label: 'Estado', value: TECHNICAL_REGISTER_MODE ? '' : room.estado || '' },
         { label: 'Aberturas', value: doors || windows ? `${doors} puerta(s), ${windows} ventana(s)` : '' },
         { label: 'Electricidad', value: _tooltipCountText(electric, 'elemento(s)') },
         { label: 'Daños', value: _tooltipCountText(damages, 'marca(s)') },
@@ -11116,7 +11134,7 @@ const MecFormModule = (() => {
         { label: 'Medidas', value: item.largo_m && item.ancho_m ? `${item.largo_m} x ${item.ancho_m} m` : '' },
         { label: 'Area', value: _tooltipPlanArea(item.largo_m, item.ancho_m) },
         { label: 'Rotacion', value: `${_sanitaryRotationDeg(item)} grados` },
-        { label: 'Estado', value: item.estado || '' },
+        { label: 'Estado', value: TECHNICAL_REGISTER_MODE ? '' : item.estado || '' },
         { label: 'Accesible', value: item.accesible || '' },
         { label: 'Cabinas', value: _tooltipCountText(stalls, 'cabina(s)') },
         { label: 'Artefactos', value: _tooltipCountText(fixtures, 'artefacto(s)') },
@@ -11144,7 +11162,7 @@ const MecFormModule = (() => {
         { label: 'Diam./lado', value: element.type === 'pillar' && (element.ficha?.forma_pilar === 'Cuadrado' ? element.ficha?.lado_m : element.ficha?.diametro_m) ? `${element.ficha.forma_pilar === 'Cuadrado' ? element.ficha.lado_m : element.ficha.diametro_m} m` : '' },
         { label: 'Area', value: _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
         { label: 'Rotacion', value: rotation ? `${rotation} grados` : '0 grados' },
-      ]),
+      ], element.type),
       photos: _tooltipPhotosFromList(element.ficha?.evidencias || []),
     };
   }
@@ -11813,8 +11831,8 @@ const MecFormModule = (() => {
     object.ficha.__guidedRequired = 'true';
     object.ficha.__guidedReviewed = '';
     const requiredFields = object.type === 'door'
-      ? ['subtipo', 'estado', 'abre_hacia', 'bisagra']
-      : ['subtipo', 'estado'];
+      ? ['subtipo', 'abre_hacia', 'bisagra']
+      : (object.type === 'damage' ? ['subtipo', 'estado'] : ['subtipo']);
     requiredFields.forEach(key => { object.ficha[key] = ''; });
     return object;
   }
@@ -12502,6 +12520,22 @@ const MecFormModule = (() => {
     return options.map(option => `<option value="${_escape(option)}" ${selected === option ? 'selected' : ''}>${_escape(option)}</option>`).join('');
   }
 
+  function _technicalObjectExtraAllowed(type, key) {
+    if (type === 'damage') return true;
+    return [
+      'abre_hacia',
+      'bisagra',
+      'tiene_reja',
+      'ventila',
+      'ubicacion',
+      'capacidad',
+      'proteccion',
+      'rotulado',
+      'puesta_tierra',
+      'pasamanos',
+    ].includes(key);
+  }
+
   function _defaultSketchFicha(type) {
     const defaults = {
       outlet: { codigo: 'TC', subtipo: 'Simple', estado: 'Bueno', ubicacion: 'Pared', seguridad: 'Seguro' },
@@ -12519,7 +12553,12 @@ const MecFormModule = (() => {
       pencil: { codigo: 'Lapiz', subtipo: 'Trazo', estado: 'Registrado' },
       photo: { codigo: 'Foto', subtipo: 'Foto general', estado: 'Registrada' },
     };
-    return { ...(defaults[type] || {}) };
+    const ficha = { ...(defaults[type] || {}) };
+    if (TECHNICAL_REGISTER_MODE && type !== 'damage') {
+      delete ficha.estado;
+      delete ficha.funcionamiento;
+    }
+    return ficha;
   }
 
   function _choiceButtons(name, options, selected) {
@@ -12601,6 +12640,7 @@ const MecFormModule = (() => {
     const primaryMeasureName = object.type === 'window' ? 'largo_m' : 'ancho_m';
     const compactOpening = ['door', 'window'].includes(object.type);
     const hasMeasures = !_isPointSketchObject(object) && !['wall', 'damage', 'text', 'pencil'].includes(object.type);
+    const showObjectState = !TECHNICAL_REGISTER_MODE || object.type === 'damage';
     const locked = _isClassroomLocked(_activeClassroomRecord());
     const modal = document.createElement('div');
     modal.id = modalId;
@@ -12626,11 +12666,11 @@ const MecFormModule = (() => {
                 <label>${object.type === 'door' ? 'Tipo de abertura' : 'Tipo'}</label>
                 ${_choiceButtons('subtipo', cfg.typeOptions, object.ficha.subtipo || '')}
               </div>
-              <div class="form-group">
+              ${showObjectState ? `<div class="form-group">
                 <label>Estado</label>
                 ${_choiceButtons('estado', cfg.estados, object.ficha.estado || '')}
-              </div>
-              ${_renderSketchCriteriaHelp(object.type)}
+              </div>` : ''}
+              ${(!TECHNICAL_REGISTER_MODE || object.type === 'damage') ? _renderSketchCriteriaHelp(object.type) : ''}
               ${(!compactOpening && cfg.showMaterial !== false && (cfg.materiales || []).length) ? `
                 <div class="form-group">
                   <label>Material</label>
@@ -12663,6 +12703,7 @@ const MecFormModule = (() => {
               ` : ''}
               ${cfg.extra
                 .filter(field => !compactOpening || ['abre_hacia', 'bisagra', 'tiene_reja'].includes(field.key))
+                .filter(field => !TECHNICAL_REGISTER_MODE || _technicalObjectExtraAllowed(object.type, field.key))
                 .map(field => `
                 <div class="form-group">
                   <label>${_escape(field.label)}</label>
@@ -12812,6 +12853,7 @@ const MecFormModule = (() => {
     MEC_SCHEMA.modules.forEach(module => {
       if (moduleFilter && module.id !== moduleFilter) return;
       module.sections.forEach(section => {
+        if (!_sectionVisible(section)) return;
         section.fields.forEach(field => {
           if (field.required && _fieldVisible(field)) fields.push({ module, section, field });
         });
@@ -13403,7 +13445,7 @@ const MecFormModule = (() => {
                 <span class="mec-unit">m</span>
               </div>
             </div>
-            <div class="form-group form-group--wide">
+            <div class="form-group form-group--wide" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Estado del ${_escape(typeText)}</label>
               ${_buttonChoiceGroup(
                 ['Operativa', 'En construccion', 'Derrumbada / colapsada', 'Clausurada', 'Sin uso', 'No verificable'],
@@ -13412,7 +13454,7 @@ const MecFormModule = (() => {
                 'mec-choice-buttons--compact'
               )}
             </div>
-            <div class="form-group form-group--wide">
+            <div class="form-group form-group--wide" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Caracteristicas / uso observado</label>
               <textarea class="form-control" rows="2"
                 onchange="MecFormModule.setSketchField('caracteristicas', this.value)" ${locked ? 'disabled' : ''}>${_escape(room.caracteristicas || '')}</textarea>
@@ -13426,7 +13468,7 @@ const MecFormModule = (() => {
                 'mec-choice-buttons--compact'
               )}
             </div>
-            <div class="form-group form-group--wide">
+            <div class="form-group form-group--wide" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Estado del techo</label>
               ${_buttonChoiceGroup(
                 ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'],
@@ -13444,7 +13486,7 @@ const MecFormModule = (() => {
                 'mec-choice-buttons--compact'
               )}
             </div>
-            <div class="form-group form-group--wide">
+            <div class="form-group form-group--wide" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Estado del piso</label>
               ${_buttonChoiceGroup(
                 ['Bueno', 'Regular', 'Malo', 'Con roturas', 'Con humedad', 'No verificable'],
@@ -13454,7 +13496,7 @@ const MecFormModule = (() => {
               )}
             </div>
           </div>
-          <div class="mec-object-note" role="note">
+          <div class="mec-object-note" role="note" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
             <span aria-hidden="true">i</span>
             <p>Nota (i): registre condiciones especiales, obra, clausura, faltantes o cualquier criterio que deba revisarse en gabinete.</p>
           </div>
@@ -13707,7 +13749,7 @@ const MecFormModule = (() => {
         ${_planKpi('Otros', metrics.otherSpaces, 'Cantinas, bibliotecas, tinglados y especiales')}
         ${_planKpi('Sanitarios', metrics.sanitaries, 'Baterias o banos cargados')}
         ${_planKpi('Exteriores', metrics.siteElements, 'Tanques, galerias y recreacion')}
-        ${_planKpi('Alertas', metrics.alerts, 'Mal estado, severo o riesgo')}
+        ${_planKpi('Alertas tecnicas', metrics.alerts, 'Fallas, faltantes o inconsistencias')}
       </section>`;
 
     root.innerHTML = `
@@ -13743,7 +13785,7 @@ const MecFormModule = (() => {
               <span><i class="legend-light"></i>Foco</span>
               <span><i class="legend-fan"></i>Ventilador</span>
               <span><i class="legend-ac"></i>Aire</span>
-              <span><i class="legend-damage"></i>Daño/obs.</span>
+              <span><i class="legend-damage"></i>Daño/falla</span>
               <span><i class="legend-sanitary"></i>Sanitario</span>
               <span><i class="legend-site"></i>Exterior</span>
             </div>
@@ -14504,7 +14546,7 @@ const MecFormModule = (() => {
       const floors = _planFloorsForBlock(block, _data.__classrooms || [], _data.__sanitaries || []);
       return {
         title: block.bloque_codigo || 'Bloque seleccionado',
-        detail: `${block.estado_bloque || 'Sin estado'} · ${floors.length} piso(s) · ${block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : 'Sin dimensiones'}`,
+        detail: `${floors.length} piso(s) · ${block.largo_m && block.ancho_m ? `${block.largo_m} x ${block.ancho_m} m` : 'Sin dimensiones'}`,
         actions: [
           { label: 'Ficha bloque', tone: 'btn-primary', onClick: `MecFormModule.openPlanBlockFicha('${_escape(block.id)}')` },
           { label: '+ Piso', onClick: `MecFormModule.addPlanFloor('${_escape(block.id)}')` },
@@ -14592,7 +14634,7 @@ const MecFormModule = (() => {
         const label = object.ficha?.codigo || _sanitaryObjectShort(object.type);
         return {
           title: label || _sanitaryObjectLabel(object.type),
-          detail: `${item.codigo || 'Sanitario'} · ${_sanitaryObjectLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
+          detail: `${item.codigo || 'Sanitario'} · ${_sanitaryObjectLabel(object.type)}${_technicalStateText(object) ? ` · ${_technicalStateText(object)}` : ''}`,
           actions: [
             { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
             ...(object.type === 'door' ? [{ label: 'Apertura', onClick: 'MecFormModule.flipSelectedSanitaryDoorSwing()' }] : []),
@@ -14602,7 +14644,7 @@ const MecFormModule = (() => {
       }
       return {
         title: item.codigo || 'Sanitario seleccionado',
-        detail: `${_sanitaryBlockLabel(item)} · ${_normalizeFloor(item.planta || 'Piso 1')} · ${item.estado || item.tipo || 'Sin estado'}`,
+        detail: `${_sanitaryBlockLabel(item)} · ${_normalizeFloor(item.planta || 'Piso 1')} · ${item.tipo || item.desague || 'Sin tipo'}`,
         actions: [
           { label: 'Abrir sanitario', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           { label: '+ Cabina', onClick: 'MecFormModule.addPlanSanitaryStall()' },
@@ -14637,7 +14679,7 @@ const MecFormModule = (() => {
       const rampFall = isRamp ? _rampFallDirection(element) : '';
       return {
         title: element.ficha?.codigo || _siteElementLabel(element.type),
-        detail: `${_siteElementLabel(element.type)} · ${element.ficha?.estado || 'Sin estado'} · ${isPropertyBoundary ? (propertyEditActive ? 'edicion activa' : 'fijo por vertices lat/lon') : (isRamp ? `caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : (isTank ? 'infraestructura especial' : 'otro espacio editable'))}`,
+        detail: `${_siteElementLabel(element.type)} · ${isPropertyBoundary ? (propertyEditActive ? 'edicion activa' : 'fijo por vertices lat/lon') : (isRamp ? `caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : (isTank ? 'infraestructura especial' : 'otro espacio editable'))}`,
         actions: [
           { label: isPropertyBoundary ? 'Editar predio' : (isTank ? 'Editar tanque' : 'Editar espacio'), tone: 'btn-primary', onClick: `MecFormModule.openSiteElementFicha('${_escape(element.id)}')` },
           ...(isPropertyBoundary ? [
@@ -14671,7 +14713,7 @@ const MecFormModule = (() => {
       if (!room || !object) return fallback;
       return {
         title: object.ficha?.codigo || _sketchLabel(object.type),
-        detail: `${room.name || _roomSpaceLabel(room)} · ${_sketchLabel(object.type)} · ${object.ficha?.estado || 'Sin estado'}`,
+        detail: `${room.name || _roomSpaceLabel(room)} · ${_sketchLabel(object.type)}${_technicalStateText(object) ? ` · ${_technicalStateText(object)}` : ''}`,
         actions: [
           { label: 'Abrir ficha', tone: 'btn-primary', onClick: 'MecFormModule.openPlanSelection()' },
           ...(object.type === 'door' ? [{ label: 'Apertura', onClick: 'MecFormModule.flipSelectedDoorSwing()' }] : []),
@@ -14689,7 +14731,7 @@ const MecFormModule = (() => {
       aberturas: 'Puertas/Ventanas',
       electricidad: 'Electricidad/equipos',
       cableado: 'Cableado',
-      danos: 'Daños/obs.',
+      danos: 'Danos/fallas',
       exteriores: 'Exteriores',
       etiquetas: 'Etiquetas',
       datos: 'Datos emergentes',
@@ -14904,7 +14946,7 @@ const MecFormModule = (() => {
 
   function _renderPlanObjectRow(object) {
     const label = object.ficha?.codigo || object.classroomName || _sketchLabel(object.type);
-    const state = object.ficha?.estado || 'Sin estado';
+    const state = _technicalStateText(object);
     const dims = _sketchDimensionsText(object);
     return `
       <button class="school-plan-object school-plan-object--child ${_selectedPlanId === (object.planId || object.id) ? 'school-plan-object--active' : ''}" type="button"
@@ -14971,7 +15013,7 @@ const MecFormModule = (() => {
         onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
         <span class="school-plan-object__type">${_escape(_sanitaryObjectLabel(object.type))}</span>
         <strong>${_escape(label)}</strong>
-        <small>${_escape([item.codigo || 'Sanitario', object.ficha?.estado || 'Sin estado', _sketchDimensionsText(object)].filter(Boolean).join(' - '))}</small>
+        <small>${_escape([item.codigo || 'Sanitario', _technicalStateText(object), _sketchDimensionsText(object)].filter(Boolean).join(' - '))}</small>
       </button>`;
   }
 
@@ -14984,7 +15026,7 @@ const MecFormModule = (() => {
         onclick="MecFormModule.selectPlanItem('${_escape(id)}')">
         <span class="school-plan-object__type">${locked ? 'Exterior bloqueado' : 'Exterior'}</span>
         <strong>${_escape(item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`)}</strong>
-        <small>${_escape([_siteElementLabel(item.type), item.ficha?.estado || 'Sin estado', item.ficha?.nota_i || item.ficha?.observacion || 'Sin nota'].filter(Boolean).join(' · '))}</small>
+        <small>${_escape([_siteElementLabel(item.type), item.ficha?.nota_i || item.ficha?.observacion || 'Sin nota'].filter(Boolean).join(' · '))}</small>
       </button>`;
   }
 
@@ -15003,7 +15045,7 @@ const MecFormModule = (() => {
       isPropertyBoundary ? (propertyEditActive ? 'edicion activa' : 'fijo') : '',
       item.type === 'recreation' ? _recreationShapeLabel(item.shape || item.ficha?.forma) : '',
       isRamp ? `Caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : '',
-      item.ficha?.estado || 'Sin estado',
+      TECHNICAL_REGISTER_MODE ? '' : item.ficha?.estado || 'Sin estado',
       item.ficha?.largo_m && item.ficha?.ancho_m ? `${item.ficha.largo_m} x ${item.ficha.ancho_m} m` : '',
       Array.isArray(item.ficha?.evidencias) && item.ficha.evidencias.length ? `${item.ficha.evidencias.length} foto(s)` : '',
     ].filter(Boolean).join(' - ');
@@ -15100,7 +15142,7 @@ const MecFormModule = (() => {
       const label = block.bloque_codigo || _numberedLabel('Bloque', index);
       const blockRooms = classrooms.filter(room => roomMatchesBlock(room, block));
       const blockSanitaries = sanitaries.filter(item => _matchesBlockReference(item.bloque, block));
-      const stateText = _auditText(`${block.estado_bloque || ''} ${block.observacion || ''}`);
+      const stateText = _auditText(`${TECHNICAL_REGISTER_MODE ? '' : block.estado_bloque || ''} ${block.observacion || ''}`);
       if (!Number(block.largo_m || 0) || !Number(block.ancho_m || 0)) {
         _pushPlanAuditIssue(issues, 'warning', `${label}: dimensiones del bloque pendientes`, 'Complete largo y ancho para controlar escala, ocupacion y distancias.', targetId, 'Completar bloque');
       }
@@ -15126,8 +15168,8 @@ const MecFormModule = (() => {
       const label = _classroomHierarchyLabel(room) || room.name || _numberedLabel('Aula', index);
       const objects = Array.isArray(room.objects) ? room.objects : [];
       const roomObjects = objects.filter(object => object.type !== 'room');
-      const stateText = _auditText(room.estado || '');
-      const inactive = isInactiveState(room.estado);
+      const stateText = _auditText(TECHNICAL_REGISTER_MODE ? '' : room.estado || '');
+      const inactive = !TECHNICAL_REGISTER_MODE && isInactiveState(room.estado);
       const hasRoomGeometry = objects.some(object => object.type === 'room');
       const hasDimensions = Number(room.length || 0) > 0 && Number(room.width || 0) > 0;
       const hasDoor = roomObjects.some(object => object.type === 'door');
@@ -15175,7 +15217,7 @@ const MecFormModule = (() => {
       const hasSink = Number(item.lavamanos || 0) > 0
         || objects.some(object => object.type === 'sink')
         || stalls.some(stall => (stall.ficha?.fixtures || []).some(fixture => fixture.id === 'sink'));
-      const stateText = _auditText(`${item.estado || ''} ${item.agua || ''} ${item.desague || ''} ${item.privacidad || ''}`);
+      const stateText = _auditText(`${TECHNICAL_REGISTER_MODE ? '' : item.estado || ''} ${item.agua || ''} ${item.desague || ''} ${TECHNICAL_REGISTER_MODE ? '' : item.privacidad || ''}`);
 
       if (!Number(item.largo_m || 0) || !Number(item.ancho_m || 0)) {
         _pushPlanAuditIssue(issues, 'warning', `${label}: sin medidas`, 'Complete largo y ancho del sanitario para controlar capacidad y escala.', targetId, 'Completar sanitario');
@@ -19024,7 +19066,7 @@ const MecFormModule = (() => {
               <label>Codigo</label>
               <input id="plan-block-code" class="form-control" value="${_escape(block.bloque_codigo || '')}" ${disabled}>
             </div>
-            <div class="form-group">
+            <div class="form-group" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Estado</label>
               <input id="plan-block-state" class="form-control" value="${_escape(block.estado_bloque || '')}" ${disabled}>
             </div>
@@ -19156,7 +19198,7 @@ const MecFormModule = (() => {
               <label>Rotacion (grados)</label>
               <input id="plan-floor-rotation" class="form-control" type="number" step="1" value="${_escape(_floorRotationDeg(floor))}" ${disabled}>
             </div>
-            <div class="form-group">
+            <div class="form-group" ${TECHNICAL_REGISTER_MODE ? 'hidden' : ''}>
               <label>Estado del piso</label>
               <input id="plan-floor-state" class="form-control" value="${_escape(floor.estado || floor.estado_piso || '')}" ${disabled}>
             </div>
@@ -20002,7 +20044,7 @@ const MecFormModule = (() => {
     _showSchoolPlanAfterSiteInsert(element);
     if (!guided) setTimeout(() => openSiteElementFicha(element.id), 180);
     UI.showToast(guided
-      ? `${cfg.label} ubicado en el plano. La guia superior pedira medidas, estado y caracteristicas.`
+      ? `${cfg.label} ubicado en el plano. La guia superior pedira medidas y caracteristicas tecnicas.`
       : `${cfg.label} ubicado en el plano general. Complete la ficha y luego muevalo si hace falta.`, 'success', 5600);
     return element;
   }
@@ -23713,7 +23755,7 @@ const MecFormModule = (() => {
               <span><i class="lg-light"></i>Foco</span>
               <span><i class="lg-fan"></i>Ventilador</span>
               <span><i class="lg-ac"></i>Aire</span>
-              <span><i class="lg-damage"></i>Daño/obs.</span>
+              <span><i class="lg-damage"></i>Daño/falla</span>
               <span><i class="lg-stair"></i>Escalera</span>
               <span><i class="lg-site"></i>Exterior</span>
             </div>

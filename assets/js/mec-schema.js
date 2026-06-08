@@ -4,10 +4,10 @@
  */
 
 const MEC_ACOMETIDA_PRESENTE = ['Aerea', 'Subterranea', 'Compartida con otro bloque'];
-const MEC_TABLERO_PRESENTE = ['Bueno', 'Regular', 'Malo'];
+const MEC_TABLERO_PRESENTE = ['Tablero principal visible', 'Tablero seccional visible', 'Caja o llave visible'];
 
 const MEC_SCHEMA = {
-  version: '0.1.4',
+  version: '0.1.5',
   source: 'PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx',
   reviewedWorkbook: {
     file: 'PLANIF-2026-FORMULARIO VERIFICADO_MEC-CIALPA- DTIC_VF 24-03-26.xlsx',
@@ -26,7 +26,7 @@ const MEC_SCHEMA = {
     {
       id: 'general',
       title: 'General',
-      description: 'Ubicacion, identificacion, acceso, cercado, areas exteriores, desague pluvial y seguridad.',
+      description: 'Ubicacion, identificacion, acceso, cercado, areas exteriores y desague pluvial.',
       image: 'manual/assets/image3.png',
       sections: [
         {
@@ -58,7 +58,7 @@ const MEC_SCHEMA = {
           fields: [
             { id: 'cercado_presencia', label: 'Presencia del cercado', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del cercado', options: ['Si, completo', 'Si, incompleto', 'No'] },
             { id: 'cercado_tipo', label: 'Tipo de cercado', type: 'checkbox', options: ['Muralla', 'Verjas de hierro', 'Tejido', 'Alambrado'], visibleWhen: { field: 'general.cercado_presencia', in: ['Si, completo', 'Si, incompleto'] } },
-            { id: 'cercado_observacion', label: 'Observaciones del cercado', type: 'textarea', hint: 'Si no existe cercado, registre aqui la observacion o condicion encontrada.' },
+            { id: 'cercado_observacion', label: 'Referencia tecnica del cercado', type: 'textarea', hint: 'Registre solo datos utiles para ubicacion, materialidad o gabinete.' },
           ],
         },
         {
@@ -90,7 +90,7 @@ const MEC_SCHEMA = {
     {
       id: 'servicios',
       title: 'Servicios',
-      description: 'Agua, saneamiento e internet.',
+      description: 'Conexion de agua y desague/saneamiento.',
       image: 'manual/assets/image20.png',
       sections: [
         {
@@ -115,6 +115,7 @@ const MEC_SCHEMA = {
         {
           id: 'internet',
           title: '3 - Servicio de internet',
+          technicalHidden: true,
           fields: [
             { id: 'tiene_internet', label: 'El local tiene acceso a internet', type: 'radio', required: true, options: ['Si', 'No'] },
             { id: 'tipo_internet', label: 'Tipo de conexion', type: 'select', evidence: true, evidenceLabel: 'Foto del equipo o punto de conexion', visibleWhen: { field: 'servicios.tiene_internet', equals: 'Si' }, options: ['Fibra optica', 'ADSL', 'Movil 4G/3G', 'Satelital', 'Radioenlace', 'Otro'] },
@@ -134,7 +135,7 @@ const MEC_SCHEMA = {
           title: '1 - Identificacion del bloque',
           fields: [
             { id: 'bloque_codigo', label: 'Bloque', type: 'text', required: true, hint: 'La app enumera automaticamente: Bloque 1, Bloque 2, etc.' },
-            { id: 'estado_bloque', label: 'Estado del bloque', type: 'select', required: true, options: ['Operativo', 'En construccion', 'Derrumbado / colapsado', 'Clausurado', 'Sin uso', 'No verificable'] },
+            { id: 'estado_bloque', label: 'Estado del bloque', type: 'select', technicalHidden: true, options: ['Operativo', 'En construccion', 'Derrumbado / colapsado', 'Clausurado', 'Sin uso', 'No verificable'] },
             { id: 'cantidad_plantas', label: 'Cantidad de niveles integrados', type: 'number', required: true, min: 1, step: 1, hint: 'Todo bloque contiene Planta baja. Agregue Piso 1, Piso 2, etc. solo cuando existan niveles superiores.' },
             { id: 'largo_m', label: 'Largo aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
             { id: 'ancho_m', label: 'Ancho aproximado del bloque', type: 'number', min: 0, step: '0.1', unit: 'm' },
@@ -151,7 +152,7 @@ const MEC_SCHEMA = {
             { id: 'acometida_tipo', label: 'El local/bloque tiene acometida electrica', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto de acometida o punto de ingreso', options: ['Aerea', 'Subterranea', 'Compartida con otro bloque', 'No visible', 'No'], hint: 'Si marca No o No visible, se ocultan las preguntas dependientes de acometida.' },
             { id: 'medidor_estado', label: 'Medidor o punto de medicion', type: 'radio', required: true, visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Propio del bloque', 'Compartido', 'No visible', 'No existe'] },
             { id: 'tension_acometida', label: 'Tension de la acometida', type: 'radio', visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Monofasica 220 V', 'Trifasica 380 V', 'No verificable'] },
-            { id: 'tablero_estado', label: 'Estado del tablero electrico del bloque', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del tablero electrico del bloque', visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Bueno', 'Regular', 'Malo', 'No existe / no visible'] },
+            { id: 'tablero_estado', label: 'Tipo/presencia del tablero electrico del bloque', type: 'radio', required: true, evidence: true, evidenceLabel: 'Foto del tablero electrico del bloque', visibleWhen: { field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, options: ['Tablero principal visible', 'Tablero seccional visible', 'Caja o llave visible', 'No existe / no visible'] },
             { id: 'llave_termomagnetica', label: 'Llave termomagnetica del bloque', type: 'radio', evidence: true, evidenceLabel: 'Foto de protecciones electricas del bloque', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }] }, options: ['Si', 'No', 'No verificable'] },
             { id: 'capacidad_llave_principal_a', label: 'Capacidad de la llave principal', type: 'number', min: 0, step: '1', unit: 'A', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }, { field: 'bloques.llave_termomagnetica', equals: 'Si' }] } },
             { id: 'proteccion_diferencial', label: 'Disyuntor diferencial', type: 'radio', visibleWhen: { all: [{ field: 'bloques.acometida_tipo', in: MEC_ACOMETIDA_PRESENTE }, { field: 'bloques.tablero_estado', in: MEC_TABLERO_PRESENTE }] }, options: ['Si', 'No', 'No verificable'] },

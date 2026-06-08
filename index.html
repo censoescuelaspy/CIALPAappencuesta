@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.173" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.174" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.173" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.174" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.173</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.174</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.173</strong>
+      Edición vigente<br><strong class="app-version">v2.6.174</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -291,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.173</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.174</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -632,7 +632,7 @@
                 <div><strong>Evidencias</strong><span><code>evidence_files</code> con URL, hash, entidad, usuario y version</span></div>
                 <div><strong>Sincronizacion</strong><span><code>sync_mutations</code>, estado, intentos, error y payload resumido</span></div>
                 <div><strong>Auditoria</strong><span><code>audit_log</code> para accion, usuario, rol, IP/dispositivo, modulo y detalle</span></div>
-                <div><strong>Analitica</strong><span>vistas materializadas o consultas para tableros, tiempos, avance, calidad y fallas</span></div>
+                <div><strong>Analitica</strong><span>vistas materializadas o consultas para tableros, tiempos, avance tecnico, danos y fallas</span></div>
               </div>
             </article>
 
@@ -644,12 +644,12 @@
                 <li><strong>RECIBIDO:</strong> Apps Script confirmo escritura en Sheets/Drive.</li>
                 <li><strong>EN_COLA_DB:</strong> el paquete quedo registrado para base formal.</li>
                 <li><strong>SINCRONIZADO_DB:</strong> PostgreSQL aplico transaccion e idempotencia.</li>
-                <li><strong>VALIDADO / OBSERVADO / ANULADO:</strong> supervision institucional decide calidad y vigencia.</li>
+                <li><strong>VALIDADO / OBSERVADO / ANULADO:</strong> supervision institucional decide consistencia tecnica y vigencia.</li>
               </ul>
             </article>
 
             <article class="architecture-panel">
-              <h3>Controles de calidad</h3>
+              <h3>Controles tecnicos</h3>
               <ul class="architecture-list">
                 <li>Validaciones frontend para campos obligatorios, formatos, coordenadas, montos, fechas y dependencias.</li>
                 <li>Validaciones backend para token, rol, escuela, encabezados, duplicados y estado permitido.</li>
@@ -1588,20 +1588,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.173"></script>
-<script src="assets/js/local-store.js?v=2.6.173"></script>
-<script src="assets/js/api.js?v=2.6.173"></script>
-<script src="assets/js/auth.js?v=2.6.173"></script>
-<script src="assets/js/map.js?v=2.6.173"></script>
-<script src="assets/js/survey.js?v=2.6.173"></script>
-<script src="assets/js/stats.js?v=2.6.173"></script>
-<script src="assets/js/location-audit.js?v=2.6.173"></script>
-<script src="assets/js/planning.js?v=2.6.173"></script>
-<script src="assets/js/admin.js?v=2.6.173"></script>
-<script src="assets/js/jornada.js?v=2.6.173"></script>
-<script src="assets/js/manual.js?v=2.6.173"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.173"></script>
-<script src="assets/js/app.js?v=2.6.173"></script>
+<script src="assets/js/config.js?v=2.6.174"></script>
+<script src="assets/js/local-store.js?v=2.6.174"></script>
+<script src="assets/js/api.js?v=2.6.174"></script>
+<script src="assets/js/auth.js?v=2.6.174"></script>
+<script src="assets/js/map.js?v=2.6.174"></script>
+<script src="assets/js/survey.js?v=2.6.174"></script>
+<script src="assets/js/stats.js?v=2.6.174"></script>
+<script src="assets/js/location-audit.js?v=2.6.174"></script>
+<script src="assets/js/planning.js?v=2.6.174"></script>
+<script src="assets/js/admin.js?v=2.6.174"></script>
+<script src="assets/js/jornada.js?v=2.6.174"></script>
+<script src="assets/js/manual.js?v=2.6.174"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.174"></script>
+<script src="assets/js/app.js?v=2.6.174"></script>
 
 <script>
   // Set today's date in Inicio module

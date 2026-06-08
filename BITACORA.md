@@ -4,6 +4,43 @@
 
 ---
 
+## Registro tecnico arquitectura/servicios - 2026-06-08 - v2.6.174
+
+### Objetivo
+- Preparar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua.
+- Eliminar solicitudes de calidad/estado general para elementos normales.
+- Mantener danos y fallas como registro tecnico obligatorio cuando el usuario los marque.
+
+### Problema reportado
+- El flujo anterior seguia pidiendo calidad, estado general, limpieza, privacidad o funcionamiento como parte de varios elementos.
+- El usuario aclaro expresamente: `DANOS Y FALLAS DEBEN QUEDAR`.
+
+### Cambios implementados
+- `assets/js/guided-register.js`: se activa modo tecnico para que bloques, pisos, aulas, sanitarios, exteriores y objetos comunes pidan ubicacion, medidas, tipo y datos tecnicos, no calidad general.
+- `assets/js/guided-register.js`: los objetos `damage` siguen pidiendo subtipo y gravedad/estado; la guia muestra `Dano/falla`.
+- `assets/js/guided-register.js`: sanitarios ahora piden conexion de desague como dato tecnico del registro.
+- `assets/js/mec-form.js`: fichas de bloque, piso, aula, sanitario, cabina y objetos ocultan estado/calidad general en modo tecnico, salvo danos/fallas.
+- `assets/js/mec-form.js`: componentes de cabina sanitaria pasan a presencia/faltante/no funciona/no verificable, para registrar fallas concretas sin evaluacion de calidad.
+- `assets/js/mec-form.js`: defaults nuevos ya no nacen con `estado: Bueno` en objetos comunes; danos/fallas conservan gravedad.
+- `assets/js/mec-schema.js`: se oculta la seccion Internet en modo tecnico y el estado de bloque queda como campo legado no obligatorio.
+- `index.html`, `assets/js/config.js`, `assets/js/app.js`, `assets/js/guided-register.js`, `sw.js`: version/cache actualizados a `2.6.174`.
+- `../Manual maestro para creación de appweb.txt`: se crea actualizacion operativa con buenas practicas del modo de registro tecnico y conservacion de danos/fallas.
+
+### Validaciones ejecutadas
+- `node --check assets/js/mec-form.js`.
+- `node --check assets/js/guided-register.js`.
+- `node --check assets/js/mec-schema.js`.
+- `node --check assets/js/config.js`.
+- `node --check assets/js/app.js`.
+- `node --check sw.js`.
+- `git diff --check`.
+
+### Estado
+- Listo para revision local. No se tocaron los MP4 sin seguimiento de `tools/earthengine/`.
+- Pendiente: no se publico ni se hizo commit/push en esta intervencion.
+
+---
+
 ## Registro guiado: cierre con pendientes visible - 2026-06-03 - v2.6.173
 
 ### Objetivo

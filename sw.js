@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.6.173';
+const CACHE_NAME = 'cialpa-app-v2.6.174';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',

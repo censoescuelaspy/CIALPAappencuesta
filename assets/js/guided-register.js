@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.173
+ * Version: 2.6.174
  */
 
 const GuidedRegisterModule = (() => {
@@ -10,6 +10,7 @@ const GuidedRegisterModule = (() => {
   const STATE_KEY = 'cialpa_guided_register_state_v1';
   const DRAFT_KEY = 'cialpa_mec_form_draft_v1';
   const LAYOUT_KEY = 'cialpa_guided_register_layout_v1';
+  const TECHNICAL_REGISTER_MODE = true;
   const GUIDED_LAYOUT_DEFAULTS = {
     schoolSidebarWidth: 210,
     schoolMapHeight: 0,
@@ -172,7 +173,7 @@ const GuidedRegisterModule = (() => {
       number: '04',
       title: 'Aulas y espacios',
       kicker: 'Construccion por partes',
-      summary: 'Agregar aulas y espacios, ubicarlos en el plano y capturar estado, uso, puertas, ventanas e instalaciones desde la guia superior.',
+      summary: 'Agregar aulas y espacios, ubicarlos en el plano y capturar medidas, tipo, aberturas, instalaciones y danos/fallas desde la guia superior.',
       checks: ['Ambientes ubicados', 'Aberturas cargadas', 'Instalaciones visibles'],
       actions: [
         { label: 'Aula', icon: '+AU', action: 'classroom', primary: true },
@@ -184,7 +185,7 @@ const GuidedRegisterModule = (() => {
         { label: 'Luz', icon: 'LUZ', action: 'roomElement', value: 'light' },
         { label: 'Ventilador', icon: 'VEN', action: 'roomElement', value: 'fan' },
         { label: 'Aire', icon: 'AA', action: 'roomElement', value: 'ac' },
-        { label: 'Daño', icon: 'OBS', action: 'roomElement', value: 'damage' },
+        { label: 'Daño/falla', icon: 'OBS', action: 'roomElement', value: 'damage' },
       ],
     },
     {
@@ -192,7 +193,7 @@ const GuidedRegisterModule = (() => {
       number: '05',
       title: 'Sanitarios',
       kicker: 'Artefactos por botones',
-      summary: 'Configurar banos con o sin cabina y responder uso, estado, agua, aberturas y artefactos desde la guia superior.',
+      summary: 'Configurar banos con o sin cabina y responder uso, agua, desague, aberturas, artefactos y danos/fallas desde la guia superior.',
       checks: ['Sanitario creado', 'Cabinas o artefactos', 'Puertas y ventilacion'],
       actions: [
         { label: 'Sanitario', icon: '+WC', action: 'sanitary', primary: true },
@@ -211,7 +212,7 @@ const GuidedRegisterModule = (() => {
       title: 'Exteriores',
       kicker: 'Predio completo',
       summary: 'Ubicar tanque, galerias, camineros, pilares, espacios libres y recreacion.',
-      checks: ['Elementos exteriores', 'Dimensiones editables', 'Ficha y estado'],
+      checks: ['Elementos exteriores', 'Dimensiones editables', 'Ficha tecnica'],
       actions: [
         { label: 'Tanque', icon: 'TQ', action: 'site', value: 'water_tank', primary: true },
         { label: 'Recreacion', icon: 'REC', action: 'site', value: 'recreation' },
@@ -1783,7 +1784,7 @@ const GuidedRegisterModule = (() => {
       pending.push({ title: 'Responder medidor', detail: 'Falta indicar medidor o punto de medicion.', action: 'answerBlockField', value: 'medidor_estado::No visible' });
     }
     if (!_hasAnswer(block.tablero_estado)) {
-      pending.push({ title: 'Responder tablero electrico', detail: 'Falta estado del tablero del bloque.', action: 'answerBlockField', value: 'tablero_estado::No existe / no visible' });
+      pending.push({ title: 'Responder tablero electrico', detail: 'Falta indicar si hay tablero, caja o llave visible del bloque.', action: 'answerBlockField', value: 'tablero_estado::No existe / no visible' });
     }
     if (_tableroPresent(block.tablero_estado) && !_hasAnswer(block.llave_termomagnetica)) {
       pending.push({ title: 'Responder llave termomagnetica', detail: 'Falta verificacion de proteccion del tablero.', action: 'answerBlockField', value: 'llave_termomagnetica::No verificable' });
@@ -1819,7 +1820,7 @@ const GuidedRegisterModule = (() => {
   function _legacyGuidedNextHtml(stepId, snap) {
     if (stepId !== 'bloques') return '';
     if (!snap.blocks) {
-      return _guidedNextCard('Paso 1', 'Crear bloque y cargar medidas', 'Pulse iniciar bloque: se abrira la ficha para largo, ancho, estado y observaciones.', [
+      return _guidedNextCard('Paso 1', 'Crear bloque y cargar medidas', 'Pulse iniciar bloque: se abrira la ficha para largo, ancho y datos tecnicos.', [
         { label: 'Iniciar bloque', action: 'guidedBlock', primary: true },
       ]);
     }
@@ -2058,7 +2059,7 @@ const GuidedRegisterModule = (() => {
           { label: 'Editar ficha', action: 'blockFicha' },
         ], false, _measureControl('guided-block', 'Largo del bloque (m)', 'Ancho del bloque (m)', snap.activeBlock?.largo_m || '', snap.activeBlock?.ancho_m || ''), '', true);
       }
-      if (blockNext.field === 'estado_bloque') {
+      if (!TECHNICAL_REGISTER_MODE && blockNext.field === 'estado_bloque') {
         return _question('Paso 1', 'Bloque: estado general', 'Registre la condicion observada del bloque antes de ubicarlo.', [
           { label: 'Bueno', action: 'answerBlockField', value: 'estado_bloque::Bueno', primary: true },
           { label: 'Regular', action: 'answerBlockField', value: 'estado_bloque::Regular' },
@@ -2095,7 +2096,7 @@ const GuidedRegisterModule = (() => {
           { label: 'Editar ficha', action: 'floorGuide' },
         ], false, _measureControl('guided-floor', 'Largo del piso (m)', 'Ancho del piso (m)', floor?.largo_m || '', floor?.ancho_m || ''), '', true);
       }
-      if (next?.title === 'Condicion de calidad') {
+      if (!TECHNICAL_REGISTER_MODE && next?.title === 'Condicion de calidad') {
         return _question('Paso 3', 'Piso: estado general', 'Registre el estado/calidad del piso antes de avanzar a aulas o sanitarios.', [
           ..._fieldAnswerActions('answerFloorField', `${floorValue}::estado`, ['Bueno', 'Regular', 'Malo', 'No verificable'], 'Bueno'),
           { label: 'Seleccionar piso', action: 'selectPlanItem', value: `floor::${floorValue}` },
@@ -2131,7 +2132,7 @@ const GuidedRegisterModule = (() => {
       ]);
     }
     if (!_hasAnswer(block.pilares_bloque)) {
-      return _question('Pregunta obligatoria', 'Cuantos pilares visibles hay en el piso?', 'Indique la cantidad de pilares estructurales visibles. Se agregan al plano para ubicarlos; las dimensiones y condicion son opcionales.', [
+      return _question('Pregunta obligatoria', 'Cuantos pilares visibles hay en el piso?', 'Indique la cantidad de pilares estructurales visibles. Se agregan al plano para ubicarlos; las dimensiones quedan como dato tecnico opcional.', [
         { label: '0 — no tiene', action: 'answerBlockField', value: 'pilares_bloque::0', primary: true },
         { label: '1', action: 'answerBlockField', value: 'pilares_bloque::1' },
         { label: '2', action: 'answerBlockField', value: 'pilares_bloque::2' },
@@ -2160,10 +2161,10 @@ const GuidedRegisterModule = (() => {
       ]);
     }
     if (!_hasAnswer(block.tablero_estado)) {
-      return _question('Pregunta obligatoria', 'Tiene tablero electrico del bloque?', 'Si existe tablero, se incorpora al plano y se exige completar su ficha.', [
-        { label: 'Bueno', action: 'answerBlockField', value: 'tablero_estado::Bueno', primary: true },
-        { label: 'Regular', action: 'answerBlockField', value: 'tablero_estado::Regular', primary: true },
-        { label: 'Malo', action: 'answerBlockField', value: 'tablero_estado::Malo' },
+      return _question('Pregunta obligatoria', 'Tiene tablero, caja o llave visible del bloque?', 'Si existe, se incorpora al plano para ubicarlo y cargar tipo/medidas.', [
+        { label: 'Tablero principal', action: 'answerBlockField', value: 'tablero_estado::Tablero principal visible', primary: true },
+        { label: 'Tablero seccional', action: 'answerBlockField', value: 'tablero_estado::Tablero seccional visible', primary: true },
+        { label: 'Caja/llave visible', action: 'answerBlockField', value: 'tablero_estado::Caja o llave visible' },
         { label: 'No existe/no visible', action: 'answerBlockField', value: 'tablero_estado::No existe / no visible' },
       ]);
     }
@@ -2208,7 +2209,7 @@ const GuidedRegisterModule = (() => {
     }
     if (snap.activeClassrooms.length < snap.classroomTarget) {
       const nextNumber = snap.activeClassrooms.length + 1;
-      return _question('Aula pendiente', `Insertar aula ${nextNumber} de ${snap.classroomTarget}`, 'Cree el aula, ubique su rectangulo en el plano y ajuste sus esquinas. Despues la guia superior preguntara estado, uso y elementos uno por uno.', [
+      return _question('Aula pendiente', `Insertar aula ${nextNumber} de ${snap.classroomTarget}`, 'Cree el aula, ubique su rectangulo en el plano y ajuste sus esquinas. Despues la guia superior preguntara tipos constructivos, aberturas, electricidad y danos/fallas.', [
         { label: `Insertar aula ${nextNumber}`, action: 'guidedClassroom', primary: true },
         { label: 'Cambiar cantidad', action: 'resetClassroomTarget' },
       ]);
@@ -2227,7 +2228,7 @@ const GuidedRegisterModule = (() => {
         ], false, _measureControl('guided-room', 'Largo del aula/ambiente (m)', 'Ancho del aula/ambiente (m)', snap.incompleteClassroom.length || '', snap.incompleteClassroom.width || ''), '', true);
       }
       const primaryValue = next?.value || (next?.plan ? `room::${snap.incompleteClassroom.id}` : snap.incompleteClassroom.id);
-      return _question('Aula pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira estado, caracteristicas y elementos uno por uno.', [
+      return _question('Aula pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira tipos y elementos uno por uno.', [
         { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openClassroomFicha', value: primaryValue, primary: true },
         { label: 'Abrir ficha', action: 'openClassroomFicha', value: snap.incompleteClassroom.id },
         { label: 'Confirmar configuracion', action: 'confirmClassroomConfigured', value: snap.incompleteClassroom.id },
@@ -2253,7 +2254,7 @@ const GuidedRegisterModule = (() => {
     }
     const noSanitary = _flagValue(_flagKeyParts(snap.activeBlock?.id, snap.activeFloorLabel, 'noSanitary'));
     if (!snap.activeSanitaries.length && !noSanitary) {
-      return _question('Pregunta obligatoria', 'Este bloque/piso tiene sanitario?', 'Si responde Si, se inserta el sanitario. Primero se ubica y dimensiona en el plano; luego la guia pedira uso, estado, agua, aberturas y artefactos.', [
+      return _question('Pregunta obligatoria', 'Este bloque/piso tiene sanitario?', 'Si responde Si, se inserta el sanitario. Primero se ubica y dimensiona en el plano; luego la guia pedira uso, agua, desague, aberturas, artefactos y danos/fallas.', [
         { label: 'Si, insertar sanitario', action: 'sanitary', primary: true },
         { label: 'No tiene', action: 'markNoSanitary' },
       ]);
@@ -2278,7 +2279,7 @@ const GuidedRegisterModule = (() => {
         ], false, _measureControl('guided-sanitary', 'Largo del sanitario (m)', 'Ancho del sanitario (m)', snap.incompleteSanitary.largo_m || '', snap.incompleteSanitary.ancho_m || ''), '', true);
       }
       const primaryValue = next?.value || (next?.plan ? `sanitary::${snap.incompleteSanitary.id}` : snap.incompleteSanitary.id);
-      return _question('Sanitario pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira uso, estado, agua y artefactos uno por uno.', [
+      return _question('Sanitario pendiente', `${label}: ${next?.title || 'confirmar guardado'}`, next?.help || 'Complete primero la ubicacion o medida pendiente en el plano. Luego la guia pedira uso, agua, desague y artefactos uno por uno.', [
         { label: next?.plan ? 'Seleccionar en plano' : 'Abrir ficha', action: next?.plan ? 'selectPlanItem' : 'openSanitaryFicha', value: primaryValue, primary: true },
         { label: 'Abrir ficha', action: 'openSanitaryFicha', value: snap.incompleteSanitary.id },
         { label: 'Confirmar configuracion', action: 'confirmSanitaryConfigured', value: snap.incompleteSanitary.id },
@@ -2293,25 +2294,25 @@ const GuidedRegisterModule = (() => {
   function _classroomDirectQuestion(room) {
     if (!_roomHasGeometry(room) || !_hasMeasures(room, 'length', 'width')) return null;
     const label = room?.name || 'Aula pendiente';
-    if (!_hasAnswer(room?.estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(room?.estado)) {
       return _question('Pregunta del aula', `${label}: estado general`, 'Responda el estado/calidad observado. La ficha queda solo para revisar o corregir despues.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::estado`, ['Bueno', 'Regular', 'Malo', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
-    if (!_hasAnswer(room?.caracteristicas) && !_hasAnswer(room?.openings)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(room?.caracteristicas) && !_hasAnswer(room?.openings)) {
       return _question('Pregunta del aula', `${label}: uso o condicion`, 'Registre la caracteristica principal del ambiente antes de seguir con puertas, ventanas e instalaciones.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::caracteristicas`, ['Uso regular', 'Uso compartido', 'Sin uso', 'Clausurada', 'En obra', 'Necesita reparacion'], 'Uso regular'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
     if (!_hasAnswer(room?.techo_tipo)) {
-      return _question('Pregunta del aula', `${label}: tipo de techo o cubierta`, 'Registre el material o tipo de cubierta observado antes de pasar a estado del techo.', [
+      return _question('Pregunta del aula', `${label}: tipo de techo o cubierta`, 'Registre el material o tipo de cubierta observado.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::techo_tipo`, ['Chapa', 'Teja', 'Losa', 'Fibrocemento', 'Mixto', 'No verificable'], 'Chapa'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
-    if (!_hasAnswer(room?.techo_estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(room?.techo_estado)) {
       return _question('Pregunta del aula', `${label}: estado del techo`, 'Registre la calidad del techo: filtraciones, roturas, deformaciones o imposibilidad de verificar.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::techo_estado`, ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
@@ -2323,7 +2324,7 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
-    if (!_hasAnswer(room?.pared_estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(room?.pared_estado)) {
       return _question('Pregunta del aula', `${label}: estado de paredes`, 'Registre fisuras, grietas, deformidad, revoque desprendido, humedad o madera rota si corresponde.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::pared_estado`, ['Bueno', 'Regular', 'Fisuras/grietas', 'Humedad', 'Desprendimiento', 'Malo', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
@@ -2335,13 +2336,13 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)));
     }
-    if (!_hasAnswer(room?.piso_estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(room?.piso_estado)) {
       return _question('Pregunta del aula', `${label}: estado/calidad del piso`, 'Registre si el piso esta en buen estado, presenta desgaste, roturas, humedad o desniveles.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Con roturas', 'Con humedad', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
       ], false, _guidedRequirementList(_roomRequirementItems(room)) + _guidedRoomSectionPhotoHtml(room, 'piso'));
     }
-    if (!_hasAnswer(room?.requiere_intervencion)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(room?.requiere_intervencion)) {
       return _question('Pregunta del aula', `${label}: requiere intervencion inmediata?`, 'Pregunta MEC VF 24-03-26: marque si el ambiente requiere intervencion y deje la ficha solo para ampliar observaciones.', [
         ..._fieldAnswerActions('answerClassroomField', `${room.id}::requiere_intervencion`, ['No', 'Si, programada', 'Si, inmediata', 'No verificable'], 'No'),
         { label: 'Editar ficha', action: 'openClassroomFicha', value: room.id },
@@ -2357,7 +2358,7 @@ const GuidedRegisterModule = (() => {
   function _sanitaryDirectQuestion(item) {
     if (!_sanitaryHasGeometry(item) || !_hasMeasures(item, 'largo_m', 'ancho_m')) return null;
     const label = item?.codigo || 'Sanitario pendiente';
-    if (!_hasAnswer(item?.estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(item?.estado)) {
       return _question('Pregunta del sanitario', `${label}: estado general`, 'Responda el estado/calidad observado del sanitario.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::estado`, ['Bueno', 'Regular', 'Malo', 'No operativo', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
@@ -2381,13 +2382,19 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
+    if (!_hasAnswer(item?.desague)) {
+      return _question('Pregunta del sanitario', `${label}: conexion de desague`, 'Indique el tipo de descarga o conexion sanitaria registrada.', [
+        ..._fieldAnswerActions('answerSanitaryField', `${item.id}::desague`, ['Red cloacal', 'Camara septica', 'Pozo ciego', 'Letrina', 'Otro', 'No verificable'], 'Camara septica'),
+        { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
+      ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
+    }
     if (!_hasAnswer(item?.techo_tipo)) {
       return _question('Pregunta del sanitario', `${label}: material predominante del techo`, 'Pregunta MEC VF 24-03-26: registre techo del sanitario antes de piso, paredes y artefactos.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::techo_tipo`, ['Chapa', 'Teja', 'Losa', 'Fibrocemento', 'Mixto', 'No verificable'], 'Chapa'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
-    if (!_hasAnswer(item?.techo_estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(item?.techo_estado)) {
       return _question('Pregunta del sanitario', `${label}: estado del techo`, 'Registre goteras, humedad, chapas rotas, corrosiones o defectos estructurales visibles.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::techo_estado`, ['Bueno', 'Regular', 'Malo', 'Con filtraciones', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
@@ -2399,7 +2406,7 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
-    if (!_hasAnswer(item?.pared_estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(item?.pared_estado)) {
       return _question('Pregunta del sanitario', `${label}: estado de paredes`, 'Registre fisuras, grietas, humedad, desprendimiento de revoque o deformidad visible.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::pared_estado`, ['Bueno', 'Regular', 'Fisuras/grietas', 'Humedad', 'Desprendimiento', 'Malo', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
@@ -2411,13 +2418,13 @@ const GuidedRegisterModule = (() => {
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
-    if (!_hasAnswer(item?.piso_estado)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(item?.piso_estado)) {
       return _question('Pregunta del sanitario', `${label}: estado/calidad del piso`, 'Registre si el piso sanitario esta completo, roto, resbaladizo, con humedad o no verificable.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::piso_estado`, ['Bueno', 'Regular', 'Malo', 'Resbaladizo', 'Con humedad', 'No verificable'], 'Bueno'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
       ], false, _guidedRequirementList(_sanitaryRequirementItems(item)));
     }
-    if (!_hasAnswer(item?.requiere_intervencion)) {
+    if (!TECHNICAL_REGISTER_MODE && !_hasAnswer(item?.requiere_intervencion)) {
       return _question('Pregunta del sanitario', `${label}: requiere intervencion inmediata?`, 'Pregunta MEC VF 24-03-26: deje registrada la prioridad de intervencion del sanitario.', [
         ..._fieldAnswerActions('answerSanitaryField', `${item.id}::requiere_intervencion`, ['No', 'Si, programada', 'Si, inmediata', 'No verificable'], 'No'),
         { label: 'Editar ficha', action: 'openSanitaryFicha', value: item.id },
@@ -2651,7 +2658,7 @@ const GuidedRegisterModule = (() => {
         true
       );
     }
-    if (next?.title === 'Condicion de calidad') {
+    if (!TECHNICAL_REGISTER_MODE && next?.title === 'Condicion de calidad') {
       return _question(
         origin === 'bloque' ? 'Elemento automatico pendiente' : 'Elemento pendiente',
         `${label}: estado general`,
@@ -2746,16 +2753,9 @@ const GuidedRegisterModule = (() => {
         field: 'medidas_bloque',
       },
       {
-        title: 'Condicion de calidad',
-        help: 'Registre el estado general del bloque desde la guia antes de ubicarlo en el plano.',
-        doneText: block?.estado_bloque || 'Estado cargado',
-        done: _hasAnswer(block?.estado_bloque),
-        field: 'estado_bloque',
-      },
-      {
         title: 'Caracteristicas / observacion',
-        help: 'Agregue una observacion breve: uso, obra, clausura, danos visibles o contexto relevante.',
-        doneText: 'Observacion registrada',
+        help: 'Agregue una referencia tecnica breve si hace falta: uso, nombre local, relacion con otro bloque o dato de gabinete.',
+        doneText: 'Referencia registrada',
         done: _hasAnswer(block?.observacion || block?.observaciones),
         optional: true,
       },
@@ -2778,15 +2778,9 @@ const GuidedRegisterModule = (() => {
         done: _hasMeasures(floor, 'largo_m', 'ancho_m') && _measureConfirmed('floor', floor?.id || _floorLabel(floor)),
       },
       {
-        title: 'Condicion de calidad',
-        help: 'Registre el estado general del piso.',
-        doneText: floor?.estado || floor?.estado_piso || 'Estado cargado',
-        done: _hasAnswer(floor?.estado || floor?.estado_piso),
-      },
-      {
         title: 'Caracteristicas / observacion',
-        help: 'Agregue una observacion breve del piso si hay particularidades, deterioro o restricciones.',
-        doneText: 'Observacion registrada',
+        help: 'Agregue una referencia tecnica breve si hay particularidades de ubicacion, forma o medicion.',
+        doneText: 'Referencia registrada',
         done: _hasAnswer(floor?.observacion || floor?.observaciones),
         optional: true,
       },
@@ -2809,40 +2803,22 @@ const GuidedRegisterModule = (() => {
         done: _hasMeasures(room, 'length', 'width') && _measureConfirmed('room', room?.id),
       },
       {
-        title: 'Condicion de calidad',
-        help: 'Registre el estado general del ambiente desde la pregunta superior antes de confirmarlo.',
-        doneText: room?.estado || 'Estado cargado',
-        done: _hasAnswer(room?.estado),
-      },
-      {
-        title: 'Caracteristicas del ambiente',
-        help: 'Registre uso o condicion principal desde la pregunta superior; la ficha queda para edicion rapida.',
-        doneText: 'Caracteristicas registradas',
-        done: _hasAnswer(room?.caracteristicas) || _hasAnswer(room?.openings),
-      },
-      {
         title: 'Techo del ambiente',
-        help: 'Registre tipo y condicion del techo o cubierta desde preguntas superiores.',
-        doneText: [room?.techo_tipo, room?.techo_estado].filter(Boolean).join(' / ') || 'Techo registrado',
-        done: _hasAnswer(room?.techo_tipo) && _hasAnswer(room?.techo_estado),
+        help: 'Registre el tipo del techo o cubierta desde la pregunta superior.',
+        doneText: room?.techo_tipo || 'Techo registrado',
+        done: _hasAnswer(room?.techo_tipo),
       },
       {
         title: 'Paredes del ambiente',
-        help: 'Registre material predominante y condicion de paredes segun Excel MEC VF 24-03-26.',
-        doneText: [room?.pared_material, room?.pared_estado].filter(Boolean).join(' / ') || 'Paredes registradas',
-        done: _hasAnswer(room?.pared_material) && _hasAnswer(room?.pared_estado),
+        help: 'Registre el material predominante de paredes.',
+        doneText: room?.pared_material || 'Paredes registradas',
+        done: _hasAnswer(room?.pared_material),
       },
       {
         title: 'Piso del ambiente',
-        help: 'Registre tipo de piso y calidad/estado desde preguntas superiores.',
-        doneText: [room?.piso_tipo, room?.piso_estado].filter(Boolean).join(' / ') || 'Piso registrado',
-        done: _hasAnswer(room?.piso_tipo) && _hasAnswer(room?.piso_estado),
-      },
-      {
-        title: 'Intervencion del ambiente',
-        help: 'Declare si requiere intervencion inmediata o programada.',
-        doneText: room?.requiere_intervencion || 'Intervencion registrada',
-        done: _hasAnswer(room?.requiere_intervencion),
+        help: 'Registre el tipo de piso del ambiente.',
+        doneText: room?.piso_tipo || 'Piso registrado',
+        done: _hasAnswer(room?.piso_tipo),
       },
       {
         title: 'Responder elementos del aula',
@@ -2877,40 +2853,28 @@ const GuidedRegisterModule = (() => {
         done: _hasMeasures(item, 'largo_m', 'ancho_m') && _measureConfirmed('sanitary', item?.id),
       },
       {
-        title: 'Condicion de calidad',
-        help: 'Registre el estado general del sanitario desde la pregunta superior.',
-        doneText: item?.estado || 'Estado cargado',
-        done: _hasAnswer(item?.estado),
-      },
-      {
-        title: 'Caracteristicas sanitarias',
-        help: 'Complete uso principal, genero/destino y agua desde preguntas superiores sucesivas.',
-        doneText: [item?.uso, item?.genero, item?.agua].filter(Boolean).join(' / ') || 'Caracteristicas cargadas',
-        done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua),
+        title: 'Conexion sanitaria y uso',
+        help: 'Complete uso principal, genero/destino, agua y desague desde preguntas superiores sucesivas.',
+        doneText: [item?.uso, item?.genero, item?.agua, item?.desague].filter(Boolean).join(' / ') || 'Conexion cargada',
+        done: _hasAnswer(item?.uso) && _hasAnswer(item?.genero) && _hasAnswer(item?.agua) && _hasAnswer(item?.desague),
       },
       {
         title: 'Techo sanitario',
-        help: 'Registre material y condicion del techo del sanitario.',
-        doneText: [item?.techo_tipo, item?.techo_estado].filter(Boolean).join(' / ') || 'Techo registrado',
-        done: _hasAnswer(item?.techo_tipo) && _hasAnswer(item?.techo_estado),
+        help: 'Registre material del techo del sanitario.',
+        doneText: item?.techo_tipo || 'Techo registrado',
+        done: _hasAnswer(item?.techo_tipo),
       },
       {
         title: 'Paredes sanitarias',
-        help: 'Registre material predominante y condicion de paredes del sanitario.',
-        doneText: [item?.pared_material, item?.pared_estado].filter(Boolean).join(' / ') || 'Paredes registradas',
-        done: _hasAnswer(item?.pared_material) && _hasAnswer(item?.pared_estado),
+        help: 'Registre material predominante de paredes del sanitario.',
+        doneText: item?.pared_material || 'Paredes registradas',
+        done: _hasAnswer(item?.pared_material),
       },
       {
         title: 'Piso sanitario',
-        help: 'Registre tipo y estado/calidad del piso del sanitario.',
-        doneText: [item?.piso_tipo, item?.piso_estado].filter(Boolean).join(' / ') || 'Piso registrado',
-        done: _hasAnswer(item?.piso_tipo) && _hasAnswer(item?.piso_estado),
-      },
-      {
-        title: 'Intervencion sanitaria',
-        help: 'Declare si el sanitario requiere intervencion inmediata o programada.',
-        doneText: item?.requiere_intervencion || 'Intervencion registrada',
-        done: _hasAnswer(item?.requiere_intervencion),
+        help: 'Registre tipo de piso del sanitario.',
+        doneText: item?.piso_tipo || 'Piso registrado',
+        done: _hasAnswer(item?.piso_tipo),
       },
       {
         title: 'Responder elementos del sanitario',
@@ -2942,19 +2906,17 @@ const GuidedRegisterModule = (() => {
   }
 
   function _guidedObjectRequiredFields(object = {}) {
-    if (object.type === 'door') return ['subtipo', 'estado', 'abre_hacia', 'bisagra'];
-    if (object.type === 'window') return ['subtipo', 'estado'];
-    if (['outlet', 'switchboard', 'light', 'fan', 'ac', 'damage', 'board', 'stair', 'text'].includes(object.type)) return ['subtipo', 'estado'];
-    if (['toilet', 'sink', 'urinal', 'shower'].includes(object.type)) return ['subtipo', 'estado'];
-    if (object.type === 'stall') return ['estado', 'puerta'];
-    return ['estado'];
+    if (object.type === 'door') return ['subtipo', 'abre_hacia', 'bisagra'];
+    if (object.type === 'damage') return ['subtipo', 'estado'];
+    if (object.type === 'stall') return ['subtipo', 'puerta'];
+    return ['subtipo'];
   }
 
   function _guidedPendingObjectsHelp(objects = [], scope = 'elemento') {
     const pending = _guidedPendingObjects(objects);
     if (!pending.length) return 'Los elementos declarados ya tienen ficha revisada.';
     const object = pending[0];
-    return `Responda en la tarjeta superior los datos de ${_guidedObjectLabel(object)}: tipo, estado/calidad y, si es puerta, apertura/bisagra. La ficha queda como edicion rapida si necesita corregir detalles del ${scope}.`;
+    return `Responda en la tarjeta superior los datos de ${_guidedObjectLabel(object)}: tipo, ubicacion tecnica y, si corresponde, apertura/bisagra o dano/falla. La ficha queda como edicion rapida si necesita corregir detalles del ${scope}.`;
   }
 
   function _guidedObjectLabel(object = {}) {
@@ -3103,7 +3065,7 @@ const GuidedRegisterModule = (() => {
 
   function _guidedObjectFieldPrompt(object = {}, field = '') {
     if (field === 'subtipo') return `tipo de ${_guidedObjectKind(object)}`;
-    if (field === 'estado') return 'estado o calidad';
+    if (field === 'estado') return object.type === 'damage' ? 'grado de dano/falla' : 'detalle tecnico';
     if (field === 'abre_hacia') return 'sentido de apertura';
     if (field === 'bisagra') return 'lado de bisagra';
     if (field === 'puerta') return 'puerta de cabina';
@@ -3113,15 +3075,15 @@ const GuidedRegisterModule = (() => {
   function _guidedObjectFieldHelp(object = {}, field = '') {
     const kind = _guidedObjectKind(object);
     if (field === 'subtipo') return `Indique el tipo observado de ${kind}. Despues podra ubicarlo o ajustar detalles desde la ficha.`;
-    if (field === 'estado') return `Registre la calidad observada de ${kind}.`;
+    if (field === 'estado') return object.type === 'damage' ? `Registre el grado del dano/falla de ${kind}.` : `Registre el detalle tecnico de ${kind}.`;
     if (field === 'abre_hacia') return 'Defina si la puerta abre hacia el interior o exterior. Tambien puede usar el boton Apertura para invertirla visualmente.';
     if (field === 'bisagra') return 'Indique el lado de giro de la hoja para representar la apertura con mas precision.';
-    if (field === 'puerta') return 'Registre si la cabina tiene puerta y si su estado permite uso.';
+    if (field === 'puerta') return 'Registre si la cabina tiene puerta.';
     return 'Responda la opcion observada para continuar con la guia.';
   }
 
   function _guidedObjectFieldPrimary(object = {}, field = '') {
-    if (field === 'estado') return ['damage'].includes(object.type) ? 'Leve' : 'Bueno';
+    if (field === 'estado') return ['damage'].includes(object.type) ? 'Leve' : '';
     if (field === 'abre_hacia') return 'Interior';
     if (field === 'bisagra') return 'Inicio';
     if (field === 'puerta') return 'Con puerta';
@@ -3135,7 +3097,7 @@ const GuidedRegisterModule = (() => {
     }
     if (field === 'abre_hacia') return ['Interior', 'Exterior', 'Corrediza', 'No verificable'];
     if (field === 'bisagra') return ['Inicio', 'Fin', 'No verificable'];
-    if (field === 'puerta') return ['Con puerta', 'Sin puerta', 'Puerta rota', 'No verificable'];
+    if (field === 'puerta') return ['Con puerta', 'Sin puerta', 'No verificable'];
     if (field !== 'subtipo') return ['Si', 'No', 'No verificable'];
     return {
       door: ['Con puerta madera', 'Con puerta metalica', 'Con puerta PVC', 'Doble hoja', 'Corrediza', 'Reja', 'Sin hoja', 'Otro', 'No verificable'],
@@ -3217,13 +3179,6 @@ const GuidedRegisterModule = (() => {
         help: 'Complete las medidas propias del elemento, o estire sus vertices para sincronizarlas con la ficha.',
         doneText: `${_siteElementDimensionText(item)} confirmadas`,
         done: _siteElementHasMeasures(item) && _measureConfirmed('site', item?.id),
-        optional: isNonBlockingReference,
-      },
-      {
-        title: 'Condicion de calidad',
-        help: 'Registre el estado general observado.',
-        doneText: ficha.estado || 'Estado cargado',
-        done: _hasAnswer(ficha.estado),
         optional: isNonBlockingReference,
       },
       {
