@@ -37,6 +37,8 @@
 ### Estado
 - Listo para revisión local. No se tocaron los MP4 sin seguimiento de `tools/earthengine/`.
 - Publicación solicitada luego de detectar que la URL seguía mostrando `v2.6.174`: se prepara commit/push explícito de v2.6.175, dejando fuera los MP4 sin seguimiento.
+- Commit funcional publicado: `eea59c4 fix: publicar filtros mapa y formularios MEC v2.6.175`.
+- Verificación posterior: `HEAD` y `origin/main` coinciden en `eea59c4bc53d2d04afc2a36e54f0382e7d6696a2`; GitHub Pages responde `v2.6.175` con cache-busting.
 - Pendiente posterior: despliegue GAS si el endpoint publicado de Apps Script aún no tiene `listarFormulariosMec` y `getEscuela(..., includeDraft:true)`.
 
 ---
