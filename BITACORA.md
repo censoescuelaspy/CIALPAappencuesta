@@ -39,7 +39,9 @@
 - Publicación solicitada luego de detectar que la URL seguía mostrando `v2.6.174`: se prepara commit/push explícito de v2.6.175, dejando fuera los MP4 sin seguimiento.
 - Commit funcional publicado: `eea59c4 fix: publicar filtros mapa y formularios MEC v2.6.175`.
 - Verificación posterior: `HEAD` y `origin/main` coinciden en `eea59c4bc53d2d04afc2a36e54f0382e7d6696a2`; GitHub Pages responde `v2.6.175` con cache-busting.
-- Pendiente posterior: despliegue GAS si el endpoint publicado de Apps Script aún no tiene `listarFormulariosMec` y `getEscuela(..., includeDraft:true)`.
+- Commit documental publicado: `9091024 docs: registrar publicacion v2.6.175`.
+- Apps Script: `clasp push -f`, versión GAS `30` y redeploy del endpoint `AKfycbyt-THSOSgFwvH8Oxl8ojpfJR_8gNhezYA1N7JPmgG0L2RyEtfHq9E58BgfcG33yD2voA @30`.
+- Verificación GAS: `clasp deployments` confirma `@30`; llamada pública `diagnosticoPadron` devuelve `403`, por lo que no se cambian permisos del Web App desde CLI.
 
 ---
 
