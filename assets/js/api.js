@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.171
+ * Version: 2.6.175
  */
 
 const API = (() => {
@@ -266,6 +266,66 @@ const API = (() => {
   const _DEMO_INITIAL_CONTACTS = [];
   const _DEMO_INITIAL_RESPONSES = [];
   const _DEMO_APP_FEEDBACK = [];
+  const _DEMO_MEC_FORMS = [
+    {
+      id_borrador: 'MEC-DRAFT-DEMO-0001',
+      id_escuela: EXAMPLE_SCHOOL_ID,
+      codigo_local: 'DEMO-0001',
+      nombre_escuela: _EXAMPLE_SCHOOL.nombre,
+      departamento: _EXAMPLE_SCHOOL.departamento,
+      distrito: _EXAMPLE_SCHOOL.distrito,
+      usuario: 'juan.perez',
+      fecha_guardado: '2026-06-08 10:15:00',
+      actualizado_en: '2026-06-08 10:15:00',
+      estado_borrador: 'en_curso',
+      estado_operativo: 'en_curso',
+      app_version: '2.6.175',
+      schema_version: 'mec_v2',
+      bloques: 3,
+      pisos: 4,
+      aulas: 9,
+      otros_espacios: 4,
+      sanitarios: 5,
+      exteriores: 7,
+      evidencias: 6,
+      total_elementos: 28,
+      tiempo_escuela_min: 72,
+      mec_draft: _exampleMecDraft(),
+    },
+    {
+      id_borrador: 'MEC-DRAFT-0011007',
+      id_escuela: 'ESC_0011007',
+      codigo_local: '0011007',
+      nombre_escuela: 'COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO',
+      departamento: 'Capital',
+      distrito: 'Asuncion',
+      usuario: 'juan.perez',
+      fecha_guardado: '2026-06-08 12:40:00',
+      actualizado_en: '2026-06-08 12:40:00',
+      estado_borrador: 'finalizado',
+      estado_operativo: 'finalizada',
+      app_version: '2.6.175',
+      schema_version: 'mec_v2',
+      bloques: 2,
+      pisos: 2,
+      aulas: 6,
+      otros_espacios: 3,
+      sanitarios: 2,
+      exteriores: 5,
+      evidencias: 4,
+      total_elementos: 18,
+      tiempo_escuela_min: 54,
+      mec_draft: {
+        ..._exampleMecDraft(),
+        __selectedSchool: { id_escuela: 'ESC_0011007', codigo_local: '0011007', nombre: 'COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO', syncedAt: '2026-06-08T12:40:00.000Z' },
+      },
+    },
+  ];
+
+  function _demoMecFormForSchool(id) {
+    const key = String(id || '');
+    return _DEMO_MEC_FORMS.find(row => row.id_escuela === key || row.codigo_local === key || String(row.codigo_local).replace(/\D+/g, '') === key.replace(/\D+/g, '')) || null;
+  }
 
   function _demoCall(endpoint, data) {
     return new Promise(resolve => setTimeout(() => resolve(_demoDispatch(endpoint, data || {})), 180));
@@ -358,7 +418,62 @@ const API = (() => {
         Object.keys(distritos_por_departamento).forEach(key => distritos_por_departamento[key].sort((a, b) => a.localeCompare(b)));
         return { status: 'ok', data: rows, meta: { total: rows.length, departamentos, distritos, distritos_por_departamento, source: 'demo' } };
       }
-      case 'getEscuela': return { status: 'ok', data: _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || null };
+      case 'getEscuela': {
+        const school = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela) || null;
+        if (!school) return { status: 'error', message: 'Escuela demo no encontrada.' };
+        const form = _demoMecFormForSchool(data.id_escuela);
+        return {
+          status: 'ok',
+          data: data.includeDraft && form
+            ? {
+                ...school,
+                mec_draft: form.mec_draft,
+                mec_draft_id: form.id_borrador,
+                mec_draft_status: form.estado_borrador,
+                mec_draft_updated_at: form.actualizado_en,
+                mec_draft_usuario: form.usuario,
+                mec_draft_counts: {
+                  bloques: form.bloques,
+                  pisos: form.pisos,
+                  aulas: form.aulas,
+                  otros_espacios: form.otros_espacios,
+                  sanitarios: form.sanitarios,
+                  exteriores: form.exteriores,
+                  evidencias: form.evidencias,
+                },
+              }
+            : school,
+        };
+      }
+      case 'listarFormulariosMec': {
+        let rows = _DEMO_MEC_FORMS.map(({ mec_draft, ...row }) => ({ ...row }));
+        if (data.usuario) rows = rows.filter(row => String(row.usuario || '').toLowerCase() === String(data.usuario || '').toLowerCase());
+        if (data.estado) rows = rows.filter(row => String(row.estado_borrador || '').toLowerCase() === String(data.estado || '').toLowerCase());
+        if (data.q) {
+          const q = String(data.q || '').toLowerCase();
+          rows = rows.filter(row => Object.values(row).join(' ').toLowerCase().includes(q));
+        }
+        const resumen = rows.reduce((acc, row) => {
+          const key = row.usuario || 'sin_usuario';
+          if (!acc[key]) acc[key] = { usuario: key, formularios: 0, finalizados: 0, en_curso: 0, elementos: 0, evidencias: 0 };
+          acc[key].formularios += 1;
+          if (String(row.estado_operativo || row.estado_borrador).toLowerCase().includes('final')) acc[key].finalizados += 1;
+          else acc[key].en_curso += 1;
+          acc[key].elementos += Number(row.total_elementos || 0);
+          acc[key].evidencias += Number(row.evidencias || 0);
+          return acc;
+        }, {});
+        return {
+          status: 'ok',
+          data: rows,
+          meta: {
+            total: rows.length,
+            usuarios: [...new Set(_DEMO_MEC_FORMS.map(row => row.usuario).filter(Boolean))].sort(),
+            estados: [...new Set(_DEMO_MEC_FORMS.map(row => row.estado_borrador).filter(Boolean))].sort(),
+            resumen_por_usuario: Object.values(resumen),
+          },
+        };
+      }
       case 'updateEscuelaEstado': {
         const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela);
         if (esc) esc.estado_relevamiento = data.estado;
@@ -814,9 +929,11 @@ const API = (() => {
     if (result.status === 'ok' && request?.includeExample) result.data = _withExampleSchool(result.data || []);
     return result;
   }
-  async function getEscuela(id) {
+  async function getEscuela(id, options = {}) {
     if (id === EXAMPLE_SCHOOL_ID || id === _EXAMPLE_SCHOOL.codigo_local) return { status: 'ok', data: _EXAMPLE_SCHOOL };
-    return call('getEscuela', 'GET', { id_escuela: id });
+    const request = { id_escuela: id };
+    if (options.includeDraft) request.includeDraft = 'true';
+    return call('getEscuela', 'GET', request);
   }
   async function updateEscuelaEstado(id, estado, observacion = '') { return call('updateEscuelaEstado', 'POST', { id_escuela: id, estado, observacion }); }
   async function asignarEscuela(datos) { return call('asignarEscuela', 'POST', datos, { skipQueue: true }); }
@@ -844,6 +961,7 @@ const API = (() => {
   async function getComentariosApp(filters = {}) { return call('getComentariosApp', 'GET', filters, { skipLoading: true }); }
   async function resolverComentarioApp(id, estado, respuesta_admin = '') { return call('resolverComentarioApp', 'POST', { id_comentario: id, estado, respuesta_admin }); }
   async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
+  async function listarFormulariosMec(filters = {}) { return call('listarFormulariosMec', 'GET', filters, { skipLoading: true }); }
   async function reiniciarRelevamientoEscuela(datos) { return call('reiniciarRelevamientoEscuela', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
   async function uploadEvidence(datos) { return call('uploadEvidence', 'POST', datos, { skipLoading: true, skipQueue: true, retries: 1 }); }
@@ -890,6 +1008,7 @@ const API = (() => {
     getComentariosApp,
     resolverComentarioApp,
     guardarBorradorMec,
+    listarFormulariosMec,
     reiniciarRelevamientoEscuela,
     guardarCierreCompleto,
     uploadEvidence,

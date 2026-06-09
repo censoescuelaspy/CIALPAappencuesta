@@ -1,8 +1,14 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Versión 2.6.55** | Paraguay 2026
+**Versión 2.6.175** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.175
+
+- Filtros del mapa normalizados y reaplicados tras refresco de padrón/cache.
+- Reapertura de escuelas finalizadas con recuperación de la última ficha MEC guardada.
+- Panel admin de formularios MEC por censista, con filtros y acción para abrir fichas.
 
 ---
 

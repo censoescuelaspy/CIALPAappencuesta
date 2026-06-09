@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.174" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.175" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.174" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.175" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.174</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.175</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.174</strong>
+      Edición vigente<br><strong class="app-version">v2.6.175</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -291,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.174</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.175</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -732,6 +732,68 @@
               <button class="btn btn-outline btn-sm" onclick="AdminModule.loadSolicitudesRelevamiento()">Actualizar</button>
             </div>
           </div>
+
+          <section id="formularios-mec-admin-panel" class="card" style="margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+              <div>
+                <strong>Formularios MEC cargados por censista</strong>
+                <p class="text-muted" style="margin:.35rem 0 0;">Listado administrativo de fichas guardadas y finalizadas.</p>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="AdminModule.loadFormulariosMec()">Actualizar</button>
+            </div>
+            <div class="enc-admin-summary" style="margin-top:.85rem;">
+              <div class="enc-admin-kpi"><small>Formularios</small><strong id="formularios-mec-total">0</strong></div>
+              <div class="enc-admin-kpi"><small>Censistas</small><strong id="formularios-mec-censistas">0</strong></div>
+              <div class="enc-admin-kpi"><small>Escuelas</small><strong id="formularios-mec-escuelas">0</strong></div>
+              <div class="enc-admin-kpi enc-admin-kpi--active"><small>Finalizados</small><strong id="formularios-mec-finalizados">0</strong></div>
+              <div class="enc-admin-kpi"><small>Elementos</small><strong id="formularios-mec-elementos">0</strong></div>
+              <div class="enc-admin-kpi"><small>Evidencias</small><strong id="formularios-mec-evidencias">0</strong></div>
+            </div>
+            <form id="formularios-mec-filter-form" class="enc-admin-toolbar" style="margin-top:.85rem;">
+              <div class="enc-admin-filter">
+                <label for="formularios-mec-filter-usuario">Censista</label>
+                <select id="formularios-mec-filter-usuario" class="form-control form-control-sm">
+                  <option value="">Todos los censistas</option>
+                </select>
+              </div>
+              <div class="enc-admin-filter">
+                <label for="formularios-mec-filter-estado">Estado</label>
+                <select id="formularios-mec-filter-estado" class="form-control form-control-sm">
+                  <option value="">Todos los estados</option>
+                </select>
+              </div>
+              <div class="enc-admin-search">
+                <label for="formularios-mec-filter-search">Buscar</label>
+                <input id="formularios-mec-filter-search" type="text" class="form-control form-control-sm" placeholder="Escuela, codigo, distrito o censista" autocomplete="off" />
+              </div>
+              <div style="align-self:flex-end;">
+                <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+              </div>
+            </form>
+            <div class="table-wrapper" style="margin-top:.85rem;">
+              <table class="enc-admin-table">
+                <thead>
+                  <tr>
+                    <th>Censista</th>
+                    <th>Actualizado</th>
+                    <th>Escuela</th>
+                    <th>Ubicacion</th>
+                    <th>Estado</th>
+                    <th>Bloques</th>
+                    <th>Aulas</th>
+                    <th>Sanitarios</th>
+                    <th>Exteriores</th>
+                    <th>Evid.</th>
+                    <th>Tiempo</th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody id="formularios-mec-tbody">
+                  <tr><td colspan="12" class="text-center text-muted">Cargando formularios...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
           <form id="enc-filter-form" class="enc-admin-toolbar">
             <div class="enc-admin-search">
@@ -1588,20 +1650,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.174"></script>
-<script src="assets/js/local-store.js?v=2.6.174"></script>
-<script src="assets/js/api.js?v=2.6.174"></script>
-<script src="assets/js/auth.js?v=2.6.174"></script>
-<script src="assets/js/map.js?v=2.6.174"></script>
-<script src="assets/js/survey.js?v=2.6.174"></script>
-<script src="assets/js/stats.js?v=2.6.174"></script>
-<script src="assets/js/location-audit.js?v=2.6.174"></script>
-<script src="assets/js/planning.js?v=2.6.174"></script>
-<script src="assets/js/admin.js?v=2.6.174"></script>
-<script src="assets/js/jornada.js?v=2.6.174"></script>
-<script src="assets/js/manual.js?v=2.6.174"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.174"></script>
-<script src="assets/js/app.js?v=2.6.174"></script>
+<script src="assets/js/config.js?v=2.6.175"></script>
+<script src="assets/js/local-store.js?v=2.6.175"></script>
+<script src="assets/js/api.js?v=2.6.175"></script>
+<script src="assets/js/auth.js?v=2.6.175"></script>
+<script src="assets/js/map.js?v=2.6.175"></script>
+<script src="assets/js/survey.js?v=2.6.175"></script>
+<script src="assets/js/stats.js?v=2.6.175"></script>
+<script src="assets/js/location-audit.js?v=2.6.175"></script>
+<script src="assets/js/planning.js?v=2.6.175"></script>
+<script src="assets/js/admin.js?v=2.6.175"></script>
+<script src="assets/js/jornada.js?v=2.6.175"></script>
+<script src="assets/js/manual.js?v=2.6.175"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.175"></script>
+<script src="assets/js/app.js?v=2.6.175"></script>
 
 <script>
   // Set today's date in Inicio module

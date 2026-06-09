@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.126
+ * Version 2.6.175
  */
 
 const SheetsService = (() => {
@@ -118,13 +118,54 @@ const SheetsService = (() => {
     };
   }
 
-  function getEscuela(id) {
+  function getEscuela(id, options) {
     const source = _escuelasRawRows_();
     const found = source.rows
       .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || idx + 2))
       .find(r => _idMatch(r, id));
     if (!found) return { status: 'error', message: 'Escuela no encontrada.' };
-    return { status: 'ok', data: found, meta: { source: source.source } };
+    return { status: 'ok', data: _attachMecDraftToSchool_(found, options || {}), meta: { source: source.source } };
+  }
+
+  function _attachMecDraftToSchool_(school, options) {
+    const data = Object.assign({}, school || {});
+    if (!options || !_isTrueish(options.includeDraft)) return data;
+    const session = options._session || {};
+    if (!_canReadMecDraftForSchool_(session, data)) return data;
+    const latest = _latestMecDraftForSchool_(data.id_escuela, data.codigo_local);
+    if (!latest) return data;
+    const draft = _mecParseJson_(latest.draft_json);
+    const resumen = _mecParseJson_(latest.resumen_json);
+    const evidenceIndex = _mecParseJson_(latest.evidence_index_json);
+    Object.assign(data, _mecDraftMetadata_(latest, resumen, evidenceIndex));
+    if (draft) data.mec_draft = draft;
+    if (resumen) data.mec_draft_resumen = resumen;
+    if (Array.isArray(evidenceIndex)) data.mec_evidence_index = evidenceIndex;
+    return data;
+  }
+
+  function _canReadMecDraftForSchool_(session, school) {
+    const role = _txt(session && session.rol).toLowerCase();
+    if (role === 'admin' || role === 'supervisor') return true;
+    return _canOperateSchool_(session, school);
+  }
+
+  function _latestMecDraftForSchool_(idEscuela, codigoLocal) {
+    let rows = [];
+    try {
+      rows = _sheetToObjects(SHEET_NAMES.MEC_DRAFTS);
+    } catch (err) {
+      return null;
+    }
+    const ids = [idEscuela, codigoLocal].map(_txt).filter(Boolean);
+    if (!ids.length) return null;
+    let latest = null;
+    rows.forEach(function(row, index) {
+      if (!ids.some(function(id) { return _draftRowMatchesSchoolId_(row, id); })) return;
+      const candidate = Object.assign({ __row_order: index + 2 }, row);
+      if (!latest || _mecRowMs_(candidate) >= _mecRowMs_(latest)) latest = candidate;
+    });
+    return latest;
   }
 
   function diagnosticoPadron() {
@@ -1196,6 +1237,137 @@ const SheetsService = (() => {
     };
   }
 
+  function listarFormulariosMec(params) {
+    params = params || {};
+    const session = params._session || {};
+    if (!_isAuthorizedAdmin(session)) {
+      return { status: 'error', message: 'Solo administradores autorizados pueden ver todos los formularios MEC.' };
+    }
+
+    let rows = [];
+    try {
+      rows = _sheetToObjects(SHEET_NAMES.MEC_DRAFTS);
+    } catch (err) {
+      return { status: 'ok', data: [], meta: { total: 0, error: 'Hoja mec_borradores no disponible: ' + err.message } };
+    }
+
+    const schoolIndex = _schoolIndexByIdentity_();
+    let data = rows.map(function(row, index) {
+      return _mecFormListRow_(row, index, schoolIndex);
+    });
+
+    if (params.usuario) data = data.filter(function(row) { return _same(row.usuario, params.usuario); });
+    if (params.estado) data = data.filter(function(row) { return _same(row.estado_borrador, params.estado); });
+    if (params.q) {
+      const q = _txt(params.q).toLowerCase();
+      data = data.filter(function(row) {
+        return [
+          row.id_borrador,
+          row.id_escuela,
+          row.codigo_local,
+          row.nombre_escuela,
+          row.usuario,
+          row.departamento,
+          row.distrito,
+          row.estado_borrador,
+        ].join(' ').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+
+    data.sort(function(a, b) {
+      return _mecRowMs_(b) - _mecRowMs_(a) || _txt(b.actualizado_en).localeCompare(_txt(a.actualizado_en));
+    });
+
+    const total = data.length;
+    const limit = Math.max(1, Math.min(Number(_num(params.limit) || 250), 1000));
+    const page = Math.max(1, Number(_num(params.page) || 1));
+    const start = (page - 1) * limit;
+    const pageRows = data.slice(start, start + limit);
+    const resumen = {};
+    data.forEach(function(row) {
+      const user = row.usuario || 'sin_usuario';
+      if (!resumen[user]) resumen[user] = { usuario: user, formularios: 0, finalizados: 0, en_curso: 0, elementos: 0, evidencias: 0 };
+      resumen[user].formularios += 1;
+      if (_same(row.estado_operativo, 'finalizada') || _same(row.estado_borrador, 'finalizado') || _same(row.estado_borrador, 'completo')) resumen[user].finalizados += 1;
+      else resumen[user].en_curso += 1;
+      resumen[user].elementos += Number(row.total_elementos || 0);
+      resumen[user].evidencias += Number(row.evidencias || 0);
+    });
+
+    return {
+      status: 'ok',
+      data: pageRows,
+      meta: {
+        total: total,
+        page: page,
+        per_page: limit,
+        total_pages: Math.max(1, Math.ceil(total / limit)),
+        usuarios: Object.keys(resumen).sort(),
+        estados: Array.from(new Set(data.map(function(row) { return row.estado_borrador; }).filter(Boolean))).sort(),
+        resumen_por_usuario: Object.values(resumen).sort(function(a, b) { return b.formularios - a.formularios || a.usuario.localeCompare(b.usuario); }),
+      },
+    };
+  }
+
+  function _mecFormListRow_(row, index, schoolIndex) {
+    row = Object.assign({ __row_order: index + 2 }, row || {});
+    const draft = _mecParseJson_(row.draft_json) || {};
+    const selected = draft.__selectedSchool || {};
+    const key = _mecSchoolKey_(row) || _mecSchoolKey_(selected);
+    const school = key && schoolIndex ? (schoolIndex[key] || {}) : {};
+    const resumen = _mecParseJson_(row.resumen_json);
+    const evidenceIndex = _mecParseJson_(row.evidence_index_json);
+    const meta = _mecDraftMetadata_(row, resumen, evidenceIndex);
+    const counts = meta.mec_draft_counts || {};
+    return {
+      id_borrador: _txt(row.id_borrador),
+      id_escuela: _txt(row.id_escuela || selected.id_escuela || school.id_escuela),
+      codigo_local: _txt(row.codigo_local || selected.codigo_local || school.codigo_local),
+      nombre_escuela: _txt(row.nombre_escuela || selected.nombre || selected.nombre_escuela || school.nombre),
+      departamento: _txt(selected.departamento || school.departamento),
+      distrito: _txt(selected.distrito || school.distrito),
+      localidad: _txt(selected.localidad || school.localidad),
+      usuario: _txt(row.usuario),
+      fecha_guardado: _txt(row.fecha_guardado),
+      actualizado_en: _txt(row.actualizado_en || row.fecha_guardado || row.creado_en),
+      estado_borrador: _txt(row.estado_borrador) || 'borrador',
+      estado_operativo: _txt(school.estado_relevamiento),
+      app_version: _txt(row.app_version),
+      schema_version: _txt(row.schema_version),
+      bloques: counts.bloques || 0,
+      pisos: counts.pisos || 0,
+      aulas: counts.aulas || 0,
+      otros_espacios: counts.otros_espacios || 0,
+      sanitarios: counts.sanitarios || 0,
+      exteriores: counts.exteriores || 0,
+      evidencias: meta.mec_draft_evidence_count || 0,
+      total_elementos: meta.mec_draft_total_elementos || 0,
+      base_mapa_confirmada: meta.mec_draft_base_mapa_confirmada || '',
+      tiempo_escuela_min: Number(_num(row.tiempo_escuela_min) || 0),
+      tiempo_aulas_min: Number(_num(row.tiempo_aulas_min) || 0),
+      tiempo_sanitarios_min: Number(_num(row.tiempo_sanitarios_min) || 0),
+      tiempo_exteriores_min: Number(_num(row.tiempo_exteriores_min) || 0),
+      __row_order: index + 2,
+    };
+  }
+
+  function _schoolIndexByIdentity_() {
+    const index = {};
+    try {
+      const source = _escuelasRawRows_();
+      source.rows
+        .map(function(r, idx) { return _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || idx + 2); })
+        .forEach(function(school) {
+          [_digits(school.codigo_local), _digits(school.id_escuela), _txt(school.codigo_local), _txt(school.id_escuela)]
+            .filter(Boolean)
+            .forEach(function(key) { index[key] = school; });
+        });
+    } catch (err) {
+      return index;
+    }
+    return index;
+  }
+
   function reiniciarRelevamientoEscuela(params) {
     const session = params._session || {};
     const idEscuela = params.id_escuela || params.codigo_local || '';
@@ -1869,6 +2041,34 @@ const SheetsService = (() => {
     return isNaN(parsed) ? Number(row.__row_order || 0) : parsed;
   }
 
+  function _mecDraftMetadata_(row, resumen, evidenceIndex) {
+    row = row || {};
+    const counts = {
+      bloques: Number(_num(row.bloques) || 0),
+      pisos: Number(_num(row.pisos) || 0),
+      aulas: Number(_num(row.aulas) || 0),
+      otros_espacios: Number(_num(row.otros_espacios) || 0),
+      sanitarios: Number(_num(row.sanitarios) || 0),
+      exteriores: Number(_num(row.exteriores) || 0),
+      evidencias: Number(_num(row.evidencias) || 0),
+    };
+    const evidenceCount = Array.isArray(evidenceIndex) ? evidenceIndex.length : counts.evidencias;
+    const totalElements = counts.bloques + counts.aulas + counts.otros_espacios + counts.sanitarios + counts.exteriores;
+    return {
+      mec_draft_id: _txt(row.id_borrador),
+      mec_draft_status: _txt(row.estado_borrador),
+      mec_draft_updated_at: _txt(row.actualizado_en || row.fecha_guardado || row.creado_en),
+      mec_draft_usuario: _txt(row.usuario),
+      mec_draft_app_version: _txt(row.app_version),
+      mec_draft_schema_version: _txt(row.schema_version),
+      mec_draft_counts: counts,
+      mec_draft_total_elementos: totalElements,
+      mec_draft_evidence_count: evidenceCount,
+      mec_draft_base_mapa_confirmada: _txt(row.base_mapa_confirmada),
+      mec_draft_resumen_pendientes: resumen && Array.isArray(resumen.pendingItems) ? resumen.pendingItems.length : '',
+    };
+  }
+
   function _mecTimeAdd_(totals, key, value) {
     const numeric = Number(_num(value) || 0);
     if (!numeric) return;
@@ -2322,6 +2522,20 @@ const SheetsService = (() => {
       ultima_sesion_id: _txt(_first(r, ['ultima_sesion_id', 'ULTIMA_SESION_ID'])),
       folio_externo: _txt(_first(r, ['folio_externo', 'FOLIO_EXTERNO'])),
       ultimo_registro_externo: _txt(_first(r, ['ultimo_registro_externo', 'ULTIMO_REGISTRO_EXTERNO'])),
+      ultimo_cierre_id: _txt(_first(r, ['ultimo_cierre_id', 'ULTIMO_CIERRE_ID'])),
+      ultimo_pdf_url: _txt(_first(r, ['ultimo_pdf_url', 'ULTIMO_PDF_URL'])),
+      ultimo_metadata_url: _txt(_first(r, ['ultimo_metadata_url', 'ULTIMO_METADATA_URL'])),
+      email_cierre_estado: _txt(_first(r, ['email_cierre_estado', 'EMAIL_CIERRE_ESTADO'])),
+      email_cierre_destino: _txt(_first(r, ['email_cierre_destino', 'EMAIL_CIERRE_DESTINO'])),
+      ultimo_borrador_mec_id: _txt(_first(r, ['ultimo_borrador_mec_id', 'ULTIMO_BORRADOR_MEC_ID'])),
+      ultimo_borrador_mec_at: _txt(_first(r, ['ultimo_borrador_mec_at', 'ULTIMO_BORRADOR_MEC_AT'])),
+      ultimo_borrador_mec_usuario: _txt(_first(r, ['ultimo_borrador_mec_usuario', 'ULTIMO_BORRADOR_MEC_USUARIO'])),
+      tiempo_real_min: _txt(_first(r, ['tiempo_real_min', 'TIEMPO_REAL_MIN'])),
+      tiempo_aulas_min: _txt(_first(r, ['tiempo_aulas_min', 'TIEMPO_AULAS_MIN'])),
+      tiempo_aulas_promedio_min: _txt(_first(r, ['tiempo_aulas_promedio_min', 'TIEMPO_AULAS_PROMEDIO_MIN'])),
+      tiempo_sanitarios_min: _txt(_first(r, ['tiempo_sanitarios_min', 'TIEMPO_SANITARIOS_MIN'])),
+      tiempo_sanitarios_promedio_min: _txt(_first(r, ['tiempo_sanitarios_promedio_min', 'TIEMPO_SANITARIOS_PROMEDIO_MIN'])),
+      tiempo_exteriores_min: _txt(_first(r, ['tiempo_exteriores_min', 'TIEMPO_EXTERIORES_MIN'])),
       estrato: _txt(_first(r, ['ESTRATO', 'estrato'])),
       grupo_matricula: _txt(_first(r, ['GRUPO_MATRICULA', 'grupo_matricula'])),
       matricula: _txt(matricula),
@@ -3346,7 +3560,7 @@ const SheetsService = (() => {
     saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence,
     saveComentarioApp, getComentariosApp, resolverComentarioApp,
     guardarCuestionarioInicial, guardarCuestionarioInicialAdjunto, importarContactosCuestionarioInicial, listarContactosCuestionarioInicial, enviarCuestionarioInicial,
-    guardarBorradorMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    guardarBorradorMec, listarFormulariosMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };

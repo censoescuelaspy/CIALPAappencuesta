@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.126
+ * Version: 2.6.175
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -141,7 +141,7 @@ function _handleRequest(e) {
       case 'diagnosticoPadron': return _respond(SheetsService.diagnosticoPadron());
       case 'listarEscuelasCuestionarioInicial': return _respond(SheetsService.listarEscuelasCuestionarioInicial(params));
       case 'getEscuelas':     return _respond(SheetsService.getEscuelas(params));
-      case 'getEscuela':      return _respond(SheetsService.getEscuela(params.id_escuela));
+      case 'getEscuela':      return _respond(SheetsService.getEscuela(params.id_escuela, params));
       case 'updateEscuelaEstado': return _respond(SheetsService.updateEscuelaEstado(params));
       case 'asignarEscuela': return _respond(SheetsService.asignarEscuela(params));
 
@@ -177,6 +177,7 @@ function _handleRequest(e) {
       case 'listarContactosCuestionarioInicial': return _respond(SheetsService.listarContactosCuestionarioInicial(params));
       case 'enviarCuestionarioInicial': return _respond(SheetsService.enviarCuestionarioInicial(params));
       case 'guardarBorradorMec': return _respond(SheetsService.guardarBorradorMec(params));
+      case 'listarFormulariosMec': return _respond(SheetsService.listarFormulariosMec(params));
       case 'reiniciarRelevamientoEscuela': return _respond(SheetsService.reiniciarRelevamientoEscuela(params));
       case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));
       case 'getIncidencias':  return _respond(SheetsService.getIncidencias(params));

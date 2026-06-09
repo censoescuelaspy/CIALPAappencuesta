@@ -4,6 +4,43 @@
 
 ---
 
+## Correccion de filtros, reapertura y control admin MEC - 2026-06-09 - v2.6.175
+
+### Objetivo
+- Corregir filtros del mapa que no coincidían entre lista, marcadores, rutas y refresco desde red.
+- Reabrir escuelas finalizadas mostrando la ficha MEC cargada, no solo los datos generales del mapa.
+- Permitir que administradores vean los formularios MEC cargados por cada censista.
+
+### Problema reportado
+- Los filtros del mapeo fallaban o devolvían resultados inconsistentes.
+- Al volver a abrir escuelas ya finalizadas, el Registro guiado no mostraba lo cargado previamente.
+- Como admin faltaba una lista centralizada de formularios cargados por censista.
+
+### Cambios implementados
+- `assets/js/map.js`: filtros por departamento, distrito, estado, censista, muestra y búsqueda comparan valores canónicos, tolerando acentos, mayúsculas y alias de estado.
+- `assets/js/map.js` y `assets/js/app.js`: el mapa conserva y reaplica filtros activos cuando se refresca el padrón desde caché/red.
+- `assets/js/map.js` y `assets/js/api.js`: al abrir Registro guiado se consulta `getEscuela(..., includeDraft:true)` para traer la última ficha MEC antes de renderizar.
+- `gas/Code.gs` y `gas/sheets.gs`: `getEscuela` puede adjuntar el último `mec_borradores.draft_json` con permisos de admin/supervisor/censista asignado.
+- `gas/sheets.gs`: nuevo endpoint `listarFormulariosMec` para admin, con filtros por usuario, estado y texto, más resumen por censista.
+- `index.html` y `assets/js/admin.js`: módulo `Encuestadores` agrega panel `Formularios MEC cargados por censista`, KPIs, filtros y acción `Abrir`.
+- `assets/js/config.js`, `assets/js/app.js`, `assets/js/api.js`, `assets/js/map.js`, `assets/js/admin.js`, `gas/Code.gs`, `gas/sheets.gs`, `index.html`, `sw.js`: versión/cache actualizados a `2.6.175`.
+
+### Validaciones ejecutadas
+- `node --check assets/js/map.js`.
+- `node --check assets/js/api.js`.
+- `node --check assets/js/admin.js`.
+- `node --check assets/js/app.js`.
+- `Get-Content -Raw gas/Code.gs | node --check -`.
+- `Get-Content -Raw gas/sheets.gs | node --check -`.
+- `git diff --check`.
+
+### Estado
+- Listo para revisión local. No se tocaron los MP4 sin seguimiento de `tools/earthengine/`.
+- Publicación solicitada luego de detectar que la URL seguía mostrando `v2.6.174`: se prepara commit/push explícito de v2.6.175, dejando fuera los MP4 sin seguimiento.
+- Pendiente posterior: despliegue GAS si el endpoint publicado de Apps Script aún no tiene `listarFormulariosMec` y `getEscuela(..., includeDraft:true)`.
+
+---
+
 ## Registro tecnico arquitectura/servicios - 2026-06-08 - v2.6.174
 
 ### Objetivo

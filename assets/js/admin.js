@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.6.84
+ * Version: 2.6.175
  */
 
 const AdminModule = (() => {
@@ -9,8 +9,11 @@ const AdminModule = (() => {
 
   let _encuestadores = [];
   let _solicitudesRelevamiento = [];
+  let _formulariosMec = [];
+  let _formulariosMecMeta = {};
   let _auditFilters = {};
   let _encuestadorFiltersBound = false;
+  let _formulariosMecFiltersBound = false;
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +121,7 @@ const AdminModule = (() => {
       _renderEncuestadoresSummary(_encuestadores);
       _renderEncuestadoresTable(_filterEncuestadores(_encuestadores));
       loadSolicitudesRelevamiento({ silent: true });
+      loadFormulariosMec({ silent: true });
     } catch (err) {
       UI.showToast('Error al cargar encuestadores: ' + err.message, 'error');
     }
@@ -287,6 +291,145 @@ const AdminModule = (() => {
       </div>
       ${body}`;
     containers.forEach(container => { container.innerHTML = html; });
+  }
+
+  async function loadFormulariosMec(options = {}) {
+    const panel = document.getElementById('formularios-mec-admin-panel');
+    if (!panel || !Auth.canAccess('admin')) return;
+    _bindFormulariosMecFilters();
+    try {
+      const filters = _readFormulariosMecFilters();
+      const result = await API.listarFormulariosMec({ ...filters, limit: 500 });
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudo cargar el listado.');
+      _formulariosMec = result.data || [];
+      _formulariosMecMeta = result.meta || {};
+      _populateFormulariosMecFilterOptions(_formulariosMecMeta);
+      _renderFormulariosMecSummary(_formulariosMec, _formulariosMecMeta);
+      _renderFormulariosMecTable(_formulariosMec);
+    } catch (err) {
+      _renderFormulariosMecTable([]);
+      if (!options.silent) UI.showToast('Error al cargar formularios MEC: ' + err.message, 'error', 8000);
+    }
+  }
+
+  function _bindFormulariosMecFilters() {
+    if (_formulariosMecFiltersBound) return;
+    const form = document.getElementById('formularios-mec-filter-form');
+    if (!form) return;
+    _formulariosMecFiltersBound = true;
+    let timer = null;
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      loadFormulariosMec();
+    });
+    form.querySelectorAll('select').forEach(input => {
+      input.addEventListener('change', () => loadFormulariosMec({ silent: true }));
+    });
+    const search = document.getElementById('formularios-mec-filter-search');
+    if (search) {
+      search.addEventListener('input', () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => loadFormulariosMec({ silent: true }), 180);
+      });
+    }
+  }
+
+  function _readFormulariosMecFilters() {
+    return {
+      usuario: document.getElementById('formularios-mec-filter-usuario')?.value || '',
+      estado: document.getElementById('formularios-mec-filter-estado')?.value || '',
+      q: document.getElementById('formularios-mec-filter-search')?.value || '',
+    };
+  }
+
+  function _populateFormulariosMecFilterOptions(meta = {}) {
+    _populateSelect('formularios-mec-filter-usuario', meta.usuarios || [], 'Todos los censistas');
+    _populateSelect('formularios-mec-filter-estado', meta.estados || [], 'Todos los estados');
+  }
+
+  function _populateSelect(id, options, placeholder) {
+    const select = document.getElementById(id);
+    if (!select) return;
+    const current = String(select.value || '');
+    const values = [...new Set((options || []).map(value => String(value || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+    select.innerHTML = [
+      `<option value="">${_escapeHtml(placeholder)}</option>`,
+      ...values.map(value => `<option value="${_escapeHtml(value)}">${_escapeHtml(value)}</option>`),
+    ].join('');
+    select.value = values.includes(current) ? current : '';
+  }
+
+  function _renderFormulariosMecSummary(rows, meta = {}) {
+    const summary = meta.resumen_por_usuario || [];
+    const totalEscuelas = new Set((rows || []).map(row => row.codigo_local || row.id_escuela).filter(Boolean)).size;
+    const totals = (rows || []).reduce((acc, row) => {
+      acc.elementos += Number(row.total_elementos || 0);
+      acc.evidencias += Number(row.evidencias || 0);
+      acc.finalizados += _isFinalForm(row) ? 1 : 0;
+      return acc;
+    }, { elementos: 0, evidencias: 0, finalizados: 0 });
+    const values = {
+      'formularios-mec-total': meta.total ?? rows.length,
+      'formularios-mec-censistas': summary.length,
+      'formularios-mec-escuelas': totalEscuelas,
+      'formularios-mec-finalizados': totals.finalizados,
+      'formularios-mec-elementos': totals.elementos,
+      'formularios-mec-evidencias': totals.evidencias,
+    };
+    Object.entries(values).forEach(([id, value]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    });
+  }
+
+  function _renderFormulariosMecTable(rows) {
+    const tbody = document.getElementById('formularios-mec-tbody');
+    if (!tbody) return;
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No hay formularios MEC para los filtros seleccionados.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(row => {
+      const id = row.id_escuela || row.codigo_local || '';
+      return `
+        <tr>
+          <td>${_escapeHtml(row.usuario || '---')}</td>
+          <td>${_escapeHtml(row.actualizado_en || row.fecha_guardado || '---')}</td>
+          <td>${_escapeHtml([row.codigo_local, row.nombre_escuela].filter(Boolean).join(' - ') || row.id_escuela || '---')}</td>
+          <td>${_escapeHtml([row.departamento, row.distrito].filter(Boolean).join(' / ') || '---')}</td>
+          <td><span class="badge ${_isFinalForm(row) ? 'badge--success' : 'badge--warning'}">${_escapeHtml(row.estado_borrador || row.estado_operativo || 'borrador')}</span></td>
+          <td>${_escapeHtml(row.bloques ?? 0)}</td>
+          <td>${_escapeHtml(row.aulas ?? 0)}</td>
+          <td>${_escapeHtml(row.sanitarios ?? 0)}</td>
+          <td>${_escapeHtml(row.exteriores ?? 0)}</td>
+          <td>${_escapeHtml(row.evidencias ?? 0)}</td>
+          <td>${_escapeHtml(row.tiempo_escuela_min ? `${row.tiempo_escuela_min} min` : '---')}</td>
+          <td><button class="btn btn-xs btn-outline" onclick='AdminModule.openFormularioMec(${_jsString(id)})'>Abrir</button></td>
+        </tr>`;
+    }).join('');
+  }
+
+  function _isFinalForm(row) {
+    const text = String(row?.estado_operativo || row?.estado_borrador || '').toLowerCase();
+    return text.includes('final') || text.includes('complet') || text.includes('cerr');
+  }
+
+  async function openFormularioMec(id) {
+    if (!id) return;
+    try {
+      const result = await API.getEscuela(id, { includeDraft: true });
+      if (result.status !== 'ok' || !result.data) throw new Error(result.message || 'Escuela no encontrada.');
+      const school = result.data;
+      if (typeof SurveyModule !== 'undefined' && SurveyModule.setCurrentEscuela) SurveyModule.setCurrentEscuela(school, { skipAssignmentCheck: true });
+      if (typeof AppController !== 'undefined' && AppController.showModule) await Promise.resolve(AppController.showModule('registro'));
+      if (typeof MecFormModule !== 'undefined' && MecFormModule.setSelectedSchool) {
+        MecFormModule.setSelectedSchool(school, { render: false, force: true });
+      }
+      if (typeof GuidedRegisterModule !== 'undefined' && GuidedRegisterModule.init) GuidedRegisterModule.init();
+      UI.showToast(`Formulario abierto: ${school.nombre || school.codigo_local || id}.`, 'success', 4500);
+    } catch (err) {
+      UI.showToast('No se pudo abrir el formulario MEC: ' + err.message, 'error', 8000);
+    }
   }
 
   function _roleLabel(rol) {
@@ -507,6 +650,7 @@ const AdminModule = (() => {
     saveConfigItem,
     loadEncuestadores,
     loadSolicitudesRelevamiento,
+    loadFormulariosMec,
     openNewEncuestador,
     editEncuestador,
     saveEncuestador,
@@ -514,6 +658,7 @@ const AdminModule = (() => {
     setEncuestadorActivo,
     aprobarSolicitudRelevamiento,
     openSolicitudAssignment,
+    openFormularioMec,
     loadAuditoria,
     applyAuditFilters,
   };

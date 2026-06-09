@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.156
+ * Version: 2.6.175
  */
 
 const MapModule = (() => {
@@ -34,11 +34,11 @@ const MapModule = (() => {
   }
 
   function _surveyorName(e) {
-    return e.encuestador_asignado || 'Sin asignar';
+    return _schoolSurveyor(e);
   }
 
   function _surveyorColor(name) {
-    if (!name || name === 'Sin asignar') return '#94a3b8';
+    if (!name || _sameFilterValue(name, 'Sin asignar') || _sameFilterValue(name, 'No asignada') || _sameFilterValue(name, 'No asignado')) return '#94a3b8';
     return _PALETTE[_hash(name) % _PALETTE.length];
   }
 
@@ -75,6 +75,41 @@ const MapModule = (() => {
     return _normalizeFilterValue(a) === _normalizeFilterValue(b);
   }
 
+  function _hasActiveFilters(filters = {}) {
+    return Object.values(filters || {}).some(value => String(value ?? '').trim() !== '');
+  }
+
+  function _canonicalState(value) {
+    const text = _normalizeFilterValue(value || 'pendiente');
+    if (!text) return 'pendiente';
+    if (['finalizada', 'cerrada', 'completada', 'entregada', 'completo', 'con_pendientes'].includes(text)
+      || text.includes('final')
+      || text.includes('complet')
+      || text.includes('cerr')
+      || text.includes('entreg')) return 'finalizada';
+    if (text.includes('curso') || text.includes('proceso') || text.includes('avance')) return 'en_curso';
+    if (text.includes('inci') || text.includes('problema') || text.includes('observ')) return 'incidencia';
+    if (text.includes('parc') || text.includes('borrador')) return 'parcial';
+    if (text.includes('susp') || text.includes('pausa')) return 'suspendida';
+    if (text.includes('rev')) return 'revisar';
+    if (text.includes('pend')) return 'pendiente';
+    return text.replace(/[^a-z0-9_-]/g, '_') || 'pendiente';
+  }
+
+  function _schoolState(e = {}) {
+    return _canonicalState(e.estado_relevamiento || e.estado || e.estado_borrador || e.estado_cierre || e.mec_draft_status || 'pendiente');
+  }
+
+  function _stateLabel(e = {}) {
+    const state = _schoolState(e);
+    return APP_CONFIG.STATE_LABELS[state] || e.estado_relevamiento || e.estado || state;
+  }
+
+  function _stateColor(e = {}) {
+    const state = _schoolState(e);
+    return APP_CONFIG.STATE_COLORS[state] || '#6c757d';
+  }
+
   function _isTrueish(value) {
     if (value === true || value === 1) return true;
     const text = _normalizeFilterValue(value);
@@ -91,21 +126,57 @@ const MapModule = (() => {
   }
 
   function _isClosed(e) {
-    const state = String(e.estado_relevamiento || '').toLowerCase();
-    return ['finalizada', 'cerrada', 'completada', 'entregada'].includes(state)
-      || state.includes('final')
-      || state.includes('complet')
-      || state.includes('cerr')
-      || state.includes('entreg');
+    return _schoolState(e) === 'finalizada';
   }
 
   function _assignmentLabel(e) {
     return String(Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || '')).trim();
   }
 
+  function _schoolSurveyor(e = {}) {
+    return _assignmentLabel(e)
+      || String(e.encuestador_asignado || e.usuario_encuestador || e.ultimo_borrador_mec_usuario || e.usuario || '').trim()
+      || 'Sin asignar';
+  }
+
+  function _schoolDepartment(e = {}) {
+    return String(e.departamento || e.departamento_nombre || e.depto || '').trim();
+  }
+
+  function _schoolDistrict(e = {}) {
+    return String(e.distrito || e.distrito_nombre || '').trim();
+  }
+
+  function _mergeSchoolRecord(base = {}, extra = {}) {
+    return { ...(base || {}), ...(extra || {}) };
+  }
+
+  function _replaceSchoolRecord(updated = {}) {
+    const keys = _schoolIdentityKeys(updated);
+    if (!keys.length) return updated;
+    const index = _escuelas.findIndex(item => _schoolIdentityKeys(item).some(key => keys.includes(key)));
+    if (index !== -1) {
+      _escuelas[index] = _mergeSchoolRecord(_escuelas[index], updated);
+      return _escuelas[index];
+    }
+    _escuelas.push(updated);
+    return updated;
+  }
+
+  function _uniqueNormalizedOptions(values = []) {
+    const seen = new Map();
+    values.forEach(value => {
+      const label = String(value || '').trim();
+      const key = _normalizeFilterValue(label);
+      if (!label || seen.has(key)) return;
+      seen.set(key, label);
+    });
+    return [...seen.values()].sort((a, b) => a.localeCompare(b, 'es'));
+  }
+
   function _isUnassigned(e) {
     const label = _assignmentLabel(e);
-    return !label || label === 'No asignada';
+    return !label || _sameFilterValue(label, 'No asignada') || _sameFilterValue(label, 'No asignado') || _sameFilterValue(label, 'Sin asignar');
   }
 
   function _canRequestSurvey(e) {
@@ -134,13 +205,13 @@ const MapModule = (() => {
   // ── Popup builder ─────────────────────────────────────────────────────────
 
   function _buildPopup(e) {
-    const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
-    const estadoColor = APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d';
+    const estadoLabel = _stateLabel(e);
+    const estadoColor = _stateColor(e);
     const canSurvey = Auth.canAccess('encuestador');
     const canOperate = canSurvey && Auth.canOperateSchool(e);
     const canRequest = _canRequestSurvey(e) && !canOperate;
     const idArg = _jsString(_schoolPrimaryId(e));
-    const location = [e.distrito, e.localidad].filter(Boolean).join(' - ');
+    const location = [_schoolDistrict(e), e.localidad].filter(Boolean).join(' - ');
 
     return `
       <div class="map-popup">
@@ -150,8 +221,8 @@ const MapModule = (() => {
         </div>
         <div class="map-popup__body">
           <p><b>Codigo:</b> ${_escape(e.codigo_local || '-')}</p>
-          <p><b>Lugar:</b> ${_escape(location || e.departamento || '-')}</p>
-          <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
+          <p><b>Lugar:</b> ${_escape(location || _schoolDepartment(e) || '-')}</p>
+          <p><b>Encuestador:</b> ${_escape(_schoolSurveyor(e))}</p>
         </div>
         <div class="map-popup__actions">
           ${canOperate ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>` : ''}
@@ -288,6 +359,11 @@ const MapModule = (() => {
     });
     if (_markerCluster && toAdd.length) _markerCluster.addLayers(toAdd);
 
+    if (_hasActiveFilters(_activeFilters)) {
+      applyFilters(_activeFilters);
+      updateOfflineStatus();
+      return;
+    }
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
     _renderRoutes(_escuelas);
@@ -301,17 +377,27 @@ const MapModule = (() => {
   // ── Filtering ─────────────────────────────────────────────────────────────
 
   function applyFilters(filters) {
+    filters = {
+      departamento: '',
+      distrito: '',
+      zona: '',
+      encuestador: '',
+      estado: '',
+      piloto: '',
+      q: '',
+      ...(filters || {}),
+    };
     _activeFilters = { ...filters };
     _filteredEscuelas = _escuelas.filter(e => {
-      if (filters.departamento && !_sameFilterValue(e.departamento, filters.departamento)) return false;
-      if (filters.distrito && !_sameFilterValue(e.distrito, filters.distrito)) return false;
+      if (filters.departamento && !_sameFilterValue(_schoolDepartment(e), filters.departamento)) return false;
+      if (filters.distrito && !_sameFilterValue(_schoolDistrict(e), filters.distrito)) return false;
       if (filters.zona && !_sameFilterValue(e.zona, filters.zona)) return false;
-      if (filters.encuestador && !_sameFilterValue(e.encuestador_asignado, filters.encuestador)) return false;
-      if (filters.estado && !_sameFilterValue(e.estado_relevamiento, filters.estado)) return false;
+      if (filters.encuestador && !_sameFilterValue(_schoolSurveyor(e), filters.encuestador)) return false;
+      if (filters.estado && !_sameFilterValue(_schoolState(e), filters.estado)) return false;
       if (_isTrueish(filters.piloto) && !_isPilotSchool(e)) return false;
       if (filters.q) {
         const q = _normalizeFilterValue(filters.q);
-        const haystack = _normalizeFilterValue(`${e.nombre} ${e.nombre_escuela} ${e.codigo_local} ${e.codigo} ${e.id_escuela} ${e.id} ${e.code} ${e.departamento} ${e.distrito} ${e.localidad}`);
+        const haystack = _normalizeFilterValue(`${e.nombre} ${e.nombre_escuela} ${e.codigo_local} ${e.codigo} ${e.id_escuela} ${e.id} ${e.code} ${_schoolDepartment(e)} ${_schoolDistrict(e)} ${e.localidad} ${e.zona} ${_schoolSurveyor(e)} ${_stateLabel(e)} ${_schoolState(e)}`);
         if (!haystack.includes(q)) return false;
       }
       return true;
@@ -355,7 +441,7 @@ const MapModule = (() => {
     const visible = escuelas.slice(0, MAP_LIST_LIMIT);
     container.innerHTML = visible.map(e => {
       const estadoColor = _surveyorColor(_surveyorName(e));
-      const estadoLabel = APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento;
+      const estadoLabel = _stateLabel(e);
       const strength = _isClosed(e) ? 'cerrada' : 'pendiente';
       const primaryId = _schoolPrimaryId(e);
       const idArg = _jsString(primaryId);
@@ -364,9 +450,9 @@ const MapModule = (() => {
           <span class="map-list-item__dot map-list-item__dot--${strength}" style="background:${_escape(estadoColor)}"></span>
           <div class="map-list-item__info">
             <strong>${_escape(e.nombre)}</strong>
-            <small>${_escape(e.distrito || '')} · ${_escape(e.encuestador_asignado || 'Sin asignar')} · ${_estimateMinutes(e)} min</small>
+            <small>${_escape(_schoolDistrict(e) || '')} · ${_escape(_schoolSurveyor(e))} · ${_estimateMinutes(e)} min</small>
           </div>
-          <span class="map-list-item__badge" style="background:${_escape(APP_CONFIG.STATE_COLORS[e.estado_relevamiento] || '#6c757d')}">${_escape(estadoLabel)}</span>
+          <span class="map-list-item__badge" style="background:${_escape(_stateColor(e))}">${_escape(estadoLabel)}</span>
         </div>`;
     }).join('') + (escuelas.length > visible.length ? `
       <div class="map-list__limit">
@@ -385,7 +471,7 @@ const MapModule = (() => {
   function _updateInfoPanel(e) {
     const panel = document.getElementById('map-info-panel');
     if (!panel) return;
-    const state = _safeState(e.estado_relevamiento);
+    const state = _safeState(_schoolState(e));
     const idArg = _jsString(_schoolPrimaryId(e));
     const canSurvey = Auth.canAccess('encuestador');
     const canOperate = canSurvey && Auth.canOperateSchool(e);
@@ -393,12 +479,12 @@ const MapModule = (() => {
       <div class="map-info-card">
         <h4>${_escape(e.nombre)}</h4>
         <p><b>Código:</b> ${_escape(e.codigo_local || '—')}</p>
-        <p><b>Departamento:</b> ${_escape(e.departamento || '—')}</p>
-        <p><b>Distrito:</b> ${_escape(e.distrito || '—')}</p>
+        <p><b>Departamento:</b> ${_escape(_schoolDepartment(e) || '—')}</p>
+        <p><b>Distrito:</b> ${_escape(_schoolDistrict(e) || '—')}</p>
         <p><b>Zona:</b> ${_escape(e.zona || '—')}</p>
-        <p><b>Encuestador:</b> ${_escape(e.encuestador_asignado || 'No asignado')}</p>
+        <p><b>Encuestador:</b> ${_escape(_schoolSurveyor(e))}</p>
         <p><b>Tiempo estimado:</b> ${_estimateMinutes(e)} min</p>
-        <p><b>Estado:</b> <span class="badge badge--${state}">${_escape(APP_CONFIG.STATE_LABELS[e.estado_relevamiento] || e.estado_relevamiento)}</span></p>
+        <p><b>Estado:</b> <span class="badge badge--${state}">${_escape(_stateLabel(e))}</span></p>
         ${_locationReviewActions(e, true)}
         ${canOperate ? `
           <button class="btn btn-success btn-block mt-2" onclick='MapModule.startGuidedRegister(${idArg})'>Iniciar/continuar registro</button>
@@ -417,14 +503,14 @@ const MapModule = (() => {
   }
 
   function _readonlyNotice(e, block = false) {
-    const assigned = Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || 'No asignada');
+    const assigned = _schoolSurveyor(e) || 'No asignada';
     if (_canRequestSurvey(e)) return '';
     const cls = block ? 'map-readonly-note map-readonly-note--block' : 'map-readonly-note';
     return `<p class="${cls}"><b>Solo lectura.</b> Asignada a: ${_escape(assigned)}. Use el mapa para consultar; solo puede iniciar o migrar escuelas asignadas a su usuario.</p>`;
   }
 
   function _showSelectionBlocked(e) {
-    const assigned = Auth.schoolAssignmentLabel ? Auth.schoolAssignmentLabel(e) : (e.encuestador_asignado || 'No asignada');
+    const assigned = _schoolSurveyor(e) || 'No asignada';
     UI.showAlert(
       'Escuela no asignada',
       `Puede ver esta escuela en el mapa, pero no puede seleccionarla para carga. Asignada a: ${assigned}.`,
@@ -704,7 +790,7 @@ const MapModule = (() => {
       _googleRoutesNoticeShown = true;
       UI.showToast('Rutas reales Google no configuradas. Se muestran lineas directas como respaldo.', 'info', 6400);
     }
-    const groups = _groupBySurveyor(escuelas.filter(e => e.encuestador_asignado));
+    const groups = _groupBySurveyor(escuelas.filter(e => _schoolSurveyor(e) && !_isUnassigned(e)));
     Object.entries(groups).forEach(([name, rows]) => {
       const route = _nearestRoute(rows);
       const latlngs = route.map(_validPoint).filter(Boolean).map(p => [p.lat, p.lng]);
@@ -761,7 +847,8 @@ const MapModule = (() => {
   function _updateSummaryBadges(escuelas) {
     const counts = { pendiente: 0, en_curso: 0, finalizada: 0, incidencia: 0 };
     escuelas.forEach(e => {
-      if (counts[e.estado_relevamiento] !== undefined) counts[e.estado_relevamiento]++;
+      const state = _schoolState(e);
+      if (counts[state] !== undefined) counts[state]++;
     });
     Object.entries(counts).forEach(([key, val]) => {
       const el = document.getElementById(`map-count-${key}`);
@@ -895,7 +982,7 @@ const MapModule = (() => {
 
   async function startGuidedRegister(id) {
     if (!Auth.requireAuth()) return;
-    const escuela = _findSchoolById(id);
+    let escuela = _findSchoolById(id);
     if (!escuela) {
       UI.showToast('No se encontro la escuela seleccionada en el mapa.', 'warning');
       return;
@@ -903,6 +990,19 @@ const MapModule = (() => {
     if (!Auth.canOperateSchool(escuela)) {
       _showSelectionBlocked(escuela);
       return;
+    }
+    try {
+      const primaryId = _schoolPrimaryId(escuela);
+      const full = primaryId && typeof API !== 'undefined' && API.getEscuela
+        ? await API.getEscuela(primaryId, { includeDraft: true })
+        : null;
+      if (full?.status === 'ok' && full.data) {
+        escuela = _replaceSchoolRecord(_mergeSchoolRecord(escuela, full.data));
+      } else if (full?.status === 'error') {
+        console.warn('[Mapa] No se pudo hidratar la ficha MEC antes de abrir:', full.message);
+      }
+    } catch (err) {
+      console.warn('[Mapa] No se pudo traer la ultima ficha MEC; se abre con cache local:', err);
     }
     _selectedEscuela = escuela;
     _highlightListItem(_schoolPrimaryId(escuela));
@@ -1128,8 +1228,8 @@ const MapModule = (() => {
   // ── Populate filter buttons ───────────────────────────────────────────────
 
   function populateFilterButtons() {
-    const departamentos = [...new Set(_escuelas.map(e => e.departamento).filter(Boolean))].sort();
-    const encuestadores = [...new Set(_escuelas.map(e => e.encuestador_asignado).filter(Boolean))].sort();
+    const departamentos = _uniqueNormalizedOptions(_escuelas.map(_schoolDepartment));
+    const encuestadores = _uniqueNormalizedOptions(_escuelas.map(_schoolSurveyor).filter(name => !_sameFilterValue(name, 'Sin asignar') && !_sameFilterValue(name, 'No asignada')));
 
     _populateSelectChoices('filter-departamento', departamentos, 'Todos');
     populateDistrictButtons();
@@ -1138,11 +1238,9 @@ const MapModule = (() => {
 
   function populateDistrictButtons(departamento = '') {
     const selectedDepartment = departamento || document.getElementById('filter-departamento')?.value || '';
-    const distritos = [...new Set(_escuelas
-      .filter(e => !selectedDepartment || e.departamento === selectedDepartment)
-      .map(e => e.distrito)
-      .filter(Boolean))]
-      .sort();
+    const distritos = _uniqueNormalizedOptions(_escuelas
+      .filter(e => !selectedDepartment || _sameFilterValue(_schoolDepartment(e), selectedDepartment))
+      .map(_schoolDistrict));
     _populateSelectChoices('filter-distrito', distritos, 'Todos');
   }
 
@@ -1150,7 +1248,9 @@ const MapModule = (() => {
     const select = document.getElementById(id);
     if (!select) return;
     const current = String(select.value || '');
-    const nextValue = current && options.includes(current) ? current : '';
+    const nextValue = current
+      ? (options.find(option => _sameFilterValue(option, current)) || '')
+      : '';
     select.innerHTML = [
       `<option value="">${_escape(placeholder)}</option>`,
       ...options.map(option => `<option value="${_escape(option)}">${_escape(option)}</option>`),
@@ -1163,7 +1263,9 @@ const MapModule = (() => {
     const list = document.querySelector(`[data-choice-list="${id}"]`);
     if (!input || !list) return;
     const current = String(input.value || '');
-    input.value = current && options.includes(current) ? current : '';
+    input.value = current
+      ? (options.find(option => _sameFilterValue(option, current)) || '')
+      : '';
     list.innerHTML = [
       `<button class="choice-button" type="button" data-choice-target="${_escape(id)}" data-choice-value="">${_escape(placeholder)}</button>`,
       ...options.map(option => `<button class="choice-button" type="button" data-choice-target="${_escape(id)}" data-choice-value="${_escape(option)}">${_escape(option)}</button>`),
