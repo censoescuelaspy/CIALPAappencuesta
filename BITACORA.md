@@ -4,6 +4,33 @@
 
 ---
 
+## Hotfix conexion backend y rutas de mapa - 2026-06-09 - v2.6.176
+
+### Objetivo
+- Recuperar la carga de datos guardados y el guardado online luego de que el Web App GAS activo comenzara a responder `403 Prohibido`.
+- Evitar que el aviso de rutas reales de Google se interprete como bloqueo de la app cuando no existe API key configurada.
+
+### Problema reportado
+- La app no cargaba datos ya guardados.
+- Al guardar mostraba: `Sin conexion: el registro quedo en cola local para sincronizar.`
+- En el mapa mostraba: `No se pudo calcular rutas reales de Google. Se mantienen lineas directas como respaldo.`
+
+### Diagnostico
+- `APP_CONFIG.GAS_URL` apuntaba al deployment `AKfycbyt-THSOSgFwvH8Oxl8ojpfJR_8gNhezYA1N7JPmgG0L2RyEtfHq9E58BgfcG33yD2voA`, que devuelve `403` para acceso anonimo.
+- El frontend interpreta esa falta de JSON como desconexion y conserva registros en cola local para no perder datos.
+- El endpoint publico estable `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` responde `diagnosticoPadron` con `status:"ok"` y `total:5462`.
+- La advertencia de rutas no estaba relacionada con el guardado; `GOOGLE_ROUTES_API_KEY` esta vacia.
+
+### Cambios implementados
+- `assets/js/config.js`: `GAS_URL` vuelve al Web App publico estable que responde JSON.
+- `assets/js/config.js`: `MAP_REAL_ROUTES_ENABLED` queda en `false` hasta configurar una API key valida de Google Routes.
+- `assets/js/config.js`, `assets/js/app.js`, `assets/js/api.js`, `assets/js/map.js`, `assets/js/admin.js`, `gas/Code.gs`, `gas/sheets.gs`, `index.html`, `sw.js`, `README.md`: version/cache actualizados a `2.6.176`.
+
+### Pendiente operativo
+- Para recuperar en produccion las mejoras backend de v2.6.175 (`includeDraft` y `listarFormulariosMec`), el deployment GAS nuevo debe publicarse desde la consola de Apps Script con acceso `Anyone`/`Cualquiera`, o con una cuenta propietaria que mantenga el Web App publico. Mientras tanto, este hotfix prioriza que la app vuelva a cargar y guardar datos.
+
+---
+
 ## Correccion de filtros, reapertura y control admin MEC - 2026-06-09 - v2.6.175
 
 ### Objetivo

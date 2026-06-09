@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.175
+ * Version: 2.6.176
  */
 
 const API = (() => {
@@ -279,7 +279,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 10:15:00',
       estado_borrador: 'en_curso',
       estado_operativo: 'en_curso',
-      app_version: '2.6.175',
+      app_version: '2.6.176',
       schema_version: 'mec_v2',
       bloques: 3,
       pisos: 4,
@@ -304,7 +304,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 12:40:00',
       estado_borrador: 'finalizado',
       estado_operativo: 'finalizada',
-      app_version: '2.6.175',
+      app_version: '2.6.176',
       schema_version: 'mec_v2',
       bloques: 2,
       pisos: 2,

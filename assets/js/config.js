@@ -1,12 +1,12 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.175
+ * Version: 2.6.176
  */
 
 const APP_CONFIG = {
   // Google Apps Script Web App URL - fill after deploying GAS
-  GAS_URL: 'https://script.google.com/macros/s/AKfycbyt-THSOSgFwvH8Oxl8ojpfJR_8gNhezYA1N7JPmgG0L2RyEtfHq9E58BgfcG33yD2voA/exec',
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ/exec',
 
   // External survey application defaults. These values can be overridden from Google Sheets CONFIG.
   FORM_URL: 'https://demo.mec.gov.py/demo_rue/login',
@@ -17,8 +17,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.175',
-  EDITION_LABEL: 'Edición vigente v2.6.175',
+  VERSION: '2.6.176',
+  EDITION_LABEL: 'Edicion vigente v2.6.176',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -50,7 +50,7 @@ const APP_CONFIG = {
   PLAN_BASEMAP_SATELLITE_MAX_ZOOM: 17,
   GOOGLE_MAP_TILES_API_KEY: 'AIzaSyD_pqMM_Yzp3RyYbp8AnrLsI8PNw8zM35Y',
   GOOGLE_ROUTES_API_KEY: '',
-  MAP_REAL_ROUTES_ENABLED: true,
+  MAP_REAL_ROUTES_ENABLED: false,
   PLAN_BASEMAP_GOOGLE_SATELLITE_MAX_ZOOM: 21,
   PLAN_BASEMAP_HIGHRES_MAX_ZOOM: 19,
   // Sin fuentes locales activas: el piloto S2 10 m quedo solo como prueba tecnica.
