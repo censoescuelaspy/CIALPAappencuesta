@@ -4,6 +4,38 @@
 
 ---
 
+## Actualizacion GAS v31 y bloqueo de Web App publico - 2026-06-09
+
+### Objetivo
+- Subir al proyecto Apps Script el backend actualizado con las funciones `includeDraft` y `listarFormulariosMec`.
+- Publicar o validar un Web App GAS publico que permita usar esas funciones desde GitHub Pages sin romper el endpoint estable actual.
+
+### Procedimiento ejecutado
+- `clasp push -f` desde `gas/`: subidos 8 archivos (`appsscript.json`, `audit.gs`, `auth.gs`, `Code.gs`, `escuelas_embebidas.gs`, `ficha_grafica.gs`, `setup.gs`, `sheets.gs`).
+- `clasp version "v2.6.176 backend actualizado formularios MEC"`: creada version GAS `31`.
+- `clasp deploy -V 31 -d "v2.6.176 backend actualizado formularios MEC"`: creado deployment `AKfycbwHnfBVTBDWWiGOL-7GBo8CRDI7O911nEVYHeQSTU6rYIW0sZge4ofkfj8GeIYvgP7zYw @31`.
+- Consulta por Apps Script API: el deployment `@31` figura con `entryPointConfig.access = ANYONE_ANONYMOUS` y `executeAs = USER_DEPLOYING`.
+
+### Validaciones
+- Versiones API: `31` existe con descripcion `v2.6.176 backend actualizado formularios MEC`.
+- Prueba publica de `AKfycbwHnf... @31` con `diagnosticoPadron`: devuelve HTTP `403 Prohibido` antes de ejecutar JSON.
+- Prueba publica del backend estable vigente `AKfycbzrXilB80... @23` con `diagnosticoPadron`: responde `status:"ok"` y mantiene la app operativa.
+- Prueba controlada sobre deployment publico alternativo `AKfycbwwFYlY...`: al redeployarlo a `@31` tambien paso a HTTP `403`; se volvio a dejar listado en `@17`, pero su acceso anonimo no se recupero.
+
+### Estado
+- Codigo GAS actualizado en el proyecto y versionado como `31`.
+- No se cambio `APP_CONFIG.GAS_URL` porque el unico endpoint probado publicamente estable sigue siendo `AKfycbzrXilB80... @23`.
+- No se tocó el deployment `AKfycbzrXilB80... @23` para evitar dejar sin backend a la app publicada.
+
+### Pendiente operativo
+- Desde la consola de Apps Script y con la cuenta propietaria que pueda publicar anonimamente, crear o actualizar un Web App sobre la version `31` con:
+  - Ejecutar como: `Yo`.
+  - Quien tiene acceso: `Cualquiera` / `Anyone`.
+  - Probar `diagnosticoPadron` en ventana anonima antes de cambiar `GAS_URL`.
+- Una vez exista URL `@31` con HTTP 200 JSON, actualizar `assets/js/config.js`, subir version/cache y publicar en GitHub Pages.
+
+---
+
 ## Hotfix conexion backend y rutas de mapa - 2026-06-09 - v2.6.176
 
 ### Objetivo
