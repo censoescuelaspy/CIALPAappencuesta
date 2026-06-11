@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.176
+ * Version 2.6.178
  */
 
 const SheetsService = (() => {
@@ -1309,6 +1309,68 @@ const SheetsService = (() => {
     };
   }
 
+  function listarPerimetrosMec(params) {
+    params = params || {};
+    let rows = [];
+    try {
+      rows = _sheetToObjects(SHEET_NAMES.MEC_DRAFTS);
+    } catch (err) {
+      return { status: 'ok', data: [], meta: { total: 0, error: 'Hoja mec_borradores no disponible: ' + err.message } };
+    }
+
+    const schoolIndex = _schoolIndexByIdentity_();
+    const latestBySchool = {};
+    rows.forEach(function(row, index) {
+      const candidate = Object.assign({ __row_order: index + 2 }, row || {});
+      const perimeter = _mecPerimeterListRow_(candidate, index, schoolIndex);
+      if (!perimeter) return;
+      const key = _mecSchoolKey_(candidate) || _mecSchoolKey_(perimeter) || ('draft_' + index);
+      const current = latestBySchool[key];
+      if (!current || _mecRowMs_(candidate) >= _mecRowMs_(current.__row)) {
+        latestBySchool[key] = Object.assign({}, perimeter, { __row: candidate });
+      }
+    });
+
+    let data = Object.values(latestBySchool).map(function(row) {
+      delete row.__row;
+      return row;
+    });
+
+    if (params.usuario) data = data.filter(function(row) { return _same(row.usuario, params.usuario); });
+    if (params.estado) data = data.filter(function(row) { return _same(row.estado_borrador, params.estado); });
+    if (params.q) {
+      const q = _txt(params.q).toLowerCase();
+      data = data.filter(function(row) {
+        return [
+          row.id_borrador,
+          row.id_escuela,
+          row.codigo_local,
+          row.nombre_escuela,
+          row.usuario,
+          row.departamento,
+          row.distrito,
+          row.estado_borrador,
+        ].join(' ').toLowerCase().indexOf(q) !== -1;
+      });
+    }
+
+    data.sort(function(a, b) {
+      return _txt(a.departamento).localeCompare(_txt(b.departamento))
+        || _txt(a.distrito).localeCompare(_txt(b.distrito))
+        || _txt(a.nombre_escuela).localeCompare(_txt(b.nombre_escuela));
+    });
+
+    return {
+      status: 'ok',
+      data: data,
+      meta: {
+        total: data.length,
+        source: SHEET_NAMES.MEC_DRAFTS,
+        generated_at: _timestamp(),
+      },
+    };
+  }
+
   function _mecFormListRow_(row, index, schoolIndex) {
     row = Object.assign({ __row_order: index + 2 }, row || {});
     const draft = _mecParseJson_(row.draft_json) || {};
@@ -1348,6 +1410,129 @@ const SheetsService = (() => {
       tiempo_sanitarios_min: Number(_num(row.tiempo_sanitarios_min) || 0),
       tiempo_exteriores_min: Number(_num(row.tiempo_exteriores_min) || 0),
       __row_order: index + 2,
+    };
+  }
+
+  function _mecPerimeterListRow_(row, index, schoolIndex) {
+    row = Object.assign({ __row_order: index + 2 }, row || {});
+    const draft = _mecParseJson_(row.draft_json) || {};
+    const values = draft.values || draft || {};
+    const selected = values.__selectedSchool || draft.__selectedSchool || {};
+    const key = _mecSchoolKey_(row) || _mecSchoolKey_(selected);
+    const school = key && schoolIndex ? (schoolIndex[key] || schoolIndex[_digits(key)] || {}) : {};
+    const boundary = _mecPropertyBoundaryFromDraft_(values);
+    if (!boundary) return null;
+    const vertices = _mecBoundaryVerticesFromItem_(boundary);
+    if (vertices.length < 3) return null;
+    const bounds = _mecBoundaryBounds_(vertices);
+    const ficha = boundary.ficha || {};
+    return {
+      id_borrador: _txt(row.id_borrador),
+      id_escuela: _txt(row.id_escuela || selected.id_escuela || school.id_escuela),
+      codigo_local: _txt(row.codigo_local || selected.codigo_local || school.codigo_local),
+      nombre_escuela: _txt(row.nombre_escuela || selected.nombre || selected.nombre_escuela || school.nombre),
+      departamento: _txt(selected.departamento || school.departamento),
+      distrito: _txt(selected.distrito || school.distrito),
+      localidad: _txt(selected.localidad || school.localidad),
+      usuario: _txt(row.usuario),
+      fecha_guardado: _txt(row.fecha_guardado),
+      actualizado_en: _txt(row.actualizado_en || row.fecha_guardado || row.creado_en),
+      estado_borrador: _txt(row.estado_borrador) || 'borrador',
+      app_version: _txt(row.app_version),
+      base_mapa_confirmada: _txt(row.base_mapa_confirmada),
+      perimetro_m: _txt(ficha.perimetro_m || ficha.perimetro || ''),
+      superficie_m2: _txt(ficha.superficie_m2 || ficha.area_m2 || ficha.area || ''),
+      vertices: vertices,
+      vertices_count: vertices.length,
+      bounds: bounds,
+      centro: bounds ? { lat: _roundCoord_((bounds.minLat + bounds.maxLat) / 2), lng: _roundCoord_((bounds.minLng + bounds.maxLng) / 2) } : null,
+      identity_keys: [
+        row.id_escuela,
+        row.codigo_local,
+        selected.id_escuela,
+        selected.codigo_local,
+        school.id_escuela,
+        school.codigo_local,
+        _digits(row.id_escuela),
+        _digits(row.codigo_local),
+      ].map(_txt).filter(Boolean),
+      __row_order: index + 2,
+    };
+  }
+
+  function _mecPropertyBoundaryFromDraft_(values) {
+    const siteElements = _asArray_(values && values.__siteElements);
+    for (let i = 0; i < siteElements.length; i++) {
+      const item = siteElements[i] || {};
+      if (_txt(item.type) === 'property_boundary') return item;
+    }
+    return null;
+  }
+
+  function _mecBoundaryVerticesFromItem_(item) {
+    item = item || {};
+    let vertices = _mecNormalizeBoundaryVertices_(item.geoVertices);
+    if (vertices.length >= 3) return vertices;
+    vertices = _mecNormalizeBoundaryVertices_(item.boundaryGeoVertices);
+    if (vertices.length >= 3) return vertices;
+    const ficha = item.ficha || {};
+    vertices = _mecVerticesFromGeoJson_(ficha.vertices_geojson || ficha.geojson || ficha.predio_geojson);
+    if (vertices.length >= 3) return vertices;
+    vertices = _mecVerticesFromLatLonText_(ficha.vertices_latlon || ficha.vertices || '');
+    if (vertices.length >= 3) return vertices;
+    return [];
+  }
+
+  function _mecVerticesFromGeoJson_(value) {
+    if (!value) return [];
+    const geo = typeof value === 'string' ? _mecParseJson_(value) : value;
+    const ring = geo && geo.type === 'Feature'
+      ? (((geo.geometry || {}).coordinates || [])[0] || [])
+      : (((geo || {}).coordinates || [])[0] || []);
+    if (!Array.isArray(ring)) return [];
+    return _mecNormalizeBoundaryVertices_(ring.map(function(coord) {
+      return { lat: coord && coord[1], lng: coord && coord[0] };
+    }));
+  }
+
+  function _mecVerticesFromLatLonText_(value) {
+    const text = _txt(value);
+    if (!text) return [];
+    return _mecNormalizeBoundaryVertices_(text.split('|').map(function(part) {
+      const pieces = _txt(part).split(',').map(function(item) { return _txt(item); });
+      return { lat: pieces[0], lng: pieces[1] };
+    }));
+  }
+
+  function _mecNormalizeBoundaryVertices_(vertices) {
+    const rows = _asArray_(vertices).map(function(vertex) {
+      const lat = Array.isArray(vertex) ? _num(vertex[0]) : _num(vertex && (vertex.lat || vertex.latitude));
+      const lng = Array.isArray(vertex) ? _num(vertex[1]) : _num(vertex && (vertex.lng || vertex.lon || vertex.longitude));
+      if (lat === '' || lng === '') return null;
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+      if (Math.abs(latNum) > 90 || Math.abs(lngNum) > 180) return null;
+      return { lat: _roundCoord_(latNum), lng: _roundCoord_(lngNum) };
+    }).filter(Boolean);
+    if (rows.length > 1) {
+      const first = rows[0];
+      const last = rows[rows.length - 1];
+      if (first && last && Math.abs(first.lat - last.lat) < 0.0000001 && Math.abs(first.lng - last.lng) < 0.0000001) rows.pop();
+    }
+    return rows;
+  }
+
+  function _mecBoundaryBounds_(vertices) {
+    if (!Array.isArray(vertices) || vertices.length < 3) return null;
+    const lats = vertices.map(function(v) { return Number(v.lat); }).filter(Number.isFinite);
+    const lngs = vertices.map(function(v) { return Number(v.lng); }).filter(Number.isFinite);
+    if (lats.length < 3 || lngs.length < 3) return null;
+    return {
+      minLat: _roundCoord_(Math.min.apply(null, lats)),
+      maxLat: _roundCoord_(Math.max.apply(null, lats)),
+      minLng: _roundCoord_(Math.min.apply(null, lngs)),
+      maxLng: _roundCoord_(Math.max.apply(null, lngs)),
     };
   }
 
@@ -2195,6 +2380,10 @@ const SheetsService = (() => {
 
   function _round1_(value) {
     return Math.round((Number(value) || 0) * 10) / 10;
+  }
+
+  function _roundCoord_(value) {
+    return Math.round((Number(value) || 0) * 100000000) / 100000000;
   }
 
   function _mecInfrastructureAlerts_(stats) {
@@ -3560,7 +3749,7 @@ const SheetsService = (() => {
     saveIncidencia, solicitarRelevamiento, aprobarSolicitudRelevamiento, uploadEvidence,
     saveComentarioApp, getComentariosApp, resolverComentarioApp,
     guardarCuestionarioInicial, guardarCuestionarioInicialAdjunto, importarContactosCuestionarioInicial, listarContactosCuestionarioInicial, enviarCuestionarioInicial,
-    guardarBorradorMec, listarFormulariosMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
+    guardarBorradorMec, listarPerimetrosMec, listarFormulariosMec, reiniciarRelevamientoEscuela, guardarCierreCompleto, getIncidencias, resolverIncidencia,
     repararEstadosFinalizadosDesdeCierres,
     getConfig, setConfig, getStats, getResumenOperativo, getAuditoria, getCatalogos
   };

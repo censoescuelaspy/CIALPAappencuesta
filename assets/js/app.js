@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.176
+ * Version: 2.6.178
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -1687,6 +1687,7 @@ const AppController = (() => {
       MapModule.updateOfflineStatus();
       _bindMapFilters();
       _applyMapFiltersNow();
+      MapModule.loadPerimeters({ silent: true });
       if (result.cached && navigator.onLine) {
         _refreshMapRosterFromNetwork();
       }
@@ -1704,6 +1705,7 @@ const AppController = (() => {
       MapModule.loadMarkers(fresh.data || []);
       MapModule.populateFilterButtons();
       _applyMapFiltersNow();
+      MapModule.loadPerimeters({ silent: true });
       MapModule.updateOfflineStatus();
     } catch (err) {
       console.warn('[CIALPA] No se pudo refrescar el padron en segundo plano:', err);

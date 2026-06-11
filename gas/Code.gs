@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.176
+ * Version: 2.6.178
  *
  * Deploy as Web App:
  *   Execute as: Me
@@ -80,7 +80,7 @@ function _handleRequest(e) {
     const action = params.action || '';
 
     // Public endpoints (no auth required)
-    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron', 'listarEscuelasCuestionarioInicial', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto'];
+    const publicActions = ['login', 'registrarUsuario', 'recuperarPassword', 'diagnosticoPadron', 'listarEscuelasCuestionarioInicial', 'guardarCuestionarioInicial', 'guardarCuestionarioInicialAdjunto', 'listarPerimetrosMec'];
     const token = params.token || '';
 
     if (!publicActions.includes(action)) {
@@ -177,6 +177,7 @@ function _handleRequest(e) {
       case 'listarContactosCuestionarioInicial': return _respond(SheetsService.listarContactosCuestionarioInicial(params));
       case 'enviarCuestionarioInicial': return _respond(SheetsService.enviarCuestionarioInicial(params));
       case 'guardarBorradorMec': return _respond(SheetsService.guardarBorradorMec(params));
+      case 'listarPerimetrosMec': return _respond(SheetsService.listarPerimetrosMec(params));
       case 'listarFormulariosMec': return _respond(SheetsService.listarFormulariosMec(params));
       case 'reiniciarRelevamientoEscuela': return _respond(SheetsService.reiniciarRelevamientoEscuela(params));
       case 'guardarCierreCompleto': return _respond(SheetsService.guardarCierreCompleto(params));

@@ -4,6 +4,60 @@
 
 ---
 
+## Respaldo por hoja publicada para capa de perimetros - 2026-06-11 - v2.6.178
+
+### Objetivo
+- Asegurar que el mapa pueda mostrar la capa `Perimetros registrados` aunque el deployment GAS `@33` siga respondiendo HTTP `403 Prohibido`.
+
+### Cambios implementados
+- `assets/js/api.js`: `API.listarPerimetrosMec` ahora intenta primero GAS y, si el endpoint falla o no devuelve datos validos, lee la hoja publicada `mec_borradores` por Google Sheets/GViz.
+- `gas/Code.gs`: `listarPerimetrosMec` queda en acciones publicas porque solo devuelve capa liviana sin `draft_json`, evitando que un fallo de token cierre sesion al cargar el mapa.
+- El respaldo parsea CSV o JSONP de Google Sheets, toma el ultimo borrador por escuela y extrae vertices desde `geoVertices`, `boundaryGeoVertices`, GeoJSON o texto `lat,lng`.
+- `index.html`, `assets/js/config.js`, `assets/js/api.js`, `assets/js/map.js`, `assets/js/app.js`, `assets/js/admin.js`, `sw.js`, `README.md`, `gas/Code.gs` y `gas/sheets.gs`: version/cache actualizados a `2.6.178`.
+
+### Validaciones
+- Hoja publicada `mec_borradores`: responde HTTP `200` como CSV con encabezados esperados.
+- Extractor sobre CSV publicado: 67 borradores leidos, 29 perimetros completos detectados.
+- `API.listarPerimetrosMec` con GAS primario en 403 devuelve `status:"ok"`, `source:"published_sheet"`, `total:29`.
+- `clasp deploy -V 33 -d "v2.6.177 prueba publica perimetros"` creo `AKfycbypOJJlzV4WWO-4_3SVI2xXWYfhxRs_CB2AZ3-vsRvTGFE1KdG49k6OonjrN9KEe8Zf @33`, pero su prueba anonima tambien devuelve HTTP `403`.
+- `clasp push -f`: subidos 8 archivos GAS con el endpoint liviano publico.
+- `clasp version "v2.6.178 perimetros fallback hoja publicada"`: creada version GAS `34`.
+- Se mantiene sin redeploy el backend estable `AKfycbzrXilB80... @23` para no romper carga/guardado general.
+- Commit local preparado en `main`; `git push` queda bloqueado porque Git no puede leer credenciales de GitHub sin prompt y el conector GitHub responde `token_expired`.
+
+### Pendiente operativo
+- Publicar desde la consola de Apps Script, con la cuenta propietaria, un Web App sobre la version GAS `34` o superior con `Ejecutar como: Yo` y `Acceso: Cualquiera`.
+- Reintentar `git push` cuando GitHub Credential Manager o el conector GitHub vuelvan a estar autenticados; el commit local vigente queda listo.
+
+---
+
+## Capa de perimetros guardados en mapa - 2026-06-11 - v2.6.177
+
+### Objetivo
+- Usar el deployment GAS actualizado `AKfycbwHnfBVTBDWWiGOL-7GBo8CRDI7O911nEVYHeQSTU6rYIW0sZge4ofkfj8GeIYvgP7zYw/exec`.
+- Mostrar en el mapa una capa con todos los perimetros del predio ya guardados por escuela en `mec_borradores`.
+
+### Cambios implementados
+- `gas/Code.gs`: nuevo router `listarPerimetrosMec`.
+- `gas/sheets.gs`: endpoint `listarPerimetrosMec`, toma el ultimo borrador por escuela y extrae vertices de `geoVertices`, `boundaryGeoVertices`, `ficha.vertices_geojson` o `ficha.vertices_latlon`.
+- `assets/js/api.js`: wrapper `API.listarPerimetrosMec`, fallback demo y fallback automatico de backend si el deployment primario devuelve HTTP/HTML no JSON.
+- `assets/js/map.js`: nueva capa Leaflet `Perimetros registrados`, contador, popup de predio, boton `Perimetros` y sincronizacion con filtros activos.
+- `index.html` y `assets/css/app.css`: contador/estado visual de perimetros en el mapa.
+- `assets/js/config.js`: `GAS_URL` apunta al deployment nuevo `AKfycbwHnf...` y `GAS_FALLBACK_URL` conserva el Web App estable `AKfycbzr...`.
+- `index.html`, `assets/css/app.css`, `assets/js/config.js`, `assets/js/app.js`, `assets/js/api.js`, `assets/js/map.js`, `assets/js/admin.js`, `gas/Code.gs`, `gas/sheets.gs`, `sw.js`, `README.md`: version/cache actualizados a `2.6.177`.
+
+### Validaciones planificadas
+- `clasp push -f`: backend GAS subido.
+- `clasp version "v2.6.177 capa perimetros mapa"`: creada version GAS `33`.
+- `clasp redeploy -V 33 ... AKfycbwHnf...`: deployment actualizado a `@33`, pero la prueba publica vuelve a responder HTTP `403 Prohibido`.
+- Backend estable `AKfycbzr... @23`: `diagnosticoPadron` sigue respondiendo `status:"ok"`, por eso queda como fallback para no cortar operacion.
+- Verificar GitHub Pages con cache-busting para `v2.6.177`.
+
+### Pendiente operativo
+- Reabrir en consola Apps Script el deployment `AKfycbwHnf... @33`, confirmar acceso `Cualquiera/Anyone`, y probar `diagnosticoPadron` anonimo. Cuando deje de responder `403`, la capa `Perimetros registrados` usara automaticamente el endpoint nuevo.
+
+---
+
 ## Actualizacion GAS v31 y bloqueo de Web App publico - 2026-06-09
 
 ### Objetivo

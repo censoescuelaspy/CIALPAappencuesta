@@ -1,8 +1,20 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.176** | Paraguay 2026
+**Version 2.6.178** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.178
+
+- La capa `Perimetros registrados` puede cargar desde el endpoint GAS nuevo o, si el Web App devuelve 403, desde la hoja publicada `mec_borradores`.
+- El respaldo por hoja toma el ultimo borrador por escuela y extrae vertices desde `geoVertices`, `boundaryGeoVertices`, GeoJSON o texto `lat,lng`.
+- Se conserva el backend estable `AKfycbzr...` para la operacion general mientras la version GAS `@33` se habilita publicamente desde consola Apps Script.
+
+## Novedades v2.6.177
+
+- Mapa con capa `Perimetros registrados` tomada desde los borradores MEC guardados.
+- Endpoint GAS `listarPerimetrosMec` para devolver el último perímetro georreferenciado por escuela sin exponer el JSON completo del formulario.
+- Frontend con deployment GAS primario `AKfycbwHnf...`, fallback operativo `AKfycbzr...` y cache renovada.
 
 ## Novedades v2.6.176
 

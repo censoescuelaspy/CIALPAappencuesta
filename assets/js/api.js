@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.176
+ * Version: 2.6.178
  */
 
 const API = (() => {
@@ -279,7 +279,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 10:15:00',
       estado_borrador: 'en_curso',
       estado_operativo: 'en_curso',
-      app_version: '2.6.176',
+      app_version: '2.6.178',
       schema_version: 'mec_v2',
       bloques: 3,
       pisos: 4,
@@ -304,7 +304,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 12:40:00',
       estado_borrador: 'finalizado',
       estado_operativo: 'finalizada',
-      app_version: '2.6.176',
+      app_version: '2.6.178',
       schema_version: 'mec_v2',
       bloques: 2,
       pisos: 2,
@@ -473,6 +473,38 @@ const API = (() => {
             resumen_por_usuario: Object.values(resumen),
           },
         };
+      }
+      case 'listarPerimetrosMec': {
+        const rows = _DEMO_MEC_FORMS
+          .map(form => {
+            const school = _DEMO_ESCUELAS.find(item => item.id_escuela === form.id_escuela || item.codigo_local === form.codigo_local) || {};
+            const lat = Number(school.latitud);
+            const lng = Number(school.longitud);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+            const d = 0.0012;
+            return {
+              id_borrador: form.id_borrador,
+              id_escuela: form.id_escuela,
+              codigo_local: form.codigo_local,
+              nombre_escuela: form.nombre_escuela,
+              departamento: form.departamento,
+              distrito: form.distrito,
+              localidad: form.localidad,
+              usuario: form.usuario,
+              estado_borrador: form.estado_borrador,
+              actualizado_en: form.actualizado_en,
+              vertices: [
+                { lat: lat - d, lng: lng - d },
+                { lat: lat - d, lng: lng + d },
+                { lat: lat + d, lng: lng + d },
+                { lat: lat + d, lng: lng - d },
+              ],
+              vertices_count: 4,
+              identity_keys: [form.id_escuela, form.codigo_local].filter(Boolean),
+            };
+          })
+          .filter(Boolean);
+        return { status: 'ok', data: rows, meta: { total: rows.length, source: 'demo' } };
       }
       case 'updateEscuelaEstado': {
         const esc = _DEMO_ESCUELAS.find(e => e.id_escuela === data.id_escuela || e.codigo_local === data.id_escuela);
@@ -701,6 +733,347 @@ const API = (() => {
     };
   }
 
+  function _textValue(value) {
+    return String(value ?? '').trim();
+  }
+
+  function _numberValue(value) {
+    if (value === null || value === undefined || value === '') return '';
+    const normalized = String(value).trim().replace(',', '.');
+    const num = Number(normalized);
+    return Number.isFinite(num) ? num : '';
+  }
+
+  function _digitsOnly(value) {
+    return String(value ?? '').replace(/\D+/g, '');
+  }
+
+  function _parseJsonValue(value) {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    try {
+      return JSON.parse(String(value));
+    } catch {
+      return null;
+    }
+  }
+
+  function _extractSpreadsheetId() {
+    const raw = String(APP_CONFIG.SPREADSHEET_URL || '').trim();
+    if (!raw) return '';
+    const match = raw.match(/\/spreadsheets\/d\/([^/]+)/);
+    return match ? match[1] : raw;
+  }
+
+  function _publishedSheetUrl(sheetName, mode, callbackName = '') {
+    const spreadsheetId = _extractSpreadsheetId();
+    if (!spreadsheetId) return '';
+    const params = new URLSearchParams({
+      sheet: sheetName,
+      headers: '1',
+      qa: String(Date.now()),
+    });
+    if (mode === 'json') {
+      params.set('tqx', `out:json;responseHandler:${callbackName}`);
+    } else {
+      params.set('tqx', 'out:csv');
+    }
+    return `https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/gviz/tq?${params.toString()}`;
+  }
+
+  function _parseCsvTable(text) {
+    const rows = [];
+    let row = [];
+    let field = '';
+    let quoted = false;
+    const input = String(text || '');
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i];
+      if (quoted) {
+        if (ch === '"') {
+          if (input[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else {
+            quoted = false;
+          }
+        } else {
+          field += ch;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        quoted = true;
+      } else if (ch === ',') {
+        row.push(field);
+        field = '';
+      } else if (ch === '\n') {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = '';
+      } else if (ch !== '\r') {
+        field += ch;
+      }
+    }
+    if (field || row.length) {
+      row.push(field);
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function _rowsFromCsv(text) {
+    const table = _parseCsvTable(text);
+    const headers = (table.shift() || []).map(_textValue);
+    return table
+      .filter(row => row.some(value => _textValue(value)))
+      .map(row => headers.reduce((obj, header, index) => {
+        if (header) obj[header] = row[index] ?? '';
+        return obj;
+      }, {}));
+  }
+
+  function _rowsFromGvizTable(table) {
+    const headers = (table?.cols || []).map(col => _textValue(col?.label || col?.id));
+    return (table?.rows || [])
+      .map(row => headers.reduce((obj, header, index) => {
+        if (!header) return obj;
+        const cell = row?.c?.[index];
+        obj[header] = cell && cell.v !== null && cell.v !== undefined ? String(cell.v) : '';
+        return obj;
+      }, {}))
+      .filter(row => Object.values(row).some(value => _textValue(value)));
+  }
+
+  async function _fetchPublishedSheetRows(sheetName) {
+    const csvUrl = _publishedSheetUrl(sheetName, 'csv');
+    if (csvUrl) {
+      try {
+        const response = await _fetchWithTimeout(csvUrl, { method: 'GET', redirect: 'follow', cache: 'no-store' }, 75000);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const text = await response.text();
+        if (/^\s*<!doctype html/i.test(text)) throw new Error('La hoja devolvio HTML, no CSV.');
+        return _rowsFromCsv(text);
+      } catch (err) {
+        console.warn('[API] CSV publico de Google Sheets no disponible, se intenta JSONP:', err);
+      }
+    }
+    return _fetchPublishedSheetRowsJsonp(sheetName);
+  }
+
+  function _fetchPublishedSheetRowsJsonp(sheetName) {
+    if (typeof document === 'undefined' || typeof window === 'undefined') {
+      return Promise.reject(new Error('JSONP solo esta disponible en navegador.'));
+    }
+    return new Promise((resolve, reject) => {
+      const callbackName = `__cialpaSheet_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      const url = _publishedSheetUrl(sheetName, 'json', callbackName);
+      if (!url) {
+        reject(new Error('No hay URL de planilla configurada.'));
+        return;
+      }
+      const script = document.createElement('script');
+      const timeout = window.setTimeout(() => {
+        cleanup();
+        reject(new Error('Tiempo agotado leyendo Google Sheets publicado.'));
+      }, 75000);
+      function cleanup() {
+        window.clearTimeout(timeout);
+        delete window[callbackName];
+        script.remove();
+      }
+      window[callbackName] = response => {
+        cleanup();
+        if (response?.status === 'error') {
+          reject(new Error(response?.errors?.[0]?.detailed_message || 'Google Sheets devolvio error.'));
+          return;
+        }
+        resolve(_rowsFromGvizTable(response?.table || {}));
+      };
+      script.onerror = () => {
+        cleanup();
+        reject(new Error('No se pudo cargar Google Sheets publicado.'));
+      };
+      script.src = url;
+      document.head.appendChild(script);
+    });
+  }
+
+  function _mecRowMs(row = {}) {
+    const candidates = [row.actualizado_en, row.fecha_guardado, row.creado_en];
+    for (const value of candidates) {
+      const ms = Date.parse(String(value || ''));
+      if (Number.isFinite(ms)) return ms;
+    }
+    return 0;
+  }
+
+  function _mecSchoolKey(row = {}) {
+    const ids = [row.id_escuela, row.codigo_local, _digitsOnly(row.id_escuela), _digitsOnly(row.codigo_local)]
+      .map(_textValue)
+      .filter(Boolean);
+    return ids[0] || '';
+  }
+
+  function _mecPropertyBoundaryFromDraft(values = {}) {
+    const siteElements = Array.isArray(values.__siteElements) ? values.__siteElements : [];
+    return siteElements.find(item => _textValue(item?.type) === 'property_boundary') || null;
+  }
+
+  function _mecBoundaryVerticesFromItem(item = {}) {
+    let vertices = _mecNormalizeBoundaryVertices(item.geoVertices);
+    if (vertices.length >= 3) return vertices;
+    vertices = _mecNormalizeBoundaryVertices(item.boundaryGeoVertices);
+    if (vertices.length >= 3) return vertices;
+    const ficha = item.ficha || {};
+    vertices = _mecVerticesFromGeoJson(ficha.vertices_geojson || ficha.geojson || ficha.predio_geojson);
+    if (vertices.length >= 3) return vertices;
+    vertices = _mecVerticesFromLatLonText(ficha.vertices_latlon || ficha.vertices || '');
+    return vertices.length >= 3 ? vertices : [];
+  }
+
+  function _mecVerticesFromGeoJson(value) {
+    const geo = _parseJsonValue(value);
+    const ring = geo?.type === 'Feature'
+      ? (((geo.geometry || {}).coordinates || [])[0] || [])
+      : (((geo || {}).coordinates || [])[0] || []);
+    if (!Array.isArray(ring)) return [];
+    return _mecNormalizeBoundaryVertices(ring.map(coord => ({ lat: coord?.[1], lng: coord?.[0] })));
+  }
+
+  function _mecVerticesFromLatLonText(value) {
+    const text = _textValue(value);
+    if (!text) return [];
+    return _mecNormalizeBoundaryVertices(text.split('|').map(part => {
+      const pieces = _textValue(part).split(',').map(_textValue);
+      return { lat: pieces[0], lng: pieces[1] };
+    }));
+  }
+
+  function _mecNormalizeBoundaryVertices(vertices) {
+    const rows = (Array.isArray(vertices) ? vertices : []).map(vertex => {
+      const lat = Array.isArray(vertex) ? _numberValue(vertex[0]) : _numberValue(vertex?.lat || vertex?.latitude);
+      const lng = Array.isArray(vertex) ? _numberValue(vertex[1]) : _numberValue(vertex?.lng || vertex?.lon || vertex?.longitude);
+      if (lat === '' || lng === '') return null;
+      if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+      return { lat: Math.round(lat * 10000000) / 10000000, lng: Math.round(lng * 10000000) / 10000000 };
+    }).filter(Boolean);
+    if (rows.length > 1) {
+      const first = rows[0];
+      const last = rows[rows.length - 1];
+      if (Math.abs(first.lat - last.lat) < 0.0000001 && Math.abs(first.lng - last.lng) < 0.0000001) rows.pop();
+    }
+    return rows;
+  }
+
+  function _mecBoundaryBounds(vertices) {
+    const lats = vertices.map(v => Number(v.lat)).filter(Number.isFinite);
+    const lngs = vertices.map(v => Number(v.lng)).filter(Number.isFinite);
+    if (lats.length < 3 || lngs.length < 3) return null;
+    return {
+      minLat: Math.round(Math.min(...lats) * 10000000) / 10000000,
+      maxLat: Math.round(Math.max(...lats) * 10000000) / 10000000,
+      minLng: Math.round(Math.min(...lngs) * 10000000) / 10000000,
+      maxLng: Math.round(Math.max(...lngs) * 10000000) / 10000000,
+    };
+  }
+
+  function _perimeterFromDraftRow(row = {}, index = 0) {
+    const draft = _parseJsonValue(row.draft_json) || {};
+    const values = draft.values || draft || {};
+    const selected = values.__selectedSchool || draft.__selectedSchool || {};
+    const boundary = _mecPropertyBoundaryFromDraft(values);
+    if (!boundary) return null;
+    const vertices = _mecBoundaryVerticesFromItem(boundary);
+    if (vertices.length < 3) return null;
+    const bounds = _mecBoundaryBounds(vertices);
+    const ficha = boundary.ficha || {};
+    return {
+      id_borrador: _textValue(row.id_borrador),
+      id_escuela: _textValue(row.id_escuela || selected.id_escuela),
+      codigo_local: _textValue(row.codigo_local || selected.codigo_local),
+      nombre_escuela: _textValue(row.nombre_escuela || selected.nombre || selected.nombre_escuela),
+      departamento: _textValue(selected.departamento),
+      distrito: _textValue(selected.distrito),
+      localidad: _textValue(selected.localidad),
+      usuario: _textValue(row.usuario),
+      fecha_guardado: _textValue(row.fecha_guardado),
+      actualizado_en: _textValue(row.actualizado_en || row.fecha_guardado || row.creado_en),
+      estado_borrador: _textValue(row.estado_borrador) || 'borrador',
+      app_version: _textValue(row.app_version),
+      base_mapa_confirmada: _textValue(row.base_mapa_confirmada),
+      perimetro_m: _textValue(ficha.perimetro_m || ficha.perimetro || ''),
+      superficie_m2: _textValue(ficha.superficie_m2 || ficha.area_m2 || ficha.area || ''),
+      vertices,
+      vertices_count: vertices.length,
+      bounds,
+      centro: bounds ? {
+        lat: Math.round(((bounds.minLat + bounds.maxLat) / 2) * 10000000) / 10000000,
+        lng: Math.round(((bounds.minLng + bounds.maxLng) / 2) * 10000000) / 10000000,
+      } : null,
+      identity_keys: [row.id_escuela, row.codigo_local, selected.id_escuela, selected.codigo_local, _digitsOnly(row.id_escuela), _digitsOnly(row.codigo_local)]
+        .map(_textValue)
+        .filter(Boolean),
+      __row_order: index + 2,
+    };
+  }
+
+  function _filterPerimeters(rows, filters = {}) {
+    let data = rows.slice();
+    if (filters.usuario) data = data.filter(row => _textValue(row.usuario).toLowerCase() === _textValue(filters.usuario).toLowerCase());
+    if (filters.estado) data = data.filter(row => _textValue(row.estado_borrador).toLowerCase() === _textValue(filters.estado).toLowerCase());
+    if (filters.q) {
+      const q = _textValue(filters.q).toLowerCase();
+      data = data.filter(row => [
+        row.id_borrador,
+        row.id_escuela,
+        row.codigo_local,
+        row.nombre_escuela,
+        row.usuario,
+        row.departamento,
+        row.distrito,
+        row.estado_borrador,
+      ].join(' ').toLowerCase().includes(q));
+    }
+    return data;
+  }
+
+  async function _listarPerimetrosMecFromPublishedSheet(filters = {}) {
+    const rows = await _fetchPublishedSheetRows('mec_borradores');
+    const latest = new Map();
+    rows.forEach((row, index) => {
+      const perimeter = _perimeterFromDraftRow(row, index);
+      if (!perimeter) return;
+      const key = _mecSchoolKey(row) || _mecSchoolKey(perimeter) || `draft_${index}`;
+      const current = latest.get(key);
+      if (!current || _mecRowMs(row) >= _mecRowMs(current.__sourceRow)) {
+        latest.set(key, { ...perimeter, __sourceRow: row });
+      }
+    });
+    const data = _filterPerimeters([...latest.values()].map(row => {
+      delete row.__sourceRow;
+      return row;
+    }), filters).sort((a, b) => _mecRowMs(b) - _mecRowMs(a));
+    const response = {
+      status: 'ok',
+      data,
+      meta: {
+        total: data.length,
+        source: 'published_sheet',
+        fallback: true,
+        sheet: 'mec_borradores',
+      },
+      message: 'Perimetros cargados desde Google Sheets publicado mientras se corrige el Web App GAS.',
+    };
+    if (typeof CialpaLocalStore !== 'undefined') {
+      CialpaLocalStore.rememberApi('listarPerimetrosMec', 'GET', filters, response).catch(err =>
+        console.warn('[API] No se pudo cachear perimetros desde hoja publicada:', err)
+      );
+    }
+    return response;
+  }
+
   function _queueableEndpoint(endpoint) {
     return new Set([
       'updateEscuelaEstado',
@@ -830,6 +1203,32 @@ const API = (() => {
     return error;
   }
 
+  function _gasEndpointUrls() {
+    return [APP_CONFIG.GAS_URL, APP_CONFIG.GAS_FALLBACK_URL]
+      .map(url => String(url || '').trim())
+      .filter((url, index, rows) => url && rows.indexOf(url) === index);
+  }
+
+  async function _requestGasJson(baseUrl, payload, method, timeoutMs) {
+    let url = baseUrl;
+    const fetchOptions = { method, redirect: 'follow' };
+    if (method === 'GET') {
+      const params = new URLSearchParams(payload);
+      url = `${baseUrl}?${params.toString()}`;
+    } else {
+      fetchOptions.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
+      fetchOptions.body = JSON.stringify(payload);
+    }
+    const response = await _fetchWithTimeout(url, fetchOptions, timeoutMs);
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error('Respuesta invalida del servidor, no es JSON.');
+    }
+  }
+
   async function call(endpoint, method = 'GET', data = {}, options = {}) {
     const { skipAuth = false, skipLoading = false, skipQueue = false, retries = APP_CONFIG.API_RETRY_ATTEMPTS, timeoutMs = APP_CONFIG.API_TIMEOUT_MS } = options;
     if (!skipLoading) _incrementLoading();
@@ -854,41 +1253,31 @@ const API = (() => {
     let lastError;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        let url = APP_CONFIG.GAS_URL;
-        let fetchOptions = { method, redirect: 'follow' };
-        if (method === 'GET') {
-          const params = new URLSearchParams(payload);
-          url = `${APP_CONFIG.GAS_URL}?${params.toString()}`;
-        } else {
-          fetchOptions.headers = { 'Content-Type': 'text/plain;charset=UTF-8' };
-          fetchOptions.body = JSON.stringify(payload);
-        }
-        const response = await _fetchWithTimeout(url, fetchOptions, timeoutMs);
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const text = await response.text();
-        let json;
+      const urls = _gasEndpointUrls();
+      for (let urlIndex = 0; urlIndex < urls.length; urlIndex++) {
         try {
-          json = JSON.parse(text);
-        } catch {
-          throw new Error('Respuesta inválida del servidor, no es JSON.');
+          let json = await _requestGasJson(urls[urlIndex], payload, method, timeoutMs);
+          json = _normalizePublicAccountResponse(json, endpoint, skipAuth);
+          if (_isInvalidSessionResponse(json, endpoint, skipAuth)) {
+            throw _handleInvalidSession(json);
+          }
+          if (method === 'GET' && typeof CialpaLocalStore !== 'undefined') {
+            CialpaLocalStore.rememberApi(endpoint, method, data, json).catch(err =>
+              console.warn('[API] No se pudo cachear respuesta local:', err)
+            );
+          }
+          if (!skipLoading) _decrementLoading();
+          return json;
+        } catch (err) {
+          lastError = err;
+          if (err?.invalidSession) break;
+          if (urlIndex === 0 && urls.length > 1) {
+            console.warn(`[API] ${endpoint}: backend primario no disponible, se intenta fallback.`, err.message || err);
+          }
         }
-        json = _normalizePublicAccountResponse(json, endpoint, skipAuth);
-        if (_isInvalidSessionResponse(json, endpoint, skipAuth)) {
-          throw _handleInvalidSession(json);
-        }
-        if (method === 'GET' && typeof CialpaLocalStore !== 'undefined') {
-          CialpaLocalStore.rememberApi(endpoint, method, data, json).catch(err =>
-            console.warn('[API] No se pudo cachear respuesta local:', err)
-          );
-        }
-        if (!skipLoading) _decrementLoading();
-        return json;
-      } catch (err) {
-        lastError = err;
-        if (err?.invalidSession) break;
-        if (attempt < retries) await _sleep(APP_CONFIG.API_RETRY_DELAY_MS * attempt);
       }
+      if (lastError?.invalidSession) break;
+      if (attempt < retries) await _sleep(APP_CONFIG.API_RETRY_DELAY_MS * attempt);
     }
 
     if (!skipLoading) _decrementLoading();
@@ -961,6 +1350,16 @@ const API = (() => {
   async function getComentariosApp(filters = {}) { return call('getComentariosApp', 'GET', filters, { skipLoading: true }); }
   async function resolverComentarioApp(id, estado, respuesta_admin = '') { return call('resolverComentarioApp', 'POST', { id_comentario: id, estado, respuesta_admin }); }
   async function guardarBorradorMec(datos) { return call('guardarBorradorMec', 'POST', datos, { skipLoading: true }); }
+  async function listarPerimetrosMec(filters = {}) {
+    try {
+      const result = await call('listarPerimetrosMec', 'GET', filters, { skipAuth: true, skipLoading: true, retries: 1, timeoutMs: 75000 });
+      if (result.status === 'ok' && Array.isArray(result.data)) return result;
+      throw new Error(result.message || 'El endpoint de perimetros no devolvio datos validos.');
+    } catch (err) {
+      console.warn('[API] listarPerimetrosMec via GAS no disponible; se usa hoja publicada:', err);
+      return _listarPerimetrosMecFromPublishedSheet(filters);
+    }
+  }
   async function listarFormulariosMec(filters = {}) { return call('listarFormulariosMec', 'GET', filters, { skipLoading: true }); }
   async function reiniciarRelevamientoEscuela(datos) { return call('reiniciarRelevamientoEscuela', 'POST', datos, { skipLoading: true }); }
   async function guardarCierreCompleto(datos) { return call('guardarCierreCompleto', 'POST', datos); }
@@ -1008,6 +1407,7 @@ const API = (() => {
     getComentariosApp,
     resolverComentarioApp,
     guardarBorradorMec,
+    listarPerimetrosMec,
     listarFormulariosMec,
     reiniciarRelevamientoEscuela,
     guardarCierreCompleto,

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.176
+ * Version: 2.6.178
  */
 
 const MapModule = (() => {
@@ -15,6 +15,8 @@ const MapModule = (() => {
   let _activeFilters = {};
   let _selectedEscuela = null;
   let _routeLayer = null;
+  let _perimeterLayer = null;
+  let _perimeters = [];
   let _routesVisible = true;
   let _routeRenderToken = 0;
   let _googleRoutesUnavailable = false;
@@ -250,6 +252,7 @@ const MapModule = (() => {
       _map = null;
       _markerCluster = null;
       _routeLayer = null;
+      _perimeterLayer = null;
       updateOfflineStatus();
       return null;
     }
@@ -282,13 +285,19 @@ const MapModule = (() => {
       { attribution: APP_CONFIG.SATELLITE_ATTRIBUTION || 'Tiles &copy; Esri', maxZoom: APP_CONFIG.SATELLITE_MAX_ZOOM || 18 }
     );
 
+    _perimeterLayer = L.layerGroup().addTo(_map);
+    _routeLayer = L.layerGroup().addTo(_map);
+
     L.control.layers(
       {
         'Mapa base (OSM)': osm,
         'Caminos y accesos (OSM HOT)': roads,
         'Satélite (Esri)': satellite,
       },
-      {},
+      {
+        'Perimetros registrados': _perimeterLayer,
+        'Rutas por censista': _routeLayer,
+      },
       { position: 'topright' }
     ).addTo(_map);
 
@@ -318,7 +327,6 @@ const MapModule = (() => {
       : L.layerGroup();
 
     _map.addLayer(_markerCluster);
-    _routeLayer = L.layerGroup().addTo(_map);
 
     // Scale control
     L.control.scale({ imperial: false }).addTo(_map);
@@ -367,6 +375,7 @@ const MapModule = (() => {
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
     _renderRoutes(_escuelas);
+    _renderPerimeters(_escuelas);
     updateOfflineStatus();
   }
 
@@ -420,6 +429,7 @@ const MapModule = (() => {
     _renderList(_filteredEscuelas);
     _updateSummaryBadges(_filteredEscuelas);
     _renderRoutes(_filteredEscuelas);
+    _renderPerimeters(_filteredEscuelas);
   }
 
   function clearFilters() {
@@ -428,6 +438,148 @@ const MapModule = (() => {
   }
 
   // ── Sidebar list ──────────────────────────────────────────────────────────
+
+  async function loadPerimeters(options = {}) {
+    if (typeof API === 'undefined' || typeof API.listarPerimetrosMec !== 'function') return;
+    try {
+      const result = await API.listarPerimetrosMec({});
+      if (result.status !== 'ok') throw new Error(result.message || 'No se pudieron cargar perimetros.');
+      _perimeters = Array.isArray(result.data) ? result.data : [];
+      _renderPerimeters(_filteredEscuelas.length || _hasActiveFilters(_activeFilters) ? _filteredEscuelas : _escuelas);
+      if (!options.silent) UI.showToast(`Perimetros cargados: ${_perimeters.length}.`, 'success', 4200);
+    } catch (err) {
+      console.warn('[Mapa] No se pudieron cargar perimetros MEC:', err);
+      _perimeters = [];
+      _renderPerimeters(_filteredEscuelas);
+      if (!options.silent) UI.showToast('No se pudieron cargar los perimetros guardados.', 'warning', 6500);
+    }
+  }
+
+  function togglePerimeters() {
+    if (!_map || !_perimeterLayer) return;
+    if (_map.hasLayer(_perimeterLayer)) {
+      _map.removeLayer(_perimeterLayer);
+      UI.showToast('Perimetros ocultos.', 'info');
+    } else {
+      _perimeterLayer.addTo(_map);
+      _renderPerimeters(_filteredEscuelas.length || _hasActiveFilters(_activeFilters) ? _filteredEscuelas : _escuelas);
+      UI.showToast('Perimetros visibles.', 'info');
+    }
+  }
+
+  function _renderPerimeters(escuelas = []) {
+    if (!_perimeterLayer) {
+      _updatePerimeterCount(0, _perimeters.length);
+      return;
+    }
+    _perimeterLayer.clearLayers();
+    if (!_map || !window.L || !_perimeters.length) {
+      _updatePerimeterCount(0, _perimeters.length);
+      return;
+    }
+    const visibleKeys = new Set((escuelas || []).flatMap(_schoolIdentityKeys));
+    const rows = _perimeters.filter(row => {
+      const keys = _perimeterIdentityKeys(row);
+      return !visibleKeys.size || keys.some(key => visibleKeys.has(key));
+    });
+    rows.forEach(row => {
+      const vertices = _perimeterLatLngs(row);
+      if (vertices.length < 3) return;
+      const school = _perimeterSchool(row);
+      const color = _surveyorColor(row.usuario || (school && _schoolSurveyor(school)) || 'Perimetro');
+      const layer = L.polygon(vertices, {
+        color,
+        weight: 2.5,
+        opacity: 0.92,
+        fillColor: '#facc15',
+        fillOpacity: 0.14,
+        lineJoin: 'round',
+      });
+      layer.bindTooltip(`${row.nombre_escuela || row.codigo_local || 'Escuela'} - perimetro guardado`, { sticky: true });
+      layer.bindPopup(_buildPerimeterPopup(row, school), { maxWidth: 280 });
+      layer.on('click', () => {
+        if (school) {
+          _selectedEscuela = school;
+          _highlightListItem(_schoolPrimaryId(school));
+          _updateInfoPanel(school);
+        }
+      });
+      layer.addTo(_perimeterLayer);
+    });
+    _updatePerimeterCount(rows.length, _perimeters.length);
+  }
+
+  function _perimeterIdentityKeys(row = {}) {
+    return [
+      ...(Array.isArray(row.identity_keys) ? row.identity_keys : []),
+      row.id_escuela,
+      row.codigo_local,
+      _digits(row.id_escuela),
+      _digits(row.codigo_local),
+    ].map(value => String(value ?? '').trim()).filter(Boolean);
+  }
+
+  function _perimeterSchool(row = {}) {
+    const keys = _perimeterIdentityKeys(row);
+    for (const key of keys) {
+      const school = _findSchoolById(key);
+      if (school) return school;
+    }
+    return null;
+  }
+
+  function _perimeterLatLngs(row = {}) {
+    return (Array.isArray(row.vertices) ? row.vertices : [])
+      .map(vertex => {
+        const lat = Number(vertex && vertex.lat);
+        const lng = Number(vertex && vertex.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+        return [lat, lng];
+      })
+      .filter(Boolean);
+  }
+
+  function _buildPerimeterPopup(row = {}, school = null) {
+    const id = school ? _schoolPrimaryId(school) : (row.id_escuela || row.codigo_local || '');
+    const idArg = _jsString(id);
+    const canOperate = school && Auth.canAccess('encuestador') && Auth.canOperateSchool(school);
+    const metrics = [
+      row.perimetro_m ? `${_escape(row.perimetro_m)} m` : '',
+      row.superficie_m2 ? `${_escape(row.superficie_m2)} m2` : '',
+      row.vertices_count ? `${_escape(row.vertices_count)} vertices` : '',
+    ].filter(Boolean).join(' - ');
+    return `
+      <div class="map-popup map-popup--perimeter">
+        <div class="map-popup__header">
+          <strong>${_escape(row.nombre_escuela || row.codigo_local || 'Perimetro registrado')}</strong>
+          <span class="badge" style="background:#b7791f">Predio</span>
+        </div>
+        <div class="map-popup__body">
+          <p><b>Codigo:</b> ${_escape(row.codigo_local || '-')}</p>
+          <p><b>Distrito:</b> ${_escape(row.distrito || '-')}</p>
+          <p><b>Censista:</b> ${_escape(row.usuario || '-')}</p>
+          ${metrics ? `<p><b>Medidas:</b> ${metrics}</p>` : ''}
+          <p><b>Actualizado:</b> ${_escape(row.actualizado_en || row.fecha_guardado || '-')}</p>
+        </div>
+        <div class="map-popup__actions">
+          ${id ? `<button class="btn btn-outline btn-sm" onclick='MapModule.flyTo(${idArg})'>Ver escuela</button>` : ''}
+          ${canOperate ? `<button class="btn btn-success btn-sm" onclick='MapModule.startGuidedRegister(${idArg})'>Abrir registro</button>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function _updatePerimeterCount(visible, total) {
+    const count = document.getElementById('map-count-perimeters');
+    if (count) count.textContent = String(visible || 0);
+    const state = document.getElementById('map-perimeters-state');
+    if (state) {
+      state.textContent = total
+        ? `Perimetros: ${visible || 0}/${total}`
+        : 'Perimetros: sin datos cargados';
+      state.classList.toggle('map-perimeters-state--ready', Boolean(total));
+    }
+  }
 
   function _renderList(escuelas) {
     const container = document.getElementById('map-school-list');
@@ -1278,6 +1430,8 @@ const MapModule = (() => {
     loadMarkers,
     applyFilters,
     clearFilters,
+    loadPerimeters,
+    togglePerimeters,
     flyTo,
     focusListItem,
     showNextAfterFinalized,
