@@ -4,6 +4,33 @@
 
 ---
 
+## Reapertura de perimetros y salto filtrado en mapa - 2026-06-11 - v2.6.179
+
+### Objetivo
+- Corregir que el perimetro visible como capa del mapa no aparezca al abrir/ver/editar el registro de la escuela.
+- Agregar controles para saltar rapido entre escuelas del mapa respetando los filtros activos.
+
+### Cambios implementados
+- `assets/js/map.js`: expone el perimetro liviano asociado a cada escuela, lo adjunta antes de abrir Registro guiado y agrega navegacion `Anterior` / `Siguiente` sobre la lista filtrada.
+- `assets/js/mec-form.js`: si la ficha completa no trae `mec_draft`, reconstruye el elemento `property_boundary` desde `mec_perimeter`, conserva vertices lat/lon y prepara la base mapa minima para renderizarlo en el plano.
+- `assets/js/api.js` y `gas/sheets.gs`: `listarPerimetrosMec` incluye `plan_base_map` minimo cuando existe en el borrador, sin exponer `draft_json`.
+- `index.html` y `assets/css/app.css`: controles compactos de salto filtrado y contador `actual/total`.
+- Version/cache actualizados a `2.6.179`.
+
+### Validaciones realizadas
+- `node --check` ejecutado sobre `assets/js/api.js`, `assets/js/map.js`, `assets/js/mec-form.js`, `assets/js/app.js`, `assets/js/config.js`, `assets/js/admin.js` y `sw.js`, sin errores.
+- `node --check` ejecutado sobre `gas/Code.gs` y `gas/sheets.gs` via stdin, sin errores.
+- Smoke test real de `API.listarPerimetrosMec({})`: backend primario respondio HTTP 403, fallback por hoja publicada operativo con `status=ok`, `source=published_sheet`, `total=29`, `firstVertices=4` y `withPlanBaseMap=29`.
+- `git diff --check` sin errores de espacios; solo advertencias esperadas de normalizacion LF/CRLF.
+- `clasp push -f`: subidos 8 archivos al proyecto GAS.
+- `clasp version "v2.6.179 perimetros reapertura y salto mapa"`: creada version GAS `35`.
+
+### Pendientes
+- Verificar assets publicados en GitHub Pages con cache-busting despues del push a `main`.
+- No cambiar `GAS_URL` ni redeployar el endpoint estable mientras el backend primario siga devolviendo HTTP 403 sin prueba anonima JSON.
+
+---
+
 ## Respaldo por hoja publicada para capa de perimetros - 2026-06-11 - v2.6.178
 
 ### Objetivo

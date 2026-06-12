@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.178" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.179" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.178" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.179" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.178</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.179</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.178</strong>
+      Edición vigente<br><strong class="app-version">v2.6.179</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -291,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.178</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.179</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -313,13 +313,18 @@
       <div id="module-mapa" class="module-panel">
         <div class="page-header">
           <h2>Mapa de Escuelas</h2>
-          <div style="display:flex;gap:.5rem;align-items:center;">
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
             <span class="badge" style="background:var(--state-pendiente)">Pend: <span id="map-count-pendiente">0</span></span>
             <span class="badge" style="background:var(--state-en-curso)">Curso: <span id="map-count-en_curso">0</span></span>
             <span class="badge" style="background:var(--state-finalizada)">Final: <span id="map-count-finalizada">0</span></span>
             <span class="badge" style="background:var(--state-incidencia)">Inc: <span id="map-count-incidencia">0</span></span>
             <span class="badge" style="background:#b7791f">Perim: <span id="map-count-perimeters">0</span></span>
             <span class="badge" style="background:var(--color-secondary)">Total: <span id="map-count-total">0</span></span>
+            <div class="map-jump-controls" aria-label="Recorrer escuelas filtradas">
+              <button class="btn btn-sm btn-outline" type="button" title="Escuela anterior filtrada" onclick="MapModule.jumpFilteredSchool(-1)">Anterior</button>
+              <span id="map-jump-state" class="map-jump-state">0/0</span>
+              <button class="btn btn-sm btn-outline" type="button" title="Escuela siguiente filtrada" onclick="MapModule.jumpFilteredSchool(1)">Siguiente</button>
+            </div>
             <button class="btn btn-sm btn-outline" onclick="MapModule.toggleRoutes()">Rutas</button>
             <button class="btn btn-sm btn-outline" onclick="MapModule.togglePerimeters()">Perimetros</button>
             <button class="btn btn-sm btn-outline" onclick="MapModule.cacheVisibleMap()">Guardar mapa offline</button>
@@ -1653,20 +1658,20 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.178"></script>
-<script src="assets/js/local-store.js?v=2.6.178"></script>
-<script src="assets/js/api.js?v=2.6.178"></script>
-<script src="assets/js/auth.js?v=2.6.178"></script>
-<script src="assets/js/map.js?v=2.6.178"></script>
-<script src="assets/js/survey.js?v=2.6.178"></script>
-<script src="assets/js/stats.js?v=2.6.178"></script>
-<script src="assets/js/location-audit.js?v=2.6.178"></script>
-<script src="assets/js/planning.js?v=2.6.178"></script>
-<script src="assets/js/admin.js?v=2.6.178"></script>
-<script src="assets/js/jornada.js?v=2.6.178"></script>
-<script src="assets/js/manual.js?v=2.6.178"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.178"></script>
-<script src="assets/js/app.js?v=2.6.178"></script>
+<script src="assets/js/config.js?v=2.6.179"></script>
+<script src="assets/js/local-store.js?v=2.6.179"></script>
+<script src="assets/js/api.js?v=2.6.179"></script>
+<script src="assets/js/auth.js?v=2.6.179"></script>
+<script src="assets/js/map.js?v=2.6.179"></script>
+<script src="assets/js/survey.js?v=2.6.179"></script>
+<script src="assets/js/stats.js?v=2.6.179"></script>
+<script src="assets/js/location-audit.js?v=2.6.179"></script>
+<script src="assets/js/planning.js?v=2.6.179"></script>
+<script src="assets/js/admin.js?v=2.6.179"></script>
+<script src="assets/js/jornada.js?v=2.6.179"></script>
+<script src="assets/js/manual.js?v=2.6.179"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.179"></script>
+<script src="assets/js/app.js?v=2.6.179"></script>
 
 <script>
   // Set today's date in Inicio module

@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.178
+ * Version 2.6.179
  */
 
 const SheetsService = (() => {
@@ -1445,6 +1445,7 @@ const SheetsService = (() => {
       vertices: vertices,
       vertices_count: vertices.length,
       bounds: bounds,
+      plan_base_map: _mecPlanBaseMapFromDraft_(values),
       centro: bounds ? { lat: _roundCoord_((bounds.minLat + bounds.maxLat) / 2), lng: _roundCoord_((bounds.minLng + bounds.maxLng) / 2) } : null,
       identity_keys: [
         row.id_escuela,
@@ -1533,6 +1534,28 @@ const SheetsService = (() => {
       maxLat: _roundCoord_(Math.max.apply(null, lats)),
       minLng: _roundCoord_(Math.min.apply(null, lngs)),
       maxLng: _roundCoord_(Math.max.apply(null, lngs)),
+    };
+  }
+
+  function _mecPlanBaseMapFromDraft_(values) {
+    const baseMap = (values && values.__planBaseMap) || {};
+    const lat = _num(baseMap.lat);
+    const lng = _num(baseMap.lng);
+    if (lat === '' || lng === '') return null;
+    return {
+      lat: Number(lat),
+      lng: Number(lng),
+      zoom: _num(baseMap.zoom),
+      scale: _num(baseMap.scale),
+      offsetX: _num(baseMap.offsetX),
+      offsetY: _num(baseMap.offsetY),
+      rotationDeg: _num(baseMap.rotationDeg || baseMap.rotacion_grados),
+      source: _txt(baseMap.source),
+      enabled: _isTrueish(baseMap.enabled),
+      confirmed: _isTrueish(baseMap.confirmed),
+      schoolLat: _num(baseMap.schoolLat),
+      schoolLng: _num(baseMap.schoolLng),
+      schoolCoordinateCorrected: _isTrueish(baseMap.schoolCoordinateCorrected),
     };
   }
 

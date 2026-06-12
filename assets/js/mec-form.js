@@ -343,6 +343,108 @@ const MecFormModule = (() => {
     }
   }
 
+  function _perimeterFromSchoolRecord(school) {
+    if (!school) return null;
+    if (school.mec_perimeter || school.__mapPerimeter) return school.mec_perimeter || school.__mapPerimeter;
+    try {
+      if (typeof MapModule !== 'undefined' && typeof MapModule.getPerimeterForSchool === 'function') {
+        return MapModule.getPerimeterForSchool(school);
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  }
+
+  function _perimeterVerticesFromRecord(perimeter = {}) {
+    return _normalizeBoundaryGeoVertices(perimeter.vertices || perimeter.geoVertices || perimeter.boundaryGeoVertices || []);
+  }
+
+  function _perimeterCenter(perimeter = {}, vertices = _perimeterVerticesFromRecord(perimeter)) {
+    if (perimeter.centro) {
+      const lat = _numberInRange(perimeter.centro.lat, NaN, -85, 85);
+      const lng = _numberInRange(perimeter.centro.lng, NaN, -180, 180);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+    }
+    if (!vertices.length) return null;
+    const lats = vertices.map(vertex => Number(vertex.lat)).filter(Number.isFinite);
+    const lngs = vertices.map(vertex => Number(vertex.lng)).filter(Number.isFinite);
+    if (!lats.length || !lngs.length) return null;
+    return {
+      lat: (Math.min(...lats) + Math.max(...lats)) / 2,
+      lng: (Math.min(...lngs) + Math.max(...lngs)) / 2,
+    };
+  }
+
+  function _ensurePlanBaseMapFromPerimeter(perimeter = {}, school = {}) {
+    const vertices = _perimeterVerticesFromRecord(perimeter);
+    const center = _perimeterCenter(perimeter, vertices);
+    const base = perimeter.plan_base_map || perimeter.planBaseMap || {};
+    const fallback = _planBaseMapDefaults();
+    const lat = _numberInRange(base.lat, Number.isFinite(center?.lat) ? center.lat : fallback.lat, -85, 85);
+    const lng = _numberInRange(base.lng, Number.isFinite(center?.lng) ? center.lng : fallback.lng, -180, 180);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    _data.__planBaseMap = {
+      ...fallback,
+      ...(_data.__planBaseMap || {}),
+      ...base,
+      lat,
+      lng,
+      schoolLat: _numberInRange(base.schoolLat, _numberInRange(school.latitud || school.lat, lat, -85, 85), -85, 85),
+      schoolLng: _numberInRange(base.schoolLng, _numberInRange(school.longitud || school.lng || school.lon, lng, -180, 180), -180, 180),
+      enabled: base.enabled !== undefined ? Boolean(base.enabled) : fallback.enabled,
+      confirmed: Boolean(base.confirmed || _data.__planBaseMap?.confirmed),
+      savedAt: base.savedAt || _data.__planBaseMap?.savedAt || perimeter.actualizado_en || perimeter.fecha_guardado || '',
+    };
+    _ensurePlanBaseMap();
+    return _data.__planBaseMap;
+  }
+
+  function _ensurePropertyBoundaryFromPerimeter(school, options = {}) {
+    const perimeter = _perimeterFromSchoolRecord(school);
+    const vertices = _perimeterVerticesFromRecord(perimeter);
+    if (!perimeter || vertices.length < 3) return false;
+    const elements = _ensureSiteElements();
+    let element = elements.find(item => item.type === 'property_boundary');
+    const existingVertices = _boundaryGeoVerticesFromItem(element || {});
+    if (existingVertices.length >= 3 && !options.force) {
+      _ensurePlanBaseMapFromPerimeter(perimeter, school);
+      _planLayers.exteriores = true;
+      return false;
+    }
+    _ensurePlanBaseMapFromPerimeter(perimeter, school);
+    if (!element) {
+      element = {
+        id: `site_property_${Date.now()}`,
+        type: 'property_boundary',
+        shape: '',
+        xRatio: .12,
+        yRatio: .12,
+        wRatio: .76,
+        hRatio: .58,
+        rotationDeg: 0,
+        ficha: _defaultSiteElementFicha('property_boundary', 1),
+      };
+      elements.unshift(element);
+    }
+    element.ficha = {
+      ..._defaultSiteElementFicha('property_boundary', 1),
+      ...(element.ficha || {}),
+      codigo: element.ficha?.codigo || 'PRD 1',
+      subtipo: 'Perimetro del predio escolar',
+      fuente: element.ficha?.fuente || 'Registro guardado',
+      perimetro_m: perimeter.perimetro_m || element.ficha?.perimetro_m || '',
+      superficie_m2: perimeter.superficie_m2 || element.ficha?.superficie_m2 || '',
+      observacion: element.ficha?.observacion || `Perimetro recuperado desde capa de mapa (${perimeter.actualizado_en || perimeter.fecha_guardado || 'sin fecha'}).`,
+    };
+    _setPropertyBoundaryGeoVertices(element, vertices);
+    element.geoSavedAt = perimeter.actualizado_en || perimeter.fecha_guardado || element.geoSavedAt || new Date().toISOString();
+    element.locked = false;
+    _planLayers.exteriores = true;
+    _data.__siteElements = elements;
+    return true;
+  }
+
   function _draftForSchool(school, options = {}) {
     if (!school) return null;
     const scoped = _readDraftFromStorage(_schoolDraftStorageKey(school));
@@ -378,6 +480,7 @@ const MecFormModule = (() => {
       if (school && !_sameSchoolIdentity(_data.__selectedSchool, school)) {
         _data.__selectedSchool = _schoolSnapshot(school);
       }
+      if (school) _ensurePropertyBoundaryFromPerimeter(school);
     } catch {
       _applyDraftValues({});
     }
@@ -13018,6 +13121,7 @@ const MecFormModule = (() => {
     const currentSchool = _data.__selectedSchool || null;
     if (currentSchool && _sameSchoolIdentity(currentSchool, school)) {
       _prefillGeneralFromSelectedSchool(Boolean(options.force), school);
+      _ensurePropertyBoundaryFromPerimeter(school);
       _saveDraft(false);
       if (options.render) _render();
       return true;
@@ -13026,6 +13130,7 @@ const MecFormModule = (() => {
     if (hasCurrentDraft && !_sameSchoolIdentity(currentSchool, school)) _saveDraft(false);
     _applyDraftValues(_draftForSchool(school, { allowGlobal: true }) || {});
     _prefillGeneralFromSelectedSchool(true, school);
+    _ensurePropertyBoundaryFromPerimeter(school);
     _selectedPlanId = null;
     _activePlanDrag = null;
     _selectedSketchObjectId = null;

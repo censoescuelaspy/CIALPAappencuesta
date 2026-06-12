@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.178
+ * Version: 2.6.179
  */
 
 const MapModule = (() => {
@@ -151,6 +151,22 @@ const MapModule = (() => {
 
   function _mergeSchoolRecord(base = {}, extra = {}) {
     return { ...(base || {}), ...(extra || {}) };
+  }
+
+  function _perimeterForSchool(school = {}) {
+    const keys = new Set(_schoolIdentityKeys(school));
+    if (!keys.size) return null;
+    return (_perimeters || []).find(row => _perimeterIdentityKeys(row).some(key => keys.has(key))) || null;
+  }
+
+  function _enrichSchoolWithPerimeter(school = {}) {
+    const perimeter = _perimeterForSchool(school);
+    if (!perimeter) return school;
+    return {
+      ...(school || {}),
+      mec_perimeter: perimeter,
+      mec_perimeter_source: perimeter.source || perimeter.meta_source || 'map_layer',
+    };
   }
 
   function _replaceSchoolRecord(updated = {}) {
@@ -359,6 +375,7 @@ const MapModule = (() => {
       marker.on('click', () => {
         _selectedEscuela = e;
         _highlightListItem(primaryId);
+        _updateJumpState();
         _hideInfoPanel();
       });
 
@@ -374,6 +391,7 @@ const MapModule = (() => {
     }
     _renderList(_escuelas);
     _updateSummaryBadges(_escuelas);
+    _updateJumpState(_escuelas);
     _renderRoutes(_escuelas);
     _renderPerimeters(_escuelas);
     updateOfflineStatus();
@@ -428,6 +446,7 @@ const MapModule = (() => {
 
     _renderList(_filteredEscuelas);
     _updateSummaryBadges(_filteredEscuelas);
+    _updateJumpState(_filteredEscuelas);
     _renderRoutes(_filteredEscuelas);
     _renderPerimeters(_filteredEscuelas);
   }
@@ -579,6 +598,52 @@ const MapModule = (() => {
         : 'Perimetros: sin datos cargados';
       state.classList.toggle('map-perimeters-state--ready', Boolean(total));
     }
+  }
+
+  function _jumpRows() {
+    const source = _hasActiveFilters(_activeFilters)
+      ? _filteredEscuelas
+      : (_filteredEscuelas.length ? _filteredEscuelas : _escuelas);
+    const rows = (source || []).filter(row => {
+      const id = _schoolPrimaryId(row);
+      return Boolean(id && (_markers[id] || _schoolIdentityKeys(row).some(key => _markers[key])));
+    });
+    return rows.length ? rows : (source || []);
+  }
+
+  function _jumpIndex(rows = _jumpRows()) {
+    const selectedKeys = new Set(_schoolIdentityKeys(_selectedEscuela || {}));
+    if (!selectedKeys.size) return -1;
+    return rows.findIndex(row => _schoolIdentityKeys(row).some(key => selectedKeys.has(key)));
+  }
+
+  function _updateJumpState(rows = _jumpRows()) {
+    const state = document.getElementById('map-jump-state');
+    if (!state) return;
+    const total = rows.length;
+    const index = _jumpIndex(rows);
+    state.textContent = total
+      ? `${index >= 0 ? index + 1 : 0}/${total}`
+      : '0/0';
+  }
+
+  function jumpFilteredSchool(delta = 1) {
+    const rows = _jumpRows();
+    if (!rows.length) {
+      UI.showToast('No hay escuelas visibles para recorrer con los filtros actuales.', 'warning', 5200);
+      _updateJumpState(rows);
+      return null;
+    }
+    const step = Number(delta) < 0 ? -1 : 1;
+    const currentIndex = _jumpIndex(rows);
+    const nextIndex = currentIndex === -1
+      ? (step > 0 ? 0 : rows.length - 1)
+      : (currentIndex + step + rows.length) % rows.length;
+    const school = rows[nextIndex];
+    flyTo(_schoolPrimaryId(school));
+    _updateJumpState(rows);
+    UI.showToast(`Escuela ${nextIndex + 1}/${rows.length}: ${school.nombre || school.codigo_local || school.id_escuela}.`, 'info', 3200);
+    return school;
   }
 
   function _renderList(escuelas) {
@@ -1022,6 +1087,7 @@ const MapModule = (() => {
       if (escuela) {
         _selectedEscuela = escuela;
         _updateInfoPanel(escuela);
+        _updateJumpState();
       }
       if (!window.L) UI.showToast('Mapa grafico no disponible; se muestra la ficha en la lista.', 'info');
       return;
@@ -1033,6 +1099,7 @@ const MapModule = (() => {
     if (escuela) {
       _selectedEscuela = escuela;
       _hideInfoPanel();
+      _updateJumpState();
     }
   }
 
@@ -1156,6 +1223,10 @@ const MapModule = (() => {
     } catch (err) {
       console.warn('[Mapa] No se pudo traer la ultima ficha MEC; se abre con cache local:', err);
     }
+    if (!_perimeters.length) {
+      await loadPerimeters({ silent: true }).catch(err => console.warn('[Mapa] No se pudo cargar perimetro antes de abrir registro:', err));
+    }
+    escuela = _replaceSchoolRecord(_enrichSchoolWithPerimeter(escuela));
     _selectedEscuela = escuela;
     _highlightListItem(_schoolPrimaryId(escuela));
     _hideInfoPanel();
@@ -1363,6 +1434,10 @@ const MapModule = (() => {
     return _selectedEscuela;
   }
 
+  function getPerimeterForSchool(school = {}) {
+    return _perimeterForSchool(school);
+  }
+
   function clearSelection(options = {}) {
     _selectedEscuela = null;
     document.querySelectorAll('.map-list-item--active').forEach(el => el.classList.remove('map-list-item--active'));
@@ -1441,8 +1516,10 @@ const MapModule = (() => {
     getMap,
     getEscuelas,
     getSelectedEscuela,
+    getPerimeterForSchool,
     clearSelection,
     getFiltered,
+    jumpFilteredSchool,
     populateFilterButtons,
     populateDistrictButtons,
     toggleRoutes,

@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.178
+ * Version: 2.6.179
  */
 
 const API = (() => {
@@ -279,7 +279,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 10:15:00',
       estado_borrador: 'en_curso',
       estado_operativo: 'en_curso',
-      app_version: '2.6.178',
+      app_version: '2.6.179',
       schema_version: 'mec_v2',
       bloques: 3,
       pisos: 4,
@@ -304,7 +304,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 12:40:00',
       estado_borrador: 'finalizado',
       estado_operativo: 'finalizada',
-      app_version: '2.6.178',
+      app_version: '2.6.179',
       schema_version: 'mec_v2',
       bloques: 2,
       pisos: 2,
@@ -979,6 +979,28 @@ const API = (() => {
     };
   }
 
+  function _mecPlanBaseMapFromDraft(values = {}) {
+    const baseMap = values.__planBaseMap || {};
+    const lat = _numberValue(baseMap.lat);
+    const lng = _numberValue(baseMap.lng);
+    if (lat === '' || lng === '') return null;
+    return {
+      lat,
+      lng,
+      zoom: _numberValue(baseMap.zoom),
+      scale: _numberValue(baseMap.scale),
+      offsetX: _numberValue(baseMap.offsetX),
+      offsetY: _numberValue(baseMap.offsetY),
+      rotationDeg: _numberValue(baseMap.rotationDeg || baseMap.rotacion_grados),
+      source: _textValue(baseMap.source),
+      enabled: Boolean(baseMap.enabled),
+      confirmed: Boolean(baseMap.confirmed),
+      schoolLat: _numberValue(baseMap.schoolLat),
+      schoolLng: _numberValue(baseMap.schoolLng),
+      schoolCoordinateCorrected: Boolean(baseMap.schoolCoordinateCorrected),
+    };
+  }
+
   function _perimeterFromDraftRow(row = {}, index = 0) {
     const draft = _parseJsonValue(row.draft_json) || {};
     const values = draft.values || draft || {};
@@ -1008,6 +1030,7 @@ const API = (() => {
       vertices,
       vertices_count: vertices.length,
       bounds,
+      plan_base_map: _mecPlanBaseMapFromDraft(values),
       centro: bounds ? {
         lat: Math.round(((bounds.minLat + bounds.maxLat) / 2) * 10000000) / 10000000,
         lng: Math.round(((bounds.minLng + bounds.maxLng) / 2) * 10000000) / 10000000,

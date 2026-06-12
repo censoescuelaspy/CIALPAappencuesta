@@ -891,6 +891,32 @@ td {
   gap: .5rem;
 }
 
+.map-jump-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .18rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  white-space: nowrap;
+}
+
+.map-jump-controls .btn-sm {
+  padding-inline: .48rem;
+}
+
+.map-jump-state {
+  min-width: 3.6rem;
+  padding: .24rem .42rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-secondary);
+  font-size: .78rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .map-sidebar__counts {
   display: flex;
   flex-wrap: wrap;
