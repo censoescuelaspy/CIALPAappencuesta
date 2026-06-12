@@ -7080,3 +7080,100 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - Registrar en manual maestro el patron `WMS catastral como overlay de canvas georreferenciado` para apps de relevamiento con planos editables.
 - Mantener Catastro como referencia visual y no como sustituto del relevamiento tecnico ni de mensura formal.
+
+---
+
+## Alta resolucion, controles activos, predio SNC y administracion - 2026-06-12 07:38
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.185`.
+
+### Objetivo de la intervencion
+- Recuperar la carga de mapas de alta resolucion en `REGISTRO GUIADO`.
+- Asegurar que todo boton activable muestre estado visual claro.
+- Agregar alineacion automatica de la base mapa para facilitar el trazado horizontal del perimetro.
+- Permitir mayor zoom en `MAPA` y mostrar planos/perimetros ya guardados como capa activable.
+- Incorporar predio preliminar desde Catastro SNC cuando el WMS entregue geometria de poligono.
+- Mejorar vista administrativa de carga por censista con resumen, ordenamiento y exportacion.
+
+### Diagnostico inicial
+- El boton rapido `Satelite` de `REGISTRO GUIADO` forzaba la fuente satelital comun y podia sacar al usuario de la fuente de alta resolucion preferida.
+- Google Map Tiles estaba configurado y la API respondio `200`; el problema principal era de seleccion/fallback de fuente en la UI.
+- El `MAPA` general estaba limitado a `MAP_MAX_ZOOM=18` y Catastro a `maxZoom=19`.
+- La administracion ya listaba formularios MEC, pero faltaban resumen por censista, ordenamiento directo y exportacion.
+
+### Acciones realizadas
+- `assets/js/mec-form.js`: se agrego fallback automatico si falla la sesion de Google Map Tiles, evitando base en blanco.
+- `assets/js/mec-form.js`: se agrego `setPlanHighResolutionBaseMap()` para elegir fuente de alta resolucion/local/Google antes que satelite comun.
+- `assets/js/mec-form.js`: se agrego `autoAlignPlanBaseMap()` usando el lado dominante del perimetro o estructura seleccionada.
+- `assets/js/mec-form.js`: se agrego `Predio SNC`, consulta WMS `GetFeatureInfo`, lectura de geometria `Polygon/MultiPolygon` y conversion desde EPSG:4326, EPSG:3857 o EPSG:32721.
+- `assets/js/guided-register.js`: el boton rapido cambio a `Alta res.`, y se sumaron `Predio SNC` y `Alinear`.
+- `assets/js/map.js` y `assets/js/config.js`: se habilito zoom hasta 21 con `maxNativeZoom` controlado, y la capa paso a `Planos y perimetros registrados`.
+- `assets/js/map.js` e `index.html`: los botones externos de `Planos/perimetros` y `Catastro SNC` ahora usan `aria-pressed` y color activo.
+- `assets/css/app.css`: se agrego estado visual comun para botones activables y toggles encendidos.
+- `assets/js/admin.js` e `index.html`: se agrego resumen por censista, ordenamiento por columnas y exportacion CSV de formularios MEC visibles.
+- `assets/js/config.js`, `index.html`, `guided-register.js`, `sw.js`: version/cache actualizados a `2.6.185`.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/guided-register.js`
+- `assets/js/map.js`
+- `assets/js/admin.js`
+- `assets/js/config.js`
+- `assets/css/app.css`
+- `index.html`
+- `sw.js`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/guided-register.js`
+- `node --check assets/js/map.js`
+- `node --check assets/js/admin.js`
+- `git diff --check`
+- `Invoke-WebRequest` a `https://tile.googleapis.com/v1/createSession`
+- `Invoke-WebRequest` a `https://www.catastro.gov.py/geoserver/ows?SERVICE=WMS&REQUEST=GetCapabilities`
+- `python -m http.server 8091 --bind 127.0.0.1`
+- `Invoke-WebRequest -Uri http://127.0.0.1:8091/index.html`
+
+### Resultados verificados
+- Google Map Tiles respondio `200` para crear sesion.
+- Catastro SNC `GetCapabilities` respondio `200` con contenido WMS.
+- La app local respondio `200` en `http://127.0.0.1:8091/index.html`.
+- La version visible local contiene `v2.6.185`.
+- Los JS afectados pasan validacion de sintaxis.
+
+### Pruebas realizadas
+- Validacion de sintaxis JavaScript con `node --check`.
+- Validacion de whitespace con `git diff --check`.
+- Validacion HTTP local de la app estatica.
+- Validacion HTTP de Google Map Tiles y WMS de Catastro.
+
+### Errores o incidentes
+- No se pudo ejecutar Playwright porque `@playwright/test` no esta instalado en este checkout.
+- Las coordenadas demo de Asuncion consultadas contra `GetFeatureInfo` no devolvieron parcela; por eso `Predio SNC` queda como accion validada por geometria real y no genera poligonos falsos.
+
+### Soluciones aplicadas
+- Alta resolucion ya no depende de que el usuario elija manualmente la fuente correcta: el acceso rapido usa la mejor fuente disponible.
+- Si Google Map Tiles falla, la app usa una base alternativa y muestra advertencia en vez de dejar el plano en blanco.
+- La rotacion automatica es heuristica y reversible: usa los vertices ya dibujados/seleccionados, no vision artificial ni inferencia opaca.
+- El predio catastral se crea solo cuando el servicio entrega un poligono valido y queda editable por el censista.
+- El admin puede listar, filtrar, ordenar, resumir por usuario y exportar CSV de formularios MEC.
+
+### Pendientes
+- Validar visualmente en GitHub Pages con usuario real que los controles activos, alta resolucion y zoom 21 se comporten bien en movil.
+- Probar `Predio SNC` sobre escuelas donde Catastro devuelva una parcela efectiva.
+- Si el usuario valida el patron, incorporar al manual maestro la regla de prepoligono catastral con confirmacion y edicion libre.
+
+### Riesgos
+- La alta resolucion Google depende de API key, facturacion y restricciones de dominio.
+- Catastro SNC depende de disponibilidad externa y de que el WMS entregue geometria utilizable en el punto.
+- El prepoligono catastral puede no coincidir con el predio escolar real; debe mantenerse como referencia preliminar editable.
+
+### Recomendaciones
+- Mantener `Predio SNC` como accion manual y confirmada, no automatica silenciosa.
+- Registrar en manual maestro el patron `fallback de alta resolucion + overlay WMS + predio preliminar editable`.

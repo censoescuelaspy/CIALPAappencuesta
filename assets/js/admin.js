@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.6.180
+ * Version: 2.6.185
  */
 
 const AdminModule = (() => {
@@ -11,6 +11,7 @@ const AdminModule = (() => {
   let _solicitudesRelevamiento = [];
   let _formulariosMec = [];
   let _formulariosMecMeta = {};
+  let _formulariosMecSort = { key: 'actualizado', dir: 'desc' };
   let _auditFilters = {};
   let _encuestadorFiltersBound = false;
   let _formulariosMecFiltersBound = false;
@@ -307,6 +308,7 @@ const AdminModule = (() => {
       _renderFormulariosMecSummary(_formulariosMec, _formulariosMecMeta);
       _renderFormulariosMecTable(_formulariosMec);
     } catch (err) {
+      _renderFormulariosMecSummary([], {});
       _renderFormulariosMecTable([]);
       if (!options.silent) UI.showToast('Error al cargar formularios MEC: ' + err.message, 'error', 8000);
     }
@@ -380,16 +382,19 @@ const AdminModule = (() => {
       const el = document.getElementById(id);
       if (el) el.textContent = value;
     });
+    _renderFormulariosMecUserSummary(rows || []);
   }
 
   function _renderFormulariosMecTable(rows) {
     const tbody = document.getElementById('formularios-mec-tbody');
     if (!tbody) return;
-    if (!rows.length) {
+    const sortedRows = _sortFormulariosMec(rows || []);
+    _updateFormulariosMecSortButtons();
+    if (!sortedRows.length) {
       tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No hay formularios MEC para los filtros seleccionados.</td></tr>';
       return;
     }
-    tbody.innerHTML = rows.map(row => {
+    tbody.innerHTML = sortedRows.map(row => {
       const id = row.id_escuela || row.codigo_local || '';
       return `
         <tr>
@@ -407,6 +412,146 @@ const AdminModule = (() => {
           <td><button class="btn btn-xs btn-outline" onclick='AdminModule.openFormularioMec(${_jsString(id)})'>Abrir</button></td>
         </tr>`;
     }).join('');
+  }
+
+  function _renderFormulariosMecUserSummary(rows = []) {
+    const container = document.getElementById('formularios-mec-user-summary');
+    if (!container) return;
+    const grouped = new Map();
+    rows.forEach(row => {
+      const usuario = String(row.usuario || 'Sin usuario').trim() || 'Sin usuario';
+      if (!grouped.has(usuario)) {
+        grouped.set(usuario, {
+          usuario,
+          formularios: 0,
+          finalizados: 0,
+          escuelas: new Set(),
+          elementos: 0,
+          evidencias: 0,
+          ultimo: '',
+        });
+      }
+      const item = grouped.get(usuario);
+      item.formularios += 1;
+      if (_isFinalForm(row)) item.finalizados += 1;
+      const schoolId = row.codigo_local || row.id_escuela || row.nombre_escuela || '';
+      if (schoolId) item.escuelas.add(String(schoolId));
+      item.elementos += Number(row.total_elementos || 0);
+      item.evidencias += Number(row.evidencias || 0);
+      const updated = row.actualizado_en || row.fecha_guardado || '';
+      if (updated && (!item.ultimo || String(updated) > String(item.ultimo))) item.ultimo = updated;
+    });
+    const items = [...grouped.values()].sort((a, b) => b.formularios - a.formularios || a.usuario.localeCompare(b.usuario, 'es'));
+    if (!items.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = `
+      <div class="enc-admin-user-summary__header">
+        <strong>Resumen por censista</strong>
+        <small class="text-muted">${items.length} usuario${items.length === 1 ? '' : 's'} con carga visible</small>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Censista</th>
+              <th>Form.</th>
+              <th>Escuelas</th>
+              <th>Final.</th>
+              <th>Elementos</th>
+              <th>Evid.</th>
+              <th>Ultima carga</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td>${_escapeHtml(item.usuario)}</td>
+                <td>${_escapeHtml(item.formularios)}</td>
+                <td>${_escapeHtml(item.escuelas.size)}</td>
+                <td>${_escapeHtml(item.finalizados)}</td>
+                <td>${_escapeHtml(item.elementos)}</td>
+                <td>${_escapeHtml(item.evidencias)}</td>
+                <td>${_escapeHtml(item.ultimo || '---')}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  function sortFormulariosMec(key) {
+    const nextKey = String(key || 'actualizado');
+    if (_formulariosMecSort.key === nextKey) {
+      _formulariosMecSort.dir = _formulariosMecSort.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      _formulariosMecSort = { key: nextKey, dir: nextKey === 'actualizado' ? 'desc' : 'asc' };
+    }
+    _renderFormulariosMecTable(_formulariosMec);
+  }
+
+  function _formulariosMecSortValue(row, key) {
+    switch (key) {
+      case 'usuario': return String(row.usuario || '').toLowerCase();
+      case 'actualizado': return Date.parse(row.actualizado_en || row.fecha_guardado || '') || 0;
+      case 'escuela': return String([row.codigo_local, row.nombre_escuela, row.id_escuela].filter(Boolean).join(' ')).toLowerCase();
+      case 'ubicacion': return String([row.departamento, row.distrito].filter(Boolean).join(' ')).toLowerCase();
+      case 'estado': return String(row.estado_borrador || row.estado_operativo || '').toLowerCase();
+      case 'bloques': return Number(row.bloques || 0);
+      case 'aulas': return Number(row.aulas || 0);
+      case 'sanitarios': return Number(row.sanitarios || 0);
+      case 'exteriores': return Number(row.exteriores || 0);
+      case 'evidencias': return Number(row.evidencias || 0);
+      case 'tiempo': return Number(row.tiempo_escuela_min || 0);
+      default: return String(row[key] || '').toLowerCase();
+    }
+  }
+
+  function _sortFormulariosMec(rows = []) {
+    const { key, dir } = _formulariosMecSort;
+    const multiplier = dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const av = _formulariosMecSortValue(a, key);
+      const bv = _formulariosMecSortValue(b, key);
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * multiplier;
+      return String(av).localeCompare(String(bv), 'es', { numeric: true, sensitivity: 'base' }) * multiplier;
+    });
+  }
+
+  function _updateFormulariosMecSortButtons() {
+    document.querySelectorAll('[data-formularios-sort]').forEach(button => {
+      const active = button.dataset.formulariosSort === _formulariosMecSort.key;
+      button.setAttribute('aria-sort', active ? (_formulariosMecSort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    });
+  }
+
+  function exportFormulariosMecCsv() {
+    const rows = _sortFormulariosMec(_formulariosMec || []);
+    if (!rows.length) {
+      UI.showToast('No hay formularios MEC para exportar con los filtros actuales.', 'warning', 4200);
+      return;
+    }
+    const headers = ['censista', 'actualizado', 'codigo_local', 'escuela', 'departamento', 'distrito', 'estado', 'bloques', 'aulas', 'sanitarios', 'exteriores', 'evidencias', 'tiempo_min'];
+    const lines = [
+      headers,
+      ...rows.map(row => [
+        row.usuario || '',
+        row.actualizado_en || row.fecha_guardado || '',
+        row.codigo_local || '',
+        row.nombre_escuela || row.id_escuela || '',
+        row.departamento || '',
+        row.distrito || '',
+        row.estado_borrador || row.estado_operativo || '',
+        row.bloques || 0,
+        row.aulas || 0,
+        row.sanitarios || 0,
+        row.exteriores || 0,
+        row.evidencias || 0,
+        row.tiempo_escuela_min || '',
+      ]),
+    ];
+    const content = lines.map(line => line.map(_csvCell).join(',')).join('\n');
+    _downloadTextFile(`cialpa_formularios_mec_${Date.now()}.csv`, 'text/csv;charset=utf-8;', content);
   }
 
   function _isFinalForm(row) {
@@ -644,6 +789,23 @@ const AdminModule = (() => {
     return JSON.stringify(String(value ?? '')).replace(/</g, '\\u003c');
   }
 
+  function _csvCell(value) {
+    const text = String(value ?? '').replace(/"/g, '""');
+    return `"${text}"`;
+  }
+
+  function _downloadTextFile(filename, type, content) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   return {
     init,
     loadConfig,
@@ -651,6 +813,8 @@ const AdminModule = (() => {
     loadEncuestadores,
     loadSolicitudesRelevamiento,
     loadFormulariosMec,
+    sortFormulariosMec,
+    exportFormulariosMecCsv,
     openNewEncuestador,
     editEncuestador,
     saveEncuestador,

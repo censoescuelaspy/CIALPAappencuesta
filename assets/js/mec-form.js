@@ -1415,7 +1415,22 @@ const MecFormModule = (() => {
       })
       .catch(error => {
         _googleMapTilesSession = { key, token: '', pending: false, error: error?.message || String(error || '') };
-        UI.showToast('No se pudo iniciar Google Map Tiles. Revise API key, facturacion y restricciones de dominio.', 'warning', 7200);
+        try {
+          const baseMap = _ensurePlanBaseMap();
+          if (_planBaseMapSource(baseMap) === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) {
+            const fallbackSource = _planBaseMapHighresSource() ? PLAN_BASEMAP_SOURCE_HIGHRES : PLAN_BASEMAP_SOURCE_SATELLITE;
+            baseMap.source = fallbackSource;
+            const preset = _planBaseMapDetailPreset(fallbackSource);
+            baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, fallbackSource);
+            baseMap.scale = _clampPlanBaseMapScale(Math.max(Number(baseMap.scale || 1), preset.scale), preset.scale);
+            baseMap.googleSatelliteError = _googleMapTilesSession.error;
+            baseMap.confirmed = false;
+            _saveDraft(false, { skipRemoteSync: true });
+          }
+        } catch (_ignored) {
+          // Mantener el renderizado aun si el fallback no puede persistirse.
+        }
+        UI.showToast('Alta resolucion Google no disponible ahora. Se usa la mejor base alternativa configurada.', 'warning', 7200);
         renderSchoolPlan();
       });
   }
@@ -1607,6 +1622,145 @@ const MecFormModule = (() => {
     const cql = _planBaseMapCadastralCqlFilter(config);
     if (cql) params.set('CQL_FILTER', cql);
     return `${config.url}${String(config.url).includes('?') ? '&' : '?'}${params.toString()}`;
+  }
+
+  function _webMercatorProjectLatLng(lat, lng) {
+    const safeLat = Math.max(-85.05112878, Math.min(85.05112878, Number(lat)));
+    const safeLng = _numberInRange(lng, 0, -180, 180);
+    const x = safeLng * WEB_MERCATOR_HALF_WORLD / 180;
+    const y = Math.log(Math.tan((90 + safeLat) * Math.PI / 360)) * WEB_MERCATOR_HALF_WORLD / 180;
+    return { x, y };
+  }
+
+  function _webMercatorToLatLng(x, y) {
+    const lng = Number(x) * 180 / WEB_MERCATOR_HALF_WORLD;
+    const lat = (180 / Math.PI) * (2 * Math.atan(Math.exp(Number(y) * Math.PI / WEB_MERCATOR_HALF_WORLD)) - Math.PI / 2);
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+
+  function _utm21SouthToLatLng(easting, northing) {
+    const a = 6378137;
+    const eccSquared = 0.00669438;
+    const k0 = 0.9996;
+    const eccPrimeSquared = eccSquared / (1 - eccSquared);
+    const x = Number(easting) - 500000;
+    const y = Number(northing) - 10000000;
+    const longOrigin = -57;
+    const m = y / k0;
+    const mu = m / (a * (1 - eccSquared / 4 - 3 * eccSquared ** 2 / 64 - 5 * eccSquared ** 3 / 256));
+    const e1 = (1 - Math.sqrt(1 - eccSquared)) / (1 + Math.sqrt(1 - eccSquared));
+    const j1 = 3 * e1 / 2 - 27 * e1 ** 3 / 32;
+    const j2 = 21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32;
+    const j3 = 151 * e1 ** 3 / 96;
+    const j4 = 1097 * e1 ** 4 / 512;
+    const fp = mu + j1 * Math.sin(2 * mu) + j2 * Math.sin(4 * mu) + j3 * Math.sin(6 * mu) + j4 * Math.sin(8 * mu);
+    const sinFp = Math.sin(fp);
+    const cosFp = Math.cos(fp);
+    const tanFp = Math.tan(fp);
+    const c1 = eccPrimeSquared * cosFp ** 2;
+    const t1 = tanFp ** 2;
+    const n1 = a / Math.sqrt(1 - eccSquared * sinFp ** 2);
+    const r1 = a * (1 - eccSquared) / Math.pow(1 - eccSquared * sinFp ** 2, 1.5);
+    const d = x / (n1 * k0);
+    const latRad = fp - (n1 * tanFp / r1) * (
+      d ** 2 / 2
+      - (5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * eccPrimeSquared) * d ** 4 / 24
+      + (61 + 90 * t1 + 298 * c1 + 45 * t1 ** 2 - 252 * eccPrimeSquared - 3 * c1 ** 2) * d ** 6 / 720
+    );
+    const lng = longOrigin + (180 / Math.PI) * (
+      d
+      - (1 + 2 * t1 + c1) * d ** 3 / 6
+      + (5 - 2 * c1 + 28 * t1 - 3 * c1 ** 2 + 8 * eccPrimeSquared + 24 * t1 ** 2) * d ** 5 / 120
+    ) / cosFp;
+    const lat = latRad * 180 / Math.PI;
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }
+
+  function _cadastralCoordinateToLatLng(pair) {
+    if (!Array.isArray(pair) || pair.length < 2) return null;
+    const x = Number(pair[0]);
+    const y = Number(pair[1]);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (Math.abs(x) <= 180 && Math.abs(y) <= 90) return { lng: x, lat: y };
+    if (x > 100000 && x < 900000 && y > 6000000 && y < 10000000) return _utm21SouthToLatLng(x, y);
+    if (Math.abs(x) <= WEB_MERCATOR_HALF_WORLD && Math.abs(y) <= WEB_MERCATOR_HALF_WORLD) return _webMercatorToLatLng(x, y);
+    return null;
+  }
+
+  function _cadastralFeatureGeoVertices(feature = {}) {
+    const geometry = feature.geometry || {};
+    const coordinates = geometry.coordinates || [];
+    const rings = [];
+    if (geometry.type === 'Polygon') {
+      if (Array.isArray(coordinates[0])) rings.push(coordinates[0]);
+    } else if (geometry.type === 'MultiPolygon') {
+      coordinates.forEach(polygon => {
+        if (Array.isArray(polygon?.[0])) rings.push(polygon[0]);
+      });
+    }
+    let best = [];
+    let bestScore = -Infinity;
+    rings.forEach(ring => {
+      const vertices = _normalizeBoundaryGeoVertices((ring || []).map(_cadastralCoordinateToLatLng).filter(Boolean));
+      if (vertices.length < 3) return;
+      const score = vertices.reduce((acc, point, index) => {
+        const next = vertices[(index + 1) % vertices.length];
+        return acc + (point.lng * next.lat - next.lng * point.lat);
+      }, 0);
+      if (Math.abs(score) > bestScore) {
+        bestScore = Math.abs(score);
+        best = vertices;
+      }
+    });
+    return best;
+  }
+
+  function _planBaseMapCadastralFeatureInfoUrl(lat, lng, config = _planBaseMapCadastralConfig()) {
+    if (!config?.url || !config.layers) return '';
+    const center = _webMercatorProjectLatLng(lat, lng);
+    const radius = 180;
+    const params = new URLSearchParams({
+      SERVICE: 'WMS',
+      VERSION: config.version || '1.1.1',
+      REQUEST: 'GetFeatureInfo',
+      LAYERS: config.layers,
+      QUERY_LAYERS: config.layers,
+      STYLES: '',
+      FORMAT: config.format || 'image/png',
+      TRANSPARENT: 'TRUE',
+      WIDTH: '512',
+      HEIGHT: '512',
+      SRS: 'EPSG:3857',
+      BBOX: [
+        center.x - radius,
+        center.y - radius,
+        center.x + radius,
+        center.y + radius,
+      ].map(value => Number(value.toFixed(6))).join(','),
+      X: '256',
+      Y: '256',
+      INFO_FORMAT: 'application/json',
+      FEATURE_COUNT: String(typeof APP_CONFIG !== 'undefined' ? (APP_CONFIG.MAP_CADASTRAL_FEATURE_INFO_MAX || 5) : 5),
+    });
+    const cql = _planBaseMapCadastralCqlFilter(config);
+    if (cql) params.set('CQL_FILTER', cql);
+    return `${config.url}${String(config.url).includes('?') ? '&' : '?'}${params.toString()}`;
+  }
+
+  async function _fetchCadastralBoundaryVerticesForBaseMap(baseMap = _ensurePlanBaseMap()) {
+    const config = _planBaseMapCadastralConfig();
+    if (!config) throw new Error('Capa catastral SNC no configurada.');
+    if (!_planBaseMapHasCoords(baseMap)) throw new Error('Base mapa sin coordenadas.');
+    const url = _planBaseMapCadastralFeatureInfoUrl(baseMap.lat, baseMap.lng, config);
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`SNC WMS HTTP ${response.status}`);
+    const featureCollection = await response.json();
+    const features = Array.isArray(featureCollection?.features) ? featureCollection.features : [];
+    for (const feature of features) {
+      const vertices = _cadastralFeatureGeoVertices(feature);
+      if (vertices.length >= 3) return { vertices, feature, featureCount: features.length };
+    }
+    return { vertices: [], feature: null, featureCount: features.length };
   }
 
   function _planBaseMapCadastralTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1) {
@@ -2644,6 +2798,7 @@ const MecFormModule = (() => {
         <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')">Satelite</button>
         <button class="btn ${streetsActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanStreetOverlay()" aria-pressed="${streetsActive ? 'true' : 'false'}" title="Mostrar nombres de calles encima de la satelital">Calles encima</button>
         ${cadastralAvailable ? `<button class="btn ${cadastralActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanCadastralOverlay()" aria-pressed="${cadastralActive ? 'true' : 'false'}" title="Mostrar parcelas oficiales SNC encima de la base">Catastro</button>` : ''}
+        ${cadastralAvailable ? `<button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.useCadastralParcelAsPreliminaryBoundary()" title="Crear un perimetro preliminar editable desde la parcela SNC ubicada bajo la escuela">Predio SNC</button>` : ''}
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
         <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base/perimetro</button>
@@ -2745,6 +2900,8 @@ const MecFormModule = (() => {
             <button type="button" class="btn btn-primary btn-sm" onclick="MecFormModule.zoomPlanBaseMap(1.25)">Acercar base</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.rotatePlanBaseMap(-2)">Girar izq.</button>
             <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.rotatePlanBaseMap(2)">Girar der.</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.autoAlignPlanBaseMap()">Auto alinear</button>
+            ${cadastralAvailable ? `<button type="button" class="btn btn-outline btn-sm" onclick="MecFormModule.useCadastralParcelAsPreliminaryBoundary()">Predio SNC</button>` : ''}
             <button type="button" class="btn btn-secondary btn-sm" onclick="MecFormModule.enhancePlanBaseMap()">Realzar lineas</button>
           </div>
           <div class="school-plan-basemap-panel__nudge">
@@ -2886,6 +3043,24 @@ const MecFormModule = (() => {
     renderSchoolPlan();
   }
 
+  function setPlanHighResolutionBaseMap() {
+    const source = _planBaseMapHighresSource()
+      ? PLAN_BASEMAP_SOURCE_HIGHRES
+      : (_hasGoogleSatelliteSource() ? PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE : PLAN_BASEMAP_SOURCE_SATELLITE);
+    setPlanBaseMapSource(source);
+    const baseMap = _ensurePlanBaseMap();
+    const nextSource = _planBaseMapSource(baseMap);
+    const preset = _planBaseMapDetailPreset(nextSource);
+    baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, nextSource);
+    baseMap.scale = _clampPlanBaseMapScale(preset.scale, preset.scale);
+    baseMap.offsetX = 0;
+    baseMap.offsetY = 0;
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
   function rotatePlanBaseMap(delta = 0) {
     const baseMap = _ensurePlanBaseMap();
     baseMap.rotationDeg = _planBaseMapRotationDeg(Number(baseMap.rotationDeg || 0) + Number(delta || 0));
@@ -2893,6 +3068,66 @@ const MecFormModule = (() => {
     baseMap.confirmed = false;
     _saveDraft(false);
     renderSchoolPlan();
+  }
+
+  function _selectedPlanAlignmentPoints(logicalWidth = _planCanvasWidth(), logicalHeight = _planCanvasHeight()) {
+    const raw = String(_selectedPlanId || '');
+    if (raw.startsWith('site::')) {
+      const element = _ensureSiteElements().find(item => item.id === raw.replace('site::', ''));
+      if (element) {
+        const rect = _siteElementRect(element, logicalWidth, logicalHeight);
+        return _planShapePoints(element, rect) || _rectCorners(rect);
+      }
+    }
+    return _propertyBoundaryCanvasPoints(logicalWidth, logicalHeight);
+  }
+
+  function _dominantAlignmentAngle(points = []) {
+    const clean = (points || [])
+      .map(point => ({ x: Number(point?.x), y: Number(point?.y) }))
+      .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y));
+    if (clean.length < 2) return null;
+    let best = null;
+    const edgeCount = clean.length > 2 ? clean.length : clean.length - 1;
+    for (let index = 0; index < edgeCount; index += 1) {
+      const from = clean[index];
+      const to = clean[(index + 1) % clean.length];
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 8) continue;
+      let angle = Math.atan2(dy, dx) * 180 / Math.PI;
+      while (angle <= -90) angle += 180;
+      while (angle > 90) angle -= 180;
+      if (!best || length > best.length) best = { angle, length };
+    }
+    return best ? best.angle : null;
+  }
+
+  function autoAlignPlanBaseMap() {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapHasCoords(baseMap)) {
+      _planBaseMapPanelOpen = true;
+      renderSchoolPlan();
+      UI.showToast('Cargue coordenadas antes de auto alinear la base mapa.', 'warning', 5200);
+      return;
+    }
+    const points = _selectedPlanAlignmentPoints();
+    const angle = _dominantAlignmentAngle(points);
+    if (!Number.isFinite(angle)) {
+      UI.showToast('Dibuje o seleccione primero un perimetro/estructura con vertices para calcular la alineacion.', 'warning', 6200);
+      return;
+    }
+    if (Math.abs(angle) < .5) {
+      UI.showToast('La estructura principal ya esta practicamente horizontal.', 'info', 4200);
+      return;
+    }
+    baseMap.enabled = true;
+    baseMap.rotationDeg = _planBaseMapRotationDeg(Number(baseMap.rotationDeg || 0) - angle);
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+    UI.showToast(`Base mapa rotada ${Math.abs(angle).toFixed(1)} grados para horizontalizar la estructura.`, 'success', 5200);
   }
 
   function _applyPlanBaseMapWheelRotate(delta = 0) {
@@ -3064,6 +3299,74 @@ const MecFormModule = (() => {
     baseMap.confirmed = false;
     _saveDraft(false);
     renderSchoolPlan();
+  }
+
+  async function useCadastralParcelAsPreliminaryBoundary(options = {}) {
+    if (!_planBaseMapCadastralConfig()) {
+      UI.showToast('La capa Catastro SNC no esta configurada para crear un predio preliminar.', 'warning', 6200);
+      return false;
+    }
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapHasCoords(baseMap)) {
+      ensureGuidedLocationBaseMap({ render: false });
+    }
+    if (!_planBaseMapHasCoords(baseMap)) {
+      _planBaseMapPanelOpen = true;
+      renderSchoolPlan();
+      UI.showToast('Seleccione una escuela con coordenadas antes de buscar el predio SNC.', 'warning', 6200);
+      return false;
+    }
+    const existing = _propertyBoundaryElement();
+    const existingVertices = _boundaryGeoVerticesFromItem(existing || {});
+    if (existingVertices.length >= 3 && !options.force) {
+      const ok = window.confirm('Ya existe un perimetro del predio. Desea reemplazarlo por el poligono preliminar del Catastro SNC?');
+      if (!ok) return false;
+    }
+    UI.showToast('Consultando Catastro SNC para crear predio preliminar...', 'info', 5200);
+    try {
+      const result = await _fetchCadastralBoundaryVerticesForBaseMap(baseMap);
+      const vertices = _normalizeBoundaryGeoVertices(result.vertices || []);
+      if (vertices.length < 3) {
+        UI.showToast(result.featureCount
+          ? 'Catastro SNC respondio, pero no entrego una geometria de poligono utilizable en este punto.'
+          : 'No se encontro una parcela catastral sobre la ubicacion de la escuela.',
+          'warning',
+          7200);
+        return false;
+      }
+      let element = existing || ensurePropertyBoundary({ guided: true });
+      if (!element) return false;
+      element.ficha = {
+        ..._defaultSiteElementFicha('property_boundary', 1),
+        ...(element.ficha || {}),
+        codigo: element.ficha?.codigo || 'PRD 1',
+        subtipo: 'Perimetro del predio escolar',
+        fuente: 'Catastro SNC (preliminar editable)',
+        observacion: 'Poligono preliminar creado desde la capa oficial de Catastro SNC. Debe ser verificado y ajustado libremente por el censista en campo.',
+      };
+      _setPropertyBoundaryGeoVertices(element, vertices);
+      const center = _perimeterCenter({}, vertices);
+      if (center) {
+        baseMap.lat = center.lat;
+        baseMap.lng = center.lng;
+      }
+      baseMap.enabled = true;
+      baseMap.cadastralOverlay = true;
+      baseMap.cadastralOpacity = _planBaseMapCadastralOpacity(baseMap);
+      _planLayers.exteriores = true;
+      _selectedPlanId = `site::${element.id}`;
+      _propertyBoundaryEditId = element.id;
+      _planMoveMode = true;
+      _applyPropertyBoundaryGeoLock();
+      _saveDraft(false);
+      renderSchoolPlan();
+      UI.showToast('Predio preliminar SNC aplicado. Ajuste vertices y guarde base/perimetro.', 'success', 7200);
+      return true;
+    } catch (err) {
+      console.warn('[CIALPA] No se pudo crear predio preliminar desde Catastro SNC:', err);
+      UI.showToast('No se pudo consultar Catastro SNC para predio preliminar: ' + (err.message || err), 'error', 8200);
+      return false;
+    }
   }
 
   function setPlanBaseMapSource(source = PLAN_BASEMAP_SOURCE_STREET) {
@@ -14351,6 +14654,12 @@ const MecFormModule = (() => {
           className: 'school-plan-ribbon__button--cadastral-overlay',
           title: 'Superponer parcelas oficiales del Servicio Nacional de Catastro',
         }) : ''}
+        ${cadastralAvailable ? _renderPlanRibbonButton({
+          icon: 'SNC',
+          label: 'Predio SNC',
+          onClick: 'MecFormModule.useCadastralParcelAsPreliminaryBoundary()',
+          title: 'Crear perimetro preliminar editable desde la parcela catastral bajo la escuela',
+        }) : ''}
         ${_renderPlanRibbonButton({
           icon: '&#9881;',
           label: 'Ajustar',
@@ -14372,6 +14681,7 @@ const MecFormModule = (() => {
         ${_renderPlanRibbonButton({ icon: '&#8981;', label: 'Detalle', onClick: 'MecFormModule.focusPlanBaseMapDetail()', title: 'Volver al detalle del edificio' })}
         ${_renderPlanRibbonButton({ icon: '-', label: 'Base -', onClick: 'MecFormModule.zoomPlanBaseMap(0.8)', title: 'Alejar base mapa' })}
         ${_renderPlanRibbonButton({ icon: '+', label: 'Base +', onClick: 'MecFormModule.zoomPlanBaseMap(1.25)', title: 'Acercar base mapa' })}
+        ${_renderPlanRibbonButton({ icon: '&#8646;', label: 'Alinear', onClick: 'MecFormModule.autoAlignPlanBaseMap()', title: 'Rotar automaticamente la base para dejar horizontal el perimetro o estructura seleccionada' })}
         ${_renderPlanRibbonButton({ icon: '&#10003;', label: 'Guardar', onClick: 'MecFormModule.savePlanBaseMap()', tone: 'btn-success', title: 'Guardar base mapa' })}
         <small>${_escape(coords)}</small>
       </div>`;
@@ -25486,10 +25796,12 @@ const MecFormModule = (() => {
     togglePlanMoveMode,
     togglePlanBaseMap,
     setPlanBaseMapSource,
+    setPlanHighResolutionBaseMap,
     togglePlanStreetOverlay,
     setPlanStreetOverlayOpacity,
     togglePlanCadastralOverlay,
     setPlanCadastralOpacity,
+    useCadastralParcelAsPreliminaryBoundary,
     getPlanBaseMapState,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
@@ -25499,6 +25811,7 @@ const MecFormModule = (() => {
     setPlanBaseMapValue,
     zoomPlanBaseMap,
     rotatePlanBaseMap,
+    autoAlignPlanBaseMap,
     enhancePlanBaseMap,
     fitPlanBaseMapContext,
     focusPlanBaseMapDetail,

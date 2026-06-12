@@ -308,27 +308,33 @@ const MapModule = (() => {
       _map = null;
     }
 
+    const mapMaxZoom = Number(APP_CONFIG.MAP_MAX_ZOOM || 21);
+    const mapNativeMaxZoom = Number(APP_CONFIG.MAP_NATIVE_MAX_ZOOM || 19);
+    const satelliteMaxZoom = Number(APP_CONFIG.SATELLITE_MAX_ZOOM || mapMaxZoom);
+    const satelliteNativeMaxZoom = Number(APP_CONFIG.SATELLITE_NATIVE_MAX_ZOOM || 18);
+
     _map = L.map(containerId, {
       center: APP_CONFIG.MAP_CENTER,
       zoom: APP_CONFIG.MAP_ZOOM,
       minZoom: APP_CONFIG.MAP_MIN_ZOOM,
-      maxZoom: APP_CONFIG.MAP_MAX_ZOOM,
+      maxZoom: mapMaxZoom,
       zoomControl: true,
     });
 
     const osm = L.tileLayer(APP_CONFIG.TILE_URL, {
       attribution: APP_CONFIG.TILE_ATTRIBUTION,
-      maxZoom: APP_CONFIG.MAP_MAX_ZOOM,
+      maxZoom: mapMaxZoom,
+      maxNativeZoom: mapNativeMaxZoom,
     }).addTo(_map);
 
     const roads = L.tileLayer(
       'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-      { attribution: '&copy; OpenStreetMap contributors, HOT', maxZoom: 19 }
+      { attribution: '&copy; OpenStreetMap contributors, HOT', maxZoom: mapMaxZoom, maxNativeZoom: 19 }
     );
 
     const satellite = L.tileLayer(
       APP_CONFIG.SATELLITE_TILE_URL || 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      { attribution: APP_CONFIG.SATELLITE_ATTRIBUTION || 'Tiles &copy; Esri', maxZoom: APP_CONFIG.SATELLITE_MAX_ZOOM || 18 }
+      { attribution: APP_CONFIG.SATELLITE_ATTRIBUTION || 'Tiles &copy; Esri', maxZoom: satelliteMaxZoom, maxNativeZoom: satelliteNativeMaxZoom }
     );
 
     _perimeterLayer = L.layerGroup().addTo(_map);
@@ -336,7 +342,7 @@ const MapModule = (() => {
     _cadastralLayer = _createCadastralLayer();
 
     const overlayLayers = {
-      'Perimetros registrados': _perimeterLayer,
+      'Planos y perimetros registrados': _perimeterLayer,
       'Rutas por censista': _routeLayer,
     };
     if (_cadastralLayer) {
@@ -355,6 +361,7 @@ const MapModule = (() => {
 
     _map.on('overlayadd overlayremove', event => {
       if (event.layer === _cadastralLayer) _updateCadastralState();
+      if (event.layer === _perimeterLayer) _updatePerimeterCount();
     });
     _map.on('zoomend', _updateCadastralState);
     _map.on('click', _handleCadastralClick);
@@ -522,12 +529,23 @@ const MapModule = (() => {
     if (!_map || !_perimeterLayer) return;
     if (_map.hasLayer(_perimeterLayer)) {
       _map.removeLayer(_perimeterLayer);
+      _updatePerimeterCount();
       UI.showToast('Perimetros ocultos.', 'info');
     } else {
       _perimeterLayer.addTo(_map);
       _renderPerimeters(_filteredEscuelas.length || _hasActiveFilters(_activeFilters) ? _filteredEscuelas : _escuelas);
+      _updatePerimeterCount();
       UI.showToast('Perimetros visibles.', 'info');
     }
+  }
+
+  function _setMapToggleButtonState(id, active) {
+    const button = document.getElementById(id);
+    if (!button) return;
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+    button.classList.toggle('btn-primary', active);
+    button.classList.toggle('btn-outline', !active);
+    button.classList.toggle('map-layer-button--active', active);
   }
 
   function _primaryCadastralConfig() {
@@ -599,8 +617,9 @@ const MapModule = (() => {
 
   function _updateCadastralState() {
     const state = document.getElementById('map-cadastral-state');
-    if (!state) return;
     const active = Boolean(_map && _cadastralLayer && _map.hasLayer(_cadastralLayer));
+    _setMapToggleButtonState('map-cadastral-btn', active);
+    if (!state) return;
     const minZoom = Number(_cadastralLayerConfig?.minZoom || 15);
     const zoom = _map && typeof _map.getZoom === 'function' ? _map.getZoom() : 0;
     const filterText = _cadastralFilterText();
@@ -1158,13 +1177,25 @@ const MapModule = (() => {
   }
 
   function _updatePerimeterCount(visible, total) {
+    const active = Boolean(_map && _perimeterLayer && _map.hasLayer(_perimeterLayer));
+    _setMapToggleButtonState('map-perimeters-btn', active);
+    if (visible === undefined || total === undefined) {
+      const source = _filteredEscuelas.length || _hasActiveFilters(_activeFilters) ? _filteredEscuelas : _escuelas;
+      const visibleKeys = new Set((source || []).flatMap(_schoolIdentityKeys));
+      const rows = (_perimeters || []).filter(row => {
+        const keys = _perimeterIdentityKeys(row);
+        return !visibleKeys.size || keys.some(key => visibleKeys.has(key));
+      });
+      visible = active ? rows.length : 0;
+      total = (_perimeters || []).length;
+    }
     const count = document.getElementById('map-count-perimeters');
     if (count) count.textContent = String(visible || 0);
     const state = document.getElementById('map-perimeters-state');
     if (state) {
       state.textContent = total
-        ? `Perimetros: ${visible || 0}/${total}`
-        : 'Perimetros: sin datos cargados';
+        ? `Planos/perimetros: ${visible || 0}/${total}`
+        : 'Planos/perimetros: sin datos cargados';
       state.classList.toggle('map-perimeters-state--ready', Boolean(total));
     }
   }

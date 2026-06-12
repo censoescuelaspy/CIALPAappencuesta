@@ -584,6 +584,30 @@ body.sidebar-auto-hidden #sidebar.sidebar--open {
   color: #fff;
 }
 
+.btn[aria-pressed="true"],
+.btn.map-layer-button--active {
+  background: #0f766e;
+  color: #ffffff;
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .18);
+}
+
+.btn[aria-pressed="true"]:hover:not(:disabled),
+.btn.map-layer-button--active:hover:not(:disabled) {
+  background: #0b5d56;
+  border-color: #0b5d56;
+  color: #ffffff;
+}
+
+.school-plan-basemap-panel__check:has(input:checked),
+.school-plan__layers label:has(input:checked),
+.school-plan-ribbon__group label:has(input:checked) {
+  border-color: rgba(15, 118, 110, .45);
+  background: rgba(240, 253, 250, .96);
+  color: #0f766e;
+  box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .12);
+}
+
 .btn-sm  { padding: .3rem .75rem; font-size: .8rem; }
 .btn-lg  { padding: .75rem 1.5rem; font-size: 1rem; }
 .btn-xs  { padding: .2rem .5rem; font-size: .75rem; }
@@ -3093,6 +3117,65 @@ td {
 .enc-admin-table td {
   vertical-align: middle;
 }
+
+.enc-admin-user-summary {
+  margin-top: .85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.enc-admin-user-summary__header {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: center;
+  padding: .75rem .9rem;
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.enc-admin-user-summary__header strong {
+  color: var(--color-secondary);
+  font-size: .9rem;
+}
+
+.enc-admin-user-summary table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.enc-admin-user-summary th,
+.enc-admin-user-summary td {
+  padding: .55rem .7rem;
+  border-bottom: 1px solid var(--color-border);
+  font-size: .82rem;
+  text-align: left;
+}
+
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+}
+
+.table-sort-button:hover,
+.table-sort-button:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+  outline: none;
+}
+
+.table-sort-button[aria-sort="ascending"]::after { content: "↑"; }
+.table-sort-button[aria-sort="descending"]::after { content: "↓"; }
 
 .enc-admin-actions {
   display: flex;

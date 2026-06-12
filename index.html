@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.184" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.185" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.184" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.185" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.184</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.185</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.184</strong>
+      Edición vigente<br><strong class="app-version">v2.6.185</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -291,7 +291,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.184</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.185</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -326,8 +326,8 @@
               <button class="btn btn-sm btn-outline" type="button" title="Escuela siguiente filtrada" onclick="MapModule.jumpFilteredSchool(1)">Siguiente</button>
             </div>
             <button class="btn btn-sm btn-outline" onclick="MapModule.toggleRoutes()">Rutas</button>
-            <button class="btn btn-sm btn-outline" onclick="MapModule.togglePerimeters()">Perimetros</button>
-            <button class="btn btn-sm btn-outline" onclick="MapModule.toggleCadastralLayer()">Catastro SNC</button>
+            <button id="map-perimeters-btn" class="btn btn-sm btn-outline" type="button" aria-pressed="false" onclick="MapModule.togglePerimeters()">Planos/perimetros</button>
+            <button id="map-cadastral-btn" class="btn btn-sm btn-outline" type="button" aria-pressed="false" onclick="MapModule.toggleCadastralLayer()">Catastro SNC</button>
             <button class="btn btn-sm btn-outline" onclick="MapModule.exportCadastralCache('json')">Exportar catastro</button>
             <button class="btn btn-sm btn-outline" onclick="MapModule.openCadastralDownloads()">Municipios SNC</button>
             <button class="btn btn-sm btn-outline" onclick="MapModule.cacheVisibleMap()">Guardar mapa offline</button>
@@ -426,7 +426,7 @@
           <!-- Map container -->
           <div class="map-main">
             <div id="map-offline-state" class="map-offline-state">Mapa offline: calculando...</div>
-            <div id="map-perimeters-state" class="map-perimeters-state">Perimetros: cargando...</div>
+            <div id="map-perimeters-state" class="map-perimeters-state">Planos/perimetros: cargando...</div>
             <div id="map-cadastral-state" class="map-cadastral-state">Catastro SNC: desactivado</div>
             <div id="map-container"></div>
             <div id="map-info-panel" class="map-info-panel"></div>
@@ -751,7 +751,10 @@
                 <strong>Formularios MEC cargados por censista</strong>
                 <p class="text-muted" style="margin:.35rem 0 0;">Listado administrativo de fichas guardadas y finalizadas.</p>
               </div>
-              <button class="btn btn-outline btn-sm" onclick="AdminModule.loadFormulariosMec()">Actualizar</button>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" type="button" onclick="AdminModule.exportFormulariosMecCsv()">CSV</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="AdminModule.loadFormulariosMec()">Actualizar</button>
+              </div>
             </div>
             <div class="enc-admin-summary" style="margin-top:.85rem;">
               <div class="enc-admin-kpi"><small>Formularios</small><strong id="formularios-mec-total">0</strong></div>
@@ -761,6 +764,7 @@
               <div class="enc-admin-kpi"><small>Elementos</small><strong id="formularios-mec-elementos">0</strong></div>
               <div class="enc-admin-kpi"><small>Evidencias</small><strong id="formularios-mec-evidencias">0</strong></div>
             </div>
+            <div id="formularios-mec-user-summary" class="enc-admin-user-summary"></div>
             <form id="formularios-mec-filter-form" class="enc-admin-toolbar" style="margin-top:.85rem;">
               <div class="enc-admin-filter">
                 <label for="formularios-mec-filter-usuario">Censista</label>
@@ -786,17 +790,17 @@
               <table class="enc-admin-table">
                 <thead>
                   <tr>
-                    <th>Censista</th>
-                    <th>Actualizado</th>
-                    <th>Escuela</th>
-                    <th>Ubicacion</th>
-                    <th>Estado</th>
-                    <th>Bloques</th>
-                    <th>Aulas</th>
-                    <th>Sanitarios</th>
-                    <th>Exteriores</th>
-                    <th>Evid.</th>
-                    <th>Tiempo</th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="usuario" onclick="AdminModule.sortFormulariosMec('usuario')">Censista</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="actualizado" onclick="AdminModule.sortFormulariosMec('actualizado')">Actualizado</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="escuela" onclick="AdminModule.sortFormulariosMec('escuela')">Escuela</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="ubicacion" onclick="AdminModule.sortFormulariosMec('ubicacion')">Ubicacion</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="estado" onclick="AdminModule.sortFormulariosMec('estado')">Estado</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="bloques" onclick="AdminModule.sortFormulariosMec('bloques')">Bloques</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="aulas" onclick="AdminModule.sortFormulariosMec('aulas')">Aulas</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="sanitarios" onclick="AdminModule.sortFormulariosMec('sanitarios')">Sanitarios</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="exteriores" onclick="AdminModule.sortFormulariosMec('exteriores')">Exteriores</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="evidencias" onclick="AdminModule.sortFormulariosMec('evidencias')">Evid.</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="tiempo" onclick="AdminModule.sortFormulariosMec('tiempo')">Tiempo</button></th>
                     <th>Accion</th>
                   </tr>
                 </thead>
@@ -1662,21 +1666,21 @@
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.184"></script>
-<script src="assets/js/local-store.js?v=2.6.184"></script>
-<script src="assets/js/geo-measure.js?v=2.6.184"></script>
-<script src="assets/js/api.js?v=2.6.184"></script>
-<script src="assets/js/auth.js?v=2.6.184"></script>
-<script src="assets/js/map.js?v=2.6.184"></script>
-<script src="assets/js/survey.js?v=2.6.184"></script>
-<script src="assets/js/stats.js?v=2.6.184"></script>
-<script src="assets/js/location-audit.js?v=2.6.184"></script>
-<script src="assets/js/planning.js?v=2.6.184"></script>
-<script src="assets/js/admin.js?v=2.6.184"></script>
-<script src="assets/js/jornada.js?v=2.6.184"></script>
-<script src="assets/js/manual.js?v=2.6.184"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.184"></script>
-<script src="assets/js/app.js?v=2.6.184"></script>
+<script src="assets/js/config.js?v=2.6.185"></script>
+<script src="assets/js/local-store.js?v=2.6.185"></script>
+<script src="assets/js/geo-measure.js?v=2.6.185"></script>
+<script src="assets/js/api.js?v=2.6.185"></script>
+<script src="assets/js/auth.js?v=2.6.185"></script>
+<script src="assets/js/map.js?v=2.6.185"></script>
+<script src="assets/js/survey.js?v=2.6.185"></script>
+<script src="assets/js/stats.js?v=2.6.185"></script>
+<script src="assets/js/location-audit.js?v=2.6.185"></script>
+<script src="assets/js/planning.js?v=2.6.185"></script>
+<script src="assets/js/admin.js?v=2.6.185"></script>
+<script src="assets/js/jornada.js?v=2.6.185"></script>
+<script src="assets/js/manual.js?v=2.6.185"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.185"></script>
+<script src="assets/js/app.js?v=2.6.185"></script>
 
 <script>
   // Set today's date in Inicio module

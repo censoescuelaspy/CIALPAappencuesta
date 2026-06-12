@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.184
+ * Version: 2.6.185
  */
 
 const GuidedRegisterModule = (() => {
@@ -367,10 +367,12 @@ const GuidedRegisterModule = (() => {
             <em data-guided-inline-school-status>Base mapa pendiente</em>
           </div>
           <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
-            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite" aria-pressed="false">Satelite</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite" aria-pressed="false">Alta res.</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapStreet" aria-pressed="false">Calles encima</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapCatastro" aria-pressed="false">Catastro</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="cadastralBoundary">Predio SNC</button>
             <button class="btn btn-guided-soft btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase" aria-pressed="false">Mover base</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="autoAlignBase">Alinear</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="saveBasemap" aria-pressed="false">Guardar base</button>
             <button class="btn btn-outline btn-sm" type="button" data-guided-action="module" data-guided-value="mapa">Elegir escuela</button>
@@ -666,9 +668,19 @@ const GuidedRegisterModule = (() => {
           if (mec.togglePlanCadastralOverlay) mec.togglePlanCadastralOverlay();
           else UI.showToast('La capa Catastro SNC aun no esta disponible en este modulo.', 'warning', 5200);
           break;
+        case 'cadastralBoundary':
+          if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
+          if (mec.useCadastralParcelAsPreliminaryBoundary) mec.useCadastralParcelAsPreliminaryBoundary();
+          else UI.showToast('El predio preliminar SNC aun no esta disponible.', 'warning', 5200);
+          break;
         case 'basemapSatellite':
           if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
-          if (mec.setPlanBaseMapSource) mec.setPlanBaseMapSource('satellite');
+          if (mec.setPlanHighResolutionBaseMap) mec.setPlanHighResolutionBaseMap();
+          else if (mec.setPlanBaseMapSource) mec.setPlanBaseMapSource('google_satellite');
+          break;
+        case 'autoAlignBase':
+          if (mec.autoAlignPlanBaseMap) mec.autoAlignPlanBaseMap();
+          else UI.showToast('La alineacion automatica aun no esta disponible.', 'warning', 5200);
           break;
         case 'coords':
           mec.useSchoolCoordinatesForBaseMap();
@@ -1928,7 +1940,7 @@ const GuidedRegisterModule = (() => {
         [
           { label: 'Confirmar datos', action: 'saveSchoolIdentity', primary: true },
           { label: 'Usar coordenadas MEC', action: 'coords' },
-          { label: 'Ver satelite', action: 'basemapSatellite' },
+          { label: 'Ver alta res.', action: 'basemapSatellite' },
           { label: 'Calles encima', action: 'basemapStreet' },
           { label: 'Catastro', action: 'basemapCatastro' },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
@@ -1947,7 +1959,7 @@ const GuidedRegisterModule = (() => {
         'Primero pulse Usar coordenadas MEC. Luego elija Ver satelite o Calles encima para verificar la ubicacion. Cuando el punto este correcto, pulse Guardar ubicacion.',
         [
           { label: 'Usar coordenadas MEC', action: 'coords', primary: true },
-          { label: 'Ver satelite', action: 'basemapSatellite' },
+          { label: 'Ver alta res.', action: 'basemapSatellite' },
           { label: 'Calles encima', action: 'basemapStreet' },
           { label: 'Catastro', action: 'basemapCatastro' },
           { label: 'Guardar ubicacion', action: 'saveBasemap' },

@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.184
+ * Version: 2.6.185
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.184',
-  EDITION_LABEL: 'Edicion vigente v2.6.184',
+  VERSION: '2.6.185',
+  EDITION_LABEL: 'Edicion vigente v2.6.185',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -33,14 +33,16 @@ const APP_CONFIG = {
   MAP_CENTER: [-23.4, -58.0],
   MAP_ZOOM: 7,
   MAP_MIN_ZOOM: 5,
-  MAP_MAX_ZOOM: 18,
+  MAP_MAX_ZOOM: 21,
+  MAP_NATIVE_MAX_ZOOM: 19,
 
   // Tile layer
   TILE_URL: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   TILE_ATTRIBUTION: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   SATELLITE_TILE_URL: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   SATELLITE_ATTRIBUTION: 'Tiles &copy; Esri',
-  SATELLITE_MAX_ZOOM: 18,
+  SATELLITE_MAX_ZOOM: 21,
+  SATELLITE_NATIVE_MAX_ZOOM: 18,
   PLAN_BASEMAP_TILE_URL: 'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
   PLAN_BASEMAP_ATTRIBUTION: '&copy; OpenStreetMap contributors, HOT',
   PLAN_BASEMAP_STREET_OVERLAY_TILE_URL: 'https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}.png',
@@ -81,7 +83,7 @@ const APP_CONFIG = {
       version: '1.1.1',
       opacity: 0.68,
       minZoom: 15,
-      maxZoom: 19,
+      maxZoom: 21,
       filterableByDepartment: true,
       source: 'Servicio Nacional de Catastro - GeoServer WMS',
       sourceUrl: 'https://www.catastro.gov.py/visor/?snc=geo',
