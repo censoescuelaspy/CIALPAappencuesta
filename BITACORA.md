@@ -24,9 +24,8 @@
 - Smoke test real de `API.listarPerimetrosMec({})`: backend primario respondio HTTP 403 y fallback por hoja publicada devolvio `status=ok`, `source=published_sheet`, `total=29`, `withSides=29`, `withArea=29`, `withPlanBaseMap=29`; primer perimetro con `firstSides=4`, `firstPerimeterM=195.71`, `firstAreaM2=2360.07`, `firstAreaHa=0.2360`.
 - `clasp push -f`: subidos 8 archivos al proyecto GAS.
 - `clasp version "v2.6.180 medidas calculadas perimetros"`: creada version GAS `36`.
-
-### Validaciones pendientes
-- Commit/push y verificacion de GitHub Pages con cache-busting.
+- Commit de implementacion `a6e03b7` publicado en `origin/main`.
+- GitHub Pages verificado con cache-busting despues del push: `index.html`, `assets/js/geo-measure.js`, `assets/js/map.js`, `assets/js/api.js`, `assets/js/mec-form.js` y `sw.js` respondieron HTTP 200 y contienen los cambios esperados de `v2.6.180`.
 
 ### Riesgos
 - El area es una aproximacion metrica local adecuada para predios escolares pequenos; no reemplaza una mensura catastral.
