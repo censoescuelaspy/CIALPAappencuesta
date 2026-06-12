@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.174
+ * Version: 2.6.184
  */
 
 const GuidedRegisterModule = (() => {
@@ -369,6 +369,7 @@ const GuidedRegisterModule = (() => {
           <div class="guided-school-map-shell__toolbar" aria-label="Acciones rapidas de georreferencia">
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapSatellite" aria-pressed="false">Satelite</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapStreet" aria-pressed="false">Calles encima</button>
+            <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="basemapCatastro" aria-pressed="false">Catastro</button>
             <button class="btn btn-guided-soft btn-sm guided-school-map-shell__move-base" type="button" data-guided-action="moveBase" aria-pressed="false">Mover base</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="coords">Usar coords</button>
             <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="saveBasemap" aria-pressed="false">Guardar base</button>
@@ -659,6 +660,11 @@ const GuidedRegisterModule = (() => {
           if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
           if (mec.setPlanBaseMapSource) mec.setPlanBaseMapSource('street');
           else mec.togglePlanBaseMap();
+          break;
+        case 'basemapCatastro':
+          if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
+          if (mec.togglePlanCadastralOverlay) mec.togglePlanCadastralOverlay();
+          else UI.showToast('La capa Catastro SNC aun no esta disponible en este modulo.', 'warning', 5200);
           break;
         case 'basemapSatellite':
           if (mec.ensureGuidedLocationBaseMap) mec.ensureGuidedLocationBaseMap({ render: false });
@@ -1294,10 +1300,12 @@ const GuidedRegisterModule = (() => {
     const source = String(baseMap.source || 'satellite').toLowerCase();
     const enabled = Boolean(baseMap.enabled);
     const streetOverlay = Boolean(baseMap.streetOverlay);
+    const cadastralOverlay = Boolean(baseMap.cadastralOverlay);
     return {
       enabled,
       source: source === 'satellite' || source === 'google_satellite' || source === 'highres' ? source : 'street',
       streetOverlay,
+      cadastralOverlay,
       confirmed: Boolean(baseMap.confirmed || baseMap.savedAt),
       dragMode: Boolean(baseMap.dragMode),
       hasCoords: Boolean(baseMap.hasCoords || (baseMap.lat !== undefined && baseMap.lat !== '' && baseMap.lng !== undefined && baseMap.lng !== '')),
@@ -1310,6 +1318,7 @@ const GuidedRegisterModule = (() => {
     const activeFor = action => {
       if (action === 'basemapSatellite') return base.enabled && ['satellite', 'google_satellite', 'highres'].includes(base.source);
       if (action === 'basemapStreet') return base.enabled && base.streetOverlay;
+      if (action === 'basemapCatastro') return base.enabled && base.cadastralOverlay;
       if (action === 'basemap') return base.enabled;
       if (action === 'moveBase') return base.dragMode;
       if (action === 'saveBasemap') return base.confirmed;
@@ -1317,15 +1326,20 @@ const GuidedRegisterModule = (() => {
     };
     root.querySelectorAll('[data-guided-action]').forEach(button => {
       const action = button.dataset.guidedAction || '';
-      const tracked = ['basemapSatellite', 'basemapStreet', 'basemap', 'moveBase', 'saveBasemap'].includes(action);
+      const tracked = ['basemapSatellite', 'basemapStreet', 'basemapCatastro', 'basemap', 'moveBase', 'saveBasemap'].includes(action);
       if (!tracked) return;
       const active = activeFor(action);
       button.classList.toggle('btn-guided-active', active);
       button.setAttribute('aria-pressed', String(active));
     });
-    const sourceLabel = base.streetOverlay
-      ? (base.source === 'google_satellite' ? 'Alta res. + calles' : 'Satelite + calles')
-      : (base.source === 'google_satellite' ? 'Alta resolucion activa' : 'Satelite activo');
+    const sourceName = base.source === 'google_satellite'
+      ? 'Alta res.'
+      : (base.source === 'highres' ? 'Imagen alta res.' : 'Satelite');
+    const overlays = [
+      base.streetOverlay ? 'calles' : '',
+      base.cadastralOverlay ? 'catastro' : '',
+    ].filter(Boolean);
+    const sourceLabel = overlays.length ? `${sourceName} + ${overlays.join(' + ')}` : `${sourceName} activo`;
     const stateText = !base.hasCoords
       ? 'Sin coordenadas: use "Usar coords"'
       : (base.enabled ? sourceLabel : 'Base apagada');
@@ -1916,6 +1930,7 @@ const GuidedRegisterModule = (() => {
           { label: 'Usar coordenadas MEC', action: 'coords' },
           { label: 'Ver satelite', action: 'basemapSatellite' },
           { label: 'Calles encima', action: 'basemapStreet' },
+          { label: 'Catastro', action: 'basemapCatastro' },
           { label: 'Elegir otra escuela', action: 'module', value: 'mapa' },
           { label: 'Reiniciar escuela', action: 'resetSchoolData' },
         ],
@@ -1934,6 +1949,7 @@ const GuidedRegisterModule = (() => {
           { label: 'Usar coordenadas MEC', action: 'coords', primary: true },
           { label: 'Ver satelite', action: 'basemapSatellite' },
           { label: 'Calles encima', action: 'basemapStreet' },
+          { label: 'Catastro', action: 'basemapCatastro' },
           { label: 'Guardar ubicacion', action: 'saveBasemap' },
           { label: 'Corregir datos', action: 'resetSchoolIdentity' },
         ],
@@ -1950,6 +1966,7 @@ const GuidedRegisterModule = (() => {
       [
         { label: 'Siguiente', action: 'next', primary: true },
         { label: 'Calles encima', action: 'basemapStreet' },
+        { label: 'Catastro', action: 'basemapCatastro' },
         { label: 'Corregir datos escuela', action: 'resetSchoolIdentity' },
         { label: 'Reiniciar escuela', action: 'resetSchoolData' },
       ],
@@ -1982,6 +1999,7 @@ const GuidedRegisterModule = (() => {
         'Agregue el contorno amarillo del predio. Luego arrastre directamente sus vertices numerados para ajustarlo sobre la imagen o las calles.',
         [
           { label: 'Dibujar perimetro', action: 'addPropertyBoundary', primary: true },
+          { label: 'Catastro', action: 'basemapCatastro' },
           { label: 'Extender abajo', action: 'extendPlanDown' },
           { label: 'Acometida', action: 'site', value: 'service_connection' },
           { label: 'Volver a ubicacion base', action: 'prev' },
@@ -2020,6 +2038,7 @@ const GuidedRegisterModule = (() => {
         { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
         { label: 'Acometida', action: 'site', value: 'service_connection' },
         { label: 'Calles encima', action: 'basemapStreet' },
+        { label: 'Catastro', action: 'basemapCatastro' },
       ],
       true,
       '',

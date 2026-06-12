@@ -6999,3 +6999,84 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - Registrar en manual maestro el patron `WMS GetFeatureInfo + API publica + cache local + exportacion` para capas GIS institucionales.
 - Mantener los metadatos catastrales como referencia tecnica, no como fuente unica de verdad registral.
+
+---
+
+## Catastro SNC en Registro Guiado - 2026-06-12 07:13
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.184`.
+
+### Objetivo de la intervencion
+- Incorporar la capa oficial de Catastro SNC tambien en la vista `REGISTRO GUIADO`.
+- Mantener la capa como superposicion transparente sobre satelite/alta resolucion, sin reemplazar la base visual usada para dibujar.
+
+### Diagnostico inicial
+- `REGISTRO GUIADO` no usa Leaflet directamente; reutiliza el plano canvas de `MecFormModule`.
+- La base mapa del plano se renderiza con teselas HTML bajo el canvas.
+- La capa WMS `snc:parcelas_activas` ya estaba configurada en `APP_CONFIG.MAP_CADASTRAL_LAYERS`.
+
+### Acciones realizadas
+- `assets/js/mec-form.js`: se agrego estado persistente `cadastralOverlay` y `cadastralOpacity` dentro de `__planBaseMap`.
+- `assets/js/mec-form.js`: se agrego generacion de teselas WMS `GetMap` en `EPSG:3857`, con `WIDTH/HEIGHT=512` para visualizacion de alta resolucion.
+- `assets/js/mec-form.js`: se reutiliza la configuracion oficial `MAP_CADASTRAL_LAYERS` y se aplica filtro `CQL_FILTER dpto='X'` cuando la escuela tiene departamento.
+- `assets/js/mec-form.js`: se agregaron botones `Catastro` en barra de base mapa, ribbon y panel de ajustes con opacidad configurable.
+- `assets/js/guided-register.js`: se agrego boton rapido `Catastro` en la vista guiada y en preguntas de ubicacion/perimetro.
+- `assets/css/mec-form.css` y `assets/css/app.css`: se agregaron estilos para superposicion catastral y estado activo.
+- `assets/js/config.js`, `index.html`, `sw.js`: version/cache actualizados a `2.6.184`.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/guided-register.js`
+- `assets/js/config.js`
+- `assets/css/mec-form.css`
+- `assets/css/app.css`
+- `index.html`
+- `sw.js`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets\js\mec-form.js`
+- `node --check assets\js\guided-register.js`
+- `node --check assets\js\config.js`
+- `node --check sw.js`
+- `git diff --check`
+- `Invoke-WebRequest -Uri http://127.0.0.1:8765/ -UseBasicParsing`
+- Prueba WMS `GetMap` contra `https://www.catastro.gov.py/geoserver/ows` con `LAYERS=snc:parcelas_activas`, `WIDTH=512`, `HEIGHT=512`, `SRS=EPSG:3857` y `CQL_FILTER=dpto='A'`.
+
+### Resultados verificados
+- La tesela WMS de Catastro SNC respondio `200 image/png` con 49.712 bytes.
+- La app local respondio `200` en `http://127.0.0.1:8765/`.
+- La version visible y cache busters quedaron en `2.6.184`.
+- No quedan referencias `2.6.183` ni `2.6.174` en los archivos frontales revisados.
+
+### Pruebas realizadas
+- Validacion de sintaxis JavaScript con `node --check`.
+- Validacion de whitespace con `git diff --check`.
+- Validacion HTTP local.
+- Validacion HTTP de WMS oficial con teselas 512 px.
+
+### Errores o incidentes
+- Durante el primer reemplazo mecanico de version, Windows reescribio `index.html`/`sw.js` con codificacion incorrecta. Se restauraron esos dos archivos desde `HEAD` y se repitio el cambio con UTF-8 sin BOM.
+
+### Soluciones aplicadas
+- Catastro se implemento como capa transparente superpuesta, no como fuente base alternativa.
+- La capa usa el mismo encuadre, escala, rotacion y desplazamiento de la base mapa del plano.
+- Las preferencias de capa quedan guardadas en el borrador local junto con la base mapa.
+
+### Pendientes
+- Validar visualmente en navegador real con usuario autenticado que las parcelas se alineen con el predio en `REGISTRO GUIADO`.
+- Si el operador necesita metadatos por click tambien dentro del plano guiado, evaluar una version posterior con `GetFeatureInfo` desde coordenada de canvas.
+
+### Riesgos
+- La capa depende de disponibilidad externa del GeoServer del Servicio Nacional de Catastro.
+- A zoom menor que el minimo configurado de la capa, Catastro permanece oculto para evitar carga excesiva.
+- El filtro por departamento depende de que la escuela tenga departamento normalizado.
+
+### Recomendaciones
+- Registrar en manual maestro el patron `WMS catastral como overlay de canvas georreferenciado` para apps de relevamiento con planos editables.
+- Mantener Catastro como referencia visual y no como sustituto del relevamiento tecnico ni de mensura formal.

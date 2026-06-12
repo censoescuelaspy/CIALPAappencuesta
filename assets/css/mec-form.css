@@ -2347,6 +2347,13 @@
   pointer-events: none;
 }
 
+.school-plan-basemap__tiles--cadastral-overlay {
+  z-index: 2;
+  filter: contrast(1.18) saturate(1.15);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
 .school-plan-basemap::after {
   content: '';
   position: absolute;
@@ -2362,7 +2369,7 @@
   position: absolute;
   right: 6px;
   bottom: 5px;
-  z-index: 1;
+  z-index: 3;
   padding: .12rem .28rem;
   border-radius: 4px;
   background: rgba(255,255,255,.82);

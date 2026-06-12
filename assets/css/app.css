@@ -6731,6 +6731,11 @@ textarea.form-control {
   box-shadow: 0 0 0 3px rgba(15, 118, 110, .22);
 }
 
+#module-registro .school-plan-ribbon__button--cadastral-overlay.school-plan-ribbon__button--active,
+#module-plano .school-plan-ribbon__button--cadastral-overlay.school-plan-ribbon__button--active {
+  box-shadow: 0 0 0 3px rgba(202, 138, 4, .24);
+}
+
 #module-registro .school-plan-ribbon__label {
   max-width: 50px;
   white-space: normal;

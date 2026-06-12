@@ -20,11 +20,13 @@ const MecFormModule = (() => {
   const PLAN_BASEMAP_DEFAULT_CONTRAST = 1.18;
   const PLAN_BASEMAP_DEFAULT_SATURATION = 1.08;
   const PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY = .9;
+  const PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY = .72;
   const PLAN_BASEMAP_SOURCE_STREET = 'street';
   const PLAN_BASEMAP_SOURCE_SATELLITE = 'satellite';
   const PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE = 'google_satellite';
   const PLAN_BASEMAP_SOURCE_HIGHRES = 'highres';
   const PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE = 'google-map-tiles://satellite';
+  const WEB_MERCATOR_HALF_WORLD = 20037508.342789244;
   const PLAN_CANVAS_MIN_WIDTH = 760;
   const PLAN_CANVAS_MIN_HEIGHT = 500;
   const PLAN_CANVAS_MAX_WIDTH = 4200;
@@ -105,6 +107,27 @@ const MecFormModule = (() => {
   const EVIDENCE_THUMB_MAX_DIMENSION = 720;
   const EVIDENCE_IMAGE_QUALITY = 0.78;
   const EVIDENCE_THUMB_QUALITY = 0.64;
+  const SNC_DEPARTMENT_CODES = Object.freeze({
+    asuncion: 'A',
+    concepcion: 'B',
+    'san pedro': 'C',
+    cordillera: 'D',
+    guaira: 'E',
+    caaguazu: 'F',
+    caazapa: 'G',
+    itapua: 'H',
+    misiones: 'I',
+    paraguari: 'J',
+    'alto parana': 'K',
+    central: 'L',
+    neembucu: 'M',
+    amambay: 'N',
+    'presidente hayes': 'P',
+    'pdte hayes': 'P',
+    boqueron: 'Q',
+    'alto paraguay': 'R',
+    canindeyu: 'S',
+  });
 
   const SKETCH_CANVAS = { width: 760, height: 460 };
   const BLOCK_ELECTRIC_FIELDS = [
@@ -257,6 +280,10 @@ const MecFormModule = (() => {
       .toLowerCase()
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  function _compactFilterKey(value) {
+    return _normalizeText(value).replace(/[^a-z0-9]+/g, ' ').trim();
   }
 
   function _schoolIdentityValues(school) {
@@ -1306,6 +1333,8 @@ const MecFormModule = (() => {
       saturation: PLAN_BASEMAP_DEFAULT_SATURATION,
       streetOverlay: false,
       streetOverlayOpacity: PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY,
+      cadastralOverlay: false,
+      cadastralOpacity: PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY,
       savedAt: '',
       confirmed: false,
     };
@@ -1509,6 +1538,92 @@ const MecFormModule = (() => {
       attribution: (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.PLAN_BASEMAP_STREET_OVERLAY_ATTRIBUTION)
         || fallbackAttribution,
     };
+  }
+
+  function _planBaseMapCadastralConfig() {
+    const layers = typeof APP_CONFIG !== 'undefined' && Array.isArray(APP_CONFIG.MAP_CADASTRAL_LAYERS)
+      ? APP_CONFIG.MAP_CADASTRAL_LAYERS
+      : [];
+    return layers.find(layer => layer && layer.type === 'wms' && layer.url && layer.layers) || null;
+  }
+
+  function _planBaseMapCadastralOpacity(baseMap = _data.__planBaseMap) {
+    const configured = typeof APP_CONFIG !== 'undefined'
+      ? APP_CONFIG.PLAN_BASEMAP_CADASTRAL_OPACITY
+      : PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY;
+    return _numberInRange(baseMap?.cadastralOpacity, configured || PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY, .15, 1);
+  }
+
+  function _planBaseMapCadastralTilePixels() {
+    const configured = typeof APP_CONFIG !== 'undefined' ? APP_CONFIG.PLAN_BASEMAP_CADASTRAL_TILE_PIXELS : 512;
+    return Math.round(_numberInRange(configured, 512, 256, 1024));
+  }
+
+  function _sncDepartmentCode(departamento) {
+    return SNC_DEPARTMENT_CODES[_compactFilterKey(departamento)] || '';
+  }
+
+  function _planBaseMapCadastralDepartment() {
+    const school = _data.__selectedSchool || _selectedSchoolFromContext() || {};
+    const general = _data.general || {};
+    return _firstPresent(school, ['departamento', 'departamento_nombre', 'depto'])
+      || general.departamento
+      || '';
+  }
+
+  function _planBaseMapCadastralCqlFilter(config = _planBaseMapCadastralConfig()) {
+    if (!config || !config.filterableByDepartment) return '';
+    const code = _sncDepartmentCode(_planBaseMapCadastralDepartment());
+    return code ? `dpto='${code}'` : '';
+  }
+
+  function _webMercatorTileBbox(z, x, y) {
+    const tiles = Math.pow(2, z);
+    const world = WEB_MERCATOR_HALF_WORLD * 2;
+    const tileMeters = world / tiles;
+    const west = -WEB_MERCATOR_HALF_WORLD + x * tileMeters;
+    const east = west + tileMeters;
+    const north = WEB_MERCATOR_HALF_WORLD - y * tileMeters;
+    const south = north - tileMeters;
+    return [west, south, east, north].map(value => Number(value.toFixed(6))).join(',');
+  }
+
+  function _planBaseMapCadastralTileUrl(z, x, y, config = _planBaseMapCadastralConfig()) {
+    if (!config?.url || !config.layers) return '';
+    const params = new URLSearchParams({
+      SERVICE: 'WMS',
+      VERSION: config.version || '1.1.1',
+      REQUEST: 'GetMap',
+      LAYERS: config.layers,
+      STYLES: '',
+      FORMAT: config.format || 'image/png',
+      TRANSPARENT: config.transparent === false ? 'FALSE' : 'TRUE',
+      WIDTH: String(_planBaseMapCadastralTilePixels()),
+      HEIGHT: String(_planBaseMapCadastralTilePixels()),
+      SRS: 'EPSG:3857',
+      BBOX: _webMercatorTileBbox(z, x, y),
+      TILED: 'TRUE',
+    });
+    const cql = _planBaseMapCadastralCqlFilter(config);
+    if (cql) params.set('CQL_FILTER', cql);
+    return `${config.url}${String(config.url).includes('?') ? '&' : '?'}${params.toString()}`;
+  }
+
+  function _planBaseMapCadastralTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1) {
+    const baseMap = _ensurePlanBaseMap();
+    const config = _planBaseMapCadastralConfig();
+    if (!config || !baseMap.cadastralOverlay || !_planBaseMapVisible(baseMap)) return [];
+    const zoom = Math.round(Number(baseMap.zoom) || PLAN_BASEMAP_DEFAULT_ZOOM);
+    const minZoom = Math.round(_numberInRange(config.minZoom, 15, PLAN_BASEMAP_MIN_ZOOM, 22));
+    if (zoom < minZoom) return [];
+    const maxItems = typeof APP_CONFIG !== 'undefined'
+      ? Math.round(_numberInRange(APP_CONFIG.PLAN_BASEMAP_CADASTRAL_TILE_LIMIT, 96, 16, 180))
+      : 96;
+    return _planBaseMapTileItems(logicalWidth, logicalHeight, renderScale, { id: 'catastro_snc', tileUrl: '' }, {
+      maxItems,
+      referrerPolicy: 'no-referrer',
+      urlForTile: (tileZ, tileX, tileY) => _planBaseMapCadastralTileUrl(tileZ, tileX, tileY, config),
+    });
   }
 
   function _preferClosePlanBaseMapView(baseMap) {
@@ -1737,6 +1852,8 @@ const MecFormModule = (() => {
     merged.saturation = _numberInRange(merged.saturation, PLAN_BASEMAP_DEFAULT_SATURATION, .5, 1.8);
     merged.streetOverlay = Boolean(merged.streetOverlay);
     merged.streetOverlayOpacity = _planBaseMapStreetOverlayOpacity(merged);
+    merged.cadastralOverlay = Boolean(merged.cadastralOverlay && _planBaseMapCadastralConfig());
+    merged.cadastralOpacity = _planBaseMapCadastralOpacity(merged);
     merged.enabled = Boolean(merged.enabled);
     merged.confirmed = Boolean(merged.confirmed);
     _data.__planBaseMap = merged;
@@ -1800,7 +1917,7 @@ const MecFormModule = (() => {
     return Number(number.toFixed(2)).toString();
   }
 
-  function _planBaseMapTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1, sourceConfig = _planBaseMapSourceConfig(_data.__planBaseMap)) {
+  function _planBaseMapTileItems(logicalWidth = 900, logicalHeight = _planCanvasHeight(), renderScale = 1, sourceConfig = _planBaseMapSourceConfig(_data.__planBaseMap), options = {}) {
     const baseMap = _ensurePlanBaseMap();
     if (!_planBaseMapVisible(baseMap)) return [];
     const zoom = Math.round(baseMap.zoom);
@@ -1829,6 +1946,8 @@ const MecFormModule = (() => {
     const minTileY = Math.floor(minWorldY / PLAN_BASEMAP_TILE_SIZE) - 1;
     const maxTileY = Math.ceil(maxWorldY / PLAN_BASEMAP_TILE_SIZE) + 1;
     const template = sourceConfig?.tileUrl || _planBaseMapTileTemplate();
+    const urlForTile = typeof options.urlForTile === 'function' ? options.urlForTile : null;
+    const maxItems = Math.round(_numberInRange(options.maxItems, 96, 1, 240));
     const items = [];
     for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
       if (tileY < 0 || tileY >= tileCount) continue;
@@ -1837,7 +1956,7 @@ const MecFormModule = (() => {
         const planX = centerCanvas.x + ((tileX * PLAN_BASEMAP_TILE_SIZE) - centerWorld.x) * mapScale;
         const planY = centerCanvas.y + ((tileY * PLAN_BASEMAP_TILE_SIZE) - centerWorld.y) * mapScale;
         const tileSize = PLAN_BASEMAP_TILE_SIZE * mapScale;
-        const url = _tileUrlFromTemplate(template, zoom, wrappedX, tileY);
+        const url = urlForTile ? urlForTile(zoom, wrappedX, tileY, tileX) : _tileUrlFromTemplate(template, zoom, wrappedX, tileY);
         if (!url) continue;
         items.push({
           x: planX * renderScale,
@@ -1845,9 +1964,9 @@ const MecFormModule = (() => {
           w: tileSize * renderScale,
           h: tileSize * renderScale,
           url,
-          referrerPolicy: template === PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE ? 'strict-origin-when-cross-origin' : 'no-referrer',
+          referrerPolicy: options.referrerPolicy || (template === PLAN_BASEMAP_GOOGLE_TILE_TEMPLATE ? 'strict-origin-when-cross-origin' : 'no-referrer'),
         });
-        if (items.length >= 96) return items;
+        if (items.length >= maxItems) return items;
       }
     }
     return items;
@@ -2186,6 +2305,9 @@ const MecFormModule = (() => {
       baseMap.saturation,
       baseMap.streetOverlay ? 1 : 0,
       baseMap.streetOverlayOpacity,
+      baseMap.cadastralOverlay ? 1 : 0,
+      baseMap.cadastralOpacity,
+      _planBaseMapCadastralCqlFilter(),
       _planBaseMapDragMode ? 1 : 0,
       logicalWidth,
       logicalHeight,
@@ -2203,6 +2325,8 @@ const MecFormModule = (() => {
     const items = _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale, sourceConfig);
     const overlayConfig = baseMap.streetOverlay ? _planBaseMapStreetOverlayConfig() : null;
     const overlayItems = overlayConfig ? _planBaseMapTileItems(logicalWidth, logicalHeight, displayScale, overlayConfig) : [];
+    const cadastralConfig = baseMap.cadastralOverlay ? _planBaseMapCadastralConfig() : null;
+    const cadastralItems = cadastralConfig ? _planBaseMapCadastralTileItems(logicalWidth, logicalHeight, displayScale) : [];
     const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
     const originX = (logicalWidth * displayScale) / 2;
     const originY = (logicalHeight * displayScale) / 2;
@@ -2212,13 +2336,16 @@ const MecFormModule = (() => {
         style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`).join('');
     const images = renderImages(items);
     const overlayImages = renderImages(overlayItems);
-    const attribution = overlayConfig && overlayItems.length
-      ? `${sourceConfig.attribution} / ${overlayConfig.attribution}`
-      : sourceConfig.attribution;
+    const cadastralImages = renderImages(cadastralItems);
+    const attributionParts = [sourceConfig.attribution];
+    if (overlayConfig && overlayItems.length) attributionParts.push(overlayConfig.attribution);
+    if (cadastralConfig && cadastralItems.length) attributionParts.push(cadastralConfig.source || cadastralConfig.attribution || 'Servicio Nacional de Catastro');
+    const attribution = [...new Set(attributionParts.filter(Boolean))].join(' / ');
     return `
       <div class="school-plan-basemap" data-plan-basemap aria-hidden="true">
         <div class="school-plan-basemap__tiles" style="opacity:${_cssNumber(baseMap.opacity)};filter:${filter};transform:rotate(${_cssNumber(rotation)}deg);transform-origin:${_cssNumber(originX)}px ${_cssNumber(originY)}px;">${images}</div>
         ${overlayImages ? `<div class="school-plan-basemap__tiles school-plan-basemap__tiles--street-overlay" style="opacity:${_cssNumber(_planBaseMapStreetOverlayOpacity(baseMap))};transform:rotate(${_cssNumber(rotation)}deg);transform-origin:${_cssNumber(originX)}px ${_cssNumber(originY)}px;">${overlayImages}</div>` : ''}
+        ${cadastralImages ? `<div class="school-plan-basemap__tiles school-plan-basemap__tiles--cadastral-overlay" style="opacity:${_cssNumber(_planBaseMapCadastralOpacity(baseMap))};transform:rotate(${_cssNumber(rotation)}deg);transform-origin:${_cssNumber(originX)}px ${_cssNumber(originY)}px;">${cadastralImages}</div>` : ''}
         <span class="school-plan-basemap__attribution">${attribution}</span>
       </div>`;
   }
@@ -2231,6 +2358,7 @@ const MecFormModule = (() => {
     if (!items.length) return '';
     const overlayConfig = baseMap.streetOverlay ? _planBaseMapStreetOverlayConfig() : null;
     const overlayItems = overlayConfig ? _planBaseMapTileItems(logicalWidth, logicalHeight, 1, overlayConfig) : [];
+    const cadastralItems = baseMap.cadastralOverlay ? _planBaseMapCadastralTileItems(logicalWidth, logicalHeight, 1) : [];
     const id = `plan-basemap-clip-${Date.now().toString(36)}`;
     const rotation = _planBaseMapRotationDeg(baseMap.rotationDeg);
     const transform = rotation ? ` transform="rotate(${_cssNumber(rotation)} ${_cssNumber(logicalWidth / 2)} ${_cssNumber(logicalHeight / 2)})"` : '';
@@ -2241,6 +2369,9 @@ const MecFormModule = (() => {
       </g>
       ${overlayItems.length ? `<g clip-path="url(#${id})" opacity="${_cssNumber(_planBaseMapStreetOverlayOpacity(baseMap))}"${transform}>
         ${overlayItems.map(item => `<image href="${_escape(item.url)}" x="${_cssNumber(item.x)}" y="${_cssNumber(item.y)}" width="${_cssNumber(item.w)}" height="${_cssNumber(item.h)}" preserveAspectRatio="none"/>`).join('')}
+      </g>` : ''}
+      ${cadastralItems.length ? `<g clip-path="url(#${id})" opacity="${_cssNumber(_planBaseMapCadastralOpacity(baseMap))}"${transform}>
+        ${cadastralItems.map(item => `<image href="${_escape(item.url)}" x="${_cssNumber(item.x)}" y="${_cssNumber(item.y)}" width="${_cssNumber(item.w)}" height="${_cssNumber(item.h)}" preserveAspectRatio="none"/>`).join('')}
       </g>` : ''}`;
   }
 
@@ -2498,6 +2629,8 @@ const MecFormModule = (() => {
     const active = _planBaseMapVisible(baseMap);
     const source = _planBaseMapSource(baseMap);
     const streetsActive = Boolean(baseMap.streetOverlay);
+    const cadastralAvailable = Boolean(_planBaseMapCadastralConfig());
+    const cadastralActive = Boolean(baseMap.cadastralOverlay && cadastralAvailable);
     const highres = _planBaseMapHighresSource();
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const coords = _planBaseMapHasCoords(baseMap)
@@ -2510,6 +2643,7 @@ const MecFormModule = (() => {
         ${hasGoogleSatellite ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm school-plan-basemap-actions__primary-source" type="button" onclick="MecFormModule.setPlanBaseMapSource('google_satellite')" title="Usar Google satelital de alta resolucion">Alta res.</button>` : ''}
         <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')">Satelite</button>
         <button class="btn ${streetsActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanStreetOverlay()" aria-pressed="${streetsActive ? 'true' : 'false'}" title="Mostrar nombres de calles encima de la satelital">Calles encima</button>
+        ${cadastralAvailable ? `<button class="btn ${cadastralActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanCadastralOverlay()" aria-pressed="${cadastralActive ? 'true' : 'false'}" title="Mostrar parcelas oficiales SNC encima de la base">Catastro</button>` : ''}
         <button class="btn ${_planBaseMapPanelOpen ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapPanel()">Base mapa</button>
         <button class="btn ${_planBaseMapDragMode ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMapDragMode()">${_planBaseMapDragMode ? 'Mover base activo' : 'Mover base'}</button>
         <button class="btn btn-success btn-sm" type="button" onclick="MecFormModule.savePlanBaseMap()">Guardar base/perimetro</button>
@@ -2522,6 +2656,8 @@ const MecFormModule = (() => {
     const baseMap = _ensurePlanBaseMap();
     const source = _planBaseMapSource(baseMap);
     const streetsActive = Boolean(baseMap.streetOverlay);
+    const cadastralAvailable = Boolean(_planBaseMapCadastralConfig());
+    const cadastralActive = Boolean(baseMap.cadastralOverlay && cadastralAvailable);
     const highres = _planBaseMapHighresSource();
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const savedText = baseMap.savedAt ? `Guardado ${_formatSavedAt(baseMap.savedAt)}` : 'Aun sin confirmacion';
@@ -2561,6 +2697,16 @@ const MecFormModule = (() => {
             <input type="range" min="0.15" max="1" step="0.05" value="${_escape(_planBaseMapStreetOverlayOpacity(baseMap))}" onchange="MecFormModule.setPlanStreetOverlayOpacity(this.value)">
             <b>${Math.round(_planBaseMapStreetOverlayOpacity(baseMap) * 100)}%</b>
           </label>
+          ${cadastralAvailable ? `<label class="school-plan-basemap-panel__check">Catastro SNC
+            <span>
+              <input type="checkbox" ${cadastralActive ? 'checked' : ''} onchange="MecFormModule.togglePlanCadastralOverlay(this.checked)">
+              <b>${cadastralActive ? 'Activo' : 'Apagado'}</b>
+            </span>
+          </label>
+          <label>Opacidad catastro
+            <input type="range" min="0.15" max="1" step="0.05" value="${_escape(_planBaseMapCadastralOpacity(baseMap))}" onchange="MecFormModule.setPlanCadastralOpacity(this.value)">
+            <b>${Math.round(_planBaseMapCadastralOpacity(baseMap) * 100)}%</b>
+          </label>` : ''}
           <label>Latitud
             <input type="number" step="0.000001" value="${_escape(baseMap.lat)}" onchange="MecFormModule.setPlanBaseMapValue('lat', this.value)">
           </label>
@@ -2671,6 +2817,8 @@ const MecFormModule = (() => {
       panelOpen: Boolean(_planBaseMapPanelOpen),
       streetOverlay: Boolean(baseMap.streetOverlay),
       streetOverlayOpacity: _planBaseMapStreetOverlayOpacity(baseMap),
+      cadastralOverlay: Boolean(baseMap.cadastralOverlay && _planBaseMapCadastralConfig()),
+      cadastralOpacity: _planBaseMapCadastralOpacity(baseMap),
       hasCoords: _planBaseMapHasCoords(baseMap),
       lat: baseMap.lat,
       lng: baseMap.lng,
@@ -2685,6 +2833,7 @@ const MecFormModule = (() => {
     if (key === 'scale') baseMap.scale = _clampPlanBaseMapScale(value, baseMap.scale);
     if (key === 'opacity') baseMap.opacity = _numberInRange(value, baseMap.opacity, .15, 1);
     if (key === 'streetOverlayOpacity') baseMap.streetOverlayOpacity = _planBaseMapStreetOverlayOpacity({ streetOverlayOpacity: value });
+    if (key === 'cadastralOpacity') baseMap.cadastralOpacity = _planBaseMapCadastralOpacity({ cadastralOpacity: value });
     if (key === 'rotationDeg') baseMap.rotationDeg = _planBaseMapRotationDeg(value);
     if (key === 'contrast') baseMap.contrast = _numberInRange(value, baseMap.contrast, .75, 1.75);
     if (key === 'saturation') baseMap.saturation = _numberInRange(value, baseMap.saturation, .5, 1.8);
@@ -2876,6 +3025,41 @@ const MecFormModule = (() => {
     } else if (next) {
       _planBaseMapPanelOpen = true;
       UI.showToast('Cargue coordenadas para superponer las calles sobre la base satelital.', 'warning', 5200);
+    }
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function setPlanCadastralOpacity(value = PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapCadastralConfig()) {
+      UI.showToast('La capa catastral oficial no esta configurada.', 'warning', 5200);
+      return;
+    }
+    baseMap.cadastralOpacity = _planBaseMapCadastralOpacity({ cadastralOpacity: value });
+    baseMap.cadastralOverlay = true;
+    if (_planBaseMapHasCoords(baseMap)) baseMap.enabled = true;
+    baseMap.confirmed = false;
+    _saveDraft(false);
+    renderSchoolPlan();
+  }
+
+  function togglePlanCadastralOverlay(force = undefined) {
+    const baseMap = _ensurePlanBaseMap();
+    if (!_planBaseMapCadastralConfig()) {
+      UI.showToast('La capa catastral oficial no esta disponible en la configuracion.', 'warning', 5200);
+      return;
+    }
+    const next = force === undefined ? !baseMap.cadastralOverlay : Boolean(force);
+    baseMap.cadastralOverlay = next;
+    baseMap.cadastralOpacity = _planBaseMapCadastralOpacity(baseMap);
+    if (_planBaseMapHasCoords(baseMap)) {
+      baseMap.enabled = true;
+      _applyPropertyBoundaryGeoLock();
+    } else if (next) {
+      _planBaseMapPanelOpen = true;
+      UI.showToast('Cargue coordenadas para superponer Catastro SNC sobre la base mapa.', 'warning', 5200);
     }
     baseMap.confirmed = false;
     _saveDraft(false);
@@ -12241,6 +12425,8 @@ const MecFormModule = (() => {
       rotationDeg: Number(baseMap.rotationDeg || 0),
       streetOverlay: Boolean(baseMap.streetOverlay),
       streetOverlayOpacity: Number(baseMap.streetOverlayOpacity || PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY),
+      cadastralOverlay: Boolean(baseMap.cadastralOverlay),
+      cadastralOpacity: Number(baseMap.cadastralOpacity || PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY),
     };
   }
 
@@ -12257,6 +12443,10 @@ const MecFormModule = (() => {
     baseMap.streetOverlay = Boolean(view.streetOverlay);
     if (Number.isFinite(Number(view.streetOverlayOpacity))) {
       baseMap.streetOverlayOpacity = _numberInRange(Number(view.streetOverlayOpacity), PLAN_BASEMAP_STREET_OVERLAY_DEFAULT_OPACITY, .15, 1);
+    }
+    baseMap.cadastralOverlay = Boolean(view.cadastralOverlay && _planBaseMapCadastralConfig());
+    if (Number.isFinite(Number(view.cadastralOpacity))) {
+      baseMap.cadastralOpacity = _numberInRange(Number(view.cadastralOpacity), PLAN_BASEMAP_CADASTRAL_DEFAULT_OPACITY, .15, 1);
     }
   }
 
@@ -14098,6 +14288,8 @@ const MecFormModule = (() => {
     const active = _planBaseMapVisible(baseMap);
     const source = _planBaseMapSource(baseMap);
     const streetsActive = Boolean(baseMap.streetOverlay);
+    const cadastralAvailable = Boolean(_planBaseMapCadastralConfig());
+    const cadastralActive = Boolean(baseMap.cadastralOverlay && cadastralAvailable);
     const highres = _planBaseMapHighresSource();
     const hasGoogleSatellite = _hasGoogleSatelliteSource();
     const coords = _planBaseMapHasCoords(baseMap)
@@ -14150,6 +14342,15 @@ const MecFormModule = (() => {
           className: 'school-plan-ribbon__button--street-overlay',
           title: 'Superponer nombres de calles sobre la satelital',
         })}
+        ${cadastralAvailable ? _renderPlanRibbonButton({
+          icon: '&#9635;',
+          label: 'Catastro',
+          onClick: 'MecFormModule.togglePlanCadastralOverlay()',
+          tone: cadastralActive ? 'btn-primary' : 'btn-outline',
+          active: cadastralActive,
+          className: 'school-plan-ribbon__button--cadastral-overlay',
+          title: 'Superponer parcelas oficiales del Servicio Nacional de Catastro',
+        }) : ''}
         ${_renderPlanRibbonButton({
           icon: '&#9881;',
           label: 'Ajustar',
@@ -25287,6 +25488,8 @@ const MecFormModule = (() => {
     setPlanBaseMapSource,
     togglePlanStreetOverlay,
     setPlanStreetOverlayOpacity,
+    togglePlanCadastralOverlay,
+    setPlanCadastralOpacity,
     getPlanBaseMapState,
     togglePlanBaseMapPanel,
     togglePlanBaseMapDragMode,
