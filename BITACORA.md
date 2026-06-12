@@ -24,9 +24,10 @@
 - `git diff --check` sin errores de espacios; solo advertencias esperadas de normalizacion LF/CRLF.
 - `clasp push -f`: subidos 8 archivos al proyecto GAS.
 - `clasp version "v2.6.179 perimetros reapertura y salto mapa"`: creada version GAS `35`.
+- GitHub Pages verificado con cache-busting despues del push: `index.html`, `assets/js/map.js`, `assets/js/api.js` y `assets/js/mec-form.js` respondieron HTTP 200 y contienen los cambios esperados de `v2.6.179`.
 
-### Pendientes
-- Verificar assets publicados en GitHub Pages con cache-busting despues del push a `main`.
+### Pendientes y riesgos
+- Validacion funcional manual en navegador por usuario: abrir mapa, aplicar filtros, usar `Anterior` / `Siguiente`, abrir `Ver/Editar registro` y confirmar que el perimetro se rehidrata en el plano.
 - No cambiar `GAS_URL` ni redeployar el endpoint estable mientras el backend primario siga devolviendo HTTP 403 sin prueba anonima JSON.
 
 ---
