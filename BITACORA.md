@@ -23,11 +23,11 @@
 - `clasp push -f`: subidos 8 archivos GAS con el endpoint liviano publico.
 - `clasp version "v2.6.178 perimetros fallback hoja publicada"`: creada version GAS `34`.
 - Se mantiene sin redeploy el backend estable `AKfycbzrXilB80... @23` para no romper carga/guardado general.
-- Commit local preparado en `main`; `git push` queda bloqueado porque Git no puede leer credenciales de GitHub sin prompt y el conector GitHub responde `token_expired`.
+- Commit de implementacion `11cdab1` publicado en `origin/main`; remoto actualizado de `f48c5a0` a `11cdab1`.
 
 ### Pendiente operativo
 - Publicar desde la consola de Apps Script, con la cuenta propietaria, un Web App sobre la version GAS `34` o superior con `Ejecutar como: Yo` y `Acceso: Cualquiera`.
-- Reintentar `git push` cuando GitHub Credential Manager o el conector GitHub vuelvan a estar autenticados; el commit local vigente queda listo.
+- Verificar GitHub Pages con cache-busting cuando termine de propagar el commit `11cdab1`.
 
 ---
 
