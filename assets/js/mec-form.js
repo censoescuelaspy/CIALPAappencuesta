@@ -409,6 +409,7 @@ const MecFormModule = (() => {
     const existingVertices = _boundaryGeoVerticesFromItem(element || {});
     if (existingVertices.length >= 3 && !options.force) {
       _ensurePlanBaseMapFromPerimeter(perimeter, school);
+      _applyPropertyBoundaryGeoMeasurements(element, existingVertices);
       _planLayers.exteriores = true;
       return false;
     }
@@ -435,6 +436,8 @@ const MecFormModule = (() => {
       fuente: element.ficha?.fuente || 'Registro guardado',
       perimetro_m: perimeter.perimetro_m || element.ficha?.perimetro_m || '',
       superficie_m2: perimeter.superficie_m2 || element.ficha?.superficie_m2 || '',
+      area_ha: perimeter.area_ha || element.ficha?.area_ha || '',
+      lados_m: perimeter.lados_m_texto || element.ficha?.lados_m || '',
       observacion: element.ficha?.observacion || `Perimetro recuperado desde capa de mapa (${perimeter.actualizado_en || perimeter.fecha_guardado || 'sin fecha'}).`,
     };
     _setPropertyBoundaryGeoVertices(element, vertices);
@@ -2002,6 +2005,49 @@ const MecFormModule = (() => {
     return _parseBoundaryGeoVerticesFromFicha(item.ficha || {});
   }
 
+  function _propertyBoundaryGeoMeasurement(vertices = []) {
+    if (typeof GeoMeasure === 'undefined' || typeof GeoMeasure.measurePolygon !== 'function') return null;
+    const measured = GeoMeasure.measurePolygon(vertices);
+    return measured?.valid ? measured : null;
+  }
+
+  function _applyPropertyBoundaryGeoMeasurements(element, vertices = _boundaryGeoVerticesFromItem(element || {})) {
+    if (!element || element.type !== 'property_boundary') return null;
+    const measured = _propertyBoundaryGeoMeasurement(vertices);
+    if (!measured) return null;
+    element.ficha = element.ficha || {};
+    element.ficha.perimetro_m = GeoMeasure.formatNumber(measured.perimeter_m, 2);
+    element.ficha.superficie_m2 = GeoMeasure.formatNumber(measured.area_m2, 2);
+    element.ficha.area_ha = GeoMeasure.formatNumber(measured.area_ha, 4);
+    element.ficha.lados_m = GeoMeasure.formatSideList(measured, { separator: '\n' });
+    element.ficha.lados_json = JSON.stringify(measured.sides || []);
+    element.ficha.metodo_medicion = measured.method;
+    if (measured.extent?.largo_m) element.ficha.largo_m = GeoMeasure.formatNumber(measured.extent.largo_m, 2);
+    if (measured.extent?.ancho_m) element.ficha.ancho_m = GeoMeasure.formatNumber(measured.extent.ancho_m, 2);
+    element.geoMeasurement = {
+      perimeter_m: measured.perimeter_m,
+      area_m2: measured.area_m2,
+      area_ha: measured.area_ha,
+      sides: measured.sides,
+      side_lengths_m: measured.side_lengths_m,
+      extent: measured.extent,
+      method: measured.method,
+      calculatedAt: new Date().toISOString(),
+    };
+    return measured;
+  }
+
+  function _propertyBoundaryMeasureSummary(element) {
+    if (!element || element.type !== 'property_boundary') return '';
+    const measured = _applyPropertyBoundaryGeoMeasurements(element);
+    const perimeter = measured?.perimeter_m || Number(String(element.ficha?.perimetro_m || '').replace(',', '.')) || 0;
+    const area = measured?.area_m2 || Number(String(element.ficha?.superficie_m2 || '').replace(',', '.')) || 0;
+    const parts = [];
+    if (perimeter) parts.push(`P ${typeof GeoMeasure !== 'undefined' && GeoMeasure.formatDistance ? GeoMeasure.formatDistance(perimeter) : `${perimeter.toFixed(2)} m`}`);
+    if (area) parts.push(`A ${typeof GeoMeasure !== 'undefined' && GeoMeasure.formatArea ? GeoMeasure.formatArea(area) : `${area.toFixed(2)} m2`}`);
+    return parts.join(' - ');
+  }
+
   function _setPropertyBoundaryGeoVertices(element, vertices = []) {
     const normalized = _normalizeBoundaryGeoVertices(vertices);
     if (!element || element.type !== 'property_boundary' || normalized.length < 3) return false;
@@ -2018,6 +2064,7 @@ const MecFormModule = (() => {
       type: 'Polygon',
       coordinates: [ring],
     });
+    _applyPropertyBoundaryGeoMeasurements(element, normalized);
     return true;
   }
 
@@ -2083,6 +2130,7 @@ const MecFormModule = (() => {
       })),
     };
     _syncSiteElementMeasuresFromRect(element, { x: shiftedMinX, y: shiftedMinY, w: width, h: height }, logicalWidth, logicalHeight);
+    _applyPropertyBoundaryGeoMeasurements(element);
     return true;
   }
 
@@ -5091,11 +5139,14 @@ const MecFormModule = (() => {
       }
       const rotationDeg = _normalizeSiteRotation(item.rotationDeg ?? item.rotacion_grados ?? ficha.rotacion_grados);
       ficha.rotacion_grados = String(rotationDeg);
+      const geoVertices = type === 'property_boundary' ? _boundaryGeoVerticesFromItem({ ...item, ficha }) : [];
+      if (type === 'property_boundary' && geoVertices.length >= 3) {
+        _applyPropertyBoundaryGeoMeasurements({ ...item, type, ficha, geoVertices }, geoVertices);
+      }
       const measuredSize = _siteElementSizeFromFicha(type, shape, ficha);
       const planShape = type === 'property_boundary'
         ? _normalizePropertyBoundaryShape(item.planShape)
         : _clonePlanShape(item.planShape);
-      const geoVertices = type === 'property_boundary' ? _boundaryGeoVerticesFromItem(item) : [];
       const applyBoundaryMeasuredScale = type === 'property_boundary' &&
         measuredSize &&
         item.boundaryScaleVersion !== PROPERTY_BOUNDARY_SCALE_VERSION;
@@ -5335,6 +5386,9 @@ const MecFormModule = (() => {
       element.shape = _normalizeRecreationShape(element.ficha.forma || element.shape);
       element.ficha.forma = _recreationShapeLabel(element.shape);
     }
+    const geoBoundaryMeasurement = element.type === 'property_boundary'
+      ? _applyPropertyBoundaryGeoMeasurements(element)
+      : null;
     const largo = Number(element.ficha.largo_m || 0);
     const ancho = Number(element.ficha.ancho_m || 0);
     if (element.type === 'water_tank') {
@@ -5345,7 +5399,7 @@ const MecFormModule = (() => {
       const diametro = Number(element.ficha.diametro_m || element.ficha.ancho_m || 0);
       if (diametro > 0) element.ficha.superficie_m2 = (Math.PI * Math.pow(diametro / 2, 2)).toFixed(2);
     }
-    if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space', 'property_boundary', 'stair', 'ramp'].includes(element.type)) {
+    if (largo > 0 && ancho > 0 && ['recreation', 'gallery', 'walkway', 'open_space', 'property_boundary', 'stair', 'ramp'].includes(element.type) && !(element.type === 'property_boundary' && geoBoundaryMeasurement)) {
       element.ficha.superficie_m2 = (largo * ancho).toFixed(2);
       if (element.ficha.perimetro_m !== undefined) element.ficha.perimetro_m = (2 * (largo + ancho)).toFixed(2);
     }
@@ -5453,6 +5507,8 @@ const MecFormModule = (() => {
         ancho_m: '',
         superficie_m2: '',
         perimetro_m: '',
+        area_ha: '',
+        lados_m: '',
         fuente: 'Verificacion en campo',
         cerramiento: 'No verificado',
       },
@@ -5603,8 +5659,10 @@ const MecFormModule = (() => {
         { key: 'uso', label: 'Uso', options: ['Limite aproximado del predio', 'Area escolar confirmada', 'Limite dudoso', 'Otro'] },
         { key: 'largo_m', label: 'Largo aprox. (m)', type: 'number', placeholder: 'Ej. 80' },
         { key: 'ancho_m', label: 'Ancho aprox. (m)', type: 'number', placeholder: 'Ej. 55' },
-        { key: 'superficie_m2', label: 'Superficie aprox. (m2)', type: 'number', placeholder: 'Auto' },
-        { key: 'perimetro_m', label: 'Perimetro aprox. (m)', type: 'number', placeholder: 'Auto' },
+        { key: 'superficie_m2', label: 'Area total calculada (m2)', type: 'number', placeholder: 'Auto', readonly: true },
+        { key: 'perimetro_m', label: 'Perimetro total calculado (m)', type: 'number', placeholder: 'Auto', readonly: true },
+        { key: 'area_ha', label: 'Area total (ha)', type: 'number', placeholder: 'Auto', readonly: true },
+        { key: 'lados_m', label: 'Lados calculados (m)', type: 'textarea', placeholder: 'Auto', rows: 5, wide: true, readonly: true },
         { key: 'fuente', label: 'Fuente de ubicacion', options: ['Verificacion en campo', 'Imagen/base mapa', 'Dato institucional', 'Estimado por encuestador', 'No verificable'] },
         { key: 'cerramiento', label: 'Cerramiento visible', options: ['Perimetral', 'Parcial', 'Sin cerramiento', 'No verificable'] },
       ],
@@ -5706,15 +5764,17 @@ const MecFormModule = (() => {
 
   function _renderSiteElementFieldInput(field, ficha = {}, disabled = '') {
     const value = ficha[field.key] ?? '';
+    const readonly = field.readonly ? ' readonly aria-readonly="true"' : '';
+    const state = disabled || readonly;
     if (field.options) {
       return _choiceButtons(field.key, field.options, value || field.options[0]);
     }
     if (field.type === 'textarea') {
-      return `<textarea class="form-control" name="${_escape(field.key)}" rows="2" ${disabled}>${_escape(value)}</textarea>`;
+      return `<textarea class="form-control" name="${_escape(field.key)}" rows="${_escape(field.rows || 2)}" placeholder="${_escape(field.placeholder || '')}" ${state}>${_escape(value)}</textarea>`;
     }
     const type = field.type || 'text';
     const inputMode = type === 'number' ? ' inputmode="decimal"' : '';
-    return `<input class="form-control" type="${_escape(type)}" name="${_escape(field.key)}" value="${_escape(value)}" placeholder="${_escape(field.placeholder || '')}"${inputMode} ${disabled}>`;
+    return `<input class="form-control" type="${_escape(type)}" name="${_escape(field.key)}" value="${_escape(value)}" placeholder="${_escape(field.placeholder || '')}"${inputMode} ${state}>`;
   }
 
   function _siteElementDefaultSize(type, shape = '') {
@@ -11254,6 +11314,7 @@ const MecFormModule = (() => {
       ? _recreationShapeLabel(element.shape || element.ficha?.forma)
       : (element.type === 'pillar' ? (element.ficha?.forma_pilar || element.ficha?.seccion || '') : '');
     const rotation = _siteElementRotationDeg(element);
+    const boundarySummary = element.type === 'property_boundary' ? _propertyBoundaryMeasureSummary(element) : '';
     return {
       title: element.ficha?.codigo || _siteElementLabel(element.type),
       subtitle: element.type === 'water_tank' ? 'Infraestructura especial' : 'Otro espacio',
@@ -11261,9 +11322,9 @@ const MecFormModule = (() => {
         { label: 'Tipo', value: _siteElementLabel(element.type) },
         { label: 'Figura', value: shape },
         { label: 'Caida', value: element.type === 'ramp' ? _rampFallDirectionLabel(_rampFallDirection(element)) : '' },
-        { label: 'Medidas', value: element.ficha?.largo_m && element.ficha?.ancho_m ? `${element.ficha.largo_m} x ${element.ficha.ancho_m} m` : '' },
+        { label: 'Medidas', value: boundarySummary || (element.ficha?.largo_m && element.ficha?.ancho_m ? `${element.ficha.largo_m} x ${element.ficha.ancho_m} m` : '') },
         { label: 'Diam./lado', value: element.type === 'pillar' && (element.ficha?.forma_pilar === 'Cuadrado' ? element.ficha?.lado_m : element.ficha?.diametro_m) ? `${element.ficha.forma_pilar === 'Cuadrado' ? element.ficha.lado_m : element.ficha.diametro_m} m` : '' },
-        { label: 'Area', value: _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
+        { label: 'Area', value: element.type === 'property_boundary' && element.ficha?.superficie_m2 ? `${element.ficha.superficie_m2} m2` : _tooltipPlanArea(element.ficha?.largo_m, element.ficha?.ancho_m) },
         { label: 'Rotacion', value: rotation ? `${rotation} grados` : '0 grados' },
       ], element.type),
       photos: _tooltipPhotosFromList(element.ficha?.evidencias || []),
@@ -15145,13 +15206,14 @@ const MecFormModule = (() => {
     const propertyEditActive = _propertyBoundaryEditActive(item);
     const rampFall = isRamp ? _rampFallDirection(item) : '';
     const label = item.ficha?.codigo || `${_siteElementLabel(item.type)} ${index + 1}`;
+    const propertyMeasureSummary = isPropertyBoundary ? _propertyBoundaryMeasureSummary(item) : '';
     const detail = [
       _siteElementLabel(item.type),
       isPropertyBoundary ? (propertyEditActive ? 'edicion activa' : 'fijo') : '',
       item.type === 'recreation' ? _recreationShapeLabel(item.shape || item.ficha?.forma) : '',
       isRamp ? `Caida ${_rampFallDirectionLabel(rampFall).toLowerCase()}` : '',
       TECHNICAL_REGISTER_MODE ? '' : item.ficha?.estado || 'Sin estado',
-      item.ficha?.largo_m && item.ficha?.ancho_m ? `${item.ficha.largo_m} x ${item.ficha.ancho_m} m` : '',
+      propertyMeasureSummary || (item.ficha?.largo_m && item.ficha?.ancho_m ? `${item.ficha.largo_m} x ${item.ficha.ancho_m} m` : ''),
       Array.isArray(item.ficha?.evidencias) && item.ficha.evidencias.length ? `${item.ficha.evidencias.length} foto(s)` : '',
     ].filter(Boolean).join(' - ');
     return `

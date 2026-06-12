@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.179
+ * Version: 2.6.180
  */
 
 const MapModule = (() => {
@@ -514,8 +514,15 @@ const MapModule = (() => {
         fillOpacity: 0.14,
         lineJoin: 'round',
       });
-      layer.bindTooltip(`${row.nombre_escuela || row.codigo_local || 'Escuela'} - perimetro guardado`, { sticky: true });
-      layer.bindPopup(_buildPerimeterPopup(row, school), { maxWidth: 280 });
+      const measurements = _perimeterMeasurements(row);
+      const tooltipParts = [
+        row.nombre_escuela || row.codigo_local || 'Escuela',
+        'perimetro guardado',
+        measurements?.perimeter_m ? `P ${_formatMapDistance(measurements.perimeter_m)}` : '',
+        measurements?.area_m2 ? `A ${_formatMapArea(measurements.area_m2)}` : '',
+      ].filter(Boolean);
+      layer.bindTooltip(tooltipParts.join(' - '), { sticky: true });
+      layer.bindPopup(_buildPerimeterPopup(row, school), { maxWidth: 340 });
       layer.on('click', () => {
         if (school) {
           _selectedEscuela = school;
@@ -559,15 +566,54 @@ const MapModule = (() => {
       .filter(Boolean);
   }
 
+  function _perimeterMeasurements(row = {}) {
+    const existing = row.medidas || row.measurements || null;
+    if (existing && existing.valid && Array.isArray(existing.sides)) return existing;
+    if (typeof GeoMeasure === 'undefined' || typeof GeoMeasure.measurePolygon !== 'function') return null;
+    const vertices = Array.isArray(row.vertices) ? row.vertices : [];
+    const measured = GeoMeasure.measurePolygon(vertices);
+    return measured?.valid ? measured : null;
+  }
+
+  function _formatMapNumber(value, decimals = 2) {
+    if (typeof GeoMeasure !== 'undefined' && typeof GeoMeasure.formatNumber === 'function') return GeoMeasure.formatNumber(value, decimals);
+    const num = Number(value);
+    return Number.isFinite(num) ? num.toFixed(decimals) : '';
+  }
+
+  function _formatMapDistance(value) {
+    if (typeof GeoMeasure !== 'undefined' && typeof GeoMeasure.formatDistance === 'function') return GeoMeasure.formatDistance(value);
+    const num = Number(value);
+    return Number.isFinite(num) ? `${num.toFixed(2)} m` : '';
+  }
+
+  function _formatMapArea(value) {
+    if (typeof GeoMeasure !== 'undefined' && typeof GeoMeasure.formatArea === 'function') return GeoMeasure.formatArea(value);
+    const num = Number(value);
+    return Number.isFinite(num) ? `${num.toFixed(2)} m2` : '';
+  }
+
+  function _perimeterMetricCards(row = {}, measurements = _perimeterMeasurements(row)) {
+    const perimeter = measurements?.perimeter_m || Number(String(row.perimetro_m || '').replace(',', '.')) || 0;
+    const area = measurements?.area_m2 || Number(String(row.superficie_m2 || '').replace(',', '.')) || 0;
+    const areaHa = measurements?.area_ha || Number(String(row.area_ha || '').replace(',', '.')) || 0;
+    return [
+      { label: 'Perimetro', value: perimeter ? _formatMapDistance(perimeter) : '' },
+      { label: 'Area', value: area ? _formatMapArea(area) : '' },
+      { label: 'Hectareas', value: areaHa ? `${_formatMapNumber(areaHa, 4)} ha` : '' },
+      { label: 'Vertices', value: row.vertices_count ? `${row.vertices_count}` : '' },
+    ].filter(item => item.value);
+  }
+
   function _buildPerimeterPopup(row = {}, school = null) {
     const id = school ? _schoolPrimaryId(school) : (row.id_escuela || row.codigo_local || '');
     const idArg = _jsString(id);
     const canOperate = school && Auth.canAccess('encuestador') && Auth.canOperateSchool(school);
-    const metrics = [
-      row.perimetro_m ? `${_escape(row.perimetro_m)} m` : '',
-      row.superficie_m2 ? `${_escape(row.superficie_m2)} m2` : '',
-      row.vertices_count ? `${_escape(row.vertices_count)} vertices` : '',
-    ].filter(Boolean).join(' - ');
+    const measurements = _perimeterMeasurements(row);
+    const metricCards = _perimeterMetricCards(row, measurements);
+    const sideItems = (measurements?.sides || [])
+      .map(side => `<li><span>${_escape(side.label || `L${side.index}`)}</span><b>${_escape(_formatMapDistance(side.length_m))}</b></li>`)
+      .join('');
     return `
       <div class="map-popup map-popup--perimeter">
         <div class="map-popup__header">
@@ -578,7 +624,15 @@ const MapModule = (() => {
           <p><b>Codigo:</b> ${_escape(row.codigo_local || '-')}</p>
           <p><b>Distrito:</b> ${_escape(row.distrito || '-')}</p>
           <p><b>Censista:</b> ${_escape(row.usuario || '-')}</p>
-          ${metrics ? `<p><b>Medidas:</b> ${metrics}</p>` : ''}
+          ${metricCards.length ? `
+            <div class="map-perimeter-metrics">
+              ${metricCards.map(item => `<span><b>${_escape(item.label)}</b>${_escape(item.value)}</span>`).join('')}
+            </div>` : ''}
+          ${sideItems ? `
+            <details class="map-perimeter-sides" open>
+              <summary>Lados calculados</summary>
+              <ol>${sideItems}</ol>
+            </details>` : ''}
           <p><b>Actualizado:</b> ${_escape(row.actualizado_en || row.fecha_guardado || '-')}</p>
         </div>
         <div class="map-popup__actions">

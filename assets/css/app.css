@@ -1090,6 +1090,65 @@ td {
 .map-popup__body p { font-size: .82rem; margin-bottom: .2rem; color: #444; }
 .map-popup__actions { margin-top: .65rem; display: flex; gap: .4rem; flex-wrap: wrap; }
 .map-popup__actions .btn { flex: 1 1 92px; white-space: normal; }
+
+.map-perimeter-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .35rem;
+  margin: .5rem 0;
+}
+
+.map-perimeter-metrics span {
+  min-width: 0;
+  padding: .35rem .4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: .76rem;
+  line-height: 1.25;
+}
+
+.map-perimeter-metrics b {
+  display: block;
+  color: var(--color-secondary);
+  font-size: .68rem;
+  text-transform: uppercase;
+}
+
+.map-perimeter-sides {
+  margin: .45rem 0;
+  font-size: .78rem;
+}
+
+.map-perimeter-sides summary {
+  cursor: pointer;
+  font-weight: 800;
+  color: var(--color-secondary);
+}
+
+.map-perimeter-sides ol {
+  max-height: 118px;
+  margin: .35rem 0 0;
+  padding: .35rem .45rem;
+  overflow: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  list-style: none;
+}
+
+.map-perimeter-sides li {
+  display: flex;
+  justify-content: space-between;
+  gap: .6rem;
+  padding: .16rem 0;
+  border-bottom: 1px solid rgba(15, 23, 42, .08);
+}
+
+.map-perimeter-sides li:last-child {
+  border-bottom: 0;
+}
 .map-readonly-note {
   width: 100%;
   margin: .25rem 0 0;

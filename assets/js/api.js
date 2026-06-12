@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.179
+ * Version: 2.6.180
  */
 
 const API = (() => {
@@ -279,7 +279,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 10:15:00',
       estado_borrador: 'en_curso',
       estado_operativo: 'en_curso',
-      app_version: '2.6.179',
+      app_version: '2.6.180',
       schema_version: 'mec_v2',
       bloques: 3,
       pisos: 4,
@@ -304,7 +304,7 @@ const API = (() => {
       actualizado_en: '2026-06-08 12:40:00',
       estado_borrador: 'finalizado',
       estado_operativo: 'finalizada',
-      app_version: '2.6.179',
+      app_version: '2.6.180',
       schema_version: 'mec_v2',
       bloques: 2,
       pisos: 2,
@@ -979,6 +979,24 @@ const API = (() => {
     };
   }
 
+  function _mecBoundaryMeasurements(vertices = []) {
+    if (typeof GeoMeasure === 'undefined' || typeof GeoMeasure.measurePolygon !== 'function') return null;
+    const measured = GeoMeasure.measurePolygon(vertices);
+    if (!measured || !measured.valid) return null;
+    return {
+      valid: true,
+      vertices_count: measured.vertices_count,
+      perimeter_m: measured.perimeter_m,
+      area_m2: measured.area_m2,
+      area_ha: measured.area_ha,
+      extent: measured.extent,
+      sides: measured.sides,
+      side_lengths_m: measured.side_lengths_m,
+      sides_text: GeoMeasure.formatSideList(measured, { separator: ' | ' }),
+      method: measured.method,
+    };
+  }
+
   function _mecPlanBaseMapFromDraft(values = {}) {
     const baseMap = values.__planBaseMap || {};
     const lat = _numberValue(baseMap.lat);
@@ -1011,6 +1029,13 @@ const API = (() => {
     if (vertices.length < 3) return null;
     const bounds = _mecBoundaryBounds(vertices);
     const ficha = boundary.ficha || {};
+    const measurements = _mecBoundaryMeasurements(vertices);
+    const perimeterText = measurements
+      ? GeoMeasure.formatNumber(measurements.perimeter_m, 2)
+      : _textValue(ficha.perimetro_m || ficha.perimetro || '');
+    const areaText = measurements
+      ? GeoMeasure.formatNumber(measurements.area_m2, 2)
+      : _textValue(ficha.superficie_m2 || ficha.area_m2 || ficha.area || '');
     return {
       id_borrador: _textValue(row.id_borrador),
       id_escuela: _textValue(row.id_escuela || selected.id_escuela),
@@ -1025,8 +1050,12 @@ const API = (() => {
       estado_borrador: _textValue(row.estado_borrador) || 'borrador',
       app_version: _textValue(row.app_version),
       base_mapa_confirmada: _textValue(row.base_mapa_confirmada),
-      perimetro_m: _textValue(ficha.perimetro_m || ficha.perimetro || ''),
-      superficie_m2: _textValue(ficha.superficie_m2 || ficha.area_m2 || ficha.area || ''),
+      perimetro_m: perimeterText,
+      superficie_m2: areaText,
+      area_ha: measurements ? GeoMeasure.formatNumber(measurements.area_ha, 4) : _textValue(ficha.area_ha || ''),
+      lados_m: measurements?.sides || [],
+      lados_m_texto: measurements?.sides_text || _textValue(ficha.lados_m || ficha.lados || ''),
+      medidas: measurements,
       vertices,
       vertices_count: vertices.length,
       bounds,

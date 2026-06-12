@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.179
+ * Version 2.6.180
  */
 
 const SheetsService = (() => {
@@ -1426,6 +1426,9 @@ const SheetsService = (() => {
     if (vertices.length < 3) return null;
     const bounds = _mecBoundaryBounds_(vertices);
     const ficha = boundary.ficha || {};
+    const measurements = _mecBoundaryMeasurements_(vertices);
+    const perimeterText = measurements ? _mecFormatMeasure_(measurements.perimeter_m, 2) : _txt(ficha.perimetro_m || ficha.perimetro || '');
+    const areaText = measurements ? _mecFormatMeasure_(measurements.area_m2, 2) : _txt(ficha.superficie_m2 || ficha.area_m2 || ficha.area || '');
     return {
       id_borrador: _txt(row.id_borrador),
       id_escuela: _txt(row.id_escuela || selected.id_escuela || school.id_escuela),
@@ -1440,8 +1443,12 @@ const SheetsService = (() => {
       estado_borrador: _txt(row.estado_borrador) || 'borrador',
       app_version: _txt(row.app_version),
       base_mapa_confirmada: _txt(row.base_mapa_confirmada),
-      perimetro_m: _txt(ficha.perimetro_m || ficha.perimetro || ''),
-      superficie_m2: _txt(ficha.superficie_m2 || ficha.area_m2 || ficha.area || ''),
+      perimetro_m: perimeterText,
+      superficie_m2: areaText,
+      area_ha: measurements ? _mecFormatMeasure_(measurements.area_ha, 4) : _txt(ficha.area_ha || ''),
+      lados_m: measurements ? measurements.sides : [],
+      lados_m_texto: measurements ? _mecSideText_(measurements, ' | ') : _txt(ficha.lados_m || ficha.lados || ''),
+      medidas: measurements,
       vertices: vertices,
       vertices_count: vertices.length,
       bounds: bounds,
@@ -1535,6 +1542,115 @@ const SheetsService = (() => {
       minLng: _roundCoord_(Math.min.apply(null, lngs)),
       maxLng: _roundCoord_(Math.max.apply(null, lngs)),
     };
+  }
+
+  function _mecRad_(deg) {
+    return (Number(deg) || 0) * Math.PI / 180;
+  }
+
+  function _mecRoundMeasure_(value, decimals) {
+    decimals = decimals === undefined ? 2 : decimals;
+    const num = Number(value);
+    if (!Number.isFinite(num)) return 0;
+    const factor = Math.pow(10, decimals);
+    return Math.round(num * factor) / factor;
+  }
+
+  function _mecFormatMeasure_(value, decimals) {
+    decimals = decimals === undefined ? 2 : decimals;
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return num.toFixed(decimals);
+  }
+
+  function _mecDistanceMeters_(a, b) {
+    const radius = 6371008.8;
+    const lat1 = _mecRad_(a && a.lat);
+    const lat2 = _mecRad_(b && b.lat);
+    const dLat = _mecRad_(Number(b && b.lat) - Number(a && a.lat));
+    const dLng = _mecRad_(Number(b && b.lng) - Number(a && a.lng));
+    const h = Math.pow(Math.sin(dLat / 2), 2)
+      + Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin(dLng / 2), 2);
+    return 2 * radius * Math.atan2(Math.sqrt(h), Math.sqrt(Math.max(0, 1 - h)));
+  }
+
+  function _mecProjectionOrigin_(vertices) {
+    const count = vertices.length || 1;
+    return {
+      lat: vertices.reduce(function(sum, vertex) { return sum + Number(vertex.lat || 0); }, 0) / count,
+      lng: vertices.reduce(function(sum, vertex) { return sum + Number(vertex.lng || 0); }, 0) / count,
+    };
+  }
+
+  function _mecProjectedPoint_(vertex, origin) {
+    const radius = 6371008.8;
+    const originLat = _mecRad_(origin.lat);
+    return {
+      x: radius * (_mecRad_(vertex.lng) - _mecRad_(origin.lng)) * Math.cos(originLat),
+      y: radius * (_mecRad_(vertex.lat) - _mecRad_(origin.lat)),
+    };
+  }
+
+  function _mecPolygonAreaM2_(vertices) {
+    if (!Array.isArray(vertices) || vertices.length < 3) return 0;
+    const origin = _mecProjectionOrigin_(vertices);
+    const points = vertices.map(function(vertex) { return _mecProjectedPoint_(vertex, origin); });
+    let acc = 0;
+    for (let i = 0; i < points.length; i++) {
+      const next = points[(i + 1) % points.length];
+      acc += points[i].x * next.y - next.x * points[i].y;
+    }
+    return Math.abs(acc) / 2;
+  }
+
+  function _mecExtentMeters_(vertices) {
+    const bounds = _mecBoundaryBounds_(vertices);
+    if (!bounds) return { width_m: 0, height_m: 0, largo_m: 0, ancho_m: 0 };
+    const midLat = (Number(bounds.minLat) + Number(bounds.maxLat)) / 2;
+    const midLng = (Number(bounds.minLng) + Number(bounds.maxLng)) / 2;
+    const width = _mecDistanceMeters_({ lat: midLat, lng: bounds.minLng }, { lat: midLat, lng: bounds.maxLng });
+    const height = _mecDistanceMeters_({ lat: bounds.minLat, lng: midLng }, { lat: bounds.maxLat, lng: midLng });
+    return {
+      width_m: _mecRoundMeasure_(width, 2),
+      height_m: _mecRoundMeasure_(height, 2),
+      largo_m: _mecRoundMeasure_(Math.max(width, height), 2),
+      ancho_m: _mecRoundMeasure_(Math.min(width, height), 2),
+    };
+  }
+
+  function _mecBoundaryMeasurements_(vertices) {
+    if (!Array.isArray(vertices) || vertices.length < 3) return null;
+    const sides = vertices.map(function(vertex, index) {
+      const nextIndex = (index + 1) % vertices.length;
+      return {
+        index: index + 1,
+        label: 'L' + (index + 1),
+        from: index + 1,
+        to: nextIndex + 1,
+        length_m: _mecRoundMeasure_(_mecDistanceMeters_(vertex, vertices[nextIndex]), 2),
+      };
+    });
+    const perimeter = sides.reduce(function(sum, side) { return sum + Number(side.length_m || 0); }, 0);
+    const area = _mecPolygonAreaM2_(vertices);
+    return {
+      valid: true,
+      vertices_count: vertices.length,
+      perimeter_m: _mecRoundMeasure_(perimeter, 2),
+      area_m2: _mecRoundMeasure_(area, 2),
+      area_ha: _mecRoundMeasure_(area / 10000, 4),
+      extent: _mecExtentMeters_(vertices),
+      sides: sides,
+      side_lengths_m: sides.map(function(side) { return side.length_m; }),
+      method: 'haversine_sides_local_projection_area',
+    };
+  }
+
+  function _mecSideText_(measurement, separator) {
+    separator = separator === undefined ? '\n' : separator;
+    const sides = Array.isArray(measurement && measurement.sides) ? measurement.sides : [];
+    return sides.map(function(side) {
+      return (side.label || ('L' + side.index)) + ': ' + _mecFormatMeasure_(side.length_m, 2) + ' m';
+    }).join(separator);
   }
 
   function _mecPlanBaseMapFromDraft_(values) {

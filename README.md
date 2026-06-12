@@ -1,8 +1,15 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.179** | Paraguay 2026
+**Version 2.6.180** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.180
+
+- Los perimetros guardados ahora calculan automaticamente cada lado del poligono desde sus vertices lat/lng.
+- La capa de mapa muestra perimetro total, area total, hectareas y lista de lados por predio.
+- Al abrir/ver/editar un registro, la ficha del predio rehidrata y guarda `perimetro_m`, `superficie_m2`, `area_ha` y `lados_m` calculados.
+- El extractor liviano `listarPerimetrosMec` devuelve medidas calculadas sin exponer `draft_json`.
 
 ## Novedades v2.6.179
 

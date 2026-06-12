@@ -4,6 +4,36 @@
 
 ---
 
+## Medidas calculadas de perimetros georreferenciados - 2026-06-11 - v2.6.180
+
+### Objetivo
+- Calcular automaticamente las medidas de cada lado, el perimetro total y el area total de los predios registrados a partir de sus vertices lat/lng.
+- Mostrar las medidas en la capa de mapa y conservarlas al abrir/ver/editar el registro del predio.
+
+### Cambios implementados
+- `assets/js/geo-measure.js`: nuevo modulo reutilizable para normalizar vertices, calcular lados por Haversine, perimetro total y area por proyeccion local.
+- `assets/js/api.js` y `gas/sheets.gs`: `listarPerimetrosMec` agrega `medidas`, `lados_m`, `lados_m_texto`, `perimetro_m`, `superficie_m2` y `area_ha` calculados desde vertices.
+- `assets/js/map.js` y `assets/css/app.css`: popup de perimetros con tarjetas de medidas y listado de lados `L1`, `L2`, etc.
+- `assets/js/mec-form.js`: la ficha `property_boundary` rehidrata y recalcula medidas exactas desde vertices geograficos, evitando que el calculo rectangular del plano pise el area real.
+- `index.html` y `sw.js`: carga y precache de `geo-measure.js`; version/cache actualizados a `2.6.180`.
+
+### Validaciones realizadas
+- `node --check` ejecutado sobre `assets/js/geo-measure.js`, `assets/js/api.js`, `assets/js/map.js`, `assets/js/mec-form.js`, `assets/js/app.js`, `assets/js/config.js`, `assets/js/admin.js` y `sw.js`, sin errores.
+- `node --check` ejecutado sobre `gas/Code.gs` y `gas/sheets.gs` via stdin, sin errores.
+- Smoke test de geometria local: poligono de 4 vertices valido, 4 lados, perimetro `423.96 m`, area `11205.86 m2`, `1.1206 ha`.
+- Smoke test real de `API.listarPerimetrosMec({})`: backend primario respondio HTTP 403 y fallback por hoja publicada devolvio `status=ok`, `source=published_sheet`, `total=29`, `withSides=29`, `withArea=29`, `withPlanBaseMap=29`; primer perimetro con `firstSides=4`, `firstPerimeterM=195.71`, `firstAreaM2=2360.07`, `firstAreaHa=0.2360`.
+- `clasp push -f`: subidos 8 archivos al proyecto GAS.
+- `clasp version "v2.6.180 medidas calculadas perimetros"`: creada version GAS `36`.
+
+### Validaciones pendientes
+- Commit/push y verificacion de GitHub Pages con cache-busting.
+
+### Riesgos
+- El area es una aproximacion metrica local adecuada para predios escolares pequenos; no reemplaza una mensura catastral.
+- No cambiar `GAS_URL` ni redeployar el endpoint estable mientras el backend primario siga devolviendo HTTP 403 sin prueba anonima JSON.
+
+---
+
 ## Reapertura de perimetros y salto filtrado en mapa - 2026-06-11 - v2.6.179
 
 ### Objetivo
