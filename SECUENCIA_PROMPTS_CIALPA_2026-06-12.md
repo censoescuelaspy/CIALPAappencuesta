@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.185`.
+- Version vigente de esta intervencion: `2.6.186`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -14,6 +14,7 @@
 - Se integro Catastro SNC como capa WMS en el mapa principal y luego consulta de metadatos por popup con cache local.
 - En una intervencion se solicito colocar tambien la capa de Catastro en `REGISTRO GUIADO` sobre el mapa en alta resolucion.
 - En la intervencion actual se reporto que Catastro cargaba, pero la alta resolucion dejo de cargar; tambien se pidieron estados activos visibles, rotacion/alineacion automatica, mas zoom en `MAPA`, capa de planos/perimetros, predio preliminar desde Catastro y mejor administracion de carga por censista.
+- Luego se reporto que el boton `Iniciar/continuar registro` no llevaba a la vista `REGISTRO GUIADO`.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -24,6 +25,7 @@
 - La alineacion automatica rota la base usando el lado dominante del perimetro o estructura seleccionada; no modifica silenciosamente la geometria.
 - `Predio SNC` consulta `GetFeatureInfo` y solo aplica un poligono preliminar si Catastro devuelve geometria valida; el censista puede editar vertices libremente.
 - El admin agrega resumen por censista, ordenamiento por columnas y exportacion CSV de formularios visibles.
+- Para `2.6.186`, se corrigio la apertura de `REGISTRO GUIADO` cuando la escuela no tiene perimetro guardado: la lectura de perimetro ahora tolera `null` y no bloquea el arranque.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -43,3 +45,4 @@
 - Google Map Tiles verificado con `createSession` `200`.
 - WMS SNC verificado con `GetCapabilities` `200`.
 - Playwright no se ejecuto porque `@playwright/test` no esta instalado en este checkout.
+- En `2.6.186`, Playwright se ejecuto desde entorno temporal fuera de Google Drive; `MapModule.startGuidedRegister('ESC_TEST_GUIDED')` termino en `module-registro` con `.guided-register` renderizado y sin errores de consola.

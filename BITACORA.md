@@ -7177,3 +7177,63 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - Mantener `Predio SNC` como accion manual y confirmada, no automatica silenciosa.
 - Registrar en manual maestro el patron `fallback de alta resolucion + overlay WMS + predio preliminar editable`.
+
+---
+
+## Correccion apertura Registro Guiado desde MAPA - 2026-06-12 07:50
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.186`.
+
+### Objetivo de la intervencion
+- Corregir el boton `Iniciar/continuar registro` del `MAPA`, que no llevaba correctamente a la vista `REGISTRO GUIADO`.
+
+### Diagnostico inicial
+- El flujo `MapModule.startGuidedRegister(id)` cargaba la escuela y luego inicializaba `MecFormModule`/`GuidedRegisterModule`.
+- La falla se reprodujo localmente con Playwright usando una sesion admin simulada y una escuela sin perimetro guardado.
+- El error era `Cannot read properties of null (reading 'vertices')` en `_perimeterVerticesFromRecord`.
+
+### Acciones realizadas
+- `assets/js/mec-form.js`: se hizo tolerante a `null` la lectura de perimetros.
+- `assets/js/mec-form.js`: `_ensurePropertyBoundaryFromPerimeter` ahora retorna sin error cuando la escuela aun no tiene perimetro guardado.
+- `assets/js/config.js`, `assets/js/guided-register.js`, `index.html`, `sw.js`: version/cache actualizados a `2.6.186`.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js`
+- `assets/js/guided-register.js`
+- `index.html`
+- `sw.js`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/config.js`
+- `node --check assets/js/guided-register.js`
+- `git diff --check`
+- Prueba Playwright local con `MapModule.startGuidedRegister('ESC_TEST_GUIDED')` y stubs de `Auth`/`API`.
+
+### Resultados verificados
+- La prueba local termino con `active: module-registro`.
+- `guided-register-root` renderizo `.guided-register`.
+- Version local verificada: `2.6.186`.
+- La prueba no registro errores de consola.
+
+### Pruebas realizadas
+- Validacion de sintaxis JavaScript.
+- Validacion de whitespace.
+- Reproduccion local headless del flujo del boton.
+
+### Errores o incidentes
+- La instalacion de Playwright dentro de Google Drive genero archivos corruptos por bloqueo de escritura; se retiro `node_modules` del repo y la prueba se ejecuto desde un entorno temporal fuera de Drive.
+
+### Soluciones aplicadas
+- Se evita que una escuela sin perimetro previo bloquee la apertura de `REGISTRO GUIADO`.
+- El registro guiado puede iniciar con escuela nueva o sin poligono, y luego crear el perimetro desde cero o con `Predio SNC`.
+
+### Pendientes
+- Verificar en GitHub Pages que el navegador del usuario descargue `v2.6.186` y no mantenga cache anterior.

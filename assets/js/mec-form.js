@@ -384,13 +384,15 @@ const MecFormModule = (() => {
   }
 
   function _perimeterVerticesFromRecord(perimeter = {}) {
-    return _normalizeBoundaryGeoVertices(perimeter.vertices || perimeter.geoVertices || perimeter.boundaryGeoVertices || []);
+    const source = perimeter || {};
+    return _normalizeBoundaryGeoVertices(source.vertices || source.geoVertices || source.boundaryGeoVertices || []);
   }
 
   function _perimeterCenter(perimeter = {}, vertices = _perimeterVerticesFromRecord(perimeter)) {
-    if (perimeter.centro) {
-      const lat = _numberInRange(perimeter.centro.lat, NaN, -85, 85);
-      const lng = _numberInRange(perimeter.centro.lng, NaN, -180, 180);
+    const source = perimeter || {};
+    if (source.centro) {
+      const lat = _numberInRange(source.centro.lat, NaN, -85, 85);
+      const lng = _numberInRange(source.centro.lng, NaN, -180, 180);
       if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
     }
     if (!vertices.length) return null;
@@ -404,9 +406,10 @@ const MecFormModule = (() => {
   }
 
   function _ensurePlanBaseMapFromPerimeter(perimeter = {}, school = {}) {
-    const vertices = _perimeterVerticesFromRecord(perimeter);
-    const center = _perimeterCenter(perimeter, vertices);
-    const base = perimeter.plan_base_map || perimeter.planBaseMap || {};
+    const source = perimeter || {};
+    const vertices = _perimeterVerticesFromRecord(source);
+    const center = _perimeterCenter(source, vertices);
+    const base = source.plan_base_map || source.planBaseMap || {};
     const fallback = _planBaseMapDefaults();
     const lat = _numberInRange(base.lat, Number.isFinite(center?.lat) ? center.lat : fallback.lat, -85, 85);
     const lng = _numberInRange(base.lng, Number.isFinite(center?.lng) ? center.lng : fallback.lng, -180, 180);
@@ -421,7 +424,7 @@ const MecFormModule = (() => {
       schoolLng: _numberInRange(base.schoolLng, _numberInRange(school.longitud || school.lng || school.lon, lng, -180, 180), -180, 180),
       enabled: base.enabled !== undefined ? Boolean(base.enabled) : fallback.enabled,
       confirmed: Boolean(base.confirmed || _data.__planBaseMap?.confirmed),
-      savedAt: base.savedAt || _data.__planBaseMap?.savedAt || perimeter.actualizado_en || perimeter.fecha_guardado || '',
+      savedAt: base.savedAt || _data.__planBaseMap?.savedAt || source.actualizado_en || source.fecha_guardado || '',
     };
     _ensurePlanBaseMap();
     return _data.__planBaseMap;
@@ -429,8 +432,9 @@ const MecFormModule = (() => {
 
   function _ensurePropertyBoundaryFromPerimeter(school, options = {}) {
     const perimeter = _perimeterFromSchoolRecord(school);
+    if (!perimeter) return false;
     const vertices = _perimeterVerticesFromRecord(perimeter);
-    if (!perimeter || vertices.length < 3) return false;
+    if (vertices.length < 3) return false;
     const elements = _ensureSiteElements();
     let element = elements.find(item => item.type === 'property_boundary');
     const existingVertices = _boundaryGeoVerticesFromItem(element || {});
