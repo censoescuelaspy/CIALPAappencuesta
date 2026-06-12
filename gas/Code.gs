@@ -35,12 +35,31 @@ const SHEET_NAMES = {
   R01_ENVIOS:     'r01_envios_cuestionario',
 };
 
-const ADMIN_USERS = ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'];
-
 function _isAuthorizedAdmin(session) {
-  return session &&
-    String(session.rol).toLowerCase() === 'admin' &&
-    ADMIN_USERS.includes(String(session.usuario).toLowerCase());
+  if (!session) return false;
+  const role = String(session.rol || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  if (!['admin', 'administrador', 'administradora'].includes(role)) return false;
+
+  const user = String(session.usuario || '').trim().toLowerCase();
+  const configured = _configuredAdminUsers_();
+  if (!configured.length) return true;
+  return configured.includes(user);
+}
+
+function _configuredAdminUsers_() {
+  try {
+    const value = PropertiesService.getScriptProperties().getProperty('CIALPA_AUTHORIZED_ADMIN_USERS') || '';
+    return value
+      .split(/[,;\n]+/)
+      .map(function(item) { return String(item || '').trim().toLowerCase(); })
+      .filter(Boolean);
+  } catch (err) {
+    return [];
+  }
 }
 
 // ── HTTP Entry Points ─────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@
 - En una intervencion se solicito colocar tambien la capa de Catastro en `REGISTRO GUIADO` sobre el mapa en alta resolucion.
 - En la intervencion actual se reporto que Catastro cargaba, pero la alta resolucion dejo de cargar; tambien se pidieron estados activos visibles, rotacion/alineacion automatica, mas zoom en `MAPA`, capa de planos/perimetros, predio preliminar desde Catastro y mejor administracion de carga por censista.
 - Luego se reporto que el boton `Iniciar/continuar registro` no llevaba a la vista `REGISTRO GUIADO`.
+- Luego se reporto que, estando logueado como admin, no se podia agregar ni quitar encuestadores; la app mostraba el error `Solo administradores autorizados pueden gestionar usuarios`.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -26,6 +27,9 @@
 - `Predio SNC` consulta `GetFeatureInfo` y solo aplica un poligono preliminar si Catastro devuelve geometria valida; el censista puede editar vertices libremente.
 - El admin agrega resumen por censista, ordenamiento por columnas y exportacion CSV de formularios visibles.
 - Para `2.6.186`, se corrigio la apertura de `REGISTRO GUIADO` cuando la escuela no tiene perimetro guardado: la lectura de perimetro ahora tolera `null` y no bloquea el arranque.
+- Para la gestion de encuestadores, se identifico una diferencia entre permiso visual y permiso real: la UI reconocia el rol admin, pero GAS exigia ademas pertenecer a una lista fija local de usuarios autorizados.
+- Se corrigio `_isAuthorizedAdmin(session)` para aceptar roles admin normalizados y dejar la lista restrictiva solo como propiedad opcional `CIALPA_AUTHORIZED_ADMIN_USERS`.
+- El codigo corregido fue subido a GAS y versionado como version 37, pero los deployments version 37 probados devuelven `403 Forbidden` en HTTP anonimo aunque la metadata figure como `ANYONE_ANONYMOUS`; no se cambio el fallback estable para evitar dejar la app sin backend publico.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -34,6 +38,7 @@
 - `assets/css/app.css`
 - `assets/js/map.js`
 - `assets/js/admin.js`
+- `gas/Code.gs`
 - `index.html`
 - `sw.js`
 - `BITACORA.md`
@@ -46,3 +51,5 @@
 - WMS SNC verificado con `GetCapabilities` `200`.
 - Playwright no se ejecuto porque `@playwright/test` no esta instalado en este checkout.
 - En `2.6.186`, Playwright se ejecuto desde entorno temporal fuera de Google Drive; `MapModule.startGuidedRegister('ESC_TEST_GUIDED')` termino en `module-registro` con `.guided-register` renderizado y sin errores de consola.
+- Para la gestion de encuestadores se verifico por lectura de codigo que `saveEncuestador` y `deleteEncuestador` dependen de `_isAuthorizedAdmin(session)`.
+- Se verifico que la URL fallback `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` responde JSON publico, mientras los deployments version 37 probados responden `403 Forbidden`.

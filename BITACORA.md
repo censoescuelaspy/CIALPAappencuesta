@@ -7237,3 +7237,80 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Pendientes
 - Verificar en GitHub Pages que el navegador del usuario descargue `v2.6.186` y no mantenga cache anterior.
+
+---
+
+## Diagnostico gestion de encuestadores admin - 2026-06-12 15:54
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Backend GAS configurado en frontend: `AKfycbwHnfBVTBDWWiGOL-7GBo8CRDI7O911nEVYHeQSTU6rYIW0sZge4ofkfj8GeIYvgP7zYw`.
+- Version: `2.6.186`.
+
+### Objetivo de la intervencion
+- Explicar y corregir por que un usuario logueado con rol `Admin` no podia agregar, editar o quitar encuestadores.
+
+### Diagnostico inicial
+- La interfaz habilitaba el modulo `Administrar encuestadores` porque `Auth.canAccess('admin')` reconocia el rol admin.
+- El guardado fallaba en GAS con el mensaje `Solo administradores autorizados pueden gestionar usuarios.`
+- La causa estaba en `_isAuthorizedAdmin(session)`: ademas del rol `admin`, exigia que el usuario estuviera en una lista fija local (`diego.meza`, `noelia.mendoza`, `latiffi.chelala`).
+- Por eso un usuario institucional con rol admin, como `admin` / Administrador Sistema, veia la pantalla pero el backend rechazaba las mutaciones.
+
+### Acciones realizadas
+- Se ajusto `_isAuthorizedAdmin(session)` en `gas/Code.gs` para normalizar roles `admin`, `administrador` y `administradora`.
+- Si no existe la propiedad GAS `CIALPA_AUTHORIZED_ADMIN_USERS`, cualquier sesion con rol admin queda autorizada para gestion operativa de usuarios.
+- Si existe `CIALPA_AUTHORIZED_ADMIN_USERS`, actua como lista restrictiva opcional separada por coma, punto y coma o saltos de linea.
+- Se ejecuto `clasp push -f`, se creo la version GAS 37 y se intentaron deployments con la correccion.
+
+### Archivos modificados
+- `gas/Code.gs`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `git status --branch --short`
+- `rg -n "ADMIN_USERS|_isAuthorizedAdmin|saveEncuestador|deleteEncuestador"`
+- `clasp.cmd show-authorized-user`
+- `clasp.cmd push -f`
+- `clasp.cmd version "v2.6.186 autorizar admin para gestionar usuarios"`
+- `clasp.cmd deploy -i AKfycbwHnfBVTBDWWiGOL-7GBo8CRDI7O911nEVYHeQSTU6rYIW0sZge4ofkfj8GeIYvgP7zYw -V 37`
+- `clasp.cmd deploy -V 37`
+- `clasp.cmd deploy -i AKfycbxgphQDS0tQ9Kdi5Z0V7wfLZIW1oPA8ukxS1FAw4ysdMUS8wJGOVuIqdxo_c0jaG7MALQ -V 37`
+- Pruebas HTTP anonimas con `Invoke-WebRequest` y `curl.exe`.
+- Consulta metadata Apps Script REST para verificar `entryPointType`, `access` y `executeAs`.
+
+### Resultados verificados
+- El codigo corregido quedo subido al proyecto GAS y versionado como version 37.
+- La metadata de Apps Script muestra los deployments version 37 como `WEB_APP`, `ANYONE_ANONYMOUS`, `USER_DEPLOYING`.
+- La URL fallback estable `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` sigue respondiendo anonimamente con JSON `200`.
+
+### Pruebas realizadas
+- Se probo `diagnosticoPadron` y `login` contra:
+  - `AKfycbwHnfBVTBDWWiGOL-7GBo8CRDI7O911nEVYHeQSTU6rYIW0sZge4ofkfj8GeIYvgP7zYw`
+  - `AKfycbywTM42mFow70Dw42IaXJHt6-CAwalg_K61RO-L-q-BVgCAQywaZWYs_BV_q6J9pnGeCQ`
+  - `AKfycbxgphQDS0tQ9Kdi5Z0V7wfLZIW1oPA8ukxS1FAw4ysdMUS8wJGOVuIqdxo_c0jaG7MALQ`
+  - `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ`
+
+### Errores o incidentes
+- Los deployments con version 37 devuelven HTTP `403 Forbidden` y pagina de Google Drive `Necesitas acceso`, aunque la metadata indique `ANYONE_ANONYMOUS`.
+- No se redeployo la URL fallback estable para no romper la unica ruta publica que sigue respondiendo.
+- `clasp run` no pudo usarse para ejecutar funciones porque el proyecto no esta desplegado como API executable.
+
+### Soluciones aplicadas
+- Se corrigio la regla de autorizacion de backend para que el rol admin operativo pueda gestionar encuestadores.
+- Se dejo una propiedad opcional de endurecimiento (`CIALPA_AUTHORIZED_ADMIN_USERS`) para casos futuros donde se quiera volver a restringir por usuarios especificos sin tocar codigo.
+
+### Pendientes
+- Resolver desde Apps Script UI o cuenta propietaria el `403` de los deployments version 37 antes de cambiar `APP_CONFIG.GAS_URL`.
+- Una vez que una URL version 37 responda JSON publico, actualizar frontend si cambia el deployment ID y verificar creacion/desactivacion real de encuestadores con usuario admin.
+
+### Riesgos
+- Si se redeploya el fallback estable sin resolver la causa del `403`, la app puede quedarse sin backend publico funcional.
+- La pantalla puede seguir mostrando el modulo admin, pero las mutaciones continuaran fallando mientras el navegador use un backend viejo sin la correccion.
+
+### Recomendaciones
+- No tocar el fallback publico hasta tener un nuevo endpoint version 37 validado anonimamente.
+- Registrar como aprendizaje maestro que `clasp deployments` y metadata `ANYONE_ANONYMOUS` no alcanzan: la validacion decisiva es HTTP anonimo con JSON del endpoint exacto.
