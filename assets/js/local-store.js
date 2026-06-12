@@ -7,7 +7,7 @@ const CialpaLocalStore = (() => {
   'use strict';
 
   const DB_NAME = 'cialpa_offline_store';
-  const DB_VERSION = 1;
+  const DB_VERSION = 2;
   const FALLBACK_PREFIX = 'cialpa_local_store_';
   const MEC_DRAFT_KEY = 'cialpa_mec_form_draft_v1';
   let _dbPromise = null;
@@ -30,6 +30,12 @@ const CialpaLocalStore = (() => {
           const queue = db.createObjectStore('queue', { keyPath: 'id' });
           queue.createIndex('status', 'status', { unique: false });
           queue.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+        if (!db.objectStoreNames.contains('catastro')) {
+          const catastro = db.createObjectStore('catastro', { keyPath: 'key' });
+          catastro.createIndex('savedAt', 'savedAt', { unique: false });
+          catastro.createIndex('ccatastral', 'ccatastral', { unique: false });
+          catastro.createIndex('schoolKey', 'schoolKey', { unique: false });
         }
       };
       request.onsuccess = () => resolve(request.result);
@@ -125,6 +131,32 @@ const CialpaLocalStore = (() => {
   async function getApi(endpoint, request = {}) {
     return (await _storeGet('cache', apiKey(endpoint, request))) ||
       (await _storeGet('cache', `api:${endpoint}:latest`));
+  }
+
+  async function rememberCatastro(record = {}) {
+    const now = new Date().toISOString();
+    const key = String(record.key || record.ccatastral || record.clave_comparacion || record.id || `catastro_${Date.now()}`).trim();
+    const saved = {
+      ...(record || {}),
+      key,
+      savedAt: record.savedAt || now,
+      updatedAt: now,
+    };
+    await _storePut('catastro', saved);
+    return saved;
+  }
+
+  async function getCatastro(key) {
+    return _storeGet('catastro', String(key || ''));
+  }
+
+  async function listCatastro(options = {}) {
+    const limit = Number(options.limit || 1000);
+    const schoolKey = String(options.schoolKey || '').trim();
+    const rows = (await _storeAll('catastro'))
+      .filter(row => !schoolKey || String(row.schoolKey || '') === schoolKey)
+      .sort((a, b) => String(b.savedAt || b.updatedAt || '').localeCompare(String(a.savedAt || a.updatedAt || '')));
+    return rows.slice(0, limit);
   }
 
   async function enqueue(endpoint, method, data, reason = '') {
@@ -487,6 +519,9 @@ const CialpaLocalStore = (() => {
     apiKey,
     rememberApi,
     getApi,
+    rememberCatastro,
+    getCatastro,
+    listCatastro,
     enqueue,
     getQueue,
     updateQueueStatus,

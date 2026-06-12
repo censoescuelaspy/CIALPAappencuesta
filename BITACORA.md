@@ -6919,3 +6919,83 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - Mantener WMS como capa visual y no duplicar parcelario nacional dentro del frontend.
 - Registrar en manual maestro el patron: fuente oficial WMS como capa liviana, WFS solo bajo demanda y con filtros verificables.
+
+---
+
+## Metadatos catastrales emergentes y cache local - 2026-06-12 06:53
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.183`.
+
+### Objetivo de la intervencion
+- Permitir consultar metadatos publicos del parcelario SNC desde el mapa.
+- Mostrar panel emergente sobre la parcela consultada.
+- Guardar la consulta en cache local del dispositivo y permitir exportacion.
+
+### Diagnostico inicial
+- El WMS oficial `snc:parcelas_activas` soporta `GetFeatureInfo` en `EPSG:3857`.
+- El endpoint publico `https://www.catastro.gov.py/api/v1/public/cuentas` acepta CORS desde GitHub Pages.
+- La API publica devuelve datos registrales basicos disponibles, sin exponer propietarios.
+
+### Acciones realizadas
+- `assets/js/map.js`: se agrego consulta por click sobre la capa `Catastro SNC` activa.
+- `assets/js/map.js`: se construye `GetFeatureInfo` con bbox/px del mapa Leaflet y filtro de departamento vigente.
+- `assets/js/map.js`: se enriquece la parcela con API publica de cuentas cuando existen `dpto`, `dist`, `padron` o `zona/manzana/lote`.
+- `assets/js/map.js`: se muestra popup con numero catastral, padron, finca, matricula, zona/manzana/lote, superficie, valores publicos, situacion y fecha de inscripcion cuando existen.
+- `assets/js/map.js`: se agregaron exportes `JSON parcela`, `CSV cache` y `Exportar catastro`.
+- `assets/js/local-store.js`: se amplio IndexedDB a version 2 con store `catastro` y fallback a `localStorage`.
+- `assets/js/config.js`, `index.html`, `sw.js`: version/cache actualizados a `2.6.183`.
+- `assets/css/app.css`: estilos para popup catastral.
+
+### Archivos modificados
+- `assets/js/map.js`
+- `assets/js/local-store.js`
+- `assets/js/config.js`
+- `assets/css/app.css`
+- `index.html`
+- `sw.js`
+
+### Comandos o scripts ejecutados
+- `node --check assets\js\map.js`
+- `node --check assets\js\local-store.js`
+- `node --check assets\js\config.js`
+- `node --check sw.js`
+- `git diff --check`
+- Prueba WMS `GetFeatureInfo` contra `https://www.catastro.gov.py/geoserver/ows` con `LAYERS=snc:parcelas_activas`, `SRS=EPSG:3857` y `CQL_FILTER=dpto='A'`.
+- Prueba API publica de cuentas con `dpto=A`, `dist=3`, `zona=12`, `manzana=902`, `lote=47`.
+
+### Resultados verificados
+- `GetFeatureInfo` respondio `200 application/json` y devolvio 3 parcelas en la prueba.
+- API publica de cuentas respondio `200 application/json` con CORS `https://censoescuelaspy.github.io`.
+- La consulta de ejemplo devolvio distrito, finca, fecha de inscripcion, situacion, superficie, valor tierra y valor edificacion.
+
+### Pruebas realizadas
+- Validacion de sintaxis JavaScript con `node --check`.
+- Validacion de whitespace con `git diff --check`.
+- Validacion HTTP de WMS oficial.
+- Validacion HTTP de API publica de cuentas.
+
+### Errores o incidentes
+- No se ejecuto Playwright porque `@playwright/test` no esta instalado en este checkout.
+
+### Soluciones aplicadas
+- Se implemento cache local offline-first en IndexedDB/localStorage para no depender de escritura inmediata en Google Sheets.
+- Se evita consultar Catastro si el usuario hace click sobre marcadores o poligonos interactivos existentes.
+- Se restringe la consulta efectiva a zoom 15+ para evitar resultados imprecisos y carga excesiva.
+
+### Pendientes
+- Validar visualmente con usuario autenticado en GitHub Pages.
+- Si se requiere persistencia central, agregar hoja `catastro_cache` y endpoint GAS autenticado en una version posterior.
+- Si se requiere asociacion formal a cada escuela, agregar boton `Vincular a escuela seleccionada` y guardar relacion en el registro MEC.
+
+### Riesgos
+- Los metadatos dependen de disponibilidad externa del SNC.
+- Algunos registros no tienen `ccatastral`, padron o matricula completos; se guarda `clave_comparacion` como identificador alternativo.
+- El cache local es por dispositivo y debe exportarse si se necesita consolidacion externa.
+
+### Recomendaciones
+- Registrar en manual maestro el patron `WMS GetFeatureInfo + API publica + cache local + exportacion` para capas GIS institucionales.
+- Mantener los metadatos catastrales como referencia tecnica, no como fuente unica de verdad registral.

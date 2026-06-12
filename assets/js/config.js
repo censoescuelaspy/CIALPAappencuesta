@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.182
+ * Version: 2.6.183
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.182',
-  EDITION_LABEL: 'Edicion vigente v2.6.182',
+  VERSION: '2.6.183',
+  EDITION_LABEL: 'Edicion vigente v2.6.183',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -62,6 +62,10 @@ const APP_CONFIG = {
   MAP_TILE_CACHE_NAME: 'cialpa-map-tiles-v2.5.0',
   MAP_TILE_CACHE_LIMIT: 260,
   MAP_CADASTRAL_DOWNLOAD_URL: 'https://www.catastro.gov.py/municipios',
+  MAP_CADASTRAL_ACCOUNT_URL: 'https://www.catastro.gov.py/api/v1/public/cuentas',
+  MAP_CADASTRAL_FEATURE_INFO_ENABLED: true,
+  MAP_CADASTRAL_FEATURE_INFO_MAX: 5,
+  MAP_CADASTRAL_CACHE_LIMIT: 1200,
   MAP_CADASTRAL_LAYERS: [
     {
       id: 'snc_parcelas_activas',

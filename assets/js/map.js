@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.182
+ * Version: 2.6.183
  */
 
 const MapModule = (() => {
@@ -19,6 +19,7 @@ const MapModule = (() => {
   let _perimeters = [];
   let _cadastralLayer = null;
   let _cadastralLayerConfig = null;
+  let _cadastralQueryToken = 0;
   let _routesVisible = true;
   let _routeRenderToken = 0;
   let _googleRoutesUnavailable = false;
@@ -356,6 +357,7 @@ const MapModule = (() => {
       if (event.layer === _cadastralLayer) _updateCadastralState();
     });
     _map.on('zoomend', _updateCadastralState);
+    _map.on('click', _handleCadastralClick);
 
     // Marker cluster group
     _markerCluster = typeof L.markerClusterGroup === 'function'
@@ -603,7 +605,7 @@ const MapModule = (() => {
     const zoom = _map && typeof _map.getZoom === 'function' ? _map.getZoom() : 0;
     const filterText = _cadastralFilterText();
     state.textContent = active
-      ? `Catastro SNC: activo${filterText} - zoom ${minZoom}+${zoom < minZoom ? ' requerido' : ''}`
+      ? `Catastro SNC: activo${filterText} - click para metadatos - zoom ${minZoom}+${zoom < minZoom ? ' requerido' : ''}`
       : 'Catastro SNC: desactivado';
     state.classList.toggle('map-cadastral-state--ready', active);
   }
@@ -633,6 +635,370 @@ const MapModule = (() => {
       || _cadastralLayerConfig?.downloadUrl
       || 'https://www.catastro.gov.py/municipios';
     window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  async function _handleCadastralClick(event) {
+    if (!event || !_map || !_cadastralLayer || !_map.hasLayer(_cadastralLayer)) return;
+    if (APP_CONFIG.MAP_CADASTRAL_FEATURE_INFO_ENABLED === false) return;
+    const target = event.originalEvent && event.originalEvent.target;
+    if (target && typeof target.closest === 'function' && target.closest('.leaflet-marker-icon, .leaflet-interactive')) return;
+    const minZoom = Number(_cadastralLayerConfig?.minZoom || 15);
+    if (_map.getZoom() < minZoom) {
+      UI.showToast(`Acercate a zoom ${minZoom}+ para consultar metadatos catastrales.`, 'info', 4800);
+      return;
+    }
+
+    const token = ++_cadastralQueryToken;
+    _openCadastralPopup(event.latlng, '<div class="map-popup map-popup--catastro"><p class="text-muted">Consultando Catastro SNC...</p></div>');
+    try {
+      const record = await _loadCadastralRecordAt(event.latlng);
+      if (token !== _cadastralQueryToken) return;
+      if (!record) {
+        _openCadastralPopup(event.latlng, '<div class="map-popup map-popup--catastro"><strong>Catastro SNC</strong><p>No se encontro parcela en este punto.</p></div>');
+        return;
+      }
+      const saved = await _rememberCadastralRecord(record);
+      _openCadastralPopup(event.latlng, _buildCadastralPopup(saved || record));
+      UI.showToast('Metadatos catastrales consultados y guardados en cache local.', 'success', 5200);
+    } catch (err) {
+      console.warn('[Mapa] Error al consultar metadatos catastrales:', err);
+      _openCadastralPopup(event.latlng, `<div class="map-popup map-popup--catastro"><strong>Catastro SNC</strong><p>No se pudo consultar la parcela: ${_escape(err.message || err)}</p></div>`);
+    }
+  }
+
+  function _openCadastralPopup(latlng, html) {
+    if (!_map || !window.L) return;
+    L.popup({ maxWidth: 390, className: 'map-popup-leaflet--catastro' })
+      .setLatLng(latlng)
+      .setContent(html)
+      .openOn(_map);
+  }
+
+  async function _loadCadastralRecordAt(latlng) {
+    const featureCollection = await _fetchCadastralFeatureInfo(latlng);
+    const features = Array.isArray(featureCollection?.features) ? featureCollection.features : [];
+    const feature = features[0];
+    if (!feature) return null;
+    const properties = _catastroProperties(feature.properties || {});
+    const account = await _fetchCadastralAccount(properties).catch(err => ({
+      status: 'error',
+      message: err.message || String(err),
+    }));
+    return _buildCadastralRecord(feature, properties, latlng, account, features.length);
+  }
+
+  async function _fetchCadastralFeatureInfo(latlng) {
+    const url = _cadastralFeatureInfoUrl(latlng);
+    const response = await fetch(url, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`SNC WMS HTTP ${response.status}`);
+    return response.json();
+  }
+
+  function _cadastralFeatureInfoUrl(latlng) {
+    if (!_map || !_cadastralLayerConfig) throw new Error('Mapa catastral no inicializado.');
+    const size = _map.getSize();
+    const point = _map.latLngToContainerPoint(latlng);
+    const bounds = _map.getBounds();
+    const crs = _map.options.crs || L.CRS.EPSG3857;
+    const sw = crs.project(bounds.getSouthWest());
+    const ne = crs.project(bounds.getNorthEast());
+    const west = Math.min(sw.x, ne.x);
+    const east = Math.max(sw.x, ne.x);
+    const south = Math.min(sw.y, ne.y);
+    const north = Math.max(sw.y, ne.y);
+    const params = new URLSearchParams({
+      SERVICE: 'WMS',
+      VERSION: _cadastralLayerConfig.version || '1.1.1',
+      REQUEST: 'GetFeatureInfo',
+      LAYERS: _cadastralLayerConfig.layers,
+      QUERY_LAYERS: _cadastralLayerConfig.layers,
+      STYLES: '',
+      FORMAT: _cadastralLayerConfig.format || 'image/png',
+      TRANSPARENT: 'TRUE',
+      WIDTH: String(Math.round(size.x)),
+      HEIGHT: String(Math.round(size.y)),
+      SRS: 'EPSG:3857',
+      BBOX: [west, south, east, north].join(','),
+      X: String(Math.round(point.x)),
+      Y: String(Math.round(point.y)),
+      INFO_FORMAT: 'application/json',
+      FEATURE_COUNT: String(APP_CONFIG.MAP_CADASTRAL_FEATURE_INFO_MAX || 5),
+    });
+    const cql = _cadastralCqlFilter(_activeFilters);
+    if (cql) params.set('CQL_FILTER', cql);
+    return `${_cadastralLayerConfig.url}?${params.toString()}`;
+  }
+
+  function _catastroProperties(raw = {}) {
+    const props = {};
+    Object.keys(raw || {}).forEach(key => {
+      if (['shape', 'tmp_shape'].includes(key)) return;
+      props[key] = raw[key];
+    });
+    return props;
+  }
+
+  function _catastroAccountParams(props = {}) {
+    const dpto = String(props.dpto || '').trim();
+    const dist = Number(props.dist);
+    if (!dpto || !Number.isFinite(dist)) return null;
+    const padron = Number(props.padron);
+    if (Number.isFinite(padron) && padron > 0) {
+      return { dpto, dist: String(dist), padron: String(padron) };
+    }
+    const zona = Number(props.zona);
+    const manzana = Number(props.mz);
+    const lote = Number(props.lote);
+    if (Number.isFinite(zona) && Number.isFinite(manzana) && Number.isFinite(lote)) {
+      return { dpto, dist: String(dist), zona: String(zona), manzana: String(manzana), lote: String(lote) };
+    }
+    return null;
+  }
+
+  async function _fetchCadastralAccount(props = {}) {
+    const baseUrl = APP_CONFIG.MAP_CADASTRAL_ACCOUNT_URL || 'https://www.catastro.gov.py/api/v1/public/cuentas';
+    const request = _catastroAccountParams(props);
+    if (!request) return { status: 'skipped', message: 'Sin identificadores suficientes para cuenta publica.' };
+    const response = await fetch(`${baseUrl}?${new URLSearchParams(request).toString()}`, { cache: 'no-store' });
+    const text = await response.text();
+    let data = {};
+    try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    if (!response.ok || data.statusCode >= 400) {
+      return {
+        status: 'error',
+        code: response.status || data.statusCode || '',
+        message: data?.payload?.message || data.message || `HTTP ${response.status}`,
+        request,
+      };
+    }
+    return { status: 'ok', data, request };
+  }
+
+  function _catastroKey(props = {}) {
+    return [
+      'snc',
+      props.ccatastral || '',
+      props.clave_comparacion || '',
+      props.id || props.objectid || '',
+      props.dpto || '',
+      props.dist || '',
+      props.padron || '',
+      props.zona || '',
+      props.mz || '',
+      props.lote || '',
+    ].filter(value => String(value ?? '').trim()).join('|');
+  }
+
+  function _nearestSchoolTo(latlng, maxMeters = 350) {
+    if (!latlng || !_escuelas.length) return null;
+    let best = null;
+    let bestDistance = Infinity;
+    _escuelas.forEach(school => {
+      const point = _validPoint(school);
+      if (!point) return;
+      const distance = _map && typeof _map.distance === 'function'
+        ? _map.distance(latlng, [point.lat, point.lng])
+        : Number.POSITIVE_INFINITY;
+      if (distance < bestDistance) {
+        best = school;
+        bestDistance = distance;
+      }
+    });
+    return best && bestDistance <= maxMeters ? { school: best, distance_m: Math.round(bestDistance * 10) / 10 } : null;
+  }
+
+  function _buildCadastralRecord(feature, props, latlng, account, featureCount = 1) {
+    const nearest = _nearestSchoolTo(latlng);
+    const school = _selectedEscuela || nearest?.school || null;
+    const schoolKey = school ? _schoolPrimaryId(school) : '';
+    const accountData = account?.status === 'ok' ? account.data || {} : {};
+    const bbox = Array.isArray(feature?.bbox) ? feature.bbox : null;
+    return {
+      key: _catastroKey(props),
+      source: 'Servicio Nacional de Catastro',
+      sourceLayer: _cadastralLayerConfig?.layers || 'snc:parcelas_activas',
+      sourceUrl: _cadastralLayerConfig?.sourceUrl || 'https://www.catastro.gov.py/visor/?snc=geo',
+      queriedAt: new Date().toISOString(),
+      appVersion: APP_CONFIG.VERSION,
+      click: { lat: Number(latlng.lat.toFixed(8)), lng: Number(latlng.lng.toFixed(8)) },
+      bbox,
+      featuresAtPoint: featureCount,
+      schoolKey,
+      school: school ? {
+        id_escuela: school.id_escuela || '',
+        codigo_local: school.codigo_local || '',
+        nombre: school.nombre || school.nombre_escuela || '',
+        departamento: _schoolDepartment(school),
+        distrito: _schoolDistrict(school),
+        distance_m: nearest?.distance_m || '',
+      } : null,
+      ccatastral: props.ccatastral || accountData.numeroCatastral || '',
+      clave_comparacion: props.clave_comparacion || '',
+      dpto: props.dpto || '',
+      dist: props.dist || '',
+      padron: props.padron || accountData.padron || '',
+      finca: props.finca || accountData.finca || '',
+      zona: props.zona || accountData.zona || '',
+      mz: props.mz || accountData.manzana || accountData.numeroManzana || '',
+      lote: props.lote || accountData.lote || accountData.numeroLote || '',
+      matricula: props.nro_matricula || accountData.numeroMatricula || '',
+      superficie_tierra_m2: props.superficie_tierra || accountData.superficieM2 || accountData.metrosCuadrados || '',
+      superficie_edificado_m2: props.superficie_edificado || accountData.supeficieEdificadaM2 || '',
+      hectareas: props.hectareas || accountData.hectareas || '',
+      valor_tierra: props.valor_tierra || accountData.valorTierra || accountData.valorOficial || '',
+      valor_edificado: props.valor_edificado || accountData.valorEdificacion || '',
+      situacion: accountData.situacion || '',
+      fecha_inscripcion: accountData.fechaInscripcion || '',
+      distrito_nombre: accountData.distrito || '',
+      departamento_nombre: accountData.departamento || '',
+      accountStatus: account?.status || 'skipped',
+      accountMessage: account?.message || '',
+      accountRequest: account?.request || {},
+      properties: props,
+      account: accountData,
+    };
+  }
+
+  async function _rememberCadastralRecord(record) {
+    if (typeof CialpaLocalStore === 'undefined' || typeof CialpaLocalStore.rememberCatastro !== 'function') return record;
+    return CialpaLocalStore.rememberCatastro(record);
+  }
+
+  function _formatCatastroValue(value, fallback = '-') {
+    if (value === null || value === undefined || value === '') return fallback;
+    return String(value);
+  }
+
+  function _formatCatastroDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return String(value);
+    return date.toLocaleDateString('es-PY');
+  }
+
+  function _catastroRows(record = {}) {
+    return [
+      ['Numero catastral', record.ccatastral],
+      ['Padron', record.padron],
+      ['Finca', record.finca],
+      ['Matricula', record.matricula],
+      ['Departamento', record.departamento_nombre || record.dpto],
+      ['Distrito', record.distrito_nombre || record.dist],
+      ['Zona / Manzana / Lote', [record.zona, record.mz, record.lote].filter(v => v !== '' && v !== null && v !== undefined).join(' / ')],
+      ['Superficie tierra', record.superficie_tierra_m2 ? `${record.superficie_tierra_m2} m2` : ''],
+      ['Superficie edificada', record.superficie_edificado_m2 ? `${record.superficie_edificado_m2} m2` : ''],
+      ['Hectareas', record.hectareas],
+      ['Valor tierra/oficial', record.valor_tierra],
+      ['Valor edificacion', record.valor_edificado],
+      ['Situacion', record.situacion],
+      ['Fecha inscripcion', _formatCatastroDate(record.fecha_inscripcion)],
+    ].filter(([, value]) => _formatCatastroValue(value, '') !== '');
+  }
+
+  function _buildCadastralPopup(record = {}) {
+    const rows = _catastroRows(record);
+    const keyArg = _jsString(record.key || '');
+    const sourceLabel = record.accountStatus === 'ok'
+      ? 'SNC WMS + API publica'
+      : `SNC WMS${record.accountMessage ? `; API: ${record.accountMessage}` : ''}`;
+    return `
+      <div class="map-popup map-popup--catastro">
+        <div class="map-popup__header">
+          <strong>${_escape(record.ccatastral || record.clave_comparacion || 'Parcela SNC')}</strong>
+          <span class="badge" style="background:#0f766e">Catastro</span>
+        </div>
+        <div class="map-popup__body">
+          ${record.school ? `<p><b>Escuela cercana:</b> ${_escape(record.school.nombre || record.school.codigo_local || '-')}</p>` : ''}
+          <div class="map-catastro-grid">
+            ${rows.map(([label, value]) => `<span><b>${_escape(label)}</b>${_escape(_formatCatastroValue(value))}</span>`).join('')}
+          </div>
+          <p><b>Fuente:</b> ${_escape(sourceLabel)}</p>
+          <p><b>Consulta:</b> ${_escape(_formatCatastroDate(record.queriedAt) || record.queriedAt || '-')}</p>
+          <details class="map-catastro-details">
+            <summary>Atributos tecnicos</summary>
+            <code>${_escape(JSON.stringify({
+              key: record.key,
+              dpto: record.dpto,
+              dist: record.dist,
+              padron: record.padron,
+              zona: record.zona,
+              mz: record.mz,
+              lote: record.lote,
+              bbox: record.bbox,
+            }, null, 2))}</code>
+          </details>
+        </div>
+        <div class="map-popup__actions">
+          <button class="btn btn-outline btn-sm" onclick='MapModule.exportCadastralRecord(${keyArg})'>JSON parcela</button>
+          <button class="btn btn-outline btn-sm" onclick='MapModule.exportCadastralCache("csv")'>CSV cache</button>
+        </div>
+      </div>`;
+  }
+
+  async function exportCadastralRecord(key) {
+    if (!key || typeof CialpaLocalStore === 'undefined' || typeof CialpaLocalStore.getCatastro !== 'function') {
+      UI.showToast('No hay registro catastral seleccionado para exportar.', 'warning');
+      return;
+    }
+    const record = await CialpaLocalStore.getCatastro(key);
+    if (!record) {
+      UI.showToast('El registro catastral no esta en cache local.', 'warning');
+      return;
+    }
+    _downloadTextFile(`cialpa_catastro_${_safeDownloadName(record.ccatastral || record.key)}.json`, 'application/json', JSON.stringify(record, null, 2));
+  }
+
+  async function exportCadastralCache(format = 'json') {
+    if (typeof CialpaLocalStore === 'undefined' || typeof CialpaLocalStore.listCatastro !== 'function') {
+      UI.showToast('El cache catastral local no esta disponible.', 'warning');
+      return;
+    }
+    const rows = await CialpaLocalStore.listCatastro({ limit: APP_CONFIG.MAP_CADASTRAL_CACHE_LIMIT || 1200 });
+    if (!rows.length) {
+      UI.showToast('No hay metadatos catastrales guardados en este dispositivo.', 'warning');
+      return;
+    }
+    if (String(format).toLowerCase() === 'csv') {
+      _downloadTextFile(`cialpa_catastro_cache_${Date.now()}.csv`, 'text/csv;charset=utf-8;', _cadastralCsv(rows));
+      return;
+    }
+    _downloadTextFile(`cialpa_catastro_cache_${Date.now()}.json`, 'application/json', JSON.stringify(rows, null, 2));
+  }
+
+  function _cadastralCsv(rows = []) {
+    const headers = ['savedAt','ccatastral','clave_comparacion','dpto','dist','padron','finca','zona','mz','lote','matricula','superficie_tierra_m2','superficie_edificado_m2','hectareas','valor_tierra','valor_edificado','situacion','fecha_inscripcion','schoolKey','schoolName','clickLat','clickLng','source'];
+    const csvRows = [headers.join(',')];
+    rows.forEach(row => {
+      const flat = {
+        ...row,
+        schoolName: row.school?.nombre || row.school?.codigo_local || '',
+        clickLat: row.click?.lat || '',
+        clickLng: row.click?.lng || '',
+      };
+      csvRows.push(headers.map(header => _csvCell(flat[header])).join(','));
+    });
+    return csvRows.join('\n');
+  }
+
+  function _csvCell(value) {
+    const text = String(value ?? '').replace(/\r?\n/g, ' ');
+    return /[",;]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  }
+
+  function _safeDownloadName(value) {
+    return String(value || 'parcela').replace(/[^A-Za-z0-9_-]+/g, '-').slice(0, 90) || 'parcela';
+  }
+
+  function _downloadTextFile(filename, type, content) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
 
   function _renderPerimeters(escuelas = []) {
@@ -1725,6 +2091,8 @@ const MapModule = (() => {
     jumpFilteredSchool,
     toggleCadastralLayer,
     openCadastralDownloads,
+    exportCadastralRecord,
+    exportCadastralCache,
     populateFilterButtons,
     populateDistrictButtons,
     toggleRoutes,

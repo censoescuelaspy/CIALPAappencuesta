@@ -1111,11 +1111,61 @@ td {
 
 /* Leaflet popup custom */
 .map-popup { min-width: 190px; max-width: 235px; }
+.map-popup--catastro { min-width: 270px; max-width: 360px; }
 .map-popup__header { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .5rem; }
 .map-popup__header strong { font-size: .9rem; }
 .map-popup__body p { font-size: .82rem; margin-bottom: .2rem; color: #444; }
 .map-popup__actions { margin-top: .65rem; display: flex; gap: .4rem; flex-wrap: wrap; }
 .map-popup__actions .btn { flex: 1 1 92px; white-space: normal; }
+
+.map-catastro-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .35rem;
+  margin: .5rem 0;
+}
+
+.map-catastro-grid span {
+  min-width: 0;
+  padding: .35rem .4rem;
+  border: 1px solid rgba(15, 118, 110, .22);
+  border-radius: var(--radius-sm);
+  background: rgba(240, 253, 250, .88);
+  color: var(--color-text);
+  font-size: .76rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.map-catastro-grid b {
+  display: block;
+  color: #0f766e;
+  font-size: .68rem;
+  text-transform: uppercase;
+}
+
+.map-catastro-details {
+  margin-top: .45rem;
+  font-size: .76rem;
+}
+
+.map-catastro-details summary {
+  cursor: pointer;
+  color: var(--color-secondary);
+  font-weight: 800;
+}
+
+.map-catastro-details code {
+  display: block;
+  max-height: 120px;
+  margin-top: .35rem;
+  padding: .45rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+}
 
 .map-perimeter-metrics {
   display: grid;
