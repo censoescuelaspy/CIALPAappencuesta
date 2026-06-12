@@ -6841,3 +6841,81 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - `node --check sw.js`.
 - `git diff --check`.
 - Verificacion local: `http://127.0.0.1:8765/` responde `200`.
+
+---
+
+## Capa catastral oficial SNC en mapa - 2026-06-12 05:41
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.182`.
+
+### Objetivo de la intervencion
+- Incorporar una capa catastral al mapa usando fuente oficial del Servicio Nacional de Catastro.
+- Evitar publicar como capa principal el PDF local `CIUDAD_DE_ASUNCION_CATASTRAL_A0_VER_02_02_2026.pdf` porque es estatico y solo cubre Asuncion.
+
+### Diagnostico inicial
+- La pagina `https://www.catastro.gov.py/municipios` lista documentos disponibles y convenios municipales, pero no expone directamente archivos GIS en la pagina.
+- El visor oficial `https://www.catastro.gov.py/visor/?snc=geo` utiliza GeoServer publico bajo `https://www.catastro.gov.py/geoserver/`.
+- La capa oficial identificada para parcelario es `snc:parcelas_activas`.
+
+### Acciones realizadas
+- Se configuro `MAP_CADASTRAL_LAYERS` con WMS oficial SNC (`snc:parcelas_activas`).
+- Se agrego boton `Catastro SNC` en el mapa para activar u ocultar la capa.
+- Se agrego boton `Municipios SNC` para abrir la pagina oficial de documentos/descargas municipales.
+- Se agrego estado visible `Catastro SNC` en el mapa, indicando si esta activo y el zoom minimo requerido.
+- Se aplica `CQL_FILTER` por codigo oficial de departamento cuando el filtro territorial tiene departamento.
+- Se dejo la capa desactivada por defecto y visible desde zoom 15+ para evitar carga innecesaria de parcelas nacionales.
+- Se retiro del alcance el JPG raster generado desde el PDF local.
+
+### Archivos modificados
+- `assets/js/config.js`
+- `assets/js/map.js`
+- `assets/css/app.css`
+- `index.html`
+- `sw.js`
+
+### Comandos o scripts ejecutados
+- `node --check assets\js\config.js`
+- `node --check assets\js\map.js`
+- `node --check sw.js`
+- `git diff --check`
+- `Invoke-WebRequest -Uri http://127.0.0.1:8765/ -UseBasicParsing`
+- Prueba WMS `GetMap` contra `https://www.catastro.gov.py/geoserver/ows` con `LAYERS=snc:parcelas_activas`, `SRS=EPSG:3857` y `CQL_FILTER=dpto='A'`.
+
+### Resultados verificados
+- La app local responde `200` en `http://127.0.0.1:8765/`.
+- La fuente WMS oficial responde `200 image/png`.
+- La version visible y los cache busters quedaron en `2.6.182`.
+- Los artefactos temporales del PDF y de pruebas WMS fueron eliminados del repo.
+
+### Pruebas realizadas
+- Validacion de sintaxis JavaScript con `node --check`.
+- Validacion de whitespace con `git diff --check`.
+- Validacion HTTP local.
+- Validacion HTTP de WMS oficial.
+
+### Errores o incidentes
+- `@playwright/test` no esta instalado en este checkout, por lo que no se ejecuto prueba Playwright local.
+- La pagina municipal oficial no entrega capa GIS directa en el HTML; funciona como pagina de documentos/convenios.
+
+### Soluciones aplicadas
+- Se eligio WMS oficial del GeoServer SNC para visualizacion liviana en Leaflet.
+- Se dejo el uso de `https://www.catastro.gov.py/municipios` como acceso operativo a documentos/descargas municipales.
+- Se evita filtrado por distrito hasta contar con equivalencia auditada entre nombres de distritos de la app y codigos numericos SNC.
+
+### Pendientes
+- Validar visualmente en navegador real con usuario autenticado.
+- Si se requiere identificacion puntual de parcela, agregar consulta WFS por click o por bbox a zoom alto.
+- Si se requiere descarga por municipio como datos locales, definir lista de municipios objetivo y formato oficial disponible.
+
+### Riesgos
+- La disponibilidad de `www.catastro.gov.py/geoserver` depende de infraestructura externa del SNC.
+- A zoom bajo no se muestran parcelas para proteger rendimiento; el operador debe acercarse a zoom 15+.
+- El filtro por distrito queda pendiente hasta disponer de diccionario confiable de codigos SNC.
+
+### Recomendaciones
+- Mantener WMS como capa visual y no duplicar parcelario nacional dentro del frontend.
+- Registrar en manual maestro el patron: fuente oficial WMS como capa liviana, WFS solo bajo demanda y con filtros verificables.

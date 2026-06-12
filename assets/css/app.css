@@ -1062,6 +1062,32 @@ td {
   background: rgba(254,243,199,.95);
 }
 
+.map-cadastral-state {
+  position: absolute;
+  top: 5.25rem;
+  left: 3.5rem;
+  z-index: 520;
+  max-width: min(460px, calc(100% - 7rem));
+  padding: .35rem .65rem;
+  border: 1px solid rgba(31,56,100,.24);
+  border-radius: var(--radius-full);
+  background: rgba(239,246,255,.94);
+  color: var(--color-secondary);
+  box-shadow: var(--shadow-sm);
+  font-size: .76rem;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.map-cadastral-state--ready {
+  border-color: rgba(15,118,110,.36);
+  color: #0f766e;
+  background: rgba(240,253,250,.95);
+}
+
 .map-info-panel {
   position: absolute;
   bottom: 2rem;

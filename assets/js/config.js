@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.180
+ * Version: 2.6.182
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.180',
-  EDITION_LABEL: 'Edicion vigente v2.6.180',
+  VERSION: '2.6.182',
+  EDITION_LABEL: 'Edicion vigente v2.6.182',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -61,6 +61,27 @@ const APP_CONFIG = {
   PLAN_BASEMAP_MAX_ZOOM: 19,
   MAP_TILE_CACHE_NAME: 'cialpa-map-tiles-v2.5.0',
   MAP_TILE_CACHE_LIMIT: 260,
+  MAP_CADASTRAL_DOWNLOAD_URL: 'https://www.catastro.gov.py/municipios',
+  MAP_CADASTRAL_LAYERS: [
+    {
+      id: 'snc_parcelas_activas',
+      label: 'Catastro SNC - parcelas registradas',
+      type: 'wms',
+      url: 'https://www.catastro.gov.py/geoserver/ows',
+      layers: 'snc:parcelas_activas',
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.1',
+      opacity: 0.68,
+      minZoom: 15,
+      maxZoom: 19,
+      filterableByDepartment: true,
+      source: 'Servicio Nacional de Catastro - GeoServer WMS',
+      sourceUrl: 'https://www.catastro.gov.py/visor/?snc=geo',
+      downloadUrl: 'https://www.catastro.gov.py/municipios',
+      crs: 'EPSG:3857 para visualizacion Leaflet; fuente oficial publicada tambien en EPSG:32721',
+    },
+  ],
 
   // Session
   SESSION_KEY: 'cialpa_session',

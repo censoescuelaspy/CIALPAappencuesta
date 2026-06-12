@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.180
+ * Version: 2.6.182
  */
 
 const MapModule = (() => {
@@ -17,6 +17,8 @@ const MapModule = (() => {
   let _routeLayer = null;
   let _perimeterLayer = null;
   let _perimeters = [];
+  let _cadastralLayer = null;
+  let _cadastralLayerConfig = null;
   let _routesVisible = true;
   let _routeRenderToken = 0;
   let _googleRoutesUnavailable = false;
@@ -28,6 +30,27 @@ const MapModule = (() => {
   const MAP_LIST_LIMIT = 240;
   const GOOGLE_ROUTES_ENDPOINT = 'https://routes.googleapis.com/directions/v2:computeRoutes';
   const GOOGLE_ROUTES_MAX_POINTS = 27;
+  const SNC_DEPARTMENT_CODES = Object.freeze({
+    asuncion: 'A',
+    concepcion: 'B',
+    'san pedro': 'C',
+    cordillera: 'D',
+    guaira: 'E',
+    caaguazu: 'F',
+    caazapa: 'G',
+    itapua: 'H',
+    misiones: 'I',
+    paraguari: 'J',
+    'alto parana': 'K',
+    central: 'L',
+    neembucu: 'M',
+    amambay: 'N',
+    'presidente hayes': 'P',
+    'pdte hayes': 'P',
+    boqueron: 'Q',
+    'alto paraguay': 'R',
+    canindeyu: 'S',
+  });
 
   // ── Icon factory ──────────────────────────────────────────────────────────
 
@@ -75,6 +98,10 @@ const MapModule = (() => {
 
   function _sameFilterValue(a, b) {
     return _normalizeFilterValue(a) === _normalizeFilterValue(b);
+  }
+
+  function _compactFilterKey(value) {
+    return _normalizeFilterValue(value).replace(/[^a-z0-9]+/g, ' ').trim();
   }
 
   function _hasActiveFilters(filters = {}) {
@@ -269,6 +296,8 @@ const MapModule = (() => {
       _markerCluster = null;
       _routeLayer = null;
       _perimeterLayer = null;
+      _cadastralLayer = null;
+      _cadastralLayerConfig = null;
       updateOfflineStatus();
       return null;
     }
@@ -303,6 +332,15 @@ const MapModule = (() => {
 
     _perimeterLayer = L.layerGroup().addTo(_map);
     _routeLayer = L.layerGroup().addTo(_map);
+    _cadastralLayer = _createCadastralLayer();
+
+    const overlayLayers = {
+      'Perimetros registrados': _perimeterLayer,
+      'Rutas por censista': _routeLayer,
+    };
+    if (_cadastralLayer) {
+      overlayLayers[_cadastralLayerConfig?.label || 'Catastro SNC'] = _cadastralLayer;
+    }
 
     L.control.layers(
       {
@@ -310,12 +348,14 @@ const MapModule = (() => {
         'Caminos y accesos (OSM HOT)': roads,
         'Satélite (Esri)': satellite,
       },
-      {
-        'Perimetros registrados': _perimeterLayer,
-        'Rutas por censista': _routeLayer,
-      },
+      overlayLayers,
       { position: 'topright' }
     ).addTo(_map);
+
+    _map.on('overlayadd overlayremove', event => {
+      if (event.layer === _cadastralLayer) _updateCadastralState();
+    });
+    _map.on('zoomend', _updateCadastralState);
 
     // Marker cluster group
     _markerCluster = typeof L.markerClusterGroup === 'function'
@@ -347,6 +387,7 @@ const MapModule = (() => {
     // Scale control
     L.control.scale({ imperial: false }).addTo(_map);
     updateOfflineStatus();
+    _updateCadastralState();
 
     return _map;
   }
@@ -449,6 +490,7 @@ const MapModule = (() => {
     _updateJumpState(_filteredEscuelas);
     _renderRoutes(_filteredEscuelas);
     _renderPerimeters(_filteredEscuelas);
+    _refreshCadastralLayer();
   }
 
   function clearFilters() {
@@ -484,6 +526,113 @@ const MapModule = (() => {
       _renderPerimeters(_filteredEscuelas.length || _hasActiveFilters(_activeFilters) ? _filteredEscuelas : _escuelas);
       UI.showToast('Perimetros visibles.', 'info');
     }
+  }
+
+  function _primaryCadastralConfig() {
+    const layers = Array.isArray(APP_CONFIG.MAP_CADASTRAL_LAYERS) ? APP_CONFIG.MAP_CADASTRAL_LAYERS : [];
+    return layers.find(layer => layer && layer.type === 'wms' && layer.url && layer.layers) || null;
+  }
+
+  function _sncDepartmentCode(departamento) {
+    const key = _compactFilterKey(departamento);
+    return SNC_DEPARTMENT_CODES[key] || '';
+  }
+
+  function _cadastralCqlFilter(filters = _activeFilters) {
+    if (!_cadastralLayerConfig || !_cadastralLayerConfig.filterableByDepartment) return '';
+    const code = _sncDepartmentCode(filters.departamento);
+    return code ? `dpto='${code}'` : '';
+  }
+
+  function _applyCadastralFilterToLayer(layer = _cadastralLayer, filters = _activeFilters, options = {}) {
+    if (!layer || !layer.wmsParams) return '';
+    const cql = _cadastralCqlFilter(filters);
+    if (cql) {
+      layer.wmsParams.CQL_FILTER = cql;
+    } else {
+      delete layer.wmsParams.CQL_FILTER;
+    }
+    if (!options.noRedraw && typeof layer.redraw === 'function') layer.redraw();
+    return cql;
+  }
+
+  function _createCadastralLayer() {
+    _cadastralLayerConfig = _primaryCadastralConfig();
+    if (!_cadastralLayerConfig || !window.L || !L.tileLayer || typeof L.tileLayer.wms !== 'function') return null;
+    const opacity = Number(_cadastralLayerConfig.opacity);
+    const layer = L.tileLayer.wms(_cadastralLayerConfig.url, {
+      layers: _cadastralLayerConfig.layers,
+      format: _cadastralLayerConfig.format || 'image/png',
+      transparent: _cadastralLayerConfig.transparent !== false,
+      version: _cadastralLayerConfig.version || '1.1.1',
+      attribution: _cadastralLayerConfig.source || 'Servicio Nacional de Catastro',
+      opacity: Number.isFinite(opacity) ? opacity : 0.68,
+      minZoom: Number(_cadastralLayerConfig.minZoom || 15),
+      maxZoom: Number(_cadastralLayerConfig.maxZoom || APP_CONFIG.MAP_MAX_ZOOM || 19),
+      TILED: true,
+    });
+    _applyCadastralFilterToLayer(layer, _activeFilters, { noRedraw: true });
+    layer.on('tileerror', () => {
+      console.warn('[Mapa] No se pudo cargar una tesela catastral SNC.');
+    });
+    return layer;
+  }
+
+  function _refreshCadastralLayer() {
+    if (!_cadastralLayer) {
+      _updateCadastralState();
+      return;
+    }
+    _applyCadastralFilterToLayer(_cadastralLayer, _activeFilters);
+    _updateCadastralState();
+  }
+
+  function _cadastralFilterText() {
+    const department = String(_activeFilters.departamento || '').trim();
+    if (!department) return '';
+    const code = _sncDepartmentCode(department);
+    if (!code) return '';
+    return ` - ${department}`;
+  }
+
+  function _updateCadastralState() {
+    const state = document.getElementById('map-cadastral-state');
+    if (!state) return;
+    const active = Boolean(_map && _cadastralLayer && _map.hasLayer(_cadastralLayer));
+    const minZoom = Number(_cadastralLayerConfig?.minZoom || 15);
+    const zoom = _map && typeof _map.getZoom === 'function' ? _map.getZoom() : 0;
+    const filterText = _cadastralFilterText();
+    state.textContent = active
+      ? `Catastro SNC: activo${filterText} - zoom ${minZoom}+${zoom < minZoom ? ' requerido' : ''}`
+      : 'Catastro SNC: desactivado';
+    state.classList.toggle('map-cadastral-state--ready', active);
+  }
+
+  function toggleCadastralLayer() {
+    if (!_map || !_cadastralLayer) {
+      UI.showToast('La capa catastral oficial no esta disponible.', 'warning', 5200);
+      _updateCadastralState();
+      return;
+    }
+    if (_map.hasLayer(_cadastralLayer)) {
+      _map.removeLayer(_cadastralLayer);
+      _updateCadastralState();
+      UI.showToast('Catastro SNC oculto.', 'info');
+      return;
+    }
+    _applyCadastralFilterToLayer(_cadastralLayer, _activeFilters, { noRedraw: true });
+    _cadastralLayer.addTo(_map);
+    _updateCadastralState();
+    const minZoom = Number(_cadastralLayerConfig?.minZoom || 15);
+    const suffix = _map.getZoom() < minZoom ? ` Acercate a zoom ${minZoom}+ para ver parcelas.` : '';
+    UI.showToast(`Catastro SNC visible.${suffix}`, 'info', 6200);
+  }
+
+  function openCadastralDownloads() {
+    const url = APP_CONFIG.MAP_CADASTRAL_DOWNLOAD_URL
+      || _cadastralLayerConfig?.downloadUrl
+      || 'https://www.catastro.gov.py/municipios';
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   function _renderPerimeters(escuelas = []) {
@@ -1574,6 +1723,8 @@ const MapModule = (() => {
     clearSelection,
     getFiltered,
     jumpFilteredSchool,
+    toggleCadastralLayer,
+    openCadastralDownloads,
     populateFilterButtons,
     populateDistrictButtons,
     toggleRoutes,
