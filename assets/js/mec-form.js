@@ -2995,6 +2995,7 @@ const MecFormModule = (() => {
 
   function getPlanBaseMapState() {
     const baseMap = _ensurePlanBaseMap();
+    const highres = _planBaseMapHighresSource();
     return {
       enabled: _planBaseMapVisible(baseMap),
       source: _planBaseMapSource(baseMap),
@@ -3007,6 +3008,8 @@ const MecFormModule = (() => {
       cadastralOverlay: Boolean(baseMap.cadastralOverlay && _planBaseMapCadastralConfig()),
       cadastralOpacity: _planBaseMapCadastralOpacity(baseMap),
       hasCoords: _planBaseMapHasCoords(baseMap),
+      highresAvailable: Boolean(highres),
+      highresLabel: highres ? _planBaseMapHighresLabel(highres) : '',
       lat: baseMap.lat,
       lng: baseMap.lng,
     };

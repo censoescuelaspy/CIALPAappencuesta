@@ -7442,3 +7442,30 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Resultados verificados
 - La app vuelve a tener una entrada operativa en `PLAN_BASEMAP_HIGHRES_SOURCES`.
 - El flujo deja de fallar en silencio: si no hay ortofoto local para la escuela activa, el censista recibe un mensaje claro y sigue con satelite estable.
+
+---
+
+## Claridad operativa de alta resolucion vs satelite - 2026-06-16
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.190`.
+
+### Objetivo de la intervencion
+- Evitar que el boton de `REGISTRO GUIADO` siga prometiendo `Alta res.` en escuelas que no tienen una imagen local de alta definicion disponible.
+
+### Diagnostico inicial
+- La prueba navegada confirmo que `101095` si carga su ortofoto local en alta resolucion.
+- Tambien confirmo que el resto de escuelas sin fuente local cargan correctamente satelite Esri, pero el boton seguia diciendo `Alta res.`, lo que se percibia como fallo.
+
+### Acciones realizadas
+- `assets/js/mec-form.js`: `getPlanBaseMapState()` ahora expone `highresAvailable` y `highresLabel`.
+- `assets/js/guided-register.js`: el boton rapido cambia dinamicamente entre `Alta res.` y `Satelite` segun la escuela activa.
+- `assets/js/guided-register.js`: el estado visible agrega la marca `sin imagen local HD` cuando corresponde.
+- `assets/js/config.js`, `index.html`, `sw.js`: version/cache actualizados a `2.6.190`.
+
+### Resultados verificados
+- Escuela `101095`: boton `Alta res.`, estado `Imagen alta res. activo`, imagen local cargada.
+- Escuela comun sin ortofoto local: boton `Satelite`, estado `Satelite activo | sin imagen local HD`, tesela Esri cargada.

@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.189`.
+- Version vigente de esta intervencion: `2.6.190`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -36,6 +36,7 @@
 - Para `2.6.188`, se saco a Google de la ruta normal de `Alta res.`: la app ahora usa imagen local si existe y, en caso contrario, satelite Esri como base operativa por defecto.
 - Para `2.6.189`, se reactivo explicitamente la fuente local `101095` ya presente en `assets/imagery/schools/101095/tiles/`, porque `PLAN_BASEMAP_HIGHRES_SOURCES` habia quedado vacio.
 - `Alta res.` ahora tambien avisa cuando la escuela activa no tiene ortofoto local y se mantiene en satelite estable, evitando la sensacion de fallo silencioso.
+- Para `2.6.190`, la UI deja de llamar `Alta res.` a escuelas sin fuente local HD: el boton pasa a `Satelite` y el estado visible marca `sin imagen local HD`.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -62,3 +63,4 @@
 - Se verifico que la URL fallback `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` responde JSON publico, mientras los deployments version 37 probados responden `403 Forbidden`.
 - Para la alta resolucion se verifico `createSession 200` en Google Map Tiles y `2dtiles 403 PERMISSION_DENIED`, confirmando que el boton no estaba roto: la fuente Google estaba siendo rechazada al pedir imagenes.
 - Para `2.6.189`, se verifico por inspeccion del repo que existen tiles locales y manifiesto de `101095`, y se restablecio su entrada operativa en `APP_CONFIG`.
+- Para `2.6.190`, se verifico en navegador automatizado que `101095` carga la imagen local HD y que una escuela comun cambia correctamente a boton/estado `Satelite`.

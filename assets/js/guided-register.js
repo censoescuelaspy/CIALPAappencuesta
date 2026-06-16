@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.189
+ * Version: 2.6.190
  */
 
 const GuidedRegisterModule = (() => {
@@ -1321,6 +1321,8 @@ const GuidedRegisterModule = (() => {
       confirmed: Boolean(baseMap.confirmed || baseMap.savedAt),
       dragMode: Boolean(baseMap.dragMode),
       hasCoords: Boolean(baseMap.hasCoords || (baseMap.lat !== undefined && baseMap.lat !== '' && baseMap.lng !== undefined && baseMap.lng !== '')),
+      highresAvailable: Boolean(baseMap.highresAvailable),
+      highresLabel: String(baseMap.highresLabel || '').trim(),
     };
   }
 
@@ -1343,6 +1345,13 @@ const GuidedRegisterModule = (() => {
       const active = activeFor(action);
       button.classList.toggle('btn-guided-active', active);
       button.setAttribute('aria-pressed', String(active));
+      if (action === 'basemapSatellite') {
+        const label = base.highresAvailable ? 'Alta res.' : 'Satelite';
+        button.textContent = label;
+        button.title = base.highresAvailable
+          ? (base.highresLabel || 'Imagen local de alta resolucion')
+          : 'Esta escuela no tiene imagen local de alta resolucion; se usa satelite estable';
+      }
     });
     const sourceName = base.source === 'google_satellite'
       ? 'Alta res.'
@@ -1354,7 +1363,9 @@ const GuidedRegisterModule = (() => {
     const sourceLabel = overlays.length ? `${sourceName} + ${overlays.join(' + ')}` : `${sourceName} activo`;
     const stateText = !base.hasCoords
       ? 'Sin coordenadas: use "Usar coords"'
-      : (base.enabled ? sourceLabel : 'Base apagada');
+      : (base.enabled
+        ? `${sourceLabel}${base.highresAvailable ? '' : ' | sin imagen local HD'}`
+        : (base.highresAvailable ? 'Base apagada' : 'Base apagada | sin imagen local HD'));
     root.querySelectorAll('[data-guided-basemap-state]').forEach(item => {
       item.textContent = `${stateText}${base.dragMode ? ' | Mover base activo' : ''}${base.confirmed ? ' | Guardada' : ''}`;
     });
