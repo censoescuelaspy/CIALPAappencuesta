@@ -7314,3 +7314,72 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - No tocar el fallback publico hasta tener un nuevo endpoint version 37 validado anonimamente.
 - Registrar como aprendizaje maestro que `clasp deployments` y metadata `ANYONE_ANONYMOUS` no alcanzan: la validacion decisiva es HTTP anonimo con JSON del endpoint exacto.
+
+---
+
+## Recuperacion alta resolucion en registro guiado - 2026-06-16
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.187`.
+
+### Objetivo de la intervencion
+- Recuperar el uso operativo del boton `Alta res.` en `REGISTRO GUIADO`, que dejo de mostrar una base util.
+
+### Diagnostico inicial
+- `Google Map Tiles createSession` seguia respondiendo `200`, por lo que la clave y el flujo de sesion parecian vigentes.
+- La descarga real de teselas `2dtiles` respondio `403 Forbidden` con `PERMISSION_DENIED` y el mensaje `Method doesn't allow unregistered callers`.
+- La app solo hacia fallback si fallaba `createSession`; cuando fallaba una tesela individual, podia quedar intentando pintar Google sin cambiar a una base alternativa.
+
+### Acciones realizadas
+- `assets/js/mec-form.js`: se creo `_fallbackFromGoogleMapTiles(reason)` para degradar en forma centralizada desde Google a `highres` local o `satellite` Esri.
+- `assets/js/mec-form.js`: se agrego `handlePlanBaseMapTileError(source, img)` y se conecto al `onerror` de cada tesela Google renderizada en el plano vivo.
+- `assets/js/mec-form.js`: el fallo de `createSession` ahora reutiliza el mismo fallback central en vez de una ruta separada.
+- `assets/js/config.js`, `assets/js/guided-register.js`, `index.html`, `sw.js`: version/cache actualizados a `2.6.187`.
+
+### Archivos modificados
+- `assets/js/mec-form.js`
+- `assets/js/config.js`
+- `assets/js/guided-register.js`
+- `index.html`
+- `sw.js`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `rg -n "GOOGLE_MAP_TILES_API_KEY|createSession|google_satellite|setPlanHighResolutionBaseMap"`
+- `Invoke-WebRequest` a `https://tile.googleapis.com/v1/createSession`
+- `curl.exe` / `Invoke-WebRequest` a una tesela `https://tile.googleapis.com/v1/2dtiles/...`
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/guided-register.js`
+- `git diff --check`
+
+### Resultados verificados
+- `createSession` devuelve `200 application/json`.
+- La tesela Google probada devuelve `403 Forbidden` con `PERMISSION_DENIED`, confirmando que el problema estaba en la descarga real de imagenes y no en el boton.
+- La version local quedo actualizada a `2.6.187`.
+- Los archivos JS tocados pasan validacion de sintaxis.
+
+### Pruebas realizadas
+- Prueba HTTP de sesion Google Map Tiles.
+- Prueba HTTP de descarga de tesela real con `Origin`/`Referer` del dominio GitHub Pages.
+- Validacion de sintaxis JavaScript.
+
+### Errores o incidentes
+- No se ejecuto una prueba Playwright integral del flujo autenticado porque el checkout no tiene el entorno completo instalado para navegar el circuito real de registro desde esta carpeta sincronizada.
+
+### Soluciones aplicadas
+- Si Google rechaza una tesela de alta resolucion, la app ya no insiste con una capa vacia: cambia automaticamente a la mejor base disponible y muestra un aviso claro.
+- El censista conserva una vista satelital funcional para seguir relevando aunque Google bloquee temporalmente o por permisos las teselas de alta resolucion.
+
+### Pendientes
+- Validar en GitHub Pages con usuario real que `Alta res.` muestre el toast y degrade visualmente a la base satelital sin dejar el panel vacio.
+- Si se quiere recuperar Google de forma nativa, revisar en la consola de Google Cloud las restricciones de la API key y del producto Map Tiles para `2dtiles`.
+
+### Riesgos
+- Mientras Google siga respondiendo `403` para `2dtiles`, la app no tendra imagen Google real; el arreglo actual prioriza continuidad operativa sobre insistir con una fuente bloqueada.
+
+### Recomendaciones
+- Mantener el fallback automatico aunque luego se repare la clave, porque protege la captura en campo ante cortes o restricciones futuras.

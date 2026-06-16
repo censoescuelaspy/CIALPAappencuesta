@@ -16,6 +16,7 @@
 - En la intervencion actual se reporto que Catastro cargaba, pero la alta resolucion dejo de cargar; tambien se pidieron estados activos visibles, rotacion/alineacion automatica, mas zoom en `MAPA`, capa de planos/perimetros, predio preliminar desde Catastro y mejor administracion de carga por censista.
 - Luego se reporto que el boton `Iniciar/continuar registro` no llevaba a la vista `REGISTRO GUIADO`.
 - Luego se reporto que, estando logueado como admin, no se podia agregar ni quitar encuestadores; la app mostraba el error `Solo administradores autorizados pueden gestionar usuarios`.
+- En una continuacion posterior se reporto que la nueva version dejo de mostrar el mapa en `Alta res.` dentro de `REGISTRO GUIADO`.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -30,6 +31,8 @@
 - Para la gestion de encuestadores, se identifico una diferencia entre permiso visual y permiso real: la UI reconocia el rol admin, pero GAS exigia ademas pertenecer a una lista fija local de usuarios autorizados.
 - Se corrigio `_isAuthorizedAdmin(session)` para aceptar roles admin normalizados y dejar la lista restrictiva solo como propiedad opcional `CIALPA_AUTHORIZED_ADMIN_USERS`.
 - El codigo corregido fue subido a GAS y versionado como version 37, pero los deployments version 37 probados devuelven `403 Forbidden` en HTTP anonimo aunque la metadata figure como `ANYONE_ANONYMOUS`; no se cambio el fallback estable para evitar dejar la app sin backend publico.
+- Para `2.6.187`, se verifico que Google Map Tiles seguia creando sesion (`createSession 200`), pero la descarga real de teselas `2dtiles` devolvia `403 PERMISSION_DENIED`.
+- Se corrigio `assets/js/mec-form.js` para que la vista `Alta res.` haga fallback automatico cuando falle una tesela Google, no solo cuando falle `createSession`.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -39,6 +42,7 @@
 - `assets/js/map.js`
 - `assets/js/admin.js`
 - `gas/Code.gs`
+- `assets/js/mec-form.js`
 - `index.html`
 - `sw.js`
 - `BITACORA.md`
@@ -53,3 +57,4 @@
 - En `2.6.186`, Playwright se ejecuto desde entorno temporal fuera de Google Drive; `MapModule.startGuidedRegister('ESC_TEST_GUIDED')` termino en `module-registro` con `.guided-register` renderizado y sin errores de consola.
 - Para la gestion de encuestadores se verifico por lectura de codigo que `saveEncuestador` y `deleteEncuestador` dependen de `_isAuthorizedAdmin(session)`.
 - Se verifico que la URL fallback `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` responde JSON publico, mientras los deployments version 37 probados responden `403 Forbidden`.
+- Para la alta resolucion se verifico `createSession 200` en Google Map Tiles y `2dtiles 403 PERMISSION_DENIED`, confirmando que el boton no estaba roto: la fuente Google estaba siendo rechazada al pedir imagenes.

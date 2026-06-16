@@ -56,6 +56,7 @@ const MecFormModule = (() => {
   let _planBaseMapPanelOpen = false;
   let _planBaseMapDragMode = false;
   let _googleMapTilesSession = { key: '', token: '', pending: false, error: '' };
+  let _googleMapTilesFallbackNotified = false;
   let _activeCanvasZoom = 1;
   let _schoolPlanResizeBound = false;
   let _schoolPlanResizeTimer = null;
@@ -1419,24 +1420,42 @@ const MecFormModule = (() => {
       })
       .catch(error => {
         _googleMapTilesSession = { key, token: '', pending: false, error: error?.message || String(error || '') };
-        try {
-          const baseMap = _ensurePlanBaseMap();
-          if (_planBaseMapSource(baseMap) === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) {
-            const fallbackSource = _planBaseMapHighresSource() ? PLAN_BASEMAP_SOURCE_HIGHRES : PLAN_BASEMAP_SOURCE_SATELLITE;
-            baseMap.source = fallbackSource;
-            const preset = _planBaseMapDetailPreset(fallbackSource);
-            baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, fallbackSource);
-            baseMap.scale = _clampPlanBaseMapScale(Math.max(Number(baseMap.scale || 1), preset.scale), preset.scale);
-            baseMap.googleSatelliteError = _googleMapTilesSession.error;
-            baseMap.confirmed = false;
-            _saveDraft(false, { skipRemoteSync: true });
-          }
-        } catch (_ignored) {
-          // Mantener el renderizado aun si el fallback no puede persistirse.
-        }
-        UI.showToast('Alta resolucion Google no disponible ahora. Se usa la mejor base alternativa configurada.', 'warning', 7200);
-        renderSchoolPlan();
+        if (!_fallbackFromGoogleMapTiles(_googleMapTilesSession.error)) renderSchoolPlan();
       });
+  }
+
+  function _fallbackFromGoogleMapTiles(reason = '') {
+    try {
+      const baseMap = _ensurePlanBaseMap();
+      if (_planBaseMapSource(baseMap) !== PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return false;
+      const fallbackSource = _planBaseMapHighresSource() ? PLAN_BASEMAP_SOURCE_HIGHRES : PLAN_BASEMAP_SOURCE_SATELLITE;
+      baseMap.source = fallbackSource;
+      const preset = _planBaseMapDetailPreset(fallbackSource);
+      baseMap.zoom = _clampPlanBaseMapZoom(preset.zoom, preset.zoom, fallbackSource);
+      baseMap.scale = _clampPlanBaseMapScale(Math.max(Number(baseMap.scale || 1), preset.scale), preset.scale);
+      baseMap.googleSatelliteError = reason || 'Teselas Google Map Tiles no disponibles';
+      baseMap.confirmed = false;
+      _saveDraft(false, { skipRemoteSync: true });
+      if (!_googleMapTilesFallbackNotified) {
+        _googleMapTilesFallbackNotified = true;
+        UI.showToast('Alta resolucion Google no disponible ahora. Se mantiene una base satelital alternativa para no dejar el plano en blanco.', 'warning', 8200);
+      }
+      renderSchoolPlan();
+      return true;
+    } catch (err) {
+      console.warn('[CIALPA] No se pudo aplicar fallback de Google Map Tiles:', err);
+      return false;
+    }
+  }
+
+  function handlePlanBaseMapTileError(source = '', img = null) {
+    if (img) {
+      img.onerror = null;
+      img.style.display = 'none';
+    }
+    if (String(source || '').toLowerCase() !== PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return;
+    _googleMapTilesSession.error = _googleMapTilesSession.error || 'Tesela Google Map Tiles bloqueada o no disponible';
+    _fallbackFromGoogleMapTiles(_googleMapTilesSession.error);
   }
 
   function _googleMapTilesUrl(z, x, y) {
@@ -2489,12 +2508,16 @@ const MecFormModule = (() => {
     const originX = (logicalWidth * displayScale) / 2;
     const originY = (logicalHeight * displayScale) / 2;
     const filter = _planBaseMapCssFilter(baseMap);
-    const renderImages = tileItems => tileItems.map(item => `
-      <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="${_escape(item.referrerPolicy || 'no-referrer')}"
-        style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`).join('');
-    const images = renderImages(items);
-    const overlayImages = renderImages(overlayItems);
-    const cadastralImages = renderImages(cadastralItems);
+    const renderImages = (tileItems, sourceId = '') => tileItems.map(item => {
+      const isGoogle = sourceId === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
+      const errorHandler = isGoogle ? ` onerror="MecFormModule.handlePlanBaseMapTileError('google_satellite', this)"` : '';
+      return `
+      <img src="${_escape(item.url)}" alt="" loading="lazy" decoding="async" referrerpolicy="${_escape(item.referrerPolicy || 'no-referrer')}" data-plan-basemap-source="${_escape(sourceId)}"${errorHandler}
+        style="left:${_cssNumber(item.x)}px;top:${_cssNumber(item.y)}px;width:${_cssNumber(item.w)}px;height:${_cssNumber(item.h)}px;">`;
+    }).join('');
+    const images = renderImages(items, sourceConfig.id || '');
+    const overlayImages = renderImages(overlayItems, overlayConfig?.id || '');
+    const cadastralImages = renderImages(cadastralItems, 'catastro_snc');
     const attributionParts = [sourceConfig.attribution];
     if (overlayConfig && overlayItems.length) attributionParts.push(overlayConfig.attribution);
     if (cadastralConfig && cadastralItems.length) attributionParts.push(cadastralConfig.source || cadastralConfig.attribution || 'Servicio Nacional de Catastro');
@@ -3394,6 +3417,7 @@ const MecFormModule = (() => {
         UI.showToast('Configure GOOGLE_MAP_TILES_API_KEY para usar la satelital de Google.', 'warning', 6200);
         return;
       }
+      _googleMapTilesFallbackNotified = false;
       baseMap.source = PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
       _requestGoogleMapTilesSession();
     } else {
@@ -25801,6 +25825,7 @@ const MecFormModule = (() => {
     togglePlanBaseMap,
     setPlanBaseMapSource,
     setPlanHighResolutionBaseMap,
+    handlePlanBaseMapTileError,
     togglePlanStreetOverlay,
     setPlanStreetOverlayOpacity,
     togglePlanCadastralOverlay,
