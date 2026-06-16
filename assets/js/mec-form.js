@@ -1392,7 +1392,10 @@ const MecFormModule = (() => {
   }
 
   function _hasGoogleSatelliteSource() {
-    return Boolean(_googleMapTilesApiKey());
+    const enabled = typeof APP_CONFIG !== 'undefined'
+      ? APP_CONFIG.GOOGLE_MAP_TILES_ENABLED !== false
+      : true;
+    return Boolean(_googleMapTilesApiKey() && enabled);
   }
 
   function _requestGoogleMapTilesSession() {
@@ -1496,14 +1499,14 @@ const MecFormModule = (() => {
   function _planBaseMapContextPreset(source = _planBaseMapSource(_data.__planBaseMap)) {
     if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return { zoom: 19, scale: 1 };
     if (source === PLAN_BASEMAP_SOURCE_HIGHRES) return { zoom: 18, scale: 1 };
-    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) return { zoom: 17, scale: 1 };
+    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) return { zoom: 18, scale: 1 };
     return { zoom: 18, scale: 1 };
   }
 
   function _planBaseMapDetailPreset(source = _planBaseMapSource(_data.__planBaseMap)) {
     if (source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) return { zoom: 21, scale: 1 };
     if (source === PLAN_BASEMAP_SOURCE_HIGHRES) return { zoom: _planBaseMapMaxZoom(source), scale: 1 };
-    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) return { zoom: 17, scale: PLAN_BASEMAP_DEFAULT_SCALE };
+    if (source === PLAN_BASEMAP_SOURCE_SATELLITE) return { zoom: 19, scale: 1.25 };
     return { zoom: 19, scale: 1.4 };
   }
 
@@ -3073,7 +3076,7 @@ const MecFormModule = (() => {
   function setPlanHighResolutionBaseMap() {
     const source = _planBaseMapHighresSource()
       ? PLAN_BASEMAP_SOURCE_HIGHRES
-      : (_hasGoogleSatelliteSource() ? PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE : PLAN_BASEMAP_SOURCE_SATELLITE);
+      : PLAN_BASEMAP_SOURCE_SATELLITE;
     setPlanBaseMapSource(source);
     const baseMap = _ensurePlanBaseMap();
     const nextSource = _planBaseMapSource(baseMap);

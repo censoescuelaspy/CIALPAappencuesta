@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.187
+ * Version: 2.6.188
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.187',
-  EDITION_LABEL: 'Edicion vigente v2.6.187',
+  VERSION: '2.6.188',
+  EDITION_LABEL: 'Edicion vigente v2.6.188',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -50,8 +50,9 @@ const APP_CONFIG = {
   PLAN_BASEMAP_STREET_OVERLAY_OPACITY: 0.9,
   PLAN_BASEMAP_SATELLITE_TILE_URL: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   PLAN_BASEMAP_SATELLITE_ATTRIBUTION: 'Tiles &copy; Esri',
-  PLAN_BASEMAP_SATELLITE_MAX_ZOOM: 17,
+  PLAN_BASEMAP_SATELLITE_MAX_ZOOM: 19,
   GOOGLE_MAP_TILES_API_KEY: 'AIzaSyD_pqMM_Yzp3RyYbp8AnrLsI8PNw8zM35Y',
+  GOOGLE_MAP_TILES_ENABLED: false,
   GOOGLE_ROUTES_API_KEY: '',
   MAP_REAL_ROUTES_ENABLED: false,
   PLAN_BASEMAP_GOOGLE_SATELLITE_MAX_ZOOM: 21,

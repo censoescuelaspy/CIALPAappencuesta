@@ -7383,3 +7383,36 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Recomendaciones
 - Mantener el fallback automatico aunque luego se repare la clave, porque protege la captura en campo ante cortes o restricciones futuras.
+
+---
+
+## Ajuste operativo alta resolucion por defecto - 2026-06-16
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.188`.
+
+### Objetivo de la intervencion
+- Evitar que la experiencia normal de `Alta res.` siga dependiendo de una fuente Google que actualmente devuelve teselas `403`.
+
+### Diagnostico inicial
+- La version `2.6.187` ya hacia fallback cuando Google fallaba, pero la base por defecto y el boton `Alta res.` seguian priorizando Google mientras existiera `GOOGLE_MAP_TILES_API_KEY`.
+- Eso mantenia una experiencia fragil: el censista podia seguir entrando primero a una fuente rota antes de caer al respaldo.
+
+### Acciones realizadas
+- `assets/js/config.js`: se fija `GOOGLE_MAP_TILES_ENABLED: false`.
+- `assets/js/config.js`: `PLAN_BASEMAP_SATELLITE_MAX_ZOOM` sube a `19` para permitir acercamiento mas util en la base alternativa.
+- `assets/js/mec-form.js`: `_hasGoogleSatelliteSource()` ahora respeta `GOOGLE_MAP_TILES_ENABLED`.
+- `assets/js/mec-form.js`: `setPlanHighResolutionBaseMap()` pasa a priorizar `highres` local y, si no existe, `satellite` Esri directamente.
+- `assets/js/mec-form.js`: presets de contexto/detalle satelital se ajustan para acercar mejor la base operativa.
+- Version/cache actualizados a `2.6.188`.
+
+### Resultados verificados
+- La URL publica ya expone `v2.6.188` tras el push de esta correccion.
+- `Alta res.` deja de depender del proveedor Google bloqueado para el flujo normal.
+
+### Soluciones aplicadas
+- La alta resolucion operativa del censista queda basada en una fuente visible y estable por defecto.
+- Google queda desactivado de la ruta normal hasta que sus teselas reales vuelvan a ser descargables desde el dominio publico.

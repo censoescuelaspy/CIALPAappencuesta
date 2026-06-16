@@ -33,6 +33,7 @@
 - El codigo corregido fue subido a GAS y versionado como version 37, pero los deployments version 37 probados devuelven `403 Forbidden` en HTTP anonimo aunque la metadata figure como `ANYONE_ANONYMOUS`; no se cambio el fallback estable para evitar dejar la app sin backend publico.
 - Para `2.6.187`, se verifico que Google Map Tiles seguia creando sesion (`createSession 200`), pero la descarga real de teselas `2dtiles` devolvia `403 PERMISSION_DENIED`.
 - Se corrigio `assets/js/mec-form.js` para que la vista `Alta res.` haga fallback automatico cuando falle una tesela Google, no solo cuando falle `createSession`.
+- Para `2.6.188`, se saco a Google de la ruta normal de `Alta res.`: la app ahora usa imagen local si existe y, en caso contrario, satelite Esri como base operativa por defecto.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
