@@ -7416,3 +7416,29 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Soluciones aplicadas
 - La alta resolucion operativa del censista queda basada en una fuente visible y estable por defecto.
 - Google queda desactivado de la ruta normal hasta que sus teselas reales vuelvan a ser descargables desde el dominio publico.
+
+---
+
+## Reactivacion de fuente local de alta resolucion - 2026-06-16
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.189`.
+
+### Objetivo de la intervencion
+- Recuperar la alta resolucion local que seguia existiendo en el repo pero habia quedado fuera de `APP_CONFIG`.
+
+### Diagnostico inicial
+- El repo conserva tiles locales en `assets/imagery/schools/101095/tiles/` y el manifiesto `assets/data/highres-school-pilot-isla-tuyu-101095.json`.
+- `APP_CONFIG.PLAN_BASEMAP_HIGHRES_SOURCES` habia quedado vacio, por lo que el boton `Alta res.` ya no podia reencontrar esa fuente local.
+
+### Acciones realizadas
+- `assets/js/config.js`: se reactiva la fuente local `101095` apuntando a sus tiles y manifiesto.
+- `assets/js/mec-form.js`: `setPlanHighResolutionBaseMap()` ahora informa explicitamente cuando una escuela no tiene imagen local y usa satelite estable.
+- `assets/js/config.js`, `assets/js/guided-register.js`, `index.html`, `sw.js`: version/cache actualizados a `2.6.189`.
+
+### Resultados verificados
+- La app vuelve a tener una entrada operativa en `PLAN_BASEMAP_HIGHRES_SOURCES`.
+- El flujo deja de fallar en silencio: si no hay ortofoto local para la escuela activa, el censista recibe un mensaje claro y sigue con satelite estable.

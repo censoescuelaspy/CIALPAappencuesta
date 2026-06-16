@@ -3074,7 +3074,8 @@ const MecFormModule = (() => {
   }
 
   function setPlanHighResolutionBaseMap() {
-    const source = _planBaseMapHighresSource()
+    const localHighres = _planBaseMapHighresSource();
+    const source = localHighres
       ? PLAN_BASEMAP_SOURCE_HIGHRES
       : PLAN_BASEMAP_SOURCE_SATELLITE;
     setPlanBaseMapSource(source);
@@ -3089,6 +3090,9 @@ const MecFormModule = (() => {
     baseMap.confirmed = false;
     _saveDraft(false);
     renderSchoolPlan();
+    if (!localHighres) {
+      UI.showToast('Esta escuela no tiene imagen local de alta resolucion; se usa satelite estable para continuar.', 'info', 5200);
+    }
   }
 
   function rotatePlanBaseMap(delta = 0) {

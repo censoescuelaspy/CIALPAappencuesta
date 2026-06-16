@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.188
+ * Version: 2.6.189
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.188',
-  EDITION_LABEL: 'Edicion vigente v2.6.188',
+  VERSION: '2.6.189',
+  EDITION_LABEL: 'Edicion vigente v2.6.189',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -57,9 +57,18 @@ const APP_CONFIG = {
   MAP_REAL_ROUTES_ENABLED: false,
   PLAN_BASEMAP_GOOGLE_SATELLITE_MAX_ZOOM: 21,
   PLAN_BASEMAP_HIGHRES_MAX_ZOOM: 19,
-  // Sin fuentes locales activas: el piloto S2 10 m quedo solo como prueba tecnica.
   // BEGIN CIALPA_HIGHRES_SOURCES
-  PLAN_BASEMAP_HIGHRES_SOURCES: {},
+  PLAN_BASEMAP_HIGHRES_SOURCES: {
+    '101095': {
+      label: 'Imagen local 101095',
+      tileUrl: 'assets/imagery/schools/101095/tiles/{z}/{x}/{y}.png',
+      attribution: 'Imagen local piloto 101095 / Earth Engine',
+      manifestUrl: 'assets/data/highres-school-pilot-isla-tuyu-101095.json',
+      status: 'tiles_ready_local_fallback',
+      minZoom: 17,
+      maxZoom: 19,
+    },
+  },
   // END CIALPA_HIGHRES_SOURCES
   PLAN_BASEMAP_MAX_ZOOM: 19,
   MAP_TILE_CACHE_NAME: 'cialpa-map-tiles-v2.5.0',
