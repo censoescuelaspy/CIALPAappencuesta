@@ -1,29 +1,21 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.199** | Paraguay 2026
+**Version 2.6.200** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
 
-## Novedades v2.6.199
+## Novedades v2.6.200
 
-- La vista 3D ahora aparece directamente dentro del `Registro guiado`, arriba del plano vivo.
-- Se agrega boton visible `Vista 3D` en el panel del registro para ubicar rapidamente el ensayo.
-- El panel 3D muestra estado inicial aunque no haya aula y se activa al crear o seleccionar un aula.
-- El visor conserva controles 3D/plano/giro y KPIs compactos sin reemplazar el croquis 2D.
+- Se retiran componentes experimentales pesados del `Registro guiado` para mejorar velocidad y claridad operativa.
+- El registro vuelve a priorizar croquis/plano 2D, ficha arquitectonica, evidencias y guardado confiable.
+- Se mantiene el hotfix de cache/service worker para cargar `mec-form.js` correctamente.
 
 ## Novedades v2.6.198
 
 - Hotfix de carga del `Registro guiado` cuando un navegador conserva cache/service worker previo.
 - El service worker deja de responder `index.html` como respaldo para archivos `.js`, evitando falsos errores al cargar `mec-form.js`.
 - El cargador diferido de scripts limpia cache del asset y reintenta con cache-busting si falla el primer intento.
-- Se precachean los assets criticos del formulario MEC: `mec-schema.js`, `mec-form.js`, `guided-register.js`, `classroom-3d.js` y `mec-form.css`.
-
-## Novedades v2.6.197
-
-- Primer ensayo de visor 3D para el registro arquitectonico de aulas.
-- El visor toma el aula activa del croquis, representa piso, muros, aberturas y objetos registrados.
-- Agrega metricas rapidas del ambiente y alertas basicas sin modificar la ficha ni el plano 2D.
-- Three.js se carga de forma diferida; si no esta disponible, el formulario sigue operativo con el croquis 2D.
+- Se precachean los assets criticos del formulario MEC: `mec-schema.js`, `mec-form.js`, `guided-register.js` y `mec-form.css`.
 
 ## Novedades v2.6.196
 
