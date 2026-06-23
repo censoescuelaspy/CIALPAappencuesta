@@ -1,8 +1,15 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.180** | Paraguay 2026
+**Version 2.6.191** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.191
+
+- El KPI de inicio distingue `Pendientes operativas` como conteo global del padron cargado.
+- El encabezado del mapa distingue `Pend. vista`, `Total vista` y el resumen de alcance de la vista actual.
+- El mapa informa si hay filtros activos y cuantas escuelas tienen marcador por contar con coordenadas validas.
+- Criterio operativo: para planificacion general rige el KPI global; para trabajo territorial inmediato rige la vista filtrada/georreferenciada del mapa.
 
 ## Novedades v2.6.180
 

@@ -941,6 +941,16 @@ td {
   text-align: center;
 }
 
+.map-count-summary {
+  flex: 1 1 260px;
+  min-width: min(100%, 260px);
+  color: var(--color-text-muted);
+  font-size: .76rem;
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: right;
+}
+
 .map-sidebar__counts {
   display: flex;
   flex-wrap: wrap;

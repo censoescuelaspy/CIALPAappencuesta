@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.183
+ * Version: 2.6.191
  */
 
 const MapModule = (() => {
@@ -138,6 +138,15 @@ const MapModule = (() => {
   function _stateColor(e = {}) {
     const state = _schoolState(e);
     return APP_CONFIG.STATE_COLORS[state] || '#6c757d';
+  }
+
+  function _stateCounts(escuelas = []) {
+    const counts = { pendiente: 0, en_curso: 0, finalizada: 0, incidencia: 0 };
+    (escuelas || []).forEach(e => {
+      const state = _schoolState(e);
+      if (counts[state] !== undefined) counts[state]++;
+    });
+    return counts;
   }
 
   function _isTrueish(value) {
@@ -1662,17 +1671,39 @@ const MapModule = (() => {
   }
 
   function _updateSummaryBadges(escuelas) {
-    const counts = { pendiente: 0, en_curso: 0, finalizada: 0, incidencia: 0 };
-    escuelas.forEach(e => {
-      const state = _schoolState(e);
-      if (counts[state] !== undefined) counts[state]++;
-    });
+    const visibleRows = Array.isArray(escuelas) ? escuelas : [];
+    const counts = _stateCounts(visibleRows);
     Object.entries(counts).forEach(([key, val]) => {
       const el = document.getElementById(`map-count-${key}`);
       if (el) el.textContent = val;
     });
     const total = document.getElementById('map-count-total');
-    if (total) total.textContent = escuelas.length;
+    if (total) total.textContent = visibleRows.length;
+    _updateCountScope(visibleRows, counts);
+  }
+
+  function _updateCountScope(visibleRows, visibleCounts) {
+    const el = document.getElementById('map-count-summary');
+    if (!el) return;
+    const allRows = Array.isArray(_escuelas) ? _escuelas : [];
+    const allCounts = _stateCounts(allRows);
+    const visibleWithPoint = visibleRows.filter(_validPoint);
+    const allWithPoint = allRows.filter(_validPoint);
+    const geoCounts = _stateCounts(visibleWithPoint);
+    const filtered = _hasActiveFilters(_activeFilters);
+    if (!allRows.length) {
+      el.textContent = 'Vista del mapa: sin escuelas cargadas.';
+      el.title = '';
+      return;
+    }
+    const scope = filtered
+      ? `Vista filtrada: ${visibleRows.length}/${allRows.length} escuelas`
+      : `Vista general: ${allRows.length} escuelas`;
+    const markerScope = filtered
+      ? `${visibleWithPoint.length}/${visibleRows.length} con marcador`
+      : `${allWithPoint.length}/${allRows.length} con marcador`;
+    el.textContent = `${scope}; ${visibleCounts.pendiente} pend. visibles; ${markerScope} (${geoCounts.pendiente} pend. georef.); global ${allCounts.pendiente} pend.`;
+    el.title = 'Inicio muestra pendientes operativas globales. El mapa muestra la vista actual: respeta filtros y solo dibuja marcadores para escuelas con coordenadas validas.';
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
