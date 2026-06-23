@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.191`.
+- Version vigente de esta intervencion: `2.6.193`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -19,6 +19,7 @@
 - En una continuacion posterior se reporto que la nueva version dejo de mostrar el mapa en `Alta res.` dentro de `REGISTRO GUIADO`.
 - Finalmente se solicito obtener todo lo necesario para poder agregar mapas de alta resolucion a la mayor cantidad posible de escuelas.
 - En la intervencion del 2026-06-23 se reporto diferencia entre la cantidad vista en el mapa y el KPI superior `Pendientes`.
+- Luego se solicito agregar una vista departamental con mapa de escuelas, Asuncion por defecto, botones para cambiar de departamento y salida imprimible/PDF con una pagina por departamento.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -46,6 +47,9 @@
 - En la continuacion siguiente, el usuario completo la autenticacion Earth Engine; `earthengine task list` paso a responder correctamente, pero la coleccion `projects/planet-nicfi/assets/basemaps/americas` sigue devolviendo `Permission 'earthengine.assets.get' denied`.
 - Para `2.6.191`, se aclaro la diferencia entre conteos: `Inicio` muestra `Pendientes operativas` globales, mientras el mapa muestra conteos de la vista actual con filtros y marcador/georreferenciacion.
 - El criterio operativo queda: para planificacion general rige el KPI global; para trabajo territorial inmediato rige el resumen del mapa filtrado/georreferenciado.
+- Para `2.6.192`, se agrego cobertura de coordenadas al resumen territorial: `en mapa`, `sin marcador`, pendientes con coordenadas y pendientes sin coordenadas.
+- Para `2.6.193`, se agrego `Atlas departamental`: vista supervisor/admin con Asuncion por defecto, botones por departamento, KPIs departamentales, mapa Leaflet y salida de impresion/PDF con una pagina por departamento.
+- La decision tecnica de impresion fue usar SVG de puntos generado desde latitud/longitud para evitar fallas de tiles Leaflet o servicios externos durante la exportacion PDF.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -54,6 +58,7 @@
 - `assets/css/app.css`
 - `assets/js/map.js`
 - `assets/js/admin.js`
+- `assets/js/department-atlas.js`
 - `gas/Code.gs`
 - `assets/js/mec-form.js`
 - `index.html`
@@ -88,3 +93,6 @@
 - Se agregaron campos `con_coordenadas`, `sin_coordenadas`, `pendientes_con_coordenadas` y `pendientes_sin_coordenadas` al resumen territorial local/frontend y al backend preparado.
 - `node --check assets/js/stats.js`, `node --check assets/js/local-store.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
 - Se publico `2.6.192` con commit `6312356`; GitHub Pages reporto build exitoso y la URL publica `index.html` con cache-busting devuelve `v2.6.192`.
+- Para `2.6.193`, `node --check assets/js/department-atlas.js`, `node --check assets/js/app.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
+- Se verifico localmente por HTTP que `index.html`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.193`.
+- Se publico `2.6.193` con commit funcional `88988a5`; GitHub Pages run `28038272162` reporto `success` y la URL publica `index.html` con cache-busting devuelve `v2.6.193`, `module-atlas`, `department-atlas.js?v=2.6.193` y `atlas-print-root`.

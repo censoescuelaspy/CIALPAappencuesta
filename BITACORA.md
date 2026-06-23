@@ -7731,3 +7731,112 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - Usar el conteo operativo para planificacion/cobertura administrativa.
 - Usar `en mapa` para planificacion territorial/ruteo.
 - Abrir una tarea de auditoria/geocodificacion para los registros `sin marcador`.
+
+---
+
+## Atlas departamental de escuelas - 2026-06-23 12:42
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main...origin/main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.193`.
+
+### Objetivo de la intervencion
+- Agregar una vista departamental con mapa de escuelas por departamento, iniciando por Asuncion, con botones para cambiar de departamento y salida imprimible/PDF con una pagina por departamento.
+
+### Diagnostico inicial
+- La app ya tenia mapa general y tablero estadistico, pero no una vista ejecutiva departamental pensada para recorrer territorios uno por uno.
+- El conteo operativo y el conteo georreferenciado ya estaban diferenciados desde `2.6.192`; la nueva vista debia reutilizar ese criterio para evitar confundir total operativo con puntos visibles en mapa.
+- La impresion basada en teselas Leaflet puede fallar o quedar incompleta si depende de tiles externos; para el PDF se adopto un mapa de puntos SVG generado desde coordenadas validas.
+
+### Acciones realizadas
+- Se agrego el modulo `Atlas departamental` para perfiles supervisor/admin.
+- Se agrego acceso rapido desde Inicio y entrada en el menu lateral.
+- Se creo `assets/js/department-atlas.js` para:
+  - cargar el padron con `API.getEscuelas`;
+  - usar cache local cuando corresponda;
+  - seleccionar Asuncion por defecto;
+  - generar botones por departamento;
+  - calcular KPIs departamentales;
+  - dibujar marcadores Leaflet por estado;
+  - listar distritos y escuelas del departamento activo;
+  - generar paginas imprimibles, una por departamento, con mapa SVG y metricas.
+- Se agregaron estilos responsive y reglas de impresion en `assets/css/app.css`.
+- Se agrego `department-atlas.js` al paquete del service worker.
+- Se actualizo version/cache a `2.6.193`.
+
+### Archivos modificados
+- `index.html`
+- `assets/css/app.css`
+- `assets/js/app.js`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/department-atlas.js`
+- `node --check assets/js/app.js`
+- `node --check assets/js/config.js`
+- `git diff --check -- index.html assets/css/app.css assets/js/department-atlas.js assets/js/app.js assets/js/config.js sw.js README.md`
+- `node -e` para verificar enlaces de modulo, version, cache y README.
+- `py -3 -m http.server 8037 --bind 127.0.0.1`
+- `Invoke-WebRequest` local a `index.html`, `assets/js/department-atlas.js` y `sw.js`.
+- `git commit -m "feat: agregar atlas departamental de escuelas"`
+- `git push origin main`
+- `gh run view 28038272162 --json status,conclusion,updatedAt,headSha`
+- `Invoke-WebRequest` a GitHub Pages con cache-busting.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- `git diff --check` sin errores de whitespace; solo avisos LF/CRLF esperables del repo sincronizado.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.193`, `module-atlas`, `department-atlas.js?v=2.6.193` y `atlas-print-root`.
+  - `assets/js/department-atlas.js` responde por HTTP local y contiene `DepartmentAtlasModule`.
+  - `sw.js` responde por HTTP local con `cialpa-app-v2.6.193` y `department-atlas.js`.
+- Commit funcional publicado: `88988a5 feat: agregar atlas departamental de escuelas`.
+- `HEAD` y `origin/main` apuntaron a `88988a5192a9d52cb9a13614bced8be6acf5e7ab` despues del push funcional.
+- GitHub Pages run `28038272162` finalizo `success` para el hash `88988a5192a9d52cb9a13614bced8be6acf5e7ab`.
+- Verificacion publica:
+  - `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=atlas-2-6-193-final` devuelve `v2.6.193`, `department-atlas.js?v=2.6.193`, `module-atlas` y `atlas-print-root`.
+  - `https://censoescuelaspy.github.io/CIALPAappencuesta/assets/js/department-atlas.js?v=2.6.193-final` devuelve el modulo `DepartmentAtlasModule`.
+
+### Pruebas realizadas
+- Validacion estatica de sintaxis.
+- Verificacion de contenido enlazado en HTML/cache/README.
+- Servidor local temporal en `http://127.0.0.1:8037/`, apagado luego de las pruebas.
+- Verificacion de publicacion GitHub Pages por HTTP.
+
+### Errores o incidentes
+- En la primera consulta, GitHub Pages todavia devolvia `v2.6.192` porque el workflow Pages del nuevo commit seguia en curso.
+- Se espero a que el workflow `pages build and deployment` terminara en `success`; luego la URL publica devolvio `v2.6.193`.
+- No se ejecuto prueba navegada Playwright por el problema ya conocido de `node_modules/@playwright/test/package.json` invalido en este checkout.
+
+### Soluciones aplicadas
+- Para la vista interactiva se usa Leaflet, igual que el mapa principal.
+- Para el PDF se usa impresion del navegador con paginas SVG generadas desde coordenadas, lo que evita depender de carga de teselas externas al imprimir.
+- Se mantiene la distincion operativa:
+  - `Total operativo`: registros del departamento;
+  - `En mapa`: registros con coordenadas validas;
+  - `Sin marcador`: registros que requieren correccion o carga de coordenadas.
+
+### Pendientes
+- Validar visualmente con usuario real supervisor/admin dentro de la app autenticada.
+- Revisar con el equipo si las metricas del PDF deben sumar otros indicadores institucionales, por ejemplo avance por encuestador, escuelas rurales/remotas o prioridad por falta de coordenadas.
+- Mantener tarea futura de auditoria/geocodificacion para registros sin marcador.
+
+### Riesgos
+- Si `getEscuelas` no responde y el dispositivo no tiene cache previa, el atlas no puede calcular el padron departamental.
+- El PDF usa la impresion del navegador; el usuario debe elegir `Guardar como PDF` en el dialogo del sistema.
+- Los mapas SVG impresos muestran distribucion de puntos, no una capa cartografica con limites oficiales.
+
+### Recomendaciones
+- Reutilizar el patron `mapa interactivo Leaflet + salida impresa SVG` en futuras vistas ejecutivas donde se requiera PDF estable.
+- Mantener siempre visibles los KPIs `en mapa` y `sin marcador` en vistas territoriales.
+- Si se necesita cartografia impresa con limites departamentales oficiales, incorporar una capa GeoJSON simplificada y versionada.
