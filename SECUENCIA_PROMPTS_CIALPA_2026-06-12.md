@@ -102,3 +102,4 @@
 - Para `2.6.194`, `node --check assets/js/department-atlas.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
 - Se verifico con mock Node que escuelas con `departamento: CAPITAL` y `departamento: Distrito Capital` suman correctamente bajo `Asuncion`.
 - Se verifico localmente por HTTP que `index.html`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.194`.
+- Se publico `2.6.194` con commit `493b1a3`; GitHub Pages run `28044047303` reporto `success` y la URL publica devuelve `v2.6.194`, `department-atlas.js?v=2.6.194` y los alias del atlas.

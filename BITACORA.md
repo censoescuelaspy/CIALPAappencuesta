@@ -7897,6 +7897,12 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
   - `index.html` contiene `v2.6.194`, `department-atlas.js?v=2.6.194`, `module-atlas` y `atlas-print-root`.
   - `assets/js/department-atlas.js` contiene `Version: 2.6.194`, `DEPARTMENT_ALIASES`, `capital:`, `_schoolSurveyor` y `MAX_LIST_ROWS = 180`.
   - `sw.js` contiene `cialpa-app-v2.6.194`.
+- Commit funcional publicado: `493b1a3 fix: normalizar asuncion en atlas departamental`.
+- `HEAD` y `origin/main` apuntaron a `493b1a3332a1daa60a72f2a5e05403fe8b2881dc` despues del push funcional.
+- GitHub Pages run `28044047303` finalizo `success` para el hash `493b1a3332a1daa60a72f2a5e05403fe8b2881dc`.
+- Verificacion publica:
+  - `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=atlas-2-6-194-final` devuelve `v2.6.194`, `department-atlas.js?v=2.6.194`, `module-atlas` y `atlas-print-root`.
+  - `https://censoescuelaspy.github.io/CIALPAappencuesta/assets/js/department-atlas.js?v=2.6.194-final` devuelve `Version: 2.6.194`, `DEPARTMENT_ALIASES`, `capital:`, `_schoolSurveyor` y `MAX_LIST_ROWS = 180`.
 
 ### Pruebas realizadas
 - Validacion estatica.
@@ -7911,7 +7917,6 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - La lista queda en un bloque ancho con scroll propio y mas columnas.
 
 ### Pendientes
-- Publicar y verificar GitHub Pages con cache-busting despues del commit/push.
 - Validar visualmente con usuario real que Asuncion ya muestre el conteo esperado desde el cache/dispositivo del usuario.
 
 ### Riesgos
