@@ -8061,6 +8061,10 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - `py -3 -m http.server 8040 --bind 127.0.0.1`
 - `Invoke-WebRequest` local a `index.html`, `assets/css/app.css`, `assets/js/department-atlas.js` y `sw.js`.
 - `Get-NetTCPConnection -LocalPort 8040` y `Stop-Process` para cerrar el servidor local.
+- `git commit -m "fix: mostrar atlas en dos paneles"`
+- `git push origin main`
+- `gh run view 28046520438 --json status,conclusion,updatedAt,headSha,url`
+- `Invoke-WebRequest` publico con cache-busting a `index.html`, `assets/css/app.css`, `assets/js/department-atlas.js` y `sw.js`.
 
 ### Resultados verificados
 - Sintaxis JavaScript correcta.
@@ -8070,11 +8074,20 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
   - `assets/css/app.css` contiene dos columnas `minmax(480px, 1.35fr) minmax(380px, .95fr)`, altura de mapa `clamp(520px, calc(100dvh - 310px), 780px)`, panel derecho de dos columnas y breakpoint `1080px`.
   - `assets/js/department-atlas.js` contiene `Version: 2.6.196`, `data-atlas-sort` y `_toggleSort`.
   - `sw.js` contiene `cialpa-app-v2.6.196`.
+- Publicacion:
+  - Commit funcional: `40490f1`.
+  - Push realizado a `origin/main`.
+  - GitHub Pages run `28046520438` finalizo con `success` para `40490f1ce665d98022eccd98b0bc37d424e59c1e`.
+  - URL publica con cache-busting `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=atlas-2-6-196-final` devuelve `200`, `v2.6.196`, `assets/css/app.css?v=2.6.196`, `department-atlas.js?v=2.6.196` y `module-atlas`.
+  - CSS publico devuelve `200` y contiene layout de dos columnas, altura ampliada de mapa, panel derecho de dos columnas y breakpoint `1080px`.
+  - JS publico devuelve `200` y contiene `Version: 2.6.196`, `data-atlas-sort` y `_toggleSort`.
+  - `sw.js` publico devuelve `200` y contiene `cialpa-app-v2.6.196`.
 
 ### Pruebas realizadas
 - Validacion estatica.
 - Verificacion local por HTTP.
 - Validacion de marcadores CSS del layout de dos paneles.
+- Verificacion publica por HTTP con cache-busting.
 
 ### Errores o incidentes
 - `npx playwright --version` no entrego una version util en este checkout; se mantiene la validacion estatica y HTTP.
@@ -8083,7 +8096,6 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - Layout de dos paneles para que el mapa y la tabla convivan horizontalmente sin solapamiento ni compresion excesiva.
 
 ### Pendientes
-- Publicar en GitHub Pages con cache-busting.
 - Validar visualmente con usuario real autenticado.
 
 ### Riesgos

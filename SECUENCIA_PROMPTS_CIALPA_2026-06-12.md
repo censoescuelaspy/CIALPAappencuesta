@@ -115,3 +115,4 @@
 - Se publico `2.6.195` con commit `483312e`; GitHub Pages run `28045083056` reporto `success` y la URL publica devuelve `v2.6.195`, `department-atlas.js?v=2.6.195`, encabezados sortables en JS, estilos `atlas-sort-button`/z-index en CSS y cache `cialpa-app-v2.6.195`.
 - Para `2.6.196`, `node --check assets/js/department-atlas.js`, `node --check assets/js/config.js`, `node --check assets/js/app.js` y `git diff --check` pasan sin errores.
 - Se verifico localmente por HTTP que `index.html`, `assets/css/app.css`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.196`, incluyendo el CSS de dos columnas, altura amplia de mapa y breakpoint `1080px`.
+- Se publico `2.6.196` con commit `40490f1`; GitHub Pages run `28046520438` reporto `success` y la URL publica devuelve `v2.6.196`, CSS de dos columnas, JS del Atlas `2.6.196` y cache `cialpa-app-v2.6.196`.
