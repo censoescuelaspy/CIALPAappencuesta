@@ -109,3 +109,4 @@
 - Para `2.6.195`, `node --check assets/js/department-atlas.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
 - Se verifico con mock Node que los encabezados contienen `data-atlas-sort` y que el click en `Codigo` ordena la tabla.
 - Se verifico localmente por HTTP que `index.html`, `assets/js/department-atlas.js`, `assets/css/app.css` y `sw.js` sirven la version `2.6.195`.
+- Se publico `2.6.195` con commit `483312e`; GitHub Pages run `28045083056` reporto `success` y la URL publica devuelve `v2.6.195`, `department-atlas.js?v=2.6.195`, encabezados sortables en JS, estilos `atlas-sort-button`/z-index en CSS y cache `cialpa-app-v2.6.195`.

@@ -7973,6 +7973,10 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - `git diff --check -- index.html assets/css/app.css assets/js/department-atlas.js assets/js/config.js sw.js README.md`
 - `py -3 -m http.server 8039 --bind 127.0.0.1`
 - `Invoke-WebRequest` local a `index.html`, `assets/js/department-atlas.js`, `assets/css/app.css` y `sw.js`.
+- `git commit -m "fix: separar mapa y tabla sortable en atlas"`
+- `git push origin main`
+- `gh run view 28045083056 --json status,conclusion,updatedAt,headSha,url`
+- `Invoke-WebRequest` publico con cache-busting a `index.html`, `assets/js/department-atlas.js`, `assets/css/app.css` y `sw.js`.
 
 ### Resultados verificados
 - Sintaxis JavaScript correcta.
@@ -7983,11 +7987,20 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
   - `assets/js/department-atlas.js` contiene `Version: 2.6.195`, `data-atlas-sort`, `aria-sort`, `_toggleSort` y `_sortRows`.
   - `assets/css/app.css` contiene `atlas-sort-button`, z-index de tabla/encabezado y `overflow-y: auto`.
   - `sw.js` contiene `cialpa-app-v2.6.195`.
+- Publicacion:
+  - Commit funcional: `483312e`.
+  - Push realizado a `origin/main`.
+  - GitHub Pages run `28045083056` finalizo con `success` para `483312ef4764ccac1a393aef2d8a1d31905392a6`.
+  - URL publica con cache-busting `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=atlas-2-6-195-final` devuelve `200`, `v2.6.195`, `department-atlas.js?v=2.6.195` y `module-atlas`.
+  - JS publico devuelve `200` y contiene `Version: 2.6.195`, `data-atlas-sort`, `aria-sort`, `_toggleSort` y `_sortRows`.
+  - CSS publico devuelve `200` y contiene `atlas-sort-button`, `z-index: 7`, `z-index: 9` y `overflow: visible`.
+  - `sw.js` publico devuelve `200` y contiene `cialpa-app-v2.6.195`.
 
 ### Pruebas realizadas
 - Validacion estatica.
 - Prueba mock de ordenamiento de tabla.
 - Verificacion local por HTTP.
+- Verificacion publica por HTTP con cache-busting.
 
 ### Errores o incidentes
 - No se ejecuto Playwright por el problema ya conocido de `@playwright/test` invalido en este checkout.
@@ -7997,7 +8010,6 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - Los encabezados pasan a ser botones accesibles con estado `aria-sort` e indicador `Asc`/`Desc`.
 
 ### Pendientes
-- Publicar y verificar GitHub Pages con cache-busting despues del commit/push.
 - Validar visualmente con usuario real que no haya solapamiento en resoluciones de escritorio y notebook.
 
 ### Riesgos
