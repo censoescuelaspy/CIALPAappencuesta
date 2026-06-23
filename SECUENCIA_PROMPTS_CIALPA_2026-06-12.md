@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.195`.
+- Version vigente de esta intervencion: `2.6.196`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -22,6 +22,7 @@
 - Luego se solicito agregar una vista departamental con mapa de escuelas, Asuncion por defecto, botones para cambiar de departamento y salida imprimible/PDF con una pagina por departamento.
 - Luego se reporto que Asuncion no traia datos en el Atlas aunque los demas departamentos funcionaban, y se pidio mas espacio para lista y detalles de escuelas.
 - Luego se reporto solapamiento entre mapa y tabla del Atlas, y se pidio que los encabezados permitieran ordenar por campo.
+- Luego se reporto que el mapa quedo muy comprimido y se pidio ubicar mapa y tabla uno al lado del otro.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -56,6 +57,8 @@
 - En `2.6.194`, el panel de detalle/lista del Atlas pasa a una zona amplia debajo del mapa y la tabla suma columnas: codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
 - Para `2.6.195`, el Atlas separa mapa/tabla con contexto de apilamiento, scroll del modulo, breakpoint menor a 1180 px sin scroll intermedio y encabezados sticky.
 - En `2.6.195`, los encabezados de tabla son botones sortables por codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
+- Para `2.6.196`, el Atlas usa dos paneles en escritorio/notebook: KPIs y mapa amplio a la izquierda; detalle, resumen territorial y tabla sortable a la derecha.
+- En `2.6.196`, el panel derecho compacta estados y distritos en una fila de dos columnas para reservar mas alto a la tabla.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -110,3 +113,5 @@
 - Se verifico con mock Node que los encabezados contienen `data-atlas-sort` y que el click en `Codigo` ordena la tabla.
 - Se verifico localmente por HTTP que `index.html`, `assets/js/department-atlas.js`, `assets/css/app.css` y `sw.js` sirven la version `2.6.195`.
 - Se publico `2.6.195` con commit `483312e`; GitHub Pages run `28045083056` reporto `success` y la URL publica devuelve `v2.6.195`, `department-atlas.js?v=2.6.195`, encabezados sortables en JS, estilos `atlas-sort-button`/z-index en CSS y cache `cialpa-app-v2.6.195`.
+- Para `2.6.196`, `node --check assets/js/department-atlas.js`, `node --check assets/js/config.js`, `node --check assets/js/app.js` y `git diff --check` pasan sin errores.
+- Se verifico localmente por HTTP que `index.html`, `assets/css/app.css`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.196`, incluyendo el CSS de dos columnas, altura amplia de mapa y breakpoint `1080px`.

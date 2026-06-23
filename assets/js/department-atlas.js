@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * department-atlas.js, atlas departamental con mapa e impresion multipagina
- * Version: 2.6.195
+ * Version: 2.6.196
  */
 
 const DepartmentAtlasModule = (() => {
@@ -425,7 +425,7 @@ const DepartmentAtlasModule = (() => {
             <h1>${_escape(department)}</h1>
           </div>
           <div>
-            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.195')}</strong>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.196')}</strong>
             <small>${_escape(_formatDateTime(new Date()))}</small>
           </div>
         </header>

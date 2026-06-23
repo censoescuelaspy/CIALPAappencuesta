@@ -1109,8 +1109,9 @@ td {
 
 .atlas-workbench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(480px, 1.35fr) minmax(380px, .95fr);
   gap: 1.1rem;
+  align-items: stretch;
   flex: 1;
   min-height: 0;
   overflow: visible;
@@ -1118,7 +1119,7 @@ td {
 
 .atlas-main {
   display: grid;
-  grid-template-rows: auto minmax(430px, 52vh);
+  grid-template-rows: auto minmax(520px, 1fr);
   gap: .8rem;
   min-width: 0;
   min-height: 0;
@@ -1173,7 +1174,7 @@ td {
 .atlas-map-card {
   position: relative;
   z-index: 0;
-  min-height: 420px;
+  min-height: clamp(520px, calc(100dvh - 310px), 780px);
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -1184,18 +1185,20 @@ td {
 #atlas-map {
   width: 100%;
   height: 100%;
-  min-height: 420px;
+  min-height: clamp(520px, calc(100dvh - 310px), 780px);
 }
 
 .atlas-detail-panel {
   position: relative;
   z-index: 5;
   display: grid;
-  grid-template-columns: minmax(260px, .85fr) minmax(260px, .75fr) minmax(0, 2.4fr);
-  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-items: stretch;
   min-height: 0;
+  max-height: clamp(620px, calc(100dvh - 205px), 880px);
   gap: .75rem;
-  overflow: visible;
+  overflow: hidden;
   padding: .85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -1205,7 +1208,7 @@ td {
 
 .atlas-detail-header {
   display: grid;
-  grid-column: 1;
+  grid-column: 1 / -1;
   gap: .25rem;
   padding-bottom: .65rem;
   border-bottom: 1px solid var(--color-border);
@@ -1236,19 +1239,25 @@ td {
 .atlas-district-list {
   display: grid;
   gap: .46rem;
+  min-height: 0;
+  overflow: auto;
+  padding-right: .15rem;
+  scrollbar-width: thin;
 }
 
 .atlas-status-bars {
   grid-column: 1;
+  max-height: 11rem;
 }
 
 .atlas-district-list {
   grid-column: 2;
+  max-height: 11rem;
 }
 
 .atlas-school-list {
-  grid-column: 3;
-  grid-row: 1 / span 3;
+  grid-column: 1 / -1;
+  grid-row: auto;
 }
 
 .atlas-district-list h4,
@@ -1289,14 +1298,18 @@ td {
 }
 
 .atlas-school-list {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .atlas-school-table {
   position: relative;
   z-index: 7;
-  max-height: min(58vh, 620px);
+  height: 100%;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -4295,15 +4308,21 @@ td {
   }
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1080px) {
   .atlas-workbench {
     grid-template-columns: 1fr;
     overflow: visible;
   }
 
+  .atlas-main {
+    grid-template-rows: auto minmax(460px, 54dvh);
+  }
+
   .atlas-detail-panel {
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
     max-height: none;
+    overflow: visible;
   }
 
   .atlas-detail-header,
@@ -4312,6 +4331,17 @@ td {
   .atlas-school-list {
     grid-column: auto;
     grid-row: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .atlas-school-list {
+    display: block;
+  }
+
+  .atlas-school-table {
+    height: auto;
+    max-height: min(58vh, 620px);
   }
 
   .atlas-kpi-grid {

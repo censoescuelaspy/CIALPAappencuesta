@@ -8014,3 +8014,77 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Riesgos
 - Si hay muchos campos o textos muy largos, la tabla usa scroll horizontal; es intencional para preservar encabezados y columnas.
+
+---
+
+## Ajuste Atlas dos paneles mapa-tabla - 2026-06-23 14:55
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main...origin/main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.196`.
+
+### Objetivo de la intervencion
+- Recuperar espacio de visualizacion del mapa del Atlas departamental.
+- Ubicar mapa y tabla de escuelas uno al lado del otro en escritorio/notebook.
+
+### Diagnostico inicial
+- La correccion anterior elimino el solapamiento, pero la disposicion en columna dejaba el mapa con poca prioridad visual frente a la tabla.
+- En una vista GIS de supervision, el mapa debe mantener un area amplia y estable mientras la tabla ofrece revision detallada.
+
+### Acciones realizadas
+- `assets/css/app.css`: `atlas-workbench` pasa a dos columnas en escritorio/notebook.
+- `assets/css/app.css`: el mapa queda en la columna izquierda con altura minima mayor y no depende del alto de la tabla.
+- `assets/css/app.css`: el panel derecho queda vertical, con resumen/estados/distritos compactos y tabla sortable ocupando el alto restante.
+- `assets/css/app.css`: el breakpoint de una sola columna queda reservado para pantallas menores a 1080 px.
+- `assets/js/config.js`, `index.html`, `sw.js`, `README.md`, `assets/js/department-atlas.js`: version/cache actualizados a `2.6.196`.
+
+### Archivos modificados
+- `assets/css/app.css`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/department-atlas.js`
+- `node --check assets/js/config.js`
+- `node --check assets/js/app.js`
+- `git diff --check -- index.html assets/css/app.css assets/js/config.js assets/js/department-atlas.js sw.js README.md BITACORA.md SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+- `py -3 -m http.server 8040 --bind 127.0.0.1`
+- `Invoke-WebRequest` local a `index.html`, `assets/css/app.css`, `assets/js/department-atlas.js` y `sw.js`.
+- `Get-NetTCPConnection -LocalPort 8040` y `Stop-Process` para cerrar el servidor local.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.196`, `assets/css/app.css?v=2.6.196`, `department-atlas.js?v=2.6.196` y `module-atlas`.
+  - `assets/css/app.css` contiene dos columnas `minmax(480px, 1.35fr) minmax(380px, .95fr)`, altura de mapa `clamp(520px, calc(100dvh - 310px), 780px)`, panel derecho de dos columnas y breakpoint `1080px`.
+  - `assets/js/department-atlas.js` contiene `Version: 2.6.196`, `data-atlas-sort` y `_toggleSort`.
+  - `sw.js` contiene `cialpa-app-v2.6.196`.
+
+### Pruebas realizadas
+- Validacion estatica.
+- Verificacion local por HTTP.
+- Validacion de marcadores CSS del layout de dos paneles.
+
+### Errores o incidentes
+- `npx playwright --version` no entrego una version util en este checkout; se mantiene la validacion estatica y HTTP.
+
+### Soluciones aplicadas
+- Layout de dos paneles para que el mapa y la tabla convivan horizontalmente sin solapamiento ni compresion excesiva.
+
+### Pendientes
+- Publicar en GitHub Pages con cache-busting.
+- Validar visualmente con usuario real autenticado.
+
+### Riesgos
+- En anchos pequenos la tabla conserva scroll horizontal por sus columnas; en esos casos el layout vuelve a una columna para preservar compatibilidad movil.
