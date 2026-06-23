@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.199`.
+- Version vigente de esta intervencion: `2.6.200`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -26,6 +26,7 @@
 - Luego se solicito hacer un primer ensayo para incorporar ideas de `plano3D.txt` en el registro arquitectonico de aulas.
 - Luego se reporto que `Registro guiado` dejo de funcionar con el error `No se pudo cargar assets/js/mec-form.js`.
 - Luego se reporto que no se notaba ningun cambio ni novedad del ensayo 3D.
+- Luego se reporto que el ensayo 3D resultaba muy pesado y se pidio eliminar todo lo relacionado al plano 3D.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -72,6 +73,10 @@
 - Para `2.6.199`, el ensayo 3D pasa a ser visible directamente en `Registro guiado`, debajo del progreso y antes del workbench.
 - En `2.6.199`, se agrega boton `Vista 3D` y un panel `guided-classroom-3d` que muestra estado vacio o el volumen del aula activa.
 - Criterio UX adoptado: una novedad visual no debe quedar escondida en un submodulo tecnico; debe aparecer en el flujo principal del usuario.
+- Para `2.6.200`, se retira completamente el ensayo 3D del producto porque resulto pesado para el flujo operativo.
+- En `2.6.200`, `Registro guiado` vuelve a priorizar croquis/plano 2D, ficha arquitectonica, evidencias y guardado confiable.
+- Se elimina `assets/js/classroom-3d.js`, se retira la carga diferida de Three.js y se quita el modulo 3D del service worker.
+- Criterio operativo adoptado: las funciones visuales experimentales deben ser reversibles; si afectan rendimiento o claridad de campo, se retiran sin alterar la captura validada.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -81,7 +86,6 @@
 - `assets/js/map.js`
 - `assets/js/admin.js`
 - `assets/js/department-atlas.js`
-- `assets/js/classroom-3d.js`
 - `gas/Code.gs`
 - `assets/js/mec-form.js`
 - `assets/css/mec-form.css`
@@ -142,3 +146,7 @@
 - Para `2.6.199`, `node --check` paso en `assets/js/guided-register.js`, `assets/js/classroom-3d.js`, `assets/js/app.js`, `assets/js/config.js` y `assets/js/mec-form.js`; `git diff --check` no marco errores.
 - Playwright local verifico el panel 3D visible en desktop, movil y estado vacio; luego Playwright publico movil confirmo canvas `325 x 218`, `toDataURL` mayor a `23800` y sin overflow horizontal.
 - Se publico `2.6.199` con commit `e724010`; GitHub Pages run `28059257035` reporto `success` y la URL publica devuelve `v2.6.199`, `guided-register.js` con `data-guided-classroom-3d`, CSS del panel visible y cache `cialpa-app-v2.6.199`.
+- Para `2.6.200`, `node --check` paso en `assets/js/app.js`, `assets/js/guided-register.js`, `assets/js/mec-form.js`, `assets/js/config.js` y `assets/js/department-atlas.js`.
+- Para `2.6.200`, `git diff --check` no marco errores; solo avisos LF/CRLF esperables del checkout Windows.
+- Para `2.6.200`, la verificacion local HTTP confirmo `v2.6.200`, ausencia de Three.js, ausencia de `classroom-3d` en `app.js`, `guided-register.js`, `mec-form.js`, CSS y `sw.js`, y `assets/js/classroom-3d.js` devuelve `404`.
+- Para `2.6.200`, Playwright local desde `%TEMP%` verifico que la pagina no muestra textos `Vista 3D`/`Ensayo 3D` y no dispara requests a `classroom-3d` ni a Three.js.

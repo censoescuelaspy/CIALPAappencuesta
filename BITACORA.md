@@ -8422,3 +8422,113 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Riesgos
 - Si el navegador mantiene cache anterior, el usuario debe pulsar `Actualizar app` o abrir con cache-busting.
+
+---
+
+## Retiro de componentes 3D del Registro guiado - 2026-06-23 19:00
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.200`.
+
+### Objetivo de la intervencion
+- Atender el reporte del usuario: el ensayo de plano/visor 3D resultaba pesado.
+- Eliminar del producto todo lo relacionado al plano 3D y dejar el `Registro guiado` nuevamente centrado en croquis 2D, ficha arquitectonica, evidencias y guardado confiable.
+
+### Diagnostico inicial
+- La version `2.6.199` hacia visible el ensayo 3D dentro del `Registro guiado`.
+- Aunque el componente estaba aislado y era reversible, agregaba peso visual y dependencia opcional de Three.js.
+- Para uso operativo en campo, la prioridad vuelve a ser carga rapida, claridad de formulario y continuidad offline/cache.
+
+### Acciones realizadas
+- Se elimino `assets/js/classroom-3d.js`.
+- Se retiro la carga diferida de Three.js y `classroom-3d.js` desde `assets/js/app.js`.
+- Se retiro el panel visible `Vista 3D del aula activa` y el boton `Vista 3D` de `assets/js/guided-register.js`.
+- Se retiro la API `getActiveClassroom3DModel`, el panel 3D y los refrescos asociados de `assets/js/mec-form.js`.
+- Se eliminaron estilos `.guided-classroom-3d` y `.mec-classroom-3d`.
+- Se retiro `classroom-3d.js` del service worker y se actualizo cache a `cialpa-app-v2.6.200`.
+- Se mantuvo el hotfix previo de service worker para assets criticos del `Registro guiado`.
+- Version/cache actualizados a `2.6.200`.
+
+### Archivos modificados
+- `README.md`
+- `index.html`
+- `sw.js`
+- `assets/js/app.js`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `assets/js/guided-register.js`
+- `assets/js/mec-form.js`
+- `assets/css/app.css`
+- `assets/css/mec-form.css`
+- `assets/js/classroom-3d.js` eliminado
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/app.js`
+- `node --check assets/js/guided-register.js`
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/config.js`
+- `node --check assets/js/department-atlas.js`
+- `git diff --check -- README.md assets/css/app.css assets/css/mec-form.css assets/js/app.js assets/js/config.js assets/js/department-atlas.js assets/js/guided-register.js assets/js/mec-form.js index.html sw.js`
+- `rg -n "3D|3d|Three|three|classroom-3d|Classroom3D|guided-classroom-3d|mec-classroom-3d|focus3d|getActiveClassroom3DModel|_refreshClassroom3D|_renderClassroom3DPanel|classroom3d" index.html README.md sw.js assets/js assets/css`
+- `py -3 -m http.server 8044 --bind 127.0.0.1`
+- Verificacion HTTP local y publica con `Invoke-WebRequest`.
+- Playwright `1.61.1` desde `%TEMP%\cialpa-pw-no-3d`.
+- `git commit -m "fix: retirar visor 3d del registro"`
+- `git push origin main`
+- `gh run watch 28060209303 --exit-status`
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables en Windows.
+- Busqueda de referencias funcionales 3D sin coincidencias reales; solo aparecieron falsos positivos por colores CSS como `#15803d`.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.200` y assets con `?v=2.6.200`.
+  - `app.js` no contiene carga de Three.js ni `classroom-3d`.
+  - `guided-register.js` no contiene `Vista 3D`, `focus3d` ni `_refreshGuided3D`.
+  - `mec-form.js` no contiene `getActiveClassroom3DModel`, `_renderClassroom3DPanel` ni `_refreshClassroom3D`.
+  - CSS sin clases `guided-classroom-3d` ni `mec-classroom-3d`.
+  - `sw.js` contiene `cialpa-app-v2.6.200` y no precachea `classroom-3d.js`.
+  - `assets/js/classroom-3d.js` devuelve `404`.
+- Playwright local:
+  - pagina sin textos `Vista 3D`, `Ensayo 3D` ni `3D del aula`.
+  - no se disparan requests a `classroom-3d` ni Three.js.
+- Publicacion:
+  - Commit funcional: `ee5ca8a`.
+  - GitHub Pages run `28060209303` finalizo con `success` para `ee5ca8a9cd4d4b8d32173dbb9d821b40a058c9ce`.
+  - URL publica con cache-busting devuelve `v2.6.200`, assets sin visor 3D y `classroom-3d.js` como `404`.
+- Playwright publico:
+  - version `2.6.200` visible.
+  - sin textos 3D.
+  - sin requests a `classroom-3d` ni Three.js.
+  - sin errores de consola.
+
+### Pruebas realizadas
+- Validacion estatica.
+- Validacion HTTP local y publica.
+- Validacion navegada local y publica con Playwright.
+- Verificacion de service worker y cache versionado.
+
+### Errores o incidentes
+- Playwright desde el repo sigue interferido por un `node_modules/playwright/package.json` invalido; se ejecuto desde una carpeta temporal fuera del repo para no modificar el checkout.
+
+### Soluciones aplicadas
+- Retiro completo del componente experimental pesado.
+- Preservacion del croquis 2D y del formulario validado.
+- Service worker actualizado para que no intente cachear un asset eliminado.
+
+### Pendientes
+- El usuario debe pulsar `Actualizar app` o abrir con cache-busting si su navegador conserva cache anterior.
+
+### Riesgos
+- Dispositivos que ya tengan service worker viejo y esten offline antes de actualizar podrian seguir viendo la version previa hasta recuperar conexion y actualizar cache.
+
+### Recomendaciones
+- Las visualizaciones experimentales pesadas deben quedar detras de una decision explicita o en rama/entorno de ensayo, no en el flujo principal de captura de campo.
+- Antes de incorporar WebGL u otro componente pesado en una PWA institucional, validar rendimiento en equipo real de campo y costo sobre offline/cache.
