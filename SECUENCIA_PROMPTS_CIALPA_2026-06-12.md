@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.198`.
+- Version vigente de esta intervencion: `2.6.199`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -25,6 +25,7 @@
 - Luego se reporto que el mapa quedo muy comprimido y se pidio ubicar mapa y tabla uno al lado del otro.
 - Luego se solicito hacer un primer ensayo para incorporar ideas de `plano3D.txt` en el registro arquitectonico de aulas.
 - Luego se reporto que `Registro guiado` dejo de funcionar con el error `No se pudo cargar assets/js/mec-form.js`.
+- Luego se reporto que no se notaba ningun cambio ni novedad del ensayo 3D.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -68,6 +69,9 @@
 - Para `2.6.198`, se corrigio la carga del `Registro guiado` frente a caches/service workers previos: `sw.js` ya no devuelve `index.html` como fallback de archivos `.js`.
 - En `2.6.198`, `mec-form.css`, `mec-schema.js`, `mec-form.js`, `guided-register.js` y `classroom-3d.js` quedan en precache porque son assets criticos del registro.
 - En `2.6.198`, el cargador diferido de scripts limpia cache del asset y reintenta con cache-busting si falla el primer intento.
+- Para `2.6.199`, el ensayo 3D pasa a ser visible directamente en `Registro guiado`, debajo del progreso y antes del workbench.
+- En `2.6.199`, se agrega boton `Vista 3D` y un panel `guided-classroom-3d` que muestra estado vacio o el volumen del aula activa.
+- Criterio UX adoptado: una novedad visual no debe quedar escondida en un submodulo tecnico; debe aparecer en el flujo principal del usuario.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -135,3 +139,6 @@
 - Para `2.6.198`, `node --check` paso en `assets/js/app.js`, `assets/js/mec-form.js`, `assets/js/classroom-3d.js`, `assets/js/config.js` y `assets/js/department-atlas.js`; `git diff --check` no marco errores.
 - Playwright local y publico con service worker verifico que `mec-form.js?v=2.6.198` queda precacheado y, aun offline, devuelve JavaScript con `MecFormModule` en vez de HTML.
 - Se publico `2.6.198` con commit `cf35d70`; GitHub Pages run `28057987248` reporto `success` y la URL publica devuelve `v2.6.198`, `sw.js` con fallback corregido, loader con reintento y `mec-form.js` operativo.
+- Para `2.6.199`, `node --check` paso en `assets/js/guided-register.js`, `assets/js/classroom-3d.js`, `assets/js/app.js`, `assets/js/config.js` y `assets/js/mec-form.js`; `git diff --check` no marco errores.
+- Playwright local verifico el panel 3D visible en desktop, movil y estado vacio; luego Playwright publico movil confirmo canvas `325 x 218`, `toDataURL` mayor a `23800` y sin overflow horizontal.
+- Se publico `2.6.199` con commit `e724010`; GitHub Pages run `28059257035` reporto `success` y la URL publica devuelve `v2.6.199`, `guided-register.js` con `data-guided-classroom-3d`, CSS del panel visible y cache `cialpa-app-v2.6.199`.

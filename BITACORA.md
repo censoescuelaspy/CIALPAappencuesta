@@ -8316,3 +8316,109 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Riesgos
 - Si el dispositivo esta completamente sin conexion y aun no instalo `2.6.198`, puede mantener el error hasta actualizar cache.
+
+---
+
+## Visibilidad real del ensayo 3D en Registro guiado - 2026-06-23 18:41
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.199`.
+
+### Objetivo de la intervencion
+- Responder al reporte del usuario: no se notaba ningun cambio ni novedad tras el ensayo 3D.
+- Hacer que la vista 3D sea visible dentro del flujo principal del `Registro guiado`, no escondida en un submodulo tecnico.
+
+### Diagnostico inicial
+- El visor 3D existia dentro del modulo tecnico de croquis del aula.
+- En el uso habitual del `Registro guiado`, el usuario podia no llegar a ese submodulo o no verlo.
+- Ademas, el panel lateral `Plano vivo` puede quedar estacionado/oculto en la etapa inicial, por lo que ubicar la novedad dentro de ese aside tampoco garantizaba visibilidad.
+
+### Acciones realizadas
+- `assets/js/guided-register.js`: se agrego una franja visible `Vista 3D del aula activa` directamente debajo del progreso del `Registro guiado`.
+- Se agrego boton visible `Vista 3D` en el panel del registro.
+- El panel muestra estado inicial aunque no exista aula activa.
+- Cuando existe modelo de aula, el panel monta `Classroom3DModule` con canvas y KPIs compactos.
+- `assets/css/app.css`: se agregaron estilos compactos y responsivos para `guided-classroom-3d`.
+- En movil se compactaron KPIs a dos columnas para no ocupar toda la pantalla.
+- Version/cache actualizados a `2.6.199`.
+
+### Archivos modificados
+- `assets/js/guided-register.js`
+- `assets/css/app.css`
+- `assets/js/classroom-3d.js`
+- `assets/js/app.js`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/guided-register.js`
+- `node --check assets/js/classroom-3d.js`
+- `node --check assets/js/app.js`
+- `node --check assets/js/config.js`
+- `node --check assets/js/mec-form.js`
+- `git diff --check -- ...`
+- `py -3 -m http.server 8043 --bind 127.0.0.1`
+- `Invoke-WebRequest` local y publico con cache-busting.
+- Playwright local con modelo 3D mock en desktop.
+- Playwright local con modelo 3D mock en movil.
+- Playwright local con estado vacio sin aula activa.
+- Playwright publico con assets publicados en movil.
+- `git commit -m "feat: mostrar vista 3d en registro guiado"`
+- `git push origin main`
+- `gh run watch 28059257035 --exit-status`
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables.
+- Verificacion HTTP publica:
+  - `index.html` sirve `v2.6.199`.
+  - `guided-register.js` contiene `data-guided-classroom-3d`, `Vista 3D`, `_refreshGuided3D` y `focus3d`.
+  - `app.css` contiene `.guided-classroom-3d`, `guided3dPulse` y altura movil compacta.
+  - `classroom-3d.js` declara `Version: 2.6.199`.
+  - `sw.js` contiene `cialpa-app-v2.6.199`.
+- Playwright local desktop:
+  - panel visible.
+  - titulo `Bloque B1 / Planta baja / Aula 1`.
+  - canvas `1365 x 232`, `toDataURL` mayor a `42000`.
+  - KPIs visibles: area, dimensiones, aberturas, electricidad, revision.
+- Playwright local movil:
+  - panel visible sin overflow horizontal.
+  - canvas `325 x 218`, `toDataURL` mayor a `23000`.
+  - panel compactado a `594px` de alto.
+- Playwright local estado vacio:
+  - panel visible con texto de etapa 04 y sin canvas.
+- Publicacion:
+  - Commit funcional: `e724010`.
+  - GitHub Pages run `28059257035` finalizo con `success` para `e724010f9810b56825379d9078a04eb0e90b5c5d`.
+  - Playwright publico movil confirma panel visible, canvas `325 x 218`, `toDataURL` mayor a `23800` y sin overflow horizontal.
+
+### Pruebas realizadas
+- Validacion estatica.
+- Verificacion HTTP local/publica.
+- Playwright local desktop, movil y estado vacio.
+- Playwright publico movil con assets publicados.
+
+### Errores o incidentes
+- La primera prueba local detecto que el panel agregado dentro del aside `Plano vivo` quedaba oculto en el paso inicial; se movio a una franja superior del `Registro guiado`.
+- Git dejo nuevamente un `.git/AUTO_MERGE.lock` vacio; se elimino tras verificar que estaba dentro de `.git`.
+
+### Soluciones aplicadas
+- La novedad 3D se vuelve visible desde el ingreso al `Registro guiado`.
+- Se mantiene el 3D como vista no destructiva y el croquis 2D como fuente operativa.
+
+### Pendientes
+- Validacion visual del usuario en su navegador despues de pulsar `Actualizar app`.
+
+### Riesgos
+- Si el navegador mantiene cache anterior, el usuario debe pulsar `Actualizar app` o abrir con cache-busting.
