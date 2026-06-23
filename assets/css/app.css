@@ -1040,7 +1040,8 @@ td {
   min-height: 0;
   flex-direction: column;
   gap: .85rem;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .atlas-department-buttons {
@@ -1109,10 +1110,10 @@ td {
 .atlas-workbench {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: .9rem;
+  gap: 1.1rem;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 
 .atlas-main {
@@ -1171,6 +1172,7 @@ td {
 
 .atlas-map-card {
   position: relative;
+  z-index: 0;
   min-height: 420px;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -1186,6 +1188,8 @@ td {
 }
 
 .atlas-detail-panel {
+  position: relative;
+  z-index: 5;
   display: grid;
   grid-template-columns: minmax(260px, .85fr) minmax(260px, .75fr) minmax(0, 2.4fr);
   align-items: start;
@@ -1290,6 +1294,8 @@ td {
 }
 
 .atlas-school-table {
+  position: relative;
+  z-index: 7;
   max-height: min(58vh, 620px);
   overflow: auto;
   border: 1px solid var(--color-border);
@@ -1314,10 +1320,50 @@ td {
 .atlas-school-table th {
   position: sticky;
   top: 0;
-  z-index: 1;
-  background: var(--color-surface-alt);
+  z-index: 9;
+  padding: 0;
+  background: var(--color-surface);
   color: var(--color-secondary);
   font-size: .68rem;
+  text-transform: uppercase;
+  box-shadow: 0 1px 0 var(--color-border), 0 3px 8px rgba(15, 23, 42, .08);
+}
+
+.atlas-sort-button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .35rem;
+  width: 100%;
+  min-height: 38px;
+  padding: .48rem .55rem;
+  border: 0;
+  background: var(--color-surface-alt);
+  color: var(--color-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  line-height: 1.12;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.atlas-sort-button:hover,
+.atlas-sort-button:focus-visible {
+  outline: 2px solid rgba(232, 76, 34, .25);
+  outline-offset: -2px;
+  background: #fff7ed;
+}
+
+.atlas-sort-button--active {
+  background: #fff3e8;
+  color: var(--color-primary);
+}
+
+.atlas-sort-button small {
+  color: currentColor;
+  font-size: .62rem;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -4252,7 +4298,7 @@ td {
 @media (max-width: 1180px) {
   .atlas-workbench {
     grid-template-columns: 1fr;
-    overflow: auto;
+    overflow: visible;
   }
 
   .atlas-detail-panel {

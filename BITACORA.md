@@ -7924,3 +7924,81 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Recomendaciones
 - En futuros modulos territoriales, definir una tabla de alias geograficos desde el inicio para `Capital/Asuncion` y posibles variaciones con tildes o nombres administrativos.
+
+---
+
+## Ajuste Atlas tabla sortable y solapamiento - 2026-06-23 14:30
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main...origin/main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.195`.
+
+### Objetivo de la intervencion
+- Corregir el solapamiento visual entre el mapa y la tabla del Atlas departamental.
+- Hacer que los encabezados de la tabla permitan ordenar por campo.
+
+### Diagnostico inicial
+- El mapa Leaflet puede quedar visualmente por encima de elementos posteriores si no se define un contexto de apilamiento claro.
+- La tabla del Atlas tenia encabezados estaticos, sin botones ni estado de orden.
+
+### Acciones realizadas
+- `assets/css/app.css`: el Atlas pasa a usar scroll vertical en la pagina del modulo y no en un contenedor que pueda superponer mapa/tabla.
+- `assets/css/app.css`: se alinea el breakpoint menor a 1180 px para mantener `overflow: visible` en el workbench del Atlas.
+- `assets/css/app.css`: se agregan z-index y contexto visual para que la tabla y sus encabezados queden por encima del mapa.
+- `assets/css/app.css`: se agregan estilos `atlas-sort-button` y encabezados sticky.
+- `assets/js/department-atlas.js`: se agrega estado `_tableSort`.
+- `assets/js/department-atlas.js`: se agregan encabezados con `data-atlas-sort` y `aria-sort`.
+- `assets/js/department-atlas.js`: se agregan `_toggleSort`, `_sortRows`, `_sortValue` y `_compareSortValues`.
+- `assets/js/config.js`, `index.html`, `sw.js`, `README.md`: version/cache actualizados a `2.6.195`.
+
+### Archivos modificados
+- `assets/js/department-atlas.js`
+- `assets/css/app.css`
+- `assets/js/config.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/department-atlas.js`
+- `node --check assets/js/config.js`
+- `node` por stdin con mock de encabezados sortables y orden por codigo.
+- `git diff --check -- index.html assets/css/app.css assets/js/department-atlas.js assets/js/config.js sw.js README.md`
+- `py -3 -m http.server 8039 --bind 127.0.0.1`
+- `Invoke-WebRequest` local a `index.html`, `assets/js/department-atlas.js`, `assets/css/app.css` y `sw.js`.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- La prueba mock confirma que los encabezados contienen `data-atlas-sort` y que el click en `Codigo` ordena ascendentemente.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.195`, `department-atlas.js?v=2.6.195` y `module-atlas`.
+  - `assets/js/department-atlas.js` contiene `Version: 2.6.195`, `data-atlas-sort`, `aria-sort`, `_toggleSort` y `_sortRows`.
+  - `assets/css/app.css` contiene `atlas-sort-button`, z-index de tabla/encabezado y `overflow-y: auto`.
+  - `sw.js` contiene `cialpa-app-v2.6.195`.
+
+### Pruebas realizadas
+- Validacion estatica.
+- Prueba mock de ordenamiento de tabla.
+- Verificacion local por HTTP.
+
+### Errores o incidentes
+- No se ejecuto Playwright por el problema ya conocido de `@playwright/test` invalido en este checkout.
+
+### Soluciones aplicadas
+- Se separa visualmente el mapa de la tabla con contexto de apilamiento y scroll del modulo.
+- Los encabezados pasan a ser botones accesibles con estado `aria-sort` e indicador `Asc`/`Desc`.
+
+### Pendientes
+- Publicar y verificar GitHub Pages con cache-busting despues del commit/push.
+- Validar visualmente con usuario real que no haya solapamiento en resoluciones de escritorio y notebook.
+
+### Riesgos
+- Si hay muchos campos o textos muy largos, la tabla usa scroll horizontal; es intencional para preservar encabezados y columnas.

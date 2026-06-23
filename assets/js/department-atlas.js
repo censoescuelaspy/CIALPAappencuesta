@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * department-atlas.js, atlas departamental con mapa e impresion multipagina
- * Version: 2.6.194
+ * Version: 2.6.195
  */
 
 const DepartmentAtlasModule = (() => {
@@ -61,6 +61,7 @@ const DepartmentAtlasModule = (() => {
   let _map = null;
   let _layer = null;
   let _loadSequence = 0;
+  let _tableSort = { key: 'name', dir: 'asc' };
 
   async function init() {
     if (!Auth.canAccess('supervisor')) {
@@ -150,6 +151,16 @@ const DepartmentAtlasModule = (() => {
         const button = event.target.closest('[data-atlas-department]');
         if (!button) return;
         selectDepartment(button.dataset.atlasDepartment);
+      });
+    }
+
+    const list = document.getElementById('atlas-school-list');
+    if (list && list.dataset.bound !== 'true') {
+      list.dataset.bound = 'true';
+      list.addEventListener('click', event => {
+        const button = event.target.closest('[data-atlas-sort]');
+        if (!button) return;
+        _toggleSort(button.dataset.atlasSort);
       });
     }
 
@@ -261,16 +272,22 @@ const DepartmentAtlasModule = (() => {
       container.innerHTML = '<p class="atlas-empty">Sin escuelas registradas para este departamento.</p>';
       return;
     }
-    const visible = rows
-      .slice()
-      .sort((a, b) => _stateSort(a) - _stateSort(b) || _schoolName(a).localeCompare(_schoolName(b), 'es'))
+    const visible = _sortRows(rows)
       .slice(0, MAX_LIST_ROWS);
     container.innerHTML = `
       <h4>Escuelas</h4>
       <div class="atlas-school-table">
         <table>
           <thead>
-            <tr><th>Codigo</th><th>Escuela</th><th>Distrito / localidad</th><th>Zona</th><th>Estado</th><th>Mapa</th><th>Asignacion</th></tr>
+            <tr>
+              ${_sortHeader('code', 'Codigo')}
+              ${_sortHeader('name', 'Escuela')}
+              ${_sortHeader('district', 'Distrito / localidad')}
+              ${_sortHeader('zone', 'Zona')}
+              ${_sortHeader('state', 'Estado')}
+              ${_sortHeader('map', 'Mapa')}
+              ${_sortHeader('surveyor', 'Asignacion')}
+            </tr>
           </thead>
           <tbody>
             ${visible.map(school => {
@@ -292,6 +309,61 @@ const DepartmentAtlasModule = (() => {
         </table>
       </div>
       ${rows.length > visible.length ? `<p class="atlas-list-note">Mostrando ${visible.length} de ${rows.length} escuelas.</p>` : ''}`;
+  }
+
+  function _sortHeader(key, label) {
+    const active = _tableSort.key === key;
+    const dir = active ? _tableSort.dir : 'none';
+    const icon = active ? (_tableSort.dir === 'asc' ? 'Asc' : 'Desc') : 'Ordenar';
+    return `
+      <th aria-sort="${active ? (_tableSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}">
+        <button type="button" class="atlas-sort-button${active ? ' atlas-sort-button--active' : ''}" data-atlas-sort="${_escapeAttr(key)}">
+          <span>${_escape(label)}</span>
+          <small>${_escape(icon)}</small>
+        </button>
+      </th>`;
+  }
+
+  function _toggleSort(key) {
+    if (!key) return;
+    if (_tableSort.key === key) {
+      _tableSort = { key, dir: _tableSort.dir === 'asc' ? 'desc' : 'asc' };
+    } else {
+      _tableSort = { key, dir: 'asc' };
+    }
+    _renderSchoolList(_schoolsForDepartment(_selectedDepartment));
+  }
+
+  function _sortRows(rows) {
+    const dir = _tableSort.dir === 'desc' ? -1 : 1;
+    return (rows || []).slice().sort((a, b) => {
+      const valueA = _sortValue(a, _tableSort.key);
+      const valueB = _sortValue(b, _tableSort.key);
+      const cmp = _compareSortValues(valueA, valueB);
+      if (cmp) return cmp * dir;
+      return _schoolName(a).localeCompare(_schoolName(b), 'es', { numeric: true, sensitivity: 'base' });
+    });
+  }
+
+  function _sortValue(school, key) {
+    switch (key) {
+      case 'code': return _schoolCode(school);
+      case 'district': return `${_schoolDistrict(school)} ${_schoolLocality(school)}`;
+      case 'zone': return _schoolZone(school);
+      case 'state': return `${String(_stateSort(school)).padStart(2, '0')} ${_schoolState(school)}`;
+      case 'map': return _point(school) ? 1 : 0;
+      case 'surveyor': return _schoolSurveyor(school) || 'Sin asignar';
+      case 'name':
+      default:
+        return _schoolName(school);
+    }
+  }
+
+  function _compareSortValues(a, b) {
+    const aNum = typeof a === 'number' ? a : Number.NaN;
+    const bNum = typeof b === 'number' ? b : Number.NaN;
+    if (Number.isFinite(aNum) && Number.isFinite(bNum)) return aNum - bNum;
+    return String(a ?? '').localeCompare(String(b ?? ''), 'es', { numeric: true, sensitivity: 'base' });
   }
 
   function _renderMap(rows) {
@@ -353,7 +425,7 @@ const DepartmentAtlasModule = (() => {
             <h1>${_escape(department)}</h1>
           </div>
           <div>
-            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.194')}</strong>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.195')}</strong>
             <small>${_escape(_formatDateTime(new Date()))}</small>
           </div>
         </header>

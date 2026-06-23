@@ -1,8 +1,14 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.194** | Paraguay 2026
+**Version 2.6.195** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.195
+
+- El Atlas separa explicitamente el mapa de la tabla para evitar solapamientos visuales.
+- Los encabezados de la tabla de escuelas ahora permiten ordenar por codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
+- La cabecera de tabla queda fija dentro del scroll y muestra el sentido del ordenamiento.
 
 ## Novedades v2.6.194
 
