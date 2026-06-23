@@ -7700,6 +7700,10 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - Sintaxis JavaScript correcta.
 - `git diff --check` sin errores.
 - La version local queda en `2.6.192`.
+- Commit publico generado: `6312356 fix: mostrar cobertura de coordenadas por departamento`.
+- `git push origin main` completo; `HEAD` y `origin/main` apuntan a `631235669d05f3d93fc9c69ff382ce946481f82e`.
+- GitHub Actions Pages reporto `pages build and deployment` en estado `success`.
+- Verificacion publica por HTTP: `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=final-2-6-192-...` devuelve `v2.6.192`.
 
 ### Pruebas realizadas
 - Validacion estatica y de sintaxis.
@@ -7717,7 +7721,6 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
   - `18 sin marcador`: registros que requieren correccion o carga de coordenadas.
 
 ### Pendientes
-- Publicar/pushear `2.6.192` en GitHub Pages.
 - Validar visualmente con usuario real que Amambay muestre `98 en mapa` y `18 sin marcador`.
 - En una futura publicacion GAS, subir `gas/sheets.gs` para que el backend entregue la cobertura de coordenadas sin depender del enriquecimiento frontend.
 

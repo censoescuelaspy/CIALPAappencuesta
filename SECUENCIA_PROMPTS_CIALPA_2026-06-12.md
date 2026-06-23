@@ -87,3 +87,4 @@
 - Para `2.6.192`, se aclaro el caso Amambay: `pendientes` y `total` son conteos operativos; el numero del mapa es conteo de registros con coordenadas validas.
 - Se agregaron campos `con_coordenadas`, `sin_coordenadas`, `pendientes_con_coordenadas` y `pendientes_sin_coordenadas` al resumen territorial local/frontend y al backend preparado.
 - `node --check assets/js/stats.js`, `node --check assets/js/local-store.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
+- Se publico `2.6.192` con commit `6312356`; GitHub Pages reporto build exitoso y la URL publica `index.html` con cache-busting devuelve `v2.6.192`.
