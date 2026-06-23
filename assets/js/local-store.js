@@ -306,6 +306,10 @@ const CialpaLocalStore = (() => {
         en_curso: Number(row.en_curso ?? 0),
         pendientes: Number(row.pendientes ?? row.pendiente ?? 0),
         incidencias: Number(row.incidencias ?? row.con_incidencia ?? row.incidencia ?? 0),
+        con_coordenadas: Number(row.con_coordenadas ?? row.con_marcador ?? row.georreferenciadas ?? row.with_coords ?? 0),
+        sin_coordenadas: Number(row.sin_coordenadas ?? row.sin_marcador ?? row.no_georreferenciadas ?? row.missing_coords ?? 0),
+        pendientes_con_coordenadas: Number(row.pendientes_con_coordenadas ?? row.pendientes_con_marcador ?? 0),
+        pendientes_sin_coordenadas: Number(row.pendientes_sin_coordenadas ?? row.pendientes_sin_marcador ?? 0),
       })),
       por_encuestador: (raw.por_encuestador || []).map(row => {
         const completadas = Number(row.registros_completados ?? row.completadas ?? row.completados ?? 0);
@@ -338,12 +342,33 @@ const CialpaLocalStore = (() => {
       else stats.pendientes++;
 
       const depKey = item.departamento || 'Sin dato';
-      dep[depKey] = dep[depKey] || { departamento: depKey, total: 0, finalizadas: 0, en_curso: 0, pendientes: 0, incidencias: 0 };
+      dep[depKey] = dep[depKey] || {
+        departamento: depKey,
+        total: 0,
+        finalizadas: 0,
+        en_curso: 0,
+        pendientes: 0,
+        incidencias: 0,
+        con_coordenadas: 0,
+        sin_coordenadas: 0,
+        pendientes_con_coordenadas: 0,
+        pendientes_sin_coordenadas: 0,
+      };
+      const hasCoords = _hasValidCoords(item);
       dep[depKey].total++;
-      if (state === 'finalizada') dep[depKey].finalizadas++;
-      else if (state === 'en_curso') dep[depKey].en_curso++;
-      else if (state === 'incidencia') dep[depKey].incidencias++;
-      else dep[depKey].pendientes++;
+      if (hasCoords) dep[depKey].con_coordenadas++;
+      else dep[depKey].sin_coordenadas++;
+      if (state === 'finalizada') {
+        dep[depKey].finalizadas++;
+      } else if (state === 'en_curso') {
+        dep[depKey].en_curso++;
+      } else if (state === 'incidencia') {
+        dep[depKey].incidencias++;
+      } else {
+        dep[depKey].pendientes++;
+        if (hasCoords) dep[depKey].pendientes_con_coordenadas++;
+        else dep[depKey].pendientes_sin_coordenadas++;
+      }
 
       const encKey = item.encuestador_asignado || 'Sin asignar';
       enc[encKey] = enc[encKey] || { encuestador: encKey, total_asignadas: 0, finalizadas: 0, incidencias: 0, sesiones: 0, registros_completados: 0, promedio_minutos: '' };
@@ -356,6 +381,12 @@ const CialpaLocalStore = (() => {
     stats.por_departamento = Object.values(dep).sort((a, b) => b.total - a.total);
     stats.por_encuestador = Object.values(enc).sort((a, b) => b.finalizadas - a.finalizadas);
     return stats;
+  }
+
+  function _hasValidCoords(item = {}) {
+    const lat = Number(String(item.latitud ?? item.lat ?? item.latitude ?? '').replace(',', '.'));
+    const lng = Number(String(item.longitud ?? item.lng ?? item.lon ?? item.longitude ?? '').replace(',', '.'));
+    return Number.isFinite(lat) && Number.isFinite(lng);
   }
 
   function _schemaEvidenceFields(values) {

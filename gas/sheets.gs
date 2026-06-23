@@ -3255,12 +3255,35 @@ const SheetsService = (() => {
     const m = {};
     rows.forEach(e => {
       const k = e[field] || 'Sin dato';
-      if (!m[k]) m[k] = { [field]: k, total: 0, finalizadas: 0, en_curso: 0, pendientes: 0, incidencias: 0 };
+      if (!m[k]) {
+        m[k] = {
+          [field]: k,
+          total: 0,
+          finalizadas: 0,
+          en_curso: 0,
+          pendientes: 0,
+          incidencias: 0,
+          con_coordenadas: 0,
+          sin_coordenadas: 0,
+          pendientes_con_coordenadas: 0,
+          pendientes_sin_coordenadas: 0
+        };
+      }
+      const hasCoords = _isNumeric(e.latitud) && _isNumeric(e.longitud);
       m[k].total++;
-      if (e.estado_relevamiento === 'finalizada') m[k].finalizadas++;
-      else if (e.estado_relevamiento === 'en_curso') m[k].en_curso++;
-      else if (e.estado_relevamiento === 'incidencia') m[k].incidencias++;
-      else m[k].pendientes++;
+      if (hasCoords) m[k].con_coordenadas++;
+      else m[k].sin_coordenadas++;
+      if (e.estado_relevamiento === 'finalizada') {
+        m[k].finalizadas++;
+      } else if (e.estado_relevamiento === 'en_curso') {
+        m[k].en_curso++;
+      } else if (e.estado_relevamiento === 'incidencia') {
+        m[k].incidencias++;
+      } else {
+        m[k].pendientes++;
+        if (hasCoords) m[k].pendientes_con_coordenadas++;
+        else m[k].pendientes_sin_coordenadas++;
+      }
     });
     return Object.values(m).sort((a, b) => String(a[field]).localeCompare(String(b[field])));
   }

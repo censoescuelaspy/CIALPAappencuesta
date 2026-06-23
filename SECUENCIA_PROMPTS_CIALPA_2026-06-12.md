@@ -1,10 +1,10 @@
-# Secuencia de prompts - CIALPA - ultima edicion 2026-06-12
+# Secuencia de prompts - CIALPA - ultima edicion 2026-06-23
 
 ## Proyecto
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.190`.
+- Version vigente de esta intervencion: `2.6.191`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -17,6 +17,8 @@
 - Luego se reporto que el boton `Iniciar/continuar registro` no llevaba a la vista `REGISTRO GUIADO`.
 - Luego se reporto que, estando logueado como admin, no se podia agregar ni quitar encuestadores; la app mostraba el error `Solo administradores autorizados pueden gestionar usuarios`.
 - En una continuacion posterior se reporto que la nueva version dejo de mostrar el mapa en `Alta res.` dentro de `REGISTRO GUIADO`.
+- Finalmente se solicito obtener todo lo necesario para poder agregar mapas de alta resolucion a la mayor cantidad posible de escuelas.
+- En la intervencion del 2026-06-23 se reporto diferencia entre la cantidad vista en el mapa y el KPI superior `Pendientes`.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -37,6 +39,13 @@
 - Para `2.6.189`, se reactivo explicitamente la fuente local `101095` ya presente en `assets/imagery/schools/101095/tiles/`, porque `PLAN_BASEMAP_HIGHRES_SOURCES` habia quedado vacio.
 - `Alta res.` ahora tambien avisa cuando la escuela activa no tiene ortofoto local y se mantiene en satelite estable, evitando la sensacion de fallo silencioso.
 - Para `2.6.190`, la UI deja de llamar `Alta res.` a escuelas sin fuente local HD: el boton pasa a `Satelite` y el estado visible marca `sin imagen local HD`.
+- Se verifico que hoy la cobertura HD local real del repo sigue limitada al piloto `101095`, por lo que la falta de alta resolucion en muchas escuelas es un problema de insumos y no de renderizado.
+- Para escalar cobertura se dejo preparada la ruta Earth Engine/NICFI: worklist privada de `86` escuelas confirmada, carpeta de descargas `G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS` creada y cuatro tandas JS generadas para exportacion por lotes.
+- Se agrego `tools/earthengine/prepare_highres_batches.ps1` para regenerar lotes, preparar directorios y ejecutar despues la instalacion/activacion de descargas cuando existan los TIFF exportados.
+- El bloqueo operativo restante no esta en el repo: la CLI `earthengine` y el modulo Python `ee` existen en esta maquina, pero el acceso actual responde `Not signed up for Earth Engine or project is not registered` al consultar NICFI.
+- En la continuacion siguiente, el usuario completo la autenticacion Earth Engine; `earthengine task list` paso a responder correctamente, pero la coleccion `projects/planet-nicfi/assets/basemaps/americas` sigue devolviendo `Permission 'earthengine.assets.get' denied`.
+- Para `2.6.191`, se aclaro la diferencia entre conteos: `Inicio` muestra `Pendientes operativas` globales, mientras el mapa muestra conteos de la vista actual con filtros y marcador/georreferenciacion.
+- El criterio operativo queda: para planificacion general rige el KPI global; para trabajo territorial inmediato rige el resumen del mapa filtrado/georreferenciado.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -50,6 +59,8 @@
 - `index.html`
 - `sw.js`
 - `BITACORA.md`
+- `tools/earthengine/prepare_highres_batches.ps1`
+- `README.md`
 
 ## Validacion registrada
 - Sintaxis JavaScript validada con `node --check`.
@@ -64,3 +75,15 @@
 - Para la alta resolucion se verifico `createSession 200` en Google Map Tiles y `2dtiles 403 PERMISSION_DENIED`, confirmando que el boton no estaba roto: la fuente Google estaba siendo rechazada al pedir imagenes.
 - Para `2.6.189`, se verifico por inspeccion del repo que existen tiles locales y manifiesto de `101095`, y se restablecio su entrada operativa en `APP_CONFIG`.
 - Para `2.6.190`, se verifico en navegador automatizado que `101095` carga la imagen local HD y que una escuela comun cambia correctamente a boton/estado `Satelite`.
+- Se verifico que `tools/earthengine/output/pilot-schools-worklist.json` contiene `86` escuelas de muestra piloto y se regeneraron tandas `01_25`, `26_50`, `51_75` y `76_86`.
+- `earthengine --help` y `py -3 -c "import ee"` funcionan en esta maquina, pero `earthengine ls projects/planet-nicfi/assets/basemaps/americas` y `earthengine task list` siguen bloqueados por falta de alta/registro del proyecto Earth Engine.
+- `py -3 tools\earthengine\start_pilot_ee_exports.py --source=nicfi --limit=1 --dry-run` corrio correctamente y genero evidencia de preparacion en `tools/earthengine/output/submitted-ee-tasks-nicfi-20260616-160815.json`.
+- Tras autenticar Earth Engine, `earthengine task list` quedo operativo, confirmando que la cuenta ya accede al servicio base.
+- Aun asi, `earthengine ls projects/planet-nicfi/assets/basemaps/americas` responde `Permission 'earthengine.assets.get' denied`, por lo que sigue faltando el permiso especifico a Planet/NICFI antes de exportar la tanda real `01_25`.
+- Para `2.6.191`, `node --check assets/js/map.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
+- La validacion navegada con Playwright no se pudo completar porque `node_modules/@playwright/test/package.json` esta invalido en este checkout (`ERR_INVALID_PACKAGE_CONFIG`).
+- Se publico el hotfix con commit `6e924b7`; `origin/main` quedo en `6e924b7296b41de367fb68687a0588c0c5ec1d37`.
+- GitHub Pages reporto build exitoso y la URL publica `index.html` con cache-busting ya devuelve `v2.6.191`.
+- Para `2.6.192`, se aclaro el caso Amambay: `pendientes` y `total` son conteos operativos; el numero del mapa es conteo de registros con coordenadas validas.
+- Se agregaron campos `con_coordenadas`, `sin_coordenadas`, `pendientes_con_coordenadas` y `pendientes_sin_coordenadas` al resumen territorial local/frontend y al backend preparado.
+- `node --check assets/js/stats.js`, `node --check assets/js/local-store.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.

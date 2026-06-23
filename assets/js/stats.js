@@ -123,8 +123,9 @@ const StatsModule = (() => {
     if (!forceNetwork && cached && (Date.now() - cached.time < STATS_CACHE_TTL)) {
       _statsData = cached.stats;
       _localAnalytics = cached.local;
+      _statsData = await _enrichStatsWithGeoCoverage(_statsData);
       if (!Object.keys(filters).length) {
-        _statsBaseData = cached.stats;
+        _statsBaseData = _statsData;
         _statsBaseLocal = cached.local;
       }
       await _renderStatsView();
@@ -136,8 +137,9 @@ const StatsModule = (() => {
       if (cachedApi) {
         _statsData = cachedApi.stats;
         _localAnalytics = cachedApi.local;
+        _statsData = await _enrichStatsWithGeoCoverage(_statsData);
         if (!Object.keys(filters).length) {
-          _statsBaseData = cachedApi.stats;
+          _statsBaseData = _statsData;
           _statsBaseLocal = cachedApi.local;
         }
         _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
@@ -181,6 +183,7 @@ const StatsModule = (() => {
     if (_localAnalytics?.stats && _hasInteractiveStatsFilters(filters)) {
       _statsData = _normalizeStats(_localAnalytics.stats);
     }
+    _statsData = await _enrichStatsWithGeoCoverage(_statsData);
     if (!Object.keys(filters).length) {
       _statsBaseData = _statsData;
       _statsBaseLocal = _localAnalytics;
@@ -234,6 +237,7 @@ const StatsModule = (() => {
 
     _localAnalytics = local || _statsBaseLocal || _localAnalytics;
     _statsData = _normalizeStats(local?.stats || _deriveStatsForFilters(baseStats, filters));
+    _statsData = await _enrichStatsWithGeoCoverage(_statsData);
     await _renderStatsView();
   }
 
@@ -296,7 +300,23 @@ const StatsModule = (() => {
 
   function _scaleStatsRow(row, factor) {
     const scaled = { ...row };
-    ['total', 'finalizadas', 'finalizada', 'en_curso', 'pendientes', 'pendiente', 'incidencias', 'con_incidencia', 'total_asignadas', 'sesiones', 'registros_completados'].forEach(key => {
+    [
+      'total',
+      'finalizadas',
+      'finalizada',
+      'en_curso',
+      'pendientes',
+      'pendiente',
+      'incidencias',
+      'con_incidencia',
+      'total_asignadas',
+      'sesiones',
+      'registros_completados',
+      'con_coordenadas',
+      'sin_coordenadas',
+      'pendientes_con_coordenadas',
+      'pendientes_sin_coordenadas',
+    ].forEach(key => {
       if (scaled[key] !== undefined && scaled[key] !== null && scaled[key] !== '') {
         scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
       }
@@ -522,6 +542,68 @@ const StatsModule = (() => {
     };
   }
 
+  async function _enrichStatsWithGeoCoverage(stats) {
+    if (!stats || typeof API === 'undefined') return stats;
+    const rows = stats.por_departamento || [];
+    const needsGeo = rows.some(row => Number(row.total || 0) && !Number(row.con_coordenadas || 0) && !Number(row.sin_coordenadas || 0));
+    if (!needsGeo) return stats;
+    try {
+      const result = await API.getEscuelas({}, { preferCache: true, cacheMaxAgeMs: 24 * 60 * 60 * 1000 });
+      if (result.status !== 'ok' || !Array.isArray(result.data) || !result.data.length) return stats;
+      const byDepartment = _geoCoverageByDepartment(result.data);
+      return {
+        ...stats,
+        por_departamento: rows.map(row => {
+          const key = _normalizeToken(row.departamento || 'Sin dato') || 'sin_dato';
+          const geo = byDepartment[key];
+          return geo ? { ...row, ...geo } : row;
+        }),
+      };
+    } catch (err) {
+      console.warn('No se pudo enriquecer estadisticas con coordenadas del padron:', err);
+      return stats;
+    }
+  }
+
+  function _geoCoverageByDepartment(schools = []) {
+    const acc = {};
+    (schools || []).forEach(item => {
+      const label = item.departamento || 'Sin dato';
+      const key = _normalizeToken(label) || 'sin_dato';
+      const state = _normalizeStateForGeo(item.estado_relevamiento || item.estado);
+      const hasCoords = _hasValidCoords(item);
+      if (!acc[key]) {
+        acc[key] = {
+          con_coordenadas: 0,
+          sin_coordenadas: 0,
+          pendientes_con_coordenadas: 0,
+          pendientes_sin_coordenadas: 0,
+        };
+      }
+      if (hasCoords) acc[key].con_coordenadas += 1;
+      else acc[key].sin_coordenadas += 1;
+      if (state === 'pendiente') {
+        if (hasCoords) acc[key].pendientes_con_coordenadas += 1;
+        else acc[key].pendientes_sin_coordenadas += 1;
+      }
+    });
+    return acc;
+  }
+
+  function _hasValidCoords(item = {}) {
+    const lat = Number(String(item.latitud ?? item.lat ?? item.latitude ?? '').replace(',', '.'));
+    const lng = Number(String(item.longitud ?? item.lng ?? item.lon ?? item.longitude ?? '').replace(',', '.'));
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  }
+
+  function _normalizeStateForGeo(value) {
+    const text = _normalizeToken(value || 'pendiente');
+    if (text.includes('final') || text.includes('complet') || text.includes('cerr')) return 'finalizada';
+    if (text.includes('curso') || text.includes('proceso')) return 'en_curso';
+    if (text.includes('inci') || text.includes('problema')) return 'incidencia';
+    return 'pendiente';
+  }
+
   function _renderExecutiveDashboard(data, local) {
     const container = document.getElementById('stats-executive-dashboard');
     if (!container) return;
@@ -629,6 +711,9 @@ const StatsModule = (() => {
       const pct = _pct(row.finalizadas || 0, row.total || 0);
       const active = Number(row.en_curso || 0);
       const pending = Number(row.pendientes || 0);
+      const withCoords = Number(row.con_coordenadas || 0);
+      const withoutCoords = Number(row.sin_coordenadas || Math.max(0, Number(row.total || 0) - withCoords));
+      const pendingWithoutCoords = Number(row.pendientes_sin_coordenadas || 0);
       return `
         <article class="territory-card">
           <div class="territory-card__head">
@@ -642,6 +727,8 @@ const StatsModule = (() => {
             <span>${Number(row.finalizadas || 0)} finalizadas</span>
             <span>${active} en curso</span>
             <span>${pending} pendientes</span>
+            <span>${withCoords} en mapa</span>
+            ${withoutCoords ? `<span>${withoutCoords} sin marcador${pendingWithoutCoords ? ` (${pendingWithoutCoords} pend.)` : ''}</span>` : ''}
           </div>
         </article>`;
     }).join('');
@@ -2061,9 +2148,20 @@ const StatsModule = (() => {
       return;
     }
     const rows = _statsData.por_departamento || [];
-    const headers = ['Departamento', 'Total', 'Finalizadas', 'En Curso', 'Pendientes', 'Incidencias'];
+    const headers = ['Departamento', 'Total', 'Finalizadas', 'En Curso', 'Pendientes', 'Incidencias', 'Con Coordenadas', 'Sin Coordenadas', 'Pendientes Con Coordenadas', 'Pendientes Sin Coordenadas'];
     const csv = [headers.join(','), ...rows.map(r =>
-      [r.departamento, r.total || 0, r.finalizadas || 0, r.en_curso || 0, r.pendientes || 0, r.incidencias || 0]
+      [
+        r.departamento,
+        r.total || 0,
+        r.finalizadas || 0,
+        r.en_curso || 0,
+        r.pendientes || 0,
+        r.incidencias || 0,
+        r.con_coordenadas || 0,
+        r.sin_coordenadas || 0,
+        r.pendientes_con_coordenadas || 0,
+        r.pendientes_sin_coordenadas || 0,
+      ]
         .map(_csvCell).join(',')
     )].join('\n');
     _downloadBlob(`cialpa_stats_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;', csv);

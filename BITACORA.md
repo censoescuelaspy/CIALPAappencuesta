@@ -7469,3 +7469,262 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Resultados verificados
 - Escuela `101095`: boton `Alta res.`, estado `Imagen alta res. activo`, imagen local cargada.
 - Escuela comun sin ortofoto local: boton `Satelite`, estado `Satelite activo | sin imagen local HD`, tesela Esri cargada.
+
+---
+
+## Preparacion operativa para escalar alta resolucion - 2026-06-16
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Version: `2.6.190`.
+
+### Objetivo de la intervencion
+- Obtener y dejar listos todos los insumos tecnicos posibles para ampliar mapas de alta resolucion a la mayor cantidad de escuelas.
+
+### Diagnostico inicial
+- El repo solo tenia una fuente local activa: `101095`.
+- La worklist privada y el pipeline Earth Engine por lote ya existian, pero faltaba revalidar su cobertura real y dejar preparada la corrida por tandas.
+
+### Acciones realizadas
+- Se verifico que `tools/earthengine/output/pilot-schools-worklist.json` contiene `86` escuelas con coordenadas.
+- Se creo la carpeta operativa `G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS` para recibir los GeoTIFF descargados por lote.
+- Se regeneraron cuatro scripts privados por tandas:
+  - `tools/earthengine/output/cialpa_pilot_batch_earthengine_01_25.js`
+  - `tools/earthengine/output/cialpa_pilot_batch_earthengine_26_50.js`
+  - `tools/earthengine/output/cialpa_pilot_batch_earthengine_51_75.js`
+  - `tools/earthengine/output/cialpa_pilot_batch_earthengine_76_86.js`
+- Se agrego `tools/earthengine/prepare_highres_batches.ps1` para:
+  - verificar worklist,
+  - recrear tandas,
+  - preparar carpeta de descargas,
+  - y activar instalaciones cuando ya existan GeoTIFF descargados.
+- Se verifico que el CLI `earthengine` existe en esta maquina.
+- Se verifico que el paquete Python `ee` esta instalado.
+
+### Resultados verificados
+- La muestra piloto disponible para escalar HD es de `86` escuelas.
+- El bloqueo real actual no es de frontend ni de generacion de scripts, sino de acceso Earth Engine/NICFI.
+- `earthengine ls projects/planet-nicfi/assets/basemaps/americas` devuelve `Not signed up for Earth Engine or project is not registered`.
+- Queda lista la cadena completa desde worklist hasta activacion local, pendiente solo de autenticar/habilitar Earth Engine y descargar los GeoTIFF resultantes.
+
+### Recomendaciones
+- Ejecutar primero `earthengine authenticate --force` y registrar/seleccionar el proyecto autorizado.
+- Confirmar acceso efectivo a NICFI antes de lanzar las cuatro tandas.
+
+## Validacion de acceso Earth Engine vs permiso NICFI - 2026-06-16
+
+### Objetivo de la intervencion
+- Confirmar si la cuenta ya quedo habilitada para lanzar exportaciones reales de mapas de alta resolucion.
+
+### Diagnostico inicial
+- El usuario informo que ya habia iniciado sesion en la configuracion de Earth Engine del proyecto `rapy-415107`.
+- Faltaba comprobar si eso destrababa tanto el servicio Earth Engine general como la coleccion privada `planet-nicfi`.
+
+### Acciones realizadas
+- Se ejecuto `earthengine set_project rapy-415107`.
+- Se verifico `earthengine task list`.
+- Se verifico `earthengine ls projects/planet-nicfi/assets/basemaps/americas`.
+- Se reviso tambien el estado local de `gcloud auth list` y `gcloud config get-value project`.
+- Se actualizo `tools/earthengine/prepare_highres_batches.ps1` para reflejar que el bloqueo vigente ya no es el alta Earth Engine general, sino el permiso puntual a NICFI.
+
+### Resultados verificados
+- `earthengine task list` respondio sin error, confirmando que Earth Engine ya esta habilitado para la cuenta actual.
+- `earthengine ls projects/planet-nicfi/assets/basemaps/americas` devolvio `Permission 'earthengine.assets.get' denied on resource 'projects/planet-nicfi/assets/basemaps/americas'`.
+- `gcloud` todavia no muestra cuenta activa local, pero eso no impide que `earthengine` ya use sus propias credenciales para consultar el servicio.
+
+### Conclusion operativa
+- La preparacion del pipeline sigue valida.
+- El bloqueo residual para ampliar mapas HD no esta en la app ni en Earth Engine base, sino en la falta de permiso especifico para Planet/NICFI sobre la cuenta autenticada.
+- No se inicio aun la tanda real `01_25` porque fallaria por permisos y no produciria GeoTIFFs utilizables.
+
+### Pendientes
+- Habilitar acceso Planet/NICFI para la cuenta Earth Engine usada en esta maquina.
+- Reintentar `earthengine ls projects/planet-nicfi/assets/basemaps/americas`.
+- Apenas responda, lanzar `py -3 tools/earthengine/start_pilot_ee_exports.py --project=rapy-415107 --source=nicfi --start=0 --limit=25`.
+- Una vez descargados los GeoTIFF en `G:\Mi unidad\CIALPA_EE_PILOTO_ESCUELAS`, correr el helper con instalacion/activacion para incorporar todas las fuentes locales posibles.
+
+---
+
+## Diferenciacion de conteos pendientes entre Inicio y Mapa - 2026-06-23 10:37
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main...origin/main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.191`.
+
+### Objetivo de la intervencion
+- Resolver la ambiguedad reportada: el mapa mostraba una cantidad y el indicador superior `Pendientes` otra, sin explicar si el conteo era global, filtrado o georreferenciado.
+
+### Diagnostico inicial
+- `Inicio` calcula sus KPIs con `API.getStats({})`, por lo que `inicio-pendiente` representa pendientes operativas del padron cargado.
+- `Mapa` recalcula `map-count-pendiente` con la lista actualmente visible tras aplicar filtros de territorio, estado, encuestador, muestra o busqueda.
+- La capa de marcadores solo puede dibujar escuelas con `latitud` y `longitud` validas; una escuela pendiente sin coordenadas sigue contando operativamente, pero no aparece como marcador.
+- Por eso ambos numeros podian ser correctos, pero no estaban claramente rotulados.
+
+### Acciones realizadas
+- `index.html`: el KPI de inicio pasa de `Pendientes` a `Pendientes operativas`.
+- `index.html`: los badges del mapa pasan a `Pend. vista`, `Curso vista`, `Final vista`, `Inc. vista` y `Total vista`.
+- `index.html`: se agrega `map-count-summary` en el encabezado del mapa para mostrar alcance de la vista.
+- `assets/js/map.js`: se agrega `_stateCounts()` para unificar el conteo por estado.
+- `assets/js/map.js`: `_updateSummaryBadges()` ahora actualiza tambien una explicacion de alcance:
+  - vista general o filtrada;
+  - pendientes visibles;
+  - escuelas con marcador;
+  - pendientes georreferenciadas;
+  - pendientes globales.
+- `assets/css/app.css`: se agrega estilo responsive para `map-count-summary`.
+- `assets/js/config.js`, `index.html`, `sw.js`, `README.md`: version/cache actualizados a `2.6.191`.
+
+### Archivos modificados
+- `index.html`
+- `assets/css/app.css`
+- `assets/js/map.js`
+- `assets/js/config.js`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `git status --branch --short`
+- `rg -n "inicio-pendiente|map-count-pendiente|estado_relevamiento|applyFilters|_updateSummaryBadges"`
+- `node --check .\assets\js\map.js`
+- `node --check .\assets\js\config.js`
+- `git diff --check -- index.html assets/css/app.css assets/js/map.js assets/js/config.js sw.js README.md`
+- `node -e` para verificar presencia de textos y funciones clave.
+- `py -3 -m http.server 8034 --bind 127.0.0.1`
+- `git commit -m "fix: aclarar conteos pendientes del mapa"`
+- `git push origin main`
+- `gh run list --limit 5`
+- `Invoke-WebRequest` a GitHub raw y GitHub Pages con cache-busting.
+
+### Resultados verificados
+- `assets/js/map.js` pasa validacion de sintaxis.
+- `assets/js/config.js` pasa validacion de sintaxis.
+- `git diff --check` no reporta errores de whitespace.
+- La version local queda en `2.6.191` y ya no quedan referencias `2.6.190` en los archivos de publicacion revisados.
+- Commit publico generado: `6e924b7 fix: aclarar conteos pendientes del mapa`.
+- `git push origin main` completo; `HEAD` y `origin/main` apuntan a `6e924b7296b41de367fb68687a0588c0c5ec1d37`.
+- GitHub Actions Pages reporto `pages build and deployment` en estado `success`.
+- Verificacion publica por HTTP: `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=verify-post-pages-...` devuelve `v2.6.191`.
+- La interfaz ahora diferencia explicitamente:
+  - pendientes operativas globales;
+  - pendientes de la vista del mapa;
+  - pendientes georreferenciadas con marcador.
+
+### Pruebas realizadas
+- Validacion estatica y de sintaxis JavaScript.
+- Chequeo de contenido de `index.html` y `assets/js/map.js` con Node.
+- Servidor local levantado en `http://127.0.0.1:8034/`.
+
+### Errores o incidentes
+- La prueba navegada con Playwright no pudo completarse porque `node_modules/@playwright/test/package.json` esta invalido en este checkout (`ERR_INVALID_PACKAGE_CONFIG`).
+- Los endpoints GAS probados sin sesion real no permiten consultar datos: el primario responde `403` y el fallback responde `401 Token invalido o expirado`, comportamiento esperable para endpoints autenticados.
+
+### Soluciones aplicadas
+- Se elimino la ambiguedad visual sin cambiar datos ni reglas de negocio.
+- Criterio operativo para el usuario:
+  - para planificacion general, regirse por `Pendientes operativas`;
+  - para trabajo territorial inmediato, regirse por la vista del mapa y su resumen de marcadores/georreferenciacion.
+
+### Pendientes
+- Validar visualmente en la app publicada con un usuario real y filtros activos.
+- Confirmar con el equipo si conviene iniciar una auditoria/geocodificacion de escuelas pendientes sin coordenadas.
+
+### Riesgos
+- Si el padron real tiene escuelas sin coordenadas, el mapa seguira mostrando menos marcadores que pendientes operativas; ahora queda explicado, pero la mejora de fondo requiere auditoria/geocodificacion de coordenadas.
+- Si el navegador conserva cache antigua, el usuario debe usar `Actualizar app` o recargar con cache renovada.
+
+### Recomendaciones
+- Mantener esta regla en futuras appwebs GIS: todo contador de mapa debe declarar si es global, filtrado, visible o georreferenciado.
+- No usar un unico label `Pendientes` para conteos de distinto universo.
+
+---
+
+## Cobertura de coordenadas en resumen territorial - 2026-06-23 11:25
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main...origin/main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.192`.
+
+### Objetivo de la intervencion
+- Aclarar el caso reportado de Amambay: el resumen superior indica `114` pendientes y `116` total, mientras el mapa muestra `98`.
+
+### Diagnostico inicial
+- `Pendientes` es un total de estado, no un total de marcadores.
+- `Total` es el total operativo de registros del departamento.
+- El mapa solo puede dibujar registros con latitud/longitud validas.
+- En el ejemplo reportado, la lectura correcta es: Amambay tiene `116` escuelas en el universo operativo, `114` pendientes y `98` con marcador; la diferencia probable es `18` escuelas sin coordenadas validas para el mapa.
+
+### Acciones realizadas
+- `gas/sheets.gs`: `_groupEscuelas()` ahora agrega por departamento:
+  - `con_coordenadas`;
+  - `sin_coordenadas`;
+  - `pendientes_con_coordenadas`;
+  - `pendientes_sin_coordenadas`.
+- `assets/js/local-store.js`: la analitica local offline/cache calcula los mismos campos.
+- `assets/js/stats.js`: el tablero de estadisticas enriquece el resumen con `getEscuelas` cuando el backend todavia no trae cobertura de coordenadas.
+- `assets/js/stats.js`: las tarjetas de navegacion territorial muestran `N en mapa` y `N sin marcador`.
+- `assets/js/stats.js`: el CSV de estadisticas agrega columnas de coordenadas.
+- `assets/js/config.js`, `index.html`, `sw.js`, `README.md`: version/cache actualizados a `2.6.192`.
+
+### Archivos modificados
+- `gas/sheets.gs`
+- `assets/js/local-store.js`
+- `assets/js/stats.js`
+- `assets/js/config.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check .\assets\js\stats.js`
+- `node --check .\assets\js\local-store.js`
+- `node --check .\assets\js\config.js`
+- `git diff --check -- assets/js/stats.js assets/js/local-store.js assets/js/config.js gas/sheets.gs index.html sw.js README.md`
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- `git diff --check` sin errores.
+- La version local queda en `2.6.192`.
+
+### Pruebas realizadas
+- Validacion estatica y de sintaxis.
+- Revision de diff para confirmar que no se cambian totales ni estados, solo se agrega cobertura de coordenadas.
+
+### Errores o incidentes
+- No se hizo despliegue GAS desde Apps Script en esta intervencion; por eso el frontend calcula cobertura desde `getEscuelas` mientras el backend publicado no incorpore aun los nuevos campos.
+
+### Soluciones aplicadas
+- El tablero territorial ya no deja implícito por que un departamento tiene menos puntos en el mapa que registros operativos.
+- Para Amambay, el usuario debe leer:
+  - `116 total`: universo operativo;
+  - `114 pendiente`: estado operativo pendiente;
+  - `98 en mapa`: escuelas con coordenadas validas;
+  - `18 sin marcador`: registros que requieren correccion o carga de coordenadas.
+
+### Pendientes
+- Publicar/pushear `2.6.192` en GitHub Pages.
+- Validar visualmente con usuario real que Amambay muestre `98 en mapa` y `18 sin marcador`.
+- En una futura publicacion GAS, subir `gas/sheets.gs` para que el backend entregue la cobertura de coordenadas sin depender del enriquecimiento frontend.
+
+### Riesgos
+- Si el usuario no ha cargado nunca el mapa/listado de escuelas en el dispositivo, el primer enriquecimiento puede depender de que `getEscuelas` responda correctamente con sesion activa.
+
+### Recomendaciones
+- Usar el conteo operativo para planificacion/cobertura administrativa.
+- Usar `en mapa` para planificacion territorial/ruteo.
+- Abrir una tarea de auditoria/geocodificacion para los registros `sin marcador`.
