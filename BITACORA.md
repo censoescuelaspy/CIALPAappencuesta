@@ -8215,3 +8215,104 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - Three.js se carga desde CDN; si el dispositivo esta offline, el visor 3D no aparece, pero el croquis 2D sigue operativo.
 - El modelo 3D usa una altura estimada cuando la ficha no tiene altura registrada.
 - La visualizacion es preliminar y no debe tratarse como plano tecnico certificado.
+
+---
+
+## Hotfix carga Registro guiado - 2026-06-23 18:18
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.198`.
+
+### Objetivo de la intervencion
+- Corregir el error reportado por usuario: `No se pudo cargar Registro guiado: No se pudo cargar assets/js/mec-form.js`.
+
+### Diagnostico inicial
+- `assets/js/mec-form.js?v=2.6.197` respondia `200` publico con `Content-Type: application/javascript`.
+- `node --check` confirmaba sintaxis correcta en `mec-form.js`, `classroom-3d.js` y `app.js`.
+- Una pagina minima en Playwright cargaba `mec-schema.js`, `classroom-3d.js` y `mec-form.js` publicos sin error.
+- El fallo era compatible con service worker/cache instalado: ante falla de red de un asset local, el service worker anterior podia devolver `index.html` tambien para scripts, provocando error de carga del `.js`.
+
+### Acciones realizadas
+- `sw.js`: version/cache actualizada a `cialpa-app-v2.6.198`.
+- `sw.js`: se agregaron a precache los assets criticos del registro: `mec-form.css`, `mec-schema.js`, `mec-form.js`, `guided-register.js` y `classroom-3d.js`.
+- `sw.js`: el fallback a `index.html` queda limitado a navegaciones HTML; los assets estaticos usan cache exacta/ignoreSearch y, si no existen, fallan sin devolver HTML.
+- `assets/js/app.js`: el cargador diferido de scripts ahora reintenta una vez con cache-busting si falla el primer intento.
+- `assets/js/app.js`: si un script falla, se elimina la promesa fallida de `_lazyAssetPromises` para permitir nuevos intentos.
+- `assets/js/app.js`: se limpia cache local del asset antes del reintento.
+- Version/cache actualizados a `2.6.198`.
+
+### Archivos modificados
+- `sw.js`
+- `assets/js/app.js`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `index.html`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `Invoke-WebRequest -Method Head` a `mec-form.js`, `classroom-3d.js` y `app.js` publicos.
+- Playwright publico para carga minima de `mec-schema.js`, `classroom-3d.js` y `mec-form.js`.
+- `node --check assets/js/app.js`
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/classroom-3d.js`
+- `node --check assets/js/config.js`
+- `node --check assets/js/department-atlas.js`
+- `git diff --check -- index.html assets/js/app.js assets/js/config.js assets/js/department-atlas.js sw.js README.md`
+- `py -3 -m http.server 8042 --bind 127.0.0.1`
+- Playwright local con service worker y modo offline.
+- `git commit -m "fix: robustecer carga del registro guiado"`
+- `git push origin main`
+- `gh run watch 28057987248 --exit-status`
+- `Invoke-WebRequest` publico con cache-busting.
+- Playwright publico con service worker y modo offline.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.198` y `assets/js/app.js?v=2.6.198`.
+  - `assets/js/app.js` contiene `_appendLazyScript`, `_evictLazyAssetFromCaches` y `retry: Date.now()`.
+  - `sw.js` contiene `cialpa-app-v2.6.198`, `./assets/js/mec-form.js`, `_isStaticAssetRequest` e `ignoreSearch: isStaticAsset`.
+  - `assets/js/mec-form.js` contiene `MecFormModule`.
+- Playwright local con service worker:
+  - cache creada: `cialpa-app-v2.6.198`.
+  - `mec-form.js` queda precacheado.
+  - en modo offline, `fetch('./assets/js/mec-form.js?v=2.6.198')` devuelve `200`, `application/javascript`, contiene `MecFormModule` y no empieza con HTML.
+  - un asset JS inexistente offline falla en vez de devolver `index.html`.
+- Publicacion:
+  - Commit funcional: `cf35d70`.
+  - Push realizado a `origin/main`.
+  - GitHub Pages run `28057987248` finalizo con `success` para `cf35d703e8318a30b335fa7361f5cdd11bd9a9a0`.
+  - URL publica con cache-busting devuelve `v2.6.198`, `app.js` con reintento de scripts, `sw.js` con fallback corregido y `mec-form.js` como JavaScript.
+- Playwright publico con service worker:
+  - cache creada: `cialpa-app-v2.6.198`.
+  - `mec-form.js` queda precacheado.
+  - en modo offline, `mec-form.js?v=2.6.198` devuelve `200`, `application/javascript; charset=utf-8`, contiene `MecFormModule` y no devuelve HTML.
+
+### Pruebas realizadas
+- Verificacion estatica.
+- Verificacion HTTP local/publica.
+- Playwright publico para carga directa de scripts.
+- Playwright local y publico con service worker + modo offline.
+
+### Errores o incidentes
+- No se pudo reproducir el error en navegador limpio porque el archivo publico estaba correcto; el diagnostico se centro en cache/service worker instalado y fallback incorrecto para assets.
+
+### Soluciones aplicadas
+- Fallback de service worker limitado a navegaciones HTML.
+- Assets criticos del registro guiado precacheados.
+- Loader diferido con reintento y limpieza de cache.
+
+### Pendientes
+- Pedir al usuario pulsar `Actualizar app` o abrir con cache-busting si su navegador conserva el service worker anterior.
+
+### Riesgos
+- Si el dispositivo esta completamente sin conexion y aun no instalo `2.6.198`, puede mantener el error hasta actualizar cache.

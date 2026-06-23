@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.197`.
+- Version vigente de esta intervencion: `2.6.198`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -24,6 +24,7 @@
 - Luego se reporto solapamiento entre mapa y tabla del Atlas, y se pidio que los encabezados permitieran ordenar por campo.
 - Luego se reporto que el mapa quedo muy comprimido y se pidio ubicar mapa y tabla uno al lado del otro.
 - Luego se solicito hacer un primer ensayo para incorporar ideas de `plano3D.txt` en el registro arquitectonico de aulas.
+- Luego se reporto que `Registro guiado` dejo de funcionar con el error `No se pudo cargar assets/js/mec-form.js`.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -64,6 +65,9 @@
 - El visor 3D no modifica la ficha: toma dimensiones, aula activa y objetos del modelo existente de `MecFormModule`.
 - Three.js se carga de forma diferida solo en registro/plano; si no esta disponible, queda aviso y el croquis 2D continua operativo.
 - La lectura de controles del visor usa `getAttribute('data-classroom-3d-action')` por robustez frente a nombres `data-*` con `3d`.
+- Para `2.6.198`, se corrigio la carga del `Registro guiado` frente a caches/service workers previos: `sw.js` ya no devuelve `index.html` como fallback de archivos `.js`.
+- En `2.6.198`, `mec-form.css`, `mec-schema.js`, `mec-form.js`, `guided-register.js` y `classroom-3d.js` quedan en precache porque son assets criticos del registro.
+- En `2.6.198`, el cargador diferido de scripts limpia cache del asset y reintenta con cache-busting si falla el primer intento.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -127,3 +131,7 @@
 - Se verifico localmente por HTTP que `index.html`, `assets/js/app.js`, `assets/js/mec-form.js`, `assets/js/classroom-3d.js`, `assets/css/mec-form.css` y `sw.js` sirven la version `2.6.197` y los marcadores del visor 3D.
 - Playwright temporal `1.61.1` verifico el visor 3D en desktop y movil: canvas no blanco, screenshots en memoria, pixeles WebGL muestreados, KPIs visibles, boton `Plano` operativo y sin solapamiento visor/KPIs.
 - Se publico `2.6.197` con commit `85762a5`; GitHub Pages run `28056748761` reporto `success` y la URL publica devuelve `v2.6.197`, carga diferida de Three.js, `classroom-3d.js`, panel 3D en `mec-form.js`, CSS del visor y cache `cialpa-app-v2.6.197`.
+- Para `2.6.198`, se verifico que `mec-form.js?v=2.6.197` respondia `200` publico con JavaScript y cargaba en navegador limpio, por lo que el error era compatible con service worker/cache instalado.
+- Para `2.6.198`, `node --check` paso en `assets/js/app.js`, `assets/js/mec-form.js`, `assets/js/classroom-3d.js`, `assets/js/config.js` y `assets/js/department-atlas.js`; `git diff --check` no marco errores.
+- Playwright local y publico con service worker verifico que `mec-form.js?v=2.6.198` queda precacheado y, aun offline, devuelve JavaScript con `MecFormModule` en vez de HTML.
+- Se publico `2.6.198` con commit `cf35d70`; GitHub Pages run `28057987248` reporto `success` y la URL publica devuelve `v2.6.198`, `sw.js` con fallback corregido, loader con reintento y `mec-form.js` operativo.
