@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cialpa-app-v2.6.192';
+const CACHE_NAME = 'cialpa-app-v2.6.193';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',
@@ -17,6 +17,7 @@ const APP_SHELL = [
   './assets/js/jornada.js',
   './assets/js/admin.js',
   './assets/js/stats.js',
+  './assets/js/department-atlas.js',
   './assets/js/location-audit.js',
   './assets/js/manual.js',
   './assets/js/planning.js',

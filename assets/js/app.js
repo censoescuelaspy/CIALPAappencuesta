@@ -547,6 +547,7 @@ const AppController = (() => {
   const MODULES = {
     inicio: { label: 'Inicio', icon: '🏠', minRole: 'encuestador' },
     mapa: { label: 'Mapa', icon: '🗺️', minRole: 'encuestador' },
+    atlas: { label: 'Atlas departamental', icon: 'DEP', minRole: 'supervisor' },
     registro: { label: 'Registro guiado', icon: '>>', minRole: 'encuestador' },
     encuesta: { label: 'Migrar RUE-MEC', icon: '⇄', minRole: 'encuestador' },
     mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
@@ -793,7 +794,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['inicio', 'arquitectura', 'mapa', 'registro', 'jornada', 'encuestadores', 'incidencias', 'comentarios', 'cuestionario-inicial', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
+    const primaryModules = ['inicio', 'arquitectura', 'mapa', 'atlas', 'registro', 'jornada', 'encuestadores', 'incidencias', 'comentarios', 'cuestionario-inicial', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])
@@ -1527,6 +1528,9 @@ const AppController = (() => {
           break;
         case 'mapa':
           await _initMapa();
+          break;
+        case 'atlas':
+          if (typeof DepartmentAtlasModule !== 'undefined') await DepartmentAtlasModule.init();
           break;
         case 'registro':
           if (typeof GuidedRegisterModule !== 'undefined') GuidedRegisterModule.init();
