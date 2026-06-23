@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * classroom-3d.js, ensayo de visor 3D para aula activa
- * Version: 2.6.197
+ * Version: 2.6.199
  */
 
 const Classroom3DModule = (() => {

@@ -1,7 +1,7 @@
 /**
  * CIALPA - Registro guiado secuencial
  * Capa de experiencia para construir el relevamiento sobre un plano unico.
- * Version: 2.6.190
+ * Version: 2.6.199
  */
 
 const GuidedRegisterModule = (() => {
@@ -36,6 +36,7 @@ const GuidedRegisterModule = (() => {
   let _guidedReviewQuestion = null;
   let _timeRefreshTimer = null;
   let _planSyncTimer = null;
+  let _guided3DRefreshTimer = null;
   const GUIDED_QUESTION_HISTORY_LIMIT = 40;
   const ANSWER_FEEDBACK_DELAY_MS = 1050;
   const ANSWER_FEEDBACK_ACTIONS = new Set([
@@ -257,6 +258,7 @@ const GuidedRegisterModule = (() => {
       _refreshPlan();
       _updateSlide();
       _updateSnapshot();
+      _refreshGuided3D();
     });
     if (!_timeRefreshTimer) {
       _timeRefreshTimer = setInterval(() => _refreshTimeTracking(), 15000);
@@ -277,6 +279,8 @@ const GuidedRegisterModule = (() => {
 
         <div class="guided-progress" aria-hidden="true"><span data-guided-progress></span></div>
 
+        ${_renderGuidedClassroom3DPanel()}
+
         <section class="guided-workbench">
           <div class="guided-deck" data-guided-deck>
             <div class="guided-track" data-guided-track>
@@ -295,6 +299,7 @@ const GuidedRegisterModule = (() => {
               </div>
               <div class="guided-plan-panel__actions">
                 <small data-guided-save-state>Sin borrador</small>
+                <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="focus3d">Vista 3D</button>
                 <button class="btn btn-guided-soft btn-sm" type="button" data-guided-action="goClosure">Finalizar escuela</button>
                 <button class="btn btn-sm guided-plan-panel__school-action" type="button" data-guided-action="module" data-guided-value="mapa">Cambiar escuela</button>
               </div>
@@ -317,6 +322,34 @@ const GuidedRegisterModule = (() => {
       </section>`;
     _applyGuidedLayout(root);
     _movePlanSurfaceForActiveStep(root);
+  }
+
+  function _renderGuidedClassroom3DPanel() {
+    return `
+      <section class="guided-classroom-3d mec-classroom-3d" data-classroom-3d data-guided-classroom-3d aria-label="Vista 3D visible del aula activa">
+        <div class="mec-classroom-3d__header">
+          <div class="mec-classroom-3d__title">
+            <span>Vista 3D del aula activa</span>
+            <strong data-guided-3d-title>Sin aula activa</strong>
+            <small data-guided-3d-meta>Agregue un aula en la etapa 04 para ver el ensayo arquitectonico.</small>
+          </div>
+          <div class="mec-classroom-3d__actions" aria-label="Controles del visor 3D">
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="perspective">3D</button>
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="top">Plano</button>
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="rotate-left">Girar izq.</button>
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="rotate-right">Girar der.</button>
+            <button class="btn btn-primary btn-sm" type="button" data-guided-action="focus3d" data-classroom-3d-action="refresh">Actualizar</button>
+          </div>
+        </div>
+        <div class="mec-classroom-3d__body">
+          <div class="mec-classroom-3d__viewport" data-classroom-3d-viewport>
+            <div class="mec-classroom-3d__empty">Agregue o seleccione un aula para activar la vista 3D.</div>
+          </div>
+          <aside class="mec-classroom-3d__stats" data-classroom-3d-stats>
+            <span>Sin modelo 3D activo.</span>
+          </aside>
+        </div>
+      </section>`;
   }
 
   function _renderSlide(step, index = 0) {
@@ -630,6 +663,7 @@ const GuidedRegisterModule = (() => {
     if (action === 'saveSiteMeasures') return _saveSiteMeasures(value);
     if (action === 'answerSiteElementField') return _answerSiteElementField(value);
     if (action === 'goClosure') return _goClosure();
+    if (action === 'focus3d') return _focusGuided3D();
     if (action === 'syncSheets') return _syncDraftToSheets();
     if (action === 'syncEvidence') return _syncEvidenceToDrive();
     if (action === 'finalizeComplete') return _finalizeCompleteRegistration();
@@ -861,6 +895,7 @@ const GuidedRegisterModule = (() => {
     setTimeout(() => {
       _refreshPlan();
       _updateSnapshot();
+      _refreshGuided3D();
     }, Math.max(0, Number(delay) || 0));
   }
 
@@ -868,6 +903,7 @@ const GuidedRegisterModule = (() => {
     clearTimeout(_planSyncTimer);
     _planSyncTimer = setTimeout(() => {
       _updateSnapshot();
+      _refreshGuided3D();
     }, 90);
   }
 
@@ -1241,6 +1277,7 @@ const GuidedRegisterModule = (() => {
         : ((snap.school.latitud && snap.school.longitud) ? 'Base mapa activa con coordenadas de escuela' : 'Base mapa pendiente');
     }
     _refreshTimeTracking(root, snap);
+    _refreshGuided3D(root, snap);
     root.querySelectorAll('[data-guided-step-state]').forEach(label => {
       const step = STEPS.find(item => item.id === label.dataset.guidedStepState);
       const done = _stepDone(step?.id, snap);
@@ -1294,6 +1331,73 @@ const GuidedRegisterModule = (() => {
     root.querySelectorAll('[data-guided-finish-complete]').forEach(button => {
       button.hidden = !hasSchool || !completion.complete;
     });
+  }
+
+  function _focusGuided3D() {
+    const root = document.getElementById('guided-register-root');
+    const panel = root?.querySelector('[data-guided-classroom-3d]');
+    _refreshGuided3D(root, _snapshot(), { immediate: true });
+    if (panel) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      panel.classList.add('guided-classroom-3d--pulse');
+      window.setTimeout(() => panel.classList.remove('guided-classroom-3d--pulse'), 1400);
+    }
+    const model = _guidedClassroom3DModel();
+    if (!model) {
+      UI.showToast('Vista 3D lista: cree o seleccione un aula en la etapa 04 para verla en volumen.', 'info', 6200);
+      goTo(3);
+    }
+  }
+
+  function _refreshGuided3D(root = document.getElementById('guided-register-root'), snap = null, options = {}) {
+    if (!root) return;
+    const run = () => {
+      const panel = root.querySelector('[data-guided-classroom-3d]');
+      if (!panel) return;
+      const model = _guidedClassroom3DModel();
+      _updateGuided3DLabels(panel, snap || _snapshot(), model);
+      const module = window.Classroom3DModule;
+      if (module && typeof module.mount === 'function') {
+        module.mount(panel, model);
+      } else {
+        const viewport = panel.querySelector('[data-classroom-3d-viewport]');
+        if (viewport) viewport.innerHTML = '<div class="mec-classroom-3d__empty">El visor 3D se cargara al abrir el registro guiado.</div>';
+      }
+    };
+    clearTimeout(_guided3DRefreshTimer);
+    if (options.immediate) run();
+    else _guided3DRefreshTimer = window.setTimeout(run, 90);
+  }
+
+  function _guidedClassroom3DModel() {
+    try {
+      const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+      return mec?.getActiveClassroom3DModel?.() || null;
+    } catch (err) {
+      console.warn('No se pudo leer el modelo 3D del Registro guiado:', err);
+      return null;
+    }
+  }
+
+  function _updateGuided3DLabels(panel, snap = _snapshot(), model = null) {
+    const title = panel.querySelector('[data-guided-3d-title]');
+    const meta = panel.querySelector('[data-guided-3d-meta]');
+    const classrooms = Number(snap?.classrooms || 0);
+    const roomLabel = model?.room?.label || model?.room?.name || '';
+    const dims = model?.dimensions
+      ? `${_formatNumber(model.dimensions.length)} x ${_formatNumber(model.dimensions.width)} m`
+      : '';
+    if (title) {
+      title.textContent = roomLabel || (classrooms ? `${classrooms} aula(s) cargada(s)` : 'Sin aula activa');
+    }
+    if (meta) {
+      meta.textContent = model
+        ? `${dims} - visor visible del Registro guiado`
+        : (classrooms
+          ? 'Seleccione un aula del plano vivo para activar el volumen.'
+          : 'Etapa 04: pulse Aula para crear el primer ambiente y ver el volumen.');
+    }
+    panel.classList.toggle('guided-classroom-3d--empty', !model);
   }
 
   function _refreshTimeTracking(root = document.getElementById('guided-register-root'), snap = null) {
@@ -4412,6 +4516,12 @@ const GuidedRegisterModule = (() => {
     } catch {
       return '';
     }
+  }
+
+  function _formatNumber(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '0';
+    return number >= 10 ? number.toFixed(1) : number.toFixed(2).replace(/0$/, '').replace(/\.0$/, '');
   }
 
   function _loadState() {

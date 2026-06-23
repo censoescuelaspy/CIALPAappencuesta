@@ -1,8 +1,15 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.198** | Paraguay 2026
+**Version 2.6.199** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.199
+
+- La vista 3D ahora aparece directamente dentro del `Registro guiado`, arriba del plano vivo.
+- Se agrega boton visible `Vista 3D` en el panel del registro para ubicar rapidamente el ensayo.
+- El panel 3D muestra estado inicial aunque no haya aula y se activa al crear o seleccionar un aula.
+- El visor conserva controles 3D/plano/giro y KPIs compactos sin reemplazar el croquis 2D.
 
 ## Novedades v2.6.198
 

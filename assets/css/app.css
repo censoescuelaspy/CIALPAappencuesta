@@ -7400,6 +7400,94 @@ textarea.form-control {
   font-weight: 750;
 }
 
+.guided-classroom-3d {
+  margin: .55rem .62rem .62rem;
+  padding: .62rem;
+  border-color: #bfd5ee;
+  background: #f8fbff;
+  box-shadow: none;
+}
+
+.guided-classroom-3d--pulse {
+  animation: guided3dPulse 1.35s ease;
+}
+
+@keyframes guided3dPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(232, 76, 34, 0);
+  }
+  45% {
+    box-shadow: 0 0 0 4px rgba(232, 76, 34, .18);
+  }
+}
+
+.guided-classroom-3d .mec-classroom-3d__header {
+  align-items: center;
+}
+
+.guided-classroom-3d .mec-classroom-3d__title strong {
+  font-size: .9rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__title span,
+.guided-classroom-3d .mec-classroom-3d__title small {
+  font-size: .66rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__actions {
+  gap: .28rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__actions .btn-sm {
+  min-height: 28px;
+  padding: .26rem .42rem;
+  font-size: .68rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__body {
+  grid-template-columns: 1fr;
+  gap: .5rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__viewport {
+  height: clamp(220px, 26vh, 320px);
+}
+
+.guided-classroom-3d .mec-classroom-3d__stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.guided-classroom-3d .mec-classroom-3d__stats > div {
+  padding: .42rem .48rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__stats span {
+  font-size: .56rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__stats strong {
+  font-size: .78rem;
+}
+
+.guided-classroom-3d .mec-classroom-3d__review {
+  grid-column: 1 / -1;
+}
+
+.guided-classroom-3d--empty .mec-classroom-3d__viewport {
+  height: 118px;
+}
+
+@media (max-width: 780px) {
+  .guided-classroom-3d .mec-classroom-3d__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .guided-classroom-3d .mec-classroom-3d__viewport {
+    height: 220px;
+  }
+}
+
 .guided-plan-surface {
   max-height: none;
   overflow: auto;
