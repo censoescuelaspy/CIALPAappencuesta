@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.197
+ * Version: 2.6.198
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -1608,17 +1608,51 @@ const AppController = (() => {
     if (_lazyAssetPromises.has(key)) return _lazyAssetPromises.get(key);
     const existing = document.querySelector(`script[data-lazy-src="${src}"]`);
     if (existing) return Promise.resolve();
-    const promise = new Promise((resolve, reject) => {
+    const promise = _appendLazyScript(src).catch(async firstErr => {
+      console.warn(`Primer intento fallido al cargar ${src}. Se reintenta sin cache.`, firstErr);
+      _removeLazyScript(src);
+      await _evictLazyAssetFromCaches(src);
+      return _appendLazyScript(src, true);
+    }).catch(err => {
+      _lazyAssetPromises.delete(key);
+      throw err;
+    });
+    _lazyAssetPromises.set(key, promise);
+    return promise;
+  }
+
+  function _appendLazyScript(src, retry = false) {
+    return new Promise((resolve, reject) => {
       const script = document.createElement('script');
-      script.src = _versionedAssetUrl(src);
+      script.src = _versionedAssetUrl(src, retry ? { retry: Date.now() } : {});
       script.defer = true;
       script.dataset.lazySrc = src;
       script.onload = () => resolve();
       script.onerror = () => reject(new Error(`No se pudo cargar ${src}`));
       document.body.appendChild(script);
     });
-    _lazyAssetPromises.set(key, promise);
-    return promise;
+  }
+
+  function _removeLazyScript(src) {
+    document.querySelectorAll(`script[data-lazy-src="${src}"]`).forEach(script => script.remove());
+  }
+
+  async function _evictLazyAssetFromCaches(src) {
+    if (!('caches' in window)) return;
+    try {
+      const absoluteUrl = new URL(src, document.baseURI).href;
+      const versionedUrl = _versionedAssetUrl(src);
+      const keys = await caches.keys();
+      await Promise.all(keys.map(async key => {
+        const cache = await caches.open(key);
+        await Promise.all([
+          cache.delete(versionedUrl),
+          cache.delete(absoluteUrl, { ignoreSearch: true }),
+        ]);
+      }));
+    } catch (err) {
+      console.warn(`No se pudo limpiar cache local de ${src}:`, err);
+    }
   }
 
   function _loadOptionalScriptOnce(src, label = src) {
@@ -1646,9 +1680,12 @@ const AppController = (() => {
     return promise;
   }
 
-  function _versionedAssetUrl(path) {
+  function _versionedAssetUrl(path, extraParams = {}) {
     const url = new URL(path, document.baseURI);
     url.searchParams.set('v', APP_CONFIG.VERSION || Date.now());
+    Object.entries(extraParams).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value);
+    });
     return url.href;
   }
 

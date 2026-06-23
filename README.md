@@ -1,8 +1,15 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.197** | Paraguay 2026
+**Version 2.6.198** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.198
+
+- Hotfix de carga del `Registro guiado` cuando un navegador conserva cache/service worker previo.
+- El service worker deja de responder `index.html` como respaldo para archivos `.js`, evitando falsos errores al cargar `mec-form.js`.
+- El cargador diferido de scripts limpia cache del asset y reintenta con cache-busting si falla el primer intento.
+- Se precachean los assets criticos del formulario MEC: `mec-schema.js`, `mec-form.js`, `guided-register.js`, `classroom-3d.js` y `mec-form.css`.
 
 ## Novedades v2.6.197
 

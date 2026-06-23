@@ -1,10 +1,11 @@
-const CACHE_NAME = 'cialpa-app-v2.6.197';
+const CACHE_NAME = 'cialpa-app-v2.6.198';
 const PRESERVED_CACHE_PREFIXES = ['cialpa-map-tiles'];
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.webmanifest',
   './assets/css/app.css',
+  './assets/css/mec-form.css',
   './assets/css/mec-ficha.css',
   './assets/js/config.js',
   './assets/js/local-store.js',
@@ -22,6 +23,10 @@ const APP_SHELL = [
   './assets/js/manual.js',
   './assets/js/planning.js',
   './assets/js/initial-questionnaire.js',
+  './assets/js/mec-schema.js',
+  './assets/js/mec-form.js',
+  './assets/js/guided-register.js',
+  './assets/js/classroom-3d.js',
   './assets/js/mec-ficha.js',
   './assets/data/r01-schools-public.json',
   './assets/data/demo-infraestructura-mec.json',
@@ -63,6 +68,9 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
+  const accept = request.headers.get('accept') || '';
+  const isNavigation = request.mode === 'navigate' || accept.includes('text/html');
+  const isStaticAsset = _isStaticAssetRequest(request, url);
 
   if (url.origin !== self.location.origin) {
     const cacheableExternal = [
@@ -74,7 +82,7 @@ self.addEventListener('fetch', event => {
     ].some(host => url.hostname === host || url.hostname.endsWith('.' + host));
     if (!cacheableExternal) return;
     event.respondWith(
-      caches.match(request).then(cached => cached || fetch(request).then(response => {
+      caches.match(request, { ignoreSearch: true }).then(cached => cached || fetch(request).then(response => {
         _cacheIfValid(request, response);
         return response;
       }))
@@ -88,9 +96,19 @@ self.addEventListener('fetch', event => {
         _cacheIfValid(request, response);
         return response;
       })
-      .catch(() => caches.match(request).then(cached => cached || caches.match('./index.html')))
+      .catch(() => caches.match(request, { ignoreSearch: isStaticAsset })
+        .then(cached => {
+          if (cached) return cached;
+          if (isNavigation) return caches.match('./index.html');
+          return Promise.reject(new Error(`[SW] Sin cache para ${request.url}`));
+        }))
   );
 });
+
+function _isStaticAssetRequest(request, url) {
+  if (['script', 'style', 'image', 'font', 'manifest'].includes(request.destination)) return true;
+  return /\.(?:js|css|json|png|jpg|jpeg|webp|svg|ico|woff2?|ttf|map|webmanifest)$/i.test(url.pathname);
+}
 
 function _cacheIfValid(request, response) {
   if (!response || !response.ok) return;
