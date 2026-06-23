@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.196`.
+- Version vigente de esta intervencion: `2.6.197`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -23,6 +23,7 @@
 - Luego se reporto que Asuncion no traia datos en el Atlas aunque los demas departamentos funcionaban, y se pidio mas espacio para lista y detalles de escuelas.
 - Luego se reporto solapamiento entre mapa y tabla del Atlas, y se pidio que los encabezados permitieran ordenar por campo.
 - Luego se reporto que el mapa quedo muy comprimido y se pidio ubicar mapa y tabla uno al lado del otro.
+- Luego se solicito hacer un primer ensayo para incorporar ideas de `plano3D.txt` en el registro arquitectonico de aulas.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -59,6 +60,10 @@
 - En `2.6.195`, los encabezados de tabla son botones sortables por codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
 - Para `2.6.196`, el Atlas usa dos paneles en escritorio/notebook: KPIs y mapa amplio a la izquierda; detalle, resumen territorial y tabla sortable a la derecha.
 - En `2.6.196`, el panel derecho compacta estados y distritos en una fila de dos columnas para reservar mas alto a la tabla.
+- Para `2.6.197`, se integro un visor 3D preliminar de aulas basado en Three.js como capa de lectura del croquis activo.
+- El visor 3D no modifica la ficha: toma dimensiones, aula activa y objetos del modelo existente de `MecFormModule`.
+- Three.js se carga de forma diferida solo en registro/plano; si no esta disponible, queda aviso y el croquis 2D continua operativo.
+- La lectura de controles del visor usa `getAttribute('data-classroom-3d-action')` por robustez frente a nombres `data-*` con `3d`.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -68,8 +73,10 @@
 - `assets/js/map.js`
 - `assets/js/admin.js`
 - `assets/js/department-atlas.js`
+- `assets/js/classroom-3d.js`
 - `gas/Code.gs`
 - `assets/js/mec-form.js`
+- `assets/css/mec-form.css`
 - `index.html`
 - `sw.js`
 - `BITACORA.md`
@@ -116,3 +123,7 @@
 - Para `2.6.196`, `node --check assets/js/department-atlas.js`, `node --check assets/js/config.js`, `node --check assets/js/app.js` y `git diff --check` pasan sin errores.
 - Se verifico localmente por HTTP que `index.html`, `assets/css/app.css`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.196`, incluyendo el CSS de dos columnas, altura amplia de mapa y breakpoint `1080px`.
 - Se publico `2.6.196` con commit `40490f1`; GitHub Pages run `28046520438` reporto `success` y la URL publica devuelve `v2.6.196`, CSS de dos columnas, JS del Atlas `2.6.196` y cache `cialpa-app-v2.6.196`.
+- Para `2.6.197`, `node --check assets/js/classroom-3d.js`, `node --check assets/js/mec-form.js`, `node --check assets/js/app.js`, `node --check assets/js/config.js`, `node --check assets/js/department-atlas.js` y `git diff --check` pasan sin errores.
+- Se verifico localmente por HTTP que `index.html`, `assets/js/app.js`, `assets/js/mec-form.js`, `assets/js/classroom-3d.js`, `assets/css/mec-form.css` y `sw.js` sirven la version `2.6.197` y los marcadores del visor 3D.
+- Playwright temporal `1.61.1` verifico el visor 3D en desktop y movil: canvas no blanco, screenshots en memoria, pixeles WebGL muestreados, KPIs visibles, boton `Plano` operativo y sin solapamiento visor/KPIs.
+- Se publico `2.6.197` con commit `85762a5`; GitHub Pages run `28056748761` reporto `success` y la URL publica devuelve `v2.6.197`, carga diferida de Three.js, `classroom-3d.js`, panel 3D en `mec-form.js`, CSS del visor y cache `cialpa-app-v2.6.197`.

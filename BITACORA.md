@@ -8100,3 +8100,118 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 
 ### Riesgos
 - En anchos pequenos la tabla conserva scroll horizontal por sus columnas; en esos casos el layout vuelve a una columna para preservar compatibilidad movil.
+
+---
+
+## Ensayo visor 3D de aulas - 2026-06-23 17:54
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.197`.
+
+### Objetivo de la intervencion
+- Hacer un primer ensayo de las ideas de `plano3D.txt` dentro del registro arquitectonico de aulas.
+- Agregar una visualizacion 3D no destructiva del aula activa, manteniendo el croquis 2D como fuente operativa.
+
+### Diagnostico inicial
+- `plano3D.txt` contiene un prototipo HTML standalone con Three.js, catalogo de objetos, sala 3D, metricas y exportacion.
+- La app CIALPA ya cuenta con un modelo operativo de croquis por aula en `MecFormModule`, por lo que convenia integrar un visor 3D como capa de lectura y no reemplazar el flujo existente.
+- El ensayo debia evitar romper guardado, offline/croquis 2D y compatibilidad movil.
+
+### Acciones realizadas
+- Se agrego `assets/js/classroom-3d.js` como modulo nuevo de visor 3D basado en Three.js.
+- `assets/js/app.js` carga Three.js de forma diferida solo al entrar a `registro`, `mec` o `plano`; si la libreria falla, el formulario sigue funcionando.
+- `assets/js/mec-form.js` expone `getActiveClassroom3DModel()` y renderiza un panel `Ensayo 3D del ambiente` debajo del croquis activo.
+- El modelo 3D toma largo, ancho, altura estimada, bloque, piso, aula, objetos y alertas basicas del aula activa.
+- El visor dibuja piso, muros, puertas, ventanas, pizarra, tomas, luces, ventilador, AA, danos y escaleras/particiones cuando existan.
+- El panel suma KPIs rapidos: area, dimensiones, altura, aberturas, electricidad, confort y revision.
+- `assets/css/mec-form.css` agrega layout responsivo: visor amplio con KPIs laterales en escritorio y una columna en movil.
+- Se corrigio la lectura de acciones `data-classroom-3d-action` usando `getAttribute`, porque `dataset` no era confiable con nombres que incluyen `3d`.
+- Version/cache actualizados a `2.6.197`.
+
+### Archivos modificados
+- `assets/js/classroom-3d.js`
+- `assets/js/app.js`
+- `assets/js/mec-form.js`
+- `assets/css/mec-form.css`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/classroom-3d.js`
+- `node --check assets/js/mec-form.js`
+- `node --check assets/js/app.js`
+- `node --check assets/js/config.js`
+- `node --check assets/js/department-atlas.js`
+- `git diff --check -- index.html assets/css/mec-form.css assets/js/app.js assets/js/classroom-3d.js assets/js/config.js assets/js/department-atlas.js assets/js/mec-form.js sw.js README.md`
+- `py -3 -m http.server 8041 --bind 127.0.0.1`
+- `Invoke-WebRequest` local a `index.html`, `assets/js/app.js`, `assets/js/mec-form.js`, `assets/js/classroom-3d.js`, `assets/css/mec-form.css` y `sw.js`.
+- Playwright temporal en `%TEMP%\cialpa-pw-3d` con `playwright@1.61.1`.
+- `git commit -m "feat: agregar ensayo 3d de aulas"`
+- `git push origin main`
+- `gh run watch 28056748761 --exit-status`
+- `Invoke-WebRequest` publico con cache-busting a `index.html`, `assets/js/app.js`, `assets/js/mec-form.js`, `assets/js/classroom-3d.js`, `assets/css/mec-form.css` y `sw.js`.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta en los modulos tocados.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.197`, `assets/js/app.js?v=2.6.197` y `assets/js/config.js?v=2.6.197`.
+  - `assets/js/app.js` contiene `Version: 2.6.197`, `three@0.160.0`, `assets/js/classroom-3d.js` y `_loadOptionalScriptOnce`.
+  - `assets/js/mec-form.js` contiene `data-classroom-3d`, `getActiveClassroom3DModel`, `_refreshClassroom3D` y `visor de revision`.
+  - `assets/js/classroom-3d.js` contiene `Classroom3DModule`, `WebGLRenderer`, `classroom3dCanvas`, `window.Classroom3DModule` y `_buttonAction`.
+  - `assets/css/mec-form.css` contiene `.mec-classroom-3d`, layout de dos columnas y altura estable `clamp(320px, 45vh, 520px)`.
+  - `sw.js` contiene `cialpa-app-v2.6.197`.
+- Playwright desktop:
+  - canvas 3D: `1030 x 405`.
+  - screenshot generado en memoria: `73204` bytes.
+  - `canvas.toDataURL`: `73630` caracteres.
+  - pixeles no blancos muestreados: `5`.
+  - boton `Plano` cambia a `aria-pressed=true`.
+  - sin solapamiento visor/KPIs.
+- Playwright movil:
+  - canvas 3D: `349 x 300`.
+  - screenshot generado en memoria: `44361` bytes.
+  - `canvas.toDataURL`: `36806` caracteres.
+  - pixeles no blancos muestreados: `5`.
+  - boton `Plano` cambia a `aria-pressed=true`.
+  - sin solapamiento visor/KPIs.
+- Publicacion:
+  - Commit funcional: `85762a5`.
+  - Push realizado a `origin/main`.
+  - GitHub Pages run `28056748761` finalizo con `success` para `85762a52bff4d7731cf5919cc01e21209fd1b390`.
+  - URL publica con cache-busting `https://censoescuelaspy.github.io/CIALPAappencuesta/index.html?v=3d-2-6-197-final` devuelve `200`, `v2.6.197`, `assets/js/app.js?v=2.6.197` y `assets/js/config.js?v=2.6.197`.
+  - JS/CSS publicos del visor devuelven `200` y contienen los marcadores esperados.
+  - `sw.js` publico devuelve `200` y contiene `cialpa-app-v2.6.197`.
+
+### Pruebas realizadas
+- Validacion estatica.
+- Verificacion local por HTTP.
+- Playwright con screenshots y lectura de pixeles de canvas WebGL en desktop y movil.
+- Verificacion publica por HTTP con cache-busting.
+
+### Errores o incidentes
+- Durante el commit aparecio un lock antiguo y vacio `.git/AUTO_MERGE.lock`; se verifico que estaba dentro de `.git` y se elimino para continuar.
+- La primera validacion Playwright detecto que los botones del visor no cambiaban de estado; se corrigio lectura de acciones desde `dataset` a `getAttribute('data-classroom-3d-action')`.
+
+### Soluciones aplicadas
+- Integracion incremental: visor 3D no persiste datos propios y no altera el croquis 2D ni la ficha.
+- Fallback operativo: si Three.js no carga, se muestra aviso y el formulario sigue disponible.
+- Layout estable: dimensiones definidas para el canvas, KPIs laterales y breakpoint movil.
+
+### Pendientes
+- Validar con usuario real dentro de una ficha con aulas cargadas y objetos reales.
+- Definir si en una segunda iteracion se agregan captura de mobiliario, rutas de evacuacion, exportacion PDF 3D o calculos de capacidad.
+
+### Riesgos
+- Three.js se carga desde CDN; si el dispositivo esta offline, el visor 3D no aparece, pero el croquis 2D sigue operativo.
+- El modelo 3D usa una altura estimada cuando la ficha no tiene altura registrada.
+- La visualizacion es preliminar y no debe tratarse como plano tecnico certificado.
