@@ -7840,3 +7840,82 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 - Reutilizar el patron `mapa interactivo Leaflet + salida impresa SVG` en futuras vistas ejecutivas donde se requiera PDF estable.
 - Mantener siempre visibles los KPIs `en mapa` y `sin marcador` en vistas territoriales.
 - Si se necesita cartografia impresa con limites departamentales oficiales, incorporar una capa GeoJSON simplificada y versionada.
+
+---
+
+## Ajuste Atlas Asuncion y tabla ampliada - 2026-06-23 14:15
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `main...origin/main`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.194`.
+
+### Objetivo de la intervencion
+- Corregir que `Asuncion` aparecia en cero en el Atlas departamental aunque los demas departamentos cargaban correctamente.
+- Ampliar el espacio de lectura de la lista de escuelas y mostrar mas campos de detalle por escuela.
+
+### Diagnostico inicial
+- El padron puede registrar Asuncion como `CAPITAL` o `Distrito Capital`, mientras el atlas comparaba departamentos contra `Asuncion`.
+- La lista de escuelas estaba en un panel lateral angosto, con pocos campos y alto limitado.
+
+### Acciones realizadas
+- `assets/js/department-atlas.js`: se agregaron alias departamentales para que `CAPITAL`, `Distrito Capital`, `Capital Asuncion` y `Ciudad de Asuncion` se agrupen como `Asuncion`.
+- `assets/js/department-atlas.js`: la tabla de escuelas ahora muestra codigo, escuela, distrito/localidad, zona, estado, coordenadas de mapa y asignacion.
+- `assets/js/department-atlas.js`: el limite visible de filas sube de `70` a `180`.
+- `assets/css/app.css`: el panel de detalles/lista pasa a una zona amplia debajo del mapa, con tabla mas alta y ancho minimo para campos.
+- `assets/js/config.js`, `index.html`, `sw.js`, `README.md`: version/cache actualizados a `2.6.194`.
+
+### Archivos modificados
+- `assets/js/department-atlas.js`
+- `assets/css/app.css`
+- `assets/js/config.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `BITACORA.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/department-atlas.js`
+- `node --check assets/js/app.js`
+- `node --check assets/js/config.js`
+- `node` por stdin con mock de padron `CAPITAL` / `Distrito Capital`.
+- `git diff --check -- index.html assets/css/app.css assets/js/department-atlas.js assets/js/config.js sw.js README.md`
+- `py -3 -m http.server 8038 --bind 127.0.0.1`
+- `Invoke-WebRequest` local a `index.html`, `assets/js/department-atlas.js` y `sw.js`.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta.
+- La prueba mock confirma que dos escuelas con `departamento: CAPITAL` / `Distrito Capital` suman en `Asuncion` con total `2`.
+- La tabla ampliada renderiza columnas de detalle y asignacion.
+- `git diff --check` sin errores; solo avisos LF/CRLF esperables.
+- Verificacion HTTP local:
+  - `index.html` contiene `v2.6.194`, `department-atlas.js?v=2.6.194`, `module-atlas` y `atlas-print-root`.
+  - `assets/js/department-atlas.js` contiene `Version: 2.6.194`, `DEPARTMENT_ALIASES`, `capital:`, `_schoolSurveyor` y `MAX_LIST_ROWS = 180`.
+  - `sw.js` contiene `cialpa-app-v2.6.194`.
+
+### Pruebas realizadas
+- Validacion estatica.
+- Prueba mock de alias `CAPITAL -> Asuncion`.
+- Verificacion local por HTTP.
+
+### Errores o incidentes
+- La primera ejecucion del mock fallo por quoting de PowerShell; se repitio como script enviado por stdin a Node y paso correctamente.
+
+### Soluciones aplicadas
+- Se normalizan alias de Asuncion antes de contar, seleccionar departamento, filtrar escuelas y mostrar el label.
+- La lista queda en un bloque ancho con scroll propio y mas columnas.
+
+### Pendientes
+- Publicar y verificar GitHub Pages con cache-busting despues del commit/push.
+- Validar visualmente con usuario real que Asuncion ya muestre el conteo esperado desde el cache/dispositivo del usuario.
+
+### Riesgos
+- Si existen otros alias no registrados para Asuncion en el backend, conviene agregarlos al mapa `DEPARTMENT_ALIASES`.
+
+### Recomendaciones
+- En futuros modulos territoriales, definir una tabla de alias geograficos desde el inicio para `Capital/Asuncion` y posibles variaciones con tildes o nombres administrativos.

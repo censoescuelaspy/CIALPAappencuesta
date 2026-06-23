@@ -1,14 +1,14 @@
 /**
  * CIALPA, Relevamiento Escolar
  * department-atlas.js, atlas departamental con mapa e impresion multipagina
- * Version: 2.6.193
+ * Version: 2.6.194
  */
 
 const DepartmentAtlasModule = (() => {
   'use strict';
 
   const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-  const MAX_LIST_ROWS = 70;
+  const MAX_LIST_ROWS = 180;
   const SVG_WIDTH = 760;
   const SVG_HEIGHT = 420;
   const SVG_PAD = 36;
@@ -42,6 +42,14 @@ const DepartmentAtlasModule = (() => {
     presidentehayes: [-23.7500, -58.9000],
     boqueron: [-21.6000, -60.9000],
     altoparaguay: [-20.8000, -59.9000],
+  };
+
+  const DEPARTMENT_ALIASES = {
+    asuncion: 'asuncion',
+    capital: 'asuncion',
+    distritocapital: 'asuncion',
+    capitalasuncion: 'asuncion',
+    ciudaddeasuncion: 'asuncion',
   };
 
   let _initialized = false;
@@ -262,18 +270,22 @@ const DepartmentAtlasModule = (() => {
       <div class="atlas-school-table">
         <table>
           <thead>
-            <tr><th>Escuela</th><th>Distrito</th><th>Estado</th><th>Mapa</th></tr>
+            <tr><th>Codigo</th><th>Escuela</th><th>Distrito / localidad</th><th>Zona</th><th>Estado</th><th>Mapa</th><th>Asignacion</th></tr>
           </thead>
           <tbody>
             ${visible.map(school => {
               const state = _schoolState(school);
               const meta = STATE_META[state] || STATE_META.pendiente;
+              const point = _point(school);
               return `
                 <tr>
-                  <td><strong>${_escape(_schoolName(school))}</strong><small>${_escape(_schoolCode(school))}</small></td>
-                  <td>${_escape(_schoolDistrict(school) || '-')}</td>
+                  <td>${_escape(_schoolCode(school) || '-')}</td>
+                  <td><strong>${_escape(_schoolName(school))}</strong></td>
+                  <td>${_escape(_schoolDistrict(school) || '-')}<small>${_escape(_schoolLocality(school) || '')}</small></td>
+                  <td>${_escape(_schoolZone(school) || '-')}</td>
                   <td><span class="atlas-state-pill" style="background:${meta.color}">${_escape(meta.label)}</span></td>
-                  <td>${_point(school) ? 'Si' : 'No'}</td>
+                  <td>${point ? `Si<small>${_round(point.lat, 5)}, ${_round(point.lng, 5)}</small>` : 'No'}</td>
+                  <td>${_escape(_schoolSurveyor(school) || 'Sin asignar')}</td>
                 </tr>`;
             }).join('')}
           </tbody>
@@ -341,7 +353,7 @@ const DepartmentAtlasModule = (() => {
             <h1>${_escape(department)}</h1>
           </div>
           <div>
-            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.193')}</strong>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.194')}</strong>
             <small>${_escape(_formatDateTime(new Date()))}</small>
           </div>
         </header>
@@ -483,7 +495,7 @@ const DepartmentAtlasModule = (() => {
       const state = _schoolState(school);
       if (metrics[state] !== undefined) metrics[state] += 1;
       if (_point(school)) metrics.withCoords += 1;
-      const district = _departmentKey(_schoolDistrict(school));
+      const district = _compactKey(_schoolDistrict(school));
       if (district) districts.add(district);
     });
     metrics.withoutCoords = Math.max(0, metrics.total - metrics.withCoords);
@@ -498,7 +510,7 @@ const DepartmentAtlasModule = (() => {
     const map = new Map();
     rows.forEach(row => {
       const label = String(getter(row) || 'Sin dato').trim() || 'Sin dato';
-      const key = _departmentKey(label) || label.toLowerCase();
+      const key = _compactKey(label) || label.toLowerCase();
       if (!map.has(key)) map.set(key, { label, count: 0 });
       map.get(key).count += 1;
     });
@@ -597,6 +609,22 @@ const DepartmentAtlasModule = (() => {
     return String(school?.zona || school?.area || '').trim();
   }
 
+  function _schoolLocality(school) {
+    return String(school?.localidad || school?.barrio || school?.compania || '').trim();
+  }
+
+  function _schoolSurveyor(school) {
+    try {
+      if (typeof Auth !== 'undefined' && typeof Auth.schoolAssignmentLabel === 'function') {
+        const label = Auth.schoolAssignmentLabel(school);
+        if (label) return String(label).trim();
+      }
+    } catch (_) {
+      // Optional helper only.
+    }
+    return String(school?.encuestador_asignado || school?.usuario_encuestador || school?.ultimo_borrador_mec_usuario || school?.usuario || '').trim();
+  }
+
   function _schoolName(school) {
     return String(school?.nombre || school?.nombre_institucion || school?.institucion || 'Escuela sin nombre').trim();
   }
@@ -674,7 +702,8 @@ const DepartmentAtlasModule = (() => {
   }
 
   function _departmentKey(value) {
-    return _normalize(value).replace(/[^a-z0-9]/g, '');
+    const key = _compactKey(value);
+    return DEPARTMENT_ALIASES[key] || key;
   }
 
   function _sameDepartment(a, b) {
@@ -685,6 +714,10 @@ const DepartmentAtlasModule = (() => {
     const text = String(value || '').trim();
     if (_sameDepartment(text, 'Asuncion')) return 'Asuncion';
     return text || 'Sin departamento';
+  }
+
+  function _compactKey(value) {
+    return _normalize(value).replace(/[^a-z0-9]/g, '');
   }
 
   function _normalize(value) {

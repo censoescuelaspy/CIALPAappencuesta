@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.193`.
+- Version vigente de esta intervencion: `2.6.194`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -20,6 +20,7 @@
 - Finalmente se solicito obtener todo lo necesario para poder agregar mapas de alta resolucion a la mayor cantidad posible de escuelas.
 - En la intervencion del 2026-06-23 se reporto diferencia entre la cantidad vista en el mapa y el KPI superior `Pendientes`.
 - Luego se solicito agregar una vista departamental con mapa de escuelas, Asuncion por defecto, botones para cambiar de departamento y salida imprimible/PDF con una pagina por departamento.
+- Luego se reporto que Asuncion no traia datos en el Atlas aunque los demas departamentos funcionaban, y se pidio mas espacio para lista y detalles de escuelas.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -50,6 +51,8 @@
 - Para `2.6.192`, se agrego cobertura de coordenadas al resumen territorial: `en mapa`, `sin marcador`, pendientes con coordenadas y pendientes sin coordenadas.
 - Para `2.6.193`, se agrego `Atlas departamental`: vista supervisor/admin con Asuncion por defecto, botones por departamento, KPIs departamentales, mapa Leaflet y salida de impresion/PDF con una pagina por departamento.
 - La decision tecnica de impresion fue usar SVG de puntos generado desde latitud/longitud para evitar fallas de tiles Leaflet o servicios externos durante la exportacion PDF.
+- Para `2.6.194`, el Atlas normaliza `CAPITAL`, `Distrito Capital`, `Capital Asuncion` y `Ciudad de Asuncion` como `Asuncion`.
+- En `2.6.194`, el panel de detalle/lista del Atlas pasa a una zona amplia debajo del mapa y la tabla suma columnas: codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
 
 ## Archivos principales tocados
 - `assets/js/mec-form.js`
@@ -96,3 +99,6 @@
 - Para `2.6.193`, `node --check assets/js/department-atlas.js`, `node --check assets/js/app.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
 - Se verifico localmente por HTTP que `index.html`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.193`.
 - Se publico `2.6.193` con commit funcional `88988a5`; GitHub Pages run `28038272162` reporto `success` y la URL publica `index.html` con cache-busting devuelve `v2.6.193`, `module-atlas`, `department-atlas.js?v=2.6.193` y `atlas-print-root`.
+- Para `2.6.194`, `node --check assets/js/department-atlas.js`, `node --check assets/js/config.js` y `git diff --check` pasan sin errores.
+- Se verifico con mock Node que escuelas con `departamento: CAPITAL` y `departamento: Distrito Capital` suman correctamente bajo `Asuncion`.
+- Se verifico localmente por HTTP que `index.html`, `assets/js/department-atlas.js` y `sw.js` sirven la version `2.6.194`.

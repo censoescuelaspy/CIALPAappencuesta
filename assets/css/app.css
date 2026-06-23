@@ -1108,15 +1108,16 @@ td {
 
 .atlas-workbench {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 380px);
+  grid-template-columns: minmax(0, 1fr);
   gap: .9rem;
   flex: 1;
   min-height: 0;
+  overflow: auto;
 }
 
 .atlas-main {
   display: grid;
-  grid-template-rows: auto minmax(420px, 1fr);
+  grid-template-rows: auto minmax(430px, 52vh);
   gap: .8rem;
   min-width: 0;
   min-height: 0;
@@ -1185,11 +1186,12 @@ td {
 }
 
 .atlas-detail-panel {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(260px, .85fr) minmax(260px, .75fr) minmax(0, 2.4fr);
+  align-items: start;
   min-height: 0;
-  flex-direction: column;
   gap: .75rem;
-  overflow: hidden;
+  overflow: visible;
   padding: .85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -1199,6 +1201,7 @@ td {
 
 .atlas-detail-header {
   display: grid;
+  grid-column: 1;
   gap: .25rem;
   padding-bottom: .65rem;
   border-bottom: 1px solid var(--color-border);
@@ -1229,6 +1232,19 @@ td {
 .atlas-district-list {
   display: grid;
   gap: .46rem;
+}
+
+.atlas-status-bars {
+  grid-column: 1;
+}
+
+.atlas-district-list {
+  grid-column: 2;
+}
+
+.atlas-school-list {
+  grid-column: 3;
+  grid-row: 1 / span 3;
 }
 
 .atlas-district-list h4,
@@ -1270,11 +1286,11 @@ td {
 
 .atlas-school-list {
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .atlas-school-table {
-  max-height: 320px;
+  max-height: min(58vh, 620px);
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -1282,6 +1298,7 @@ td {
 
 .atlas-school-table table {
   width: 100%;
+  min-width: 1040px;
   border-collapse: collapse;
   font-size: .76rem;
 }
@@ -1306,11 +1323,10 @@ td {
 
 .atlas-school-table strong {
   display: block;
-  max-width: 190px;
-  overflow: hidden;
+  max-width: none;
+  overflow: visible;
   color: var(--color-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .atlas-school-table small {
@@ -4240,7 +4256,16 @@ td {
   }
 
   .atlas-detail-panel {
+    grid-template-columns: 1fr;
     max-height: none;
+  }
+
+  .atlas-detail-header,
+  .atlas-status-bars,
+  .atlas-district-list,
+  .atlas-school-list {
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .atlas-kpi-grid {
