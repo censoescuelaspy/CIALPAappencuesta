@@ -3674,6 +3674,7 @@ const MecFormModule = (() => {
     _bindSanitarySketch(root);
     _refreshDynamicState();
     renderSchoolPlan();
+    _refreshClassroom3D();
   }
 
   function _readSavedMeta() {
@@ -4082,6 +4083,7 @@ const MecFormModule = (() => {
               <canvas id="mec-classroom-canvas" width="${SKETCH_CANVAS.width}" height="${SKETCH_CANVAS.height}" style="width:${Math.round(SKETCH_CANVAS.width * _sketchZoom)}px;height:${Math.round(SKETCH_CANVAS.height * _sketchZoom)}px;" aria-label="Croquis manual del ambiente"></canvas>
             </div>
             ${_renderSketchSelectionPanel()}
+            ${_renderClassroom3DPanel(sketch)}
             <div class="mec-sketch-toolset" aria-label="Elementos para insertar en el croquis">
               ${SKETCH_TOOLS.map(tool => `
                 <button class="mec-sketch-tool ${_sketchTool === tool.id ? 'mec-sketch-tool--active' : ''}"
@@ -4095,6 +4097,36 @@ const MecFormModule = (() => {
             ${_renderSiteElementToolset('aula')}
             <small id="mec-sketch-status">${_escape(_sketchStatusText(sketch))}</small>
           </div>
+        </div>
+      </section>`;
+  }
+
+  function _renderClassroom3DPanel(sketch = _data.__classroomSketch || {}) {
+    const roomLabel = _classroomHierarchyLabel(sketch) || _roomDisplayLabel(sketch, 'Ambiente activo');
+    const dims = sketch.length && sketch.width ? `${sketch.length} x ${sketch.width} m` : 'Complete largo y ancho';
+    return `
+      <section class="mec-classroom-3d" data-classroom-3d aria-label="Vista 3D preliminar del aula">
+        <div class="mec-classroom-3d__header">
+          <div class="mec-classroom-3d__title">
+            <span>Ensayo 3D del ambiente</span>
+            <strong>${_escape(roomLabel)}</strong>
+            <small>${_escape(dims)} - visor de revision, no modifica la ficha</small>
+          </div>
+          <div class="mec-classroom-3d__actions" aria-label="Controles del visor 3D">
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="perspective">3D</button>
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="top">Plano</button>
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="rotate-left">Girar izq.</button>
+            <button class="btn btn-outline btn-sm" type="button" data-classroom-3d-action="rotate-right">Girar der.</button>
+            <button class="btn btn-primary btn-sm" type="button" data-classroom-3d-action="refresh">Actualizar 3D</button>
+          </div>
+        </div>
+        <div class="mec-classroom-3d__body">
+          <div class="mec-classroom-3d__viewport" data-classroom-3d-viewport>
+            <div class="mec-classroom-3d__empty">Cargando vista 3D del aula activa...</div>
+          </div>
+          <aside class="mec-classroom-3d__stats" data-classroom-3d-stats>
+            <span>Sin modelo 3D activo.</span>
+          </aside>
         </div>
       </section>`;
   }
@@ -4670,6 +4702,88 @@ const MecFormModule = (() => {
     parts.push(`${objects.filter(object => object.type === 'fan').length} vent.`);
     parts.push(`${objects.filter(object => object.type === 'ac').length} AA`);
     return parts.join(' · ');
+  }
+
+  function getActiveClassroom3DModel() {
+    if (_data.__classroomSketch && _data.__classrooms && (_activeClassroomId || _data.__classroomSketch.id)) {
+      _syncActiveClassroomFromSketch();
+    }
+    const room = _activeClassroomRecord() || _data.__classroomSketch || null;
+    if (!room?.id) return null;
+    const roomObject = _roomObjectForClassroom(room);
+    const roomRect = roomObject ? _sketchObjectBounds(roomObject) : _sketchBlockRect();
+    const length = _classroom3DMeasure(room.length, 7);
+    const width = _classroom3DMeasure(room.width, 5);
+    const height = _classroom3DMeasure(room.altura_m || room.altura || room.ceilingHeight || room.height, 3.2);
+    const objects = (room.objects || [])
+      .filter(object => object && !['room', 'sanitary-room'].includes(object.type))
+      .map(object => _classroom3DObject(object, roomRect, { length, width }))
+      .filter(Boolean);
+    const count = type => objects.filter(object => object.type === type).length;
+    const issues = [];
+    if (!Number(room.length) || !Number(room.width)) issues.push('Completar largo y ancho del ambiente.');
+    if (!count('door')) issues.push('Registrar al menos una puerta.');
+    if (!count('window')) issues.push('Registrar ventanas o justificar ausencia.');
+    if (!count('light')) issues.push('Registrar iluminacion.');
+    if (!count('outlet')) issues.push('Registrar tomas electricas.');
+    return {
+      version: '3d-preview-v1',
+      school: _schoolSnapshot(_data.__selectedSchool || _selectedSchoolFromContext() || {}),
+      block: _blockById(room.blockId) || _activeClassroomBlock() || null,
+      floor: room.floor || _activeFloor(),
+      room: {
+        id: room.id,
+        name: room.name || '',
+        label: _classroomHierarchyLabel(room) || _roomDisplayLabel(room, 'Ambiente'),
+        kind: _roomSpaceKind(room),
+        kindLabel: _roomSpaceLabel(room),
+        status: room.estado || '',
+        locked: _isClassroomLocked(room),
+      },
+      dimensions: {
+        length,
+        width,
+        height,
+        area: length * width,
+      },
+      objects,
+      metrics: {
+        doors: count('door'),
+        windows: count('window'),
+        outlets: count('outlet'),
+        lights: count('light'),
+        fans: count('fan'),
+        ac: count('ac'),
+        damages: count('damage'),
+        totalObjects: objects.length,
+        issues,
+      },
+    };
+  }
+
+  function _classroom3DMeasure(value, fallback) {
+    const number = Number(String(value ?? '').replace(',', '.'));
+    return Number.isFinite(number) && number > 0 ? number : fallback;
+  }
+
+  function _classroom3DObject(object, roomRect, dimensions) {
+    const box = _sketchObjectBounds(object);
+    if (!box || !roomRect?.w || !roomRect?.h) return null;
+    const center = _sketchObjectCenter(object);
+    const relX = (center.x - (roomRect.x + roomRect.w / 2)) / roomRect.w;
+    const relZ = (center.y - (roomRect.y + roomRect.h / 2)) / roomRect.h;
+    return {
+      id: object.id || `${object.type}_${Math.round(center.x)}_${Math.round(center.y)}`,
+      type: object.type || 'item',
+      label: _sketchObjectLabel(object),
+      state: object.ficha?.estado || object.ficha?.subtipo || '',
+      x: relX * dimensions.length,
+      z: relZ * dimensions.width,
+      w: Math.max(.18, (box.w / roomRect.w) * dimensions.length),
+      d: Math.max(.18, (box.h / roomRect.h) * dimensions.width),
+      rotationDeg: _sketchObjectRotationDeg(object),
+      attached: object.attached || null,
+    };
   }
 
   function _buildRoomObjectFromDimensions(length, width, id = null, rect = null) {
@@ -12657,6 +12771,7 @@ const MecFormModule = (() => {
     _applySketchZoom();
     if (canvas) _drawSketch(canvas.getContext('2d'), canvas);
     _centerSketchOnActiveRoom();
+    _refreshClassroom3D();
   }
 
   function _touchDistance(event) {
@@ -25673,6 +25788,18 @@ const MecFormModule = (() => {
     selectModule(moduleId);
   }
 
+  function _refreshClassroom3D() {
+    const module = window.Classroom3DModule;
+    if (!module || typeof module.mount !== 'function') return;
+    const root = document.querySelector('[data-classroom-3d]');
+    if (!root) return;
+    try {
+      module.mount(root, getActiveClassroom3DModel());
+    } catch (err) {
+      console.warn('No se pudo actualizar la vista 3D del aula:', err);
+    }
+  }
+
   return {
     init,
     showFieldInfo,
@@ -25685,6 +25812,7 @@ const MecFormModule = (() => {
     setSelectedSchool,
     getSelectedSchool,
     getActiveModule,
+    getActiveClassroom3DModel,
     clearActiveSchoolContext,
     resetDraft,
     updateGuidedSchoolIdentity,

@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.180
+ * Version: 2.6.197
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -1591,6 +1591,8 @@ const AppController = (() => {
     try {
       await _loadStyleOnce('assets/css/mec-form.css');
       await _loadScriptOnce('assets/js/mec-schema.js');
+      await _loadOptionalScriptOnce('https://unpkg.com/three@0.160.0/build/three.min.js', 'Three.js');
+      await _loadScriptOnce('assets/js/classroom-3d.js');
       await _loadScriptOnce('assets/js/mec-form.js');
       _syncSelectedSchoolToMec();
       if (id === 'registro') {
@@ -1617,6 +1619,13 @@ const AppController = (() => {
     });
     _lazyAssetPromises.set(key, promise);
     return promise;
+  }
+
+  function _loadOptionalScriptOnce(src, label = src) {
+    return _loadScriptOnce(src).catch(err => {
+      console.warn(`No se pudo cargar ${label}:`, err);
+      return null;
+    });
   }
 
   function _loadStyleOnce(href) {
