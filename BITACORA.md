@@ -8746,3 +8746,50 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Riesgos
 - Mientras la app opere contra `AKfycbzr...`, el backend publico sigue siendo el estable anterior; el saneamiento territorial queda resuelto de forma visible por frontend, pero no en el JSON bruto del endpoint estable.
 - Un redeploy apresurado del backend principal desde la cuenta incorrecta puede volver a dejar el Web App en `403`.
+
+---
+
+## Desbloqueo de GitHub Pages legacy - 2026-07-02
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.203`.
+
+### Objetivo de la intervencion
+- Destrabar la publicacion de GitHub Pages para que la URL publica tome el hotfix `2.6.203`.
+
+### Diagnostico inicial
+- `main` ya contenia `bf5dd5c fix: volver al backend estable publicado`.
+- La URL publica seguia sirviendo `v2.6.202`.
+- `gh api repos/censoescuelaspy/CIALPAappencuesta/pages/builds/latest` devolvio `status:"errored"` para el commit `9d20844`.
+- Las corridas `pages-build-deployment` quedaban en cola o canceladas del lado GitHub Pages.
+
+### Acciones realizadas
+- Se inspeccionaron corridas con `gh run list`, `gh run view` y `gh api repos/.../pages/builds/latest`.
+- Se cancelo la corrida colgada `28591220957`.
+- Se genero el commit vacio `9d20844 chore: retrigger pages deploy`.
+- Se agrego el archivo raiz `.nojekyll` para forzar publicacion estatica pura, sin procesamiento Jekyll sobre la app ni sobre los `.md` operativos del repositorio.
+
+### Archivos modificados
+- `.nojekyll`
+- `BITACORA.md`
+
+### Resultados verificados
+- Antes del ajuste, la URL publica seguia mostrando `v2.6.202`.
+- El backend estable `AKfycbzr...` sigue respondiendo `200`.
+- GitHub Pages quedo re-disparado con el ajuste `.nojekyll`.
+
+### Pendientes
+- Confirmar que GitHub Pages publique finalmente `v2.6.203` y el `GAS_URL` estable.
+
+### Riesgos
+- GitHub Pages puede tardar algunos minutos en propagar incluso con el ajuste correcto.
+
+### Recomendaciones
+- Mantener `.nojekyll` en la raiz mientras esta app siga siendo frontend estatico puro.
+- Migrar definitivamente GitHub Pages de `legacy` a `workflow` para evitar nuevas colas o fallas opacas del builder historico.
