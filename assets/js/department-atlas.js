@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * department-atlas.js, atlas departamental con mapa e impresion multipagina
- * Version: 2.6.203
+ * Version: 2.6.204
  */
 
 const DepartmentAtlasModule = (() => {
@@ -15,6 +15,11 @@ const DepartmentAtlasModule = (() => {
   const SVG_PAD = 36;
   const VIEW_MODE_OVERVIEW = 'overview';
   const VIEW_MODE_DEPARTMENT = 'department';
+  const VIEW_MODE_CHOROPLETH = 'choropleth';
+  const CHORO_COLORS = ['#edf4ff', '#cfe0f6', '#a9c4ea', '#6fa0d6', '#396fae', '#173d69'];
+  const CHORO_STROKE = '#ffffff';
+  const CHORO_LABEL_COLOR = '#172033';
+  const BOUNDARY_GEOJSON_URL = 'assets/data/paraguay-adm1-simplified.geojson';
 
   const STATE_META = {
     pendiente: { label: 'Pendiente', color: '#b7791f', tone: 'warning' },
@@ -64,6 +69,8 @@ const DepartmentAtlasModule = (() => {
   let _lastLoadLabel = '';
   let _map = null;
   let _layer = null;
+  let _boundaryGeoJson = null;
+  let _boundaryGeoJsonPromise = null;
   let _loadSequence = 0;
   let _tableSort = { key: 'name', dir: 'asc' };
 
@@ -124,20 +131,38 @@ const DepartmentAtlasModule = (() => {
   }
 
   function setViewMode(mode) {
-    _viewMode = mode === VIEW_MODE_DEPARTMENT ? VIEW_MODE_DEPARTMENT : VIEW_MODE_OVERVIEW;
+    if (mode === VIEW_MODE_DEPARTMENT) {
+      _viewMode = VIEW_MODE_DEPARTMENT;
+    } else if (mode === VIEW_MODE_CHOROPLETH) {
+      _viewMode = VIEW_MODE_CHOROPLETH;
+    } else {
+      _viewMode = VIEW_MODE_OVERVIEW;
+    }
     _renderAll();
   }
 
-  function printPdf() {
+  async function printPdf() {
     if (!_schools.length) {
       UI.showToast('El atlas todavia no tiene padron cargado para imprimir.', 'warning', 6000);
       return;
     }
+    if (_viewMode === VIEW_MODE_CHOROPLETH && !_boundaryGeoJson) {
+      try {
+        await _ensureBoundaryGeoJson();
+      } catch (err) {
+        UI.showToast('No se pudo preparar el mapa nacional para imprimir: ' + err.message, 'error', 7000);
+        return;
+      }
+    }
     const root = document.getElementById('atlas-print-root');
     if (!root) return;
-    root.innerHTML = [_printOverviewPage()]
-      .concat(_departments.map(department => _printPage(department.label)))
-      .join('');
+    if (_viewMode === VIEW_MODE_CHOROPLETH) {
+      root.innerHTML = _printChoroplethPage();
+    } else {
+      root.innerHTML = [_printOverviewPage()]
+        .concat(_departments.map(department => _printPage(department.label)))
+        .join('');
+    }
     root.setAttribute('aria-hidden', 'false');
     document.body.classList.add('atlas-printing');
     setTimeout(() => window.print(), 120);
@@ -166,6 +191,12 @@ const DepartmentAtlasModule = (() => {
       printBtn.addEventListener('click', printPdf);
     }
 
+    const copyBtn = document.getElementById('atlas-copy-btn');
+    if (copyBtn && copyBtn.dataset.bound !== 'true') {
+      copyBtn.dataset.bound = 'true';
+      copyBtn.addEventListener('click', copyCurrentImage);
+    }
+
     const buttons = document.getElementById('atlas-department-buttons');
     if (buttons && buttons.dataset.bound !== 'true') {
       buttons.dataset.bound = 'true';
@@ -190,6 +221,16 @@ const DepartmentAtlasModule = (() => {
       });
     }
 
+    const mapEl = document.getElementById('atlas-map');
+    if (mapEl && mapEl.dataset.bound !== 'true') {
+      mapEl.dataset.bound = 'true';
+      mapEl.addEventListener('click', event => {
+        const target = event.target.closest('[data-atlas-open-department]');
+        if (!target) return;
+        selectDepartment(target.dataset.atlasOpenDepartment);
+      });
+    }
+
     if (!_printListenerBound) {
       _printListenerBound = true;
       window.addEventListener('afterprint', _clearPrintMode);
@@ -199,6 +240,17 @@ const DepartmentAtlasModule = (() => {
   function _renderAll() {
     _renderModeToggle();
     _renderDepartmentButtons();
+    _updateActionButtons();
+    if (_viewMode === VIEW_MODE_CHOROPLETH) {
+      const rows = _schools || [];
+      const metrics = _metrics(rows);
+      const summaries = _departmentSummaries(rows);
+      _renderKpis(metrics, { mode: VIEW_MODE_CHOROPLETH, departmentCount: summaries.length });
+      _renderChoroplethDetail(summaries, metrics);
+      _renderChoroplethMap(summaries);
+      _setStatus(`${_lastLoadLabel || 'Padron cargado'}: ${_formatNumber(metrics.total)} escuelas en ${_formatNumber(summaries.length)} departamentos para el mapa nacional.`);
+      return;
+    }
     if (_viewMode === VIEW_MODE_OVERVIEW) {
       const rows = _schools || [];
       const metrics = _metrics(rows);
@@ -222,6 +274,7 @@ const DepartmentAtlasModule = (() => {
     if (!container) return;
     const buttons = [
       { mode: VIEW_MODE_OVERVIEW, label: 'Resumen nacional', note: 'Totales por departamento' },
+      { mode: VIEW_MODE_CHOROPLETH, label: 'Mapa nacional', note: 'Poligonos por departamento' },
       { mode: VIEW_MODE_DEPARTMENT, label: 'Por departamento', note: _selectedDepartment || 'Detalle territorial' },
     ];
     container.innerHTML = buttons.map(item => `
@@ -256,8 +309,10 @@ const DepartmentAtlasModule = (() => {
 
   function _renderKpis(metrics, options = {}) {
     const mode = options.mode || VIEW_MODE_DEPARTMENT;
-    const scopeLabel = mode === VIEW_MODE_OVERVIEW ? 'Registros de todos los departamentos' : 'Registros del departamento';
-    const districtLabel = mode === VIEW_MODE_OVERVIEW
+    const scopeLabel = mode === VIEW_MODE_OVERVIEW
+      ? 'Registros de todos los departamentos'
+      : (mode === VIEW_MODE_CHOROPLETH ? 'Padron oficial para mapa nacional' : 'Registros del departamento');
+    const districtLabel = (mode === VIEW_MODE_OVERVIEW || mode === VIEW_MODE_CHOROPLETH)
       ? `${_formatNumber(options.departmentCount || 0)} departamentos con padron`
       : 'Cobertura territorial';
     const grid = document.getElementById('atlas-kpi-grid');
@@ -270,7 +325,7 @@ const DepartmentAtlasModule = (() => {
       _kpi('En mapa', metrics.withCoords, `${_formatPercent(metrics.geoPct)} georreferenciado`, 'map'),
       _kpi('Sin marcador', metrics.withoutCoords, 'Requiere coordenadas validas', metrics.withoutCoords ? 'danger' : 'success'),
       _kpi('Incidencias', metrics.incidencia, 'Casos para seguimiento', metrics.incidencia ? 'danger' : 'muted'),
-      _kpi(mode === VIEW_MODE_OVERVIEW ? 'Departamentos' : 'Distritos', mode === VIEW_MODE_OVERVIEW ? (options.departmentCount || 0) : metrics.districtCount, districtLabel, 'muted'),
+      _kpi((mode === VIEW_MODE_OVERVIEW || mode === VIEW_MODE_CHOROPLETH) ? 'Departamentos' : 'Distritos', (mode === VIEW_MODE_OVERVIEW || mode === VIEW_MODE_CHOROPLETH) ? (options.departmentCount || 0) : metrics.districtCount, districtLabel, 'muted'),
     ].join('');
   }
 
@@ -294,6 +349,35 @@ const DepartmentAtlasModule = (() => {
     _renderStatusBars(metrics);
     _renderOverviewDepartments(summaries);
     _renderOverviewTable(summaries);
+  }
+
+  function _renderChoroplethDetail(summaries, metrics) {
+    _setText('atlas-detail-title', 'Mapa nacional por departamento');
+    _setText(
+      'atlas-detail-summary',
+      `${_formatNumber(metrics.total)} escuelas oficiales distribuidas en ${_formatNumber(summaries.length)} departamentos. El color del poligono refleja la carga total por departamento.`
+    );
+    _renderStatusBars(metrics);
+    _renderOverviewDepartments(summaries);
+    _renderOverviewTable(summaries);
+  }
+
+  function _updateActionButtons() {
+    const printBtn = document.getElementById('atlas-print-btn');
+    if (printBtn) {
+      printBtn.textContent = _viewMode === VIEW_MODE_CHOROPLETH ? 'Imprimir mapa nacional' : 'Imprimir atlas PDF';
+      printBtn.setAttribute('aria-pressed', 'false');
+    }
+    const copyBtn = document.getElementById('atlas-copy-btn');
+    if (copyBtn) {
+      const enabled = _viewMode === VIEW_MODE_CHOROPLETH;
+      copyBtn.disabled = !enabled;
+      copyBtn.title = enabled
+        ? 'Copiar el mapa nacional coloreado al portapapeles'
+        : 'Disponible en la vista Mapa nacional';
+      copyBtn.classList.toggle('btn-primary', enabled);
+      copyBtn.classList.toggle('btn-outline', !enabled);
+    }
   }
 
   function _renderStatusBars(metrics) {
@@ -507,6 +591,11 @@ const DepartmentAtlasModule = (() => {
   function _renderMap(rows, options = {}) {
     const mapEl = document.getElementById('atlas-map');
     if (!mapEl || !window.L) return;
+    if (mapEl.dataset.renderer !== 'leaflet') {
+      _destroyLeafletMap();
+      mapEl.innerHTML = '';
+      mapEl.dataset.renderer = 'leaflet';
+    }
     if (!_map) {
       _map = L.map(mapEl, {
         zoomControl: true,
@@ -582,6 +671,86 @@ const DepartmentAtlasModule = (() => {
     });
   }
 
+  function _renderChoroplethMap(summaries) {
+    const mapEl = document.getElementById('atlas-map');
+    if (!mapEl) return;
+    _destroyLeafletMap();
+    mapEl.dataset.renderer = 'choropleth';
+    if (!_boundaryGeoJson) {
+      mapEl.innerHTML = '<div class="map-fallback"><h3>Preparando mapa nacional...</h3><p>Cargando poligonos departamentales para la vista coropletica.</p></div>';
+      _ensureBoundaryGeoJson()
+        .then(() => {
+          if (_viewMode === VIEW_MODE_CHOROPLETH) _renderChoroplethMap(summaries);
+        })
+        .catch(err => {
+          mapEl.innerHTML = `<div class="map-fallback"><h3>Mapa no disponible</h3><p>${_escape(err.message || 'No se pudo cargar la capa departamental.')}</p></div>`;
+        });
+      return;
+    }
+    mapEl.innerHTML = _choroplethFigureHtml(summaries, { interactive: true });
+  }
+
+  function _choroplethFigureHtml(summaries, options = {}) {
+    const features = Array.isArray(_boundaryGeoJson?.features) ? _boundaryGeoJson.features : [];
+    if (!features.length) {
+      return '<div class="map-fallback"><h3>Mapa no disponible</h3><p>La capa departamental no contiene poligonos utilizables.</p></div>';
+    }
+    const lookup = new Map((summaries || []).map(item => [_departmentKey(item.label), item]));
+    const bounds = _geoJsonBounds(features);
+    const projector = _projectPointFactory(bounds, SVG_WIDTH, SVG_HEIGHT, SVG_PAD);
+    const scale = _buildChoroplethScale(summaries || []);
+    const polygons = [];
+    const labels = [];
+
+    features.forEach(feature => {
+      const rawName = feature?.properties?.shapeName || feature?.properties?.name || feature?.properties?.NAME_1 || '';
+      const label = _displayDepartment(rawName);
+      const key = _departmentKey(label);
+      const summary = lookup.get(key) || { label, metrics: _metrics([]) };
+      const total = Number(summary?.metrics?.total || 0);
+      const color = scale.colorFor(total);
+      const path = _geoJsonPath(feature?.geometry, projector);
+      if (!path) return;
+      polygons.push(`
+        <path
+          d="${path}"
+          class="atlas-choropleth-path${options.interactive ? ' atlas-choropleth-path--interactive' : ''}"
+          fill="${color}"
+          stroke="${CHORO_STROKE}"
+          stroke-width="1.4"
+          data-atlas-open-department="${_escapeAttr(label)}">
+          <title>${_escape(label)}: ${_formatNumber(total)} escuelas</title>
+        </path>`);
+      const centroid = _featureCentroid(feature, projector);
+      if (!centroid) return;
+      const shortLabel = _choroplethShortLabel(label);
+      labels.push(`
+        <g class="atlas-choropleth-label" pointer-events="none">
+          <text x="${_round(centroid.x, 1)}" y="${_round(centroid.y - 4, 1)}">${_escape(shortLabel)}</text>
+          <text x="${_round(centroid.x, 1)}" y="${_round(centroid.y + 10, 1)}">${_escape(_formatNumber(total))}</text>
+        </g>`);
+    });
+
+    return `
+      <div class="atlas-choropleth-card">
+        <div class="atlas-choropleth-toolbar">
+          <div>
+            <strong>Paraguay - carga por departamento</strong>
+            <span>${_escape(_lastLoadLabel || 'Padron cargado')}</span>
+          </div>
+          <small>${_escape(scale.caption)}</small>
+        </div>
+        <svg class="atlas-choropleth-svg" viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" role="img" aria-label="Mapa nacional por departamento">
+          <rect x="0" y="0" width="${SVG_WIDTH}" height="${SVG_HEIGHT}" rx="12" fill="#f8fafc"></rect>
+          ${polygons.join('')}
+          ${labels.join('')}
+        </svg>
+        <div class="atlas-choropleth-legend">
+          ${scale.legend.map(item => `<span><i style="background:${item.color}"></i>${_escape(item.label)}</span>`).join('')}
+        </div>
+      </div>`;
+  }
+
   function _printOverviewPage() {
     const summaries = _departmentSummaries(_schools || []);
     const metrics = _metrics(_schools || []);
@@ -621,6 +790,49 @@ const DepartmentAtlasModule = (() => {
 
         <footer class="atlas-print-footer">
           Fuente: padron operativo CIALPA disponible en la app. Los totales se agrupan por departamento y los puntos usan centroide aproximado de cobertura.
+        </footer>
+      </section>`;
+  }
+
+  function _printChoroplethPage() {
+    const summaries = _departmentSummaries(_schools || []);
+    const metrics = _metrics(_schools || []);
+    return `
+      <section class="atlas-print-page">
+        <header class="atlas-print-header">
+          <div>
+            <span>CIALPA - Atlas departamental</span>
+            <h1>Mapa nacional por departamento</h1>
+          </div>
+          <div>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.204')}</strong>
+            <small>${_escape(_formatDateTime(new Date()))}</small>
+          </div>
+        </header>
+
+        <div class="atlas-print-kpis">
+          ${_printKpi('Total', metrics.total)}
+          ${_printKpi('Departamentos', summaries.length)}
+          ${_printKpi('Pendientes', metrics.pendiente)}
+          ${_printKpi('Relevadas', metrics.finalizada)}
+          ${_printKpi('En curso', metrics.en_curso)}
+          ${_printKpi('En mapa', metrics.withCoords)}
+          ${_printKpi('Sin marcador', metrics.withoutCoords)}
+          ${_printKpi('Incidencias', metrics.incidencia)}
+        </div>
+
+        <div class="atlas-print-grid">
+          ${_renderPrintChoroplethMap(summaries)}
+          <aside class="atlas-print-side">
+            <h2>Totales por departamento</h2>
+            ${_printDepartmentRows(summaries)}
+            <h2>Lectura GIS</h2>
+            <p>Vista nacional coropletica por departamento. Cada poligono refleja la cantidad total de escuelas del padron oficial visible en la app.</p>
+          </aside>
+        </div>
+
+        <footer class="atlas-print-footer">
+          Fuente: padron oficial CIALPA/MEC cargado en la app y limites ADM1 simplificados de geoBoundaries.
         </footer>
       </section>`;
   }
@@ -728,6 +940,20 @@ const DepartmentAtlasModule = (() => {
           ${circles}
         </svg>
         <div class="atlas-print-legend">${_legendHtml()}</div>
+      </div>`;
+  }
+
+  function _renderPrintChoroplethMap(summaries) {
+    if (!_boundaryGeoJson?.features?.length) {
+      return `
+        <div class="atlas-print-map atlas-print-map--empty">
+          <strong>Mapa nacional</strong>
+          <span>Sin poligonos departamentales disponibles para imprimir.</span>
+        </div>`;
+    }
+    return `
+      <div class="atlas-print-map">
+        ${_choroplethFigureHtml(summaries, { interactive: false })}
       </div>`;
   }
 
@@ -892,6 +1118,228 @@ const DepartmentAtlasModule = (() => {
       ...xs.map(x => `<line x1="${_round(x)}" y1="${SVG_PAD}" x2="${_round(x)}" y2="${SVG_HEIGHT - SVG_PAD}" stroke="#e2e8f0" stroke-width="1" />`),
       ...ys.map(y => `<line x1="${SVG_PAD}" y1="${_round(y)}" x2="${SVG_WIDTH - SVG_PAD}" y2="${_round(y)}" stroke="#e2e8f0" stroke-width="1" />`),
     ].join('');
+  }
+
+  async function copyCurrentImage() {
+    if (_viewMode !== VIEW_MODE_CHOROPLETH) {
+      UI.showToast('Cambie a la vista Mapa nacional para copiar la imagen del coropletico.', 'info', 5000);
+      return;
+    }
+    const svg = document.querySelector('#atlas-map .atlas-choropleth-svg');
+    if (!svg) {
+      UI.showToast('El mapa nacional todavia no esta listo para copiar.', 'warning', 5000);
+      return;
+    }
+    try {
+      const blob = await _svgToPngBlob(svg);
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+        UI.showToast('Mapa nacional copiado al portapapeles.', 'success', 4000);
+        return;
+      }
+      _downloadBlob(blob, `atlas_nacional_cialpa_${Date.now()}.png`);
+      UI.showToast('El navegador no permite copiar imagenes; se descargo un PNG.', 'info', 5000);
+    } catch (err) {
+      UI.showToast('No se pudo copiar el mapa: ' + err.message, 'error', 7000);
+    }
+  }
+
+  function _destroyLeafletMap() {
+    if (_map) {
+      _map.remove();
+      _map = null;
+      _layer = null;
+    }
+  }
+
+  function _ensureBoundaryGeoJson() {
+    if (_boundaryGeoJson) return Promise.resolve(_boundaryGeoJson);
+    if (_boundaryGeoJsonPromise) return _boundaryGeoJsonPromise;
+    _boundaryGeoJsonPromise = fetch(`${BOUNDARY_GEOJSON_URL}?v=${encodeURIComponent(APP_CONFIG.VERSION || '2.6.204')}`, { cache: 'no-store' })
+      .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
+      })
+      .then(data => {
+        if (!Array.isArray(data?.features) || !data.features.length) {
+          throw new Error('El GeoJSON ADM1 no contiene features.');
+        }
+        _boundaryGeoJson = data;
+        return data;
+      })
+      .finally(() => {
+        _boundaryGeoJsonPromise = null;
+      });
+    return _boundaryGeoJsonPromise;
+  }
+
+  function _buildChoroplethScale(summaries) {
+    const values = (summaries || [])
+      .map(item => Number(item?.metrics?.total || 0))
+      .filter(value => Number.isFinite(value) && value >= 0)
+      .sort((a, b) => a - b);
+    if (!values.length) {
+      return {
+        colorFor: () => CHORO_COLORS[0],
+        caption: 'Sin datos',
+        legend: [{ color: CHORO_COLORS[0], label: '0' }],
+      };
+    }
+    const thresholds = [];
+    for (let i = 1; i < CHORO_COLORS.length; i++) {
+      const idx = Math.min(values.length - 1, Math.floor((values.length * i) / CHORO_COLORS.length));
+      thresholds.push(values[idx]);
+    }
+    const legend = [];
+    let lower = values[0];
+    thresholds.forEach((upper, idx) => {
+      legend.push({
+        color: CHORO_COLORS[idx],
+        label: idx === 0 ? `<= ${_formatNumber(upper)}` : `${_formatNumber(lower)} - ${_formatNumber(upper)}`,
+      });
+      lower = upper + 1;
+    });
+    legend.push({
+      color: CHORO_COLORS[CHORO_COLORS.length - 1],
+      label: `>= ${_formatNumber(lower)}`,
+    });
+    return {
+      colorFor(value) {
+        const total = Number(value || 0);
+        let bucket = thresholds.findIndex(limit => total <= limit);
+        if (bucket === -1) bucket = CHORO_COLORS.length - 1;
+        return CHORO_COLORS[bucket];
+      },
+      caption: `Escala por cantidad total de escuelas (${_formatNumber(values[0])} a ${_formatNumber(values[values.length - 1])})`,
+      legend,
+    };
+  }
+
+  function _geoJsonBounds(features) {
+    const stats = { minLng: Infinity, minLat: Infinity, maxLng: -Infinity, maxLat: -Infinity };
+    (features || []).forEach(feature => _visitCoordinates(feature?.geometry?.coordinates, point => {
+      const lng = Number(point[0]);
+      const lat = Number(point[1]);
+      if (!Number.isFinite(lng) || !Number.isFinite(lat)) return;
+      stats.minLng = Math.min(stats.minLng, lng);
+      stats.maxLng = Math.max(stats.maxLng, lng);
+      stats.minLat = Math.min(stats.minLat, lat);
+      stats.maxLat = Math.max(stats.maxLat, lat);
+    }));
+    if (!Number.isFinite(stats.minLng)) {
+      return { minLng: -62.7, maxLng: -54.1, minLat: -27.7, maxLat: -19.2 };
+    }
+    return stats;
+  }
+
+  function _projectPointFactory(bounds, width, height, pad) {
+    const usableWidth = width - (pad * 2);
+    const usableHeight = height - (pad * 2);
+    const lngSpan = Math.max(0.0001, bounds.maxLng - bounds.minLng);
+    const latSpan = Math.max(0.0001, bounds.maxLat - bounds.minLat);
+    const scale = Math.min(usableWidth / lngSpan, usableHeight / latSpan);
+    const offsetX = pad + ((usableWidth - (lngSpan * scale)) / 2);
+    const offsetY = pad + ((usableHeight - (latSpan * scale)) / 2);
+    return function project(point) {
+      const lng = Number(point[0]);
+      const lat = Number(point[1]);
+      return {
+        x: offsetX + ((lng - bounds.minLng) * scale),
+        y: offsetY + ((bounds.maxLat - lat) * scale),
+      };
+    };
+  }
+
+  function _geoJsonPath(geometry, projector) {
+    if (!geometry || !projector) return '';
+    if (geometry.type === 'Polygon') {
+      return geometry.coordinates.map(ring => _ringPath(ring, projector)).filter(Boolean).join(' ');
+    }
+    if (geometry.type === 'MultiPolygon') {
+      return geometry.coordinates
+        .map(polygon => polygon.map(ring => _ringPath(ring, projector)).filter(Boolean).join(' '))
+        .filter(Boolean)
+        .join(' ');
+    }
+    return '';
+  }
+
+  function _ringPath(ring, projector) {
+    if (!Array.isArray(ring) || ring.length < 2) return '';
+    return ring.map((point, index) => {
+      const projected = projector(point);
+      return `${index === 0 ? 'M' : 'L'}${_round(projected.x, 2)} ${_round(projected.y, 2)}`;
+    }).join(' ') + ' Z';
+  }
+
+  function _featureCentroid(feature, projector) {
+    const points = [];
+    _visitCoordinates(feature?.geometry?.coordinates, point => {
+      if (Array.isArray(point) && point.length >= 2) points.push(point);
+    });
+    if (!points.length) return null;
+    const centroid = points.reduce((acc, point) => {
+      acc.lng += Number(point[0] || 0);
+      acc.lat += Number(point[1] || 0);
+      return acc;
+    }, { lng: 0, lat: 0 });
+    centroid.lng /= points.length;
+    centroid.lat /= points.length;
+    return projector([centroid.lng, centroid.lat]);
+  }
+
+  function _visitCoordinates(node, visitor) {
+    if (!Array.isArray(node)) return;
+    if (typeof node[0] === 'number' && typeof node[1] === 'number') {
+      visitor(node);
+      return;
+    }
+    node.forEach(child => _visitCoordinates(child, visitor));
+  }
+
+  function _choroplethShortLabel(label) {
+    const words = String(label || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return '';
+    if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+    return `${words[0][0] || ''}${words[1][0] || ''}${words[words.length - 1][0] || ''}`.toUpperCase();
+  }
+
+  async function _svgToPngBlob(svg) {
+    const svgText = new XMLSerializer().serializeToString(svg);
+    const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error('No se pudo rasterizar el SVG.'));
+        image.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = SVG_WIDTH * 2;
+      canvas.height = SVG_HEIGHT * 2;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas no disponible.');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('No se pudo generar el PNG.');
+      return blob;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  function _downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   function _legendHtml() {
@@ -1144,6 +1592,7 @@ const DepartmentAtlasModule = (() => {
     refresh,
     setViewMode,
     selectDepartment,
+    copyCurrentImage,
     printPdf,
   };
 })();

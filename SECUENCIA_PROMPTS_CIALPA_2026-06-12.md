@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.203`.
+- Version vigente de esta intervencion: `2.6.204`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -163,3 +163,6 @@
 - Para `2.6.200`, `git diff --check` no marco errores; solo avisos LF/CRLF esperables del checkout Windows.
 - Para `2.6.200`, la verificacion local HTTP confirmo `v2.6.200`, ausencia de Three.js, ausencia de `classroom-3d` en `app.js`, `guided-register.js`, `mec-form.js`, CSS y `sw.js`, y `assets/js/classroom-3d.js` devuelve `404`.
 - Para `2.6.200`, Playwright local desde `%TEMP%` verifico que la pagina no muestra textos `Vista 3D`/`Ensayo 3D` y no dispara requests a `classroom-3d` ni a Three.js.
+- Para `2.6.204`, el Atlas agrega una vista separada `Mapa nacional` con poligonos ADM1 coloreados por cantidad de escuelas, mas `Copiar imagen` e `Imprimir mapa nacional`.
+- Se agrego `assets/data/paraguay-adm1-simplified.geojson` desde geoBoundaries como capa local del coropletico nacional.
+- Se verifico por exportacion CSV directa de la hoja oficial `listado_ini` que el padron vigente contiene `5462` escuelas de datos mas una fila de encabezado, consistente con `diagnosticoPadron` del backend publico.

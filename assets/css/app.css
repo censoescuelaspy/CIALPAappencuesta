@@ -1237,6 +1237,97 @@ td {
   min-height: clamp(520px, calc(100dvh - 310px), 780px);
 }
 
+.atlas-actions .btn[disabled] {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.atlas-choropleth-card {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  background: #f8fafc;
+}
+
+.atlas-choropleth-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: .85rem 1rem .5rem;
+  color: var(--color-secondary);
+}
+
+.atlas-choropleth-toolbar strong,
+.atlas-choropleth-toolbar span,
+.atlas-choropleth-toolbar small {
+  display: block;
+}
+
+.atlas-choropleth-toolbar span,
+.atlas-choropleth-toolbar small {
+  color: var(--color-text-muted);
+  font-size: .78rem;
+}
+
+.atlas-choropleth-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0 .65rem;
+}
+
+.atlas-choropleth-path {
+  transition: fill .16s ease, opacity .16s ease, transform .16s ease;
+}
+
+.atlas-choropleth-path--interactive {
+  cursor: pointer;
+}
+
+.atlas-choropleth-path--interactive:hover,
+.atlas-choropleth-path--interactive:focus-visible {
+  opacity: .9;
+  stroke: #0f172a;
+  stroke-width: 2;
+}
+
+.atlas-choropleth-label text {
+  fill: #172033;
+  font-size: 11px;
+  font-weight: 800;
+  text-anchor: middle;
+  paint-order: stroke fill;
+  stroke: rgba(255, 255, 255, .92);
+  stroke-width: 2.8px;
+  stroke-linejoin: round;
+}
+
+.atlas-choropleth-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .55rem .85rem;
+  padding: .2rem 1rem 1rem;
+  color: var(--color-secondary);
+  font-size: .78rem;
+}
+
+.atlas-choropleth-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+}
+
+.atlas-choropleth-legend i {
+  display: inline-block;
+  width: .9rem;
+  height: .9rem;
+  border-radius: 3px;
+  border: 1px solid rgba(15, 23, 42, .12);
+}
+
 .atlas-detail-panel {
   position: relative;
   z-index: 5;

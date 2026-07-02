@@ -8793,3 +8793,70 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - Mantener `.nojekyll` en la raiz mientras esta app siga siendo frontend estatico puro.
 - Migrar definitivamente GitHub Pages de `legacy` a `workflow` para evitar nuevas colas o fallas opacas del builder historico.
+
+---
+
+## Atlas nacional coropletico y verificacion de padron - 2026-07-02
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.204`.
+
+### Objetivo de la intervencion
+- Agregar una vista separada del Atlas con mapa nacional por departamento, coloreado por cantidad de escuelas, con salida para copiar imagen o imprimir.
+- Aclarar la diferencia reportada entre `5475` y `5462`.
+
+### Diagnostico inicial
+- El Atlas existente mostraba resumen nacional y detalle por departamento, pero el mapa seguia siendo de puntos agregados.
+- El usuario requirio una vista nacional tipo coropletico con poligonos departamentales.
+- El backend publico `diagnosticoPadron` respondio `total: 5462`.
+- La exportacion CSV directa de la hoja oficial `listado_ini` devolvio `5463` lineas incluyendo encabezado, es decir `5462` filas de escuelas.
+
+### Acciones realizadas
+- Se descargo y agrego `assets/data/paraguay-adm1-simplified.geojson` con limites ADM1 simplificados de Paraguay.
+- Se agrego el modo `Mapa nacional` al Atlas.
+- Se incorporaron los botones `Copiar imagen` e `Imprimir vista`, con comportamiento especifico para el coropletico.
+- Se implemento render SVG del mapa nacional por poligonos departamentales y leyenda por escala de cantidad de escuelas.
+- Se agrego soporte de copia a portapapeles como PNG con fallback a descarga local.
+- Se mantuvo el PDF multipagina del atlas para resumen/departamentos y se agrego una hoja especifica para imprimir el mapa nacional.
+
+### Archivos modificados
+- `index.html`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `assets/css/app.css`
+- `sw.js`
+- `assets/data/paraguay-adm1-simplified.geojson`
+- `README.md`
+- `BITACORA.md`
+
+### Comandos o scripts ejecutados
+- `Invoke-WebRequest https://www.geoboundaries.org/api/current/gbOpen/PRY/ADM1/`
+- `Invoke-WebRequest https://github.com/wmgeolab/geoBoundaries/raw/9469f09/releaseData/gbOpen/PRY/ADM1/geoBoundaries-PRY-ADM1_simplified.geojson`
+- `Invoke-WebRequest https://docs.google.com/spreadsheets/d/1Auz5pIrUzAdc2uN0UkiBNwlV3stjq0bPcnCcsEraWmU/export?format=csv&gid=0`
+- `node --check assets/js/department-atlas.js`
+- `node --check assets/js/config.js`
+- `git diff --check`
+
+### Resultados verificados
+- `node --check` paso en `assets/js/department-atlas.js` y `assets/js/config.js`.
+- `git diff --check` no marco errores funcionales; solo avisos LF/CRLF del checkout Windows.
+- El CSV oficial exportado directamente confirma `5462` escuelas de datos mas una fila de encabezado.
+- El backend publico `diagnosticoPadron` confirma `source:"official_sheet"` y `total:5462`.
+
+### Pendientes
+- Publicar `v2.6.204` en GitHub Pages y validar visualmente la nueva vista `Mapa nacional`.
+- Revisar en que listado externo o modulo se origina el numero `5475` si el usuario lo sigue viendo dentro de la app.
+
+### Riesgos
+- La capa coropletica depende del GeoJSON local agregado; si se eliminara del build, la vista vuelve a quedar sin poligonos.
+- La accion `Copiar imagen` depende del soporte del navegador para `ClipboardItem`; en caso contrario descarga PNG.
+
+### Recomendaciones
+- Usar `5462` como total oficial vigente mientras el backend siga leyendo `official_sheet` y la exportacion CSV confirme el mismo universo.
+- Si aparece `5475` en otra interfaz, explicitar alli la fuente y el universo contado para evitar confundir filas crudas con escuelas operativas unicas.
