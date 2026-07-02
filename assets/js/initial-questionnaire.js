@@ -533,8 +533,8 @@ const InitialQuestionnaire = (() => {
         codigo_local: String(row[0] || '').trim(),
         id_escuela: String(row[5] || row[0] || '').trim(),
         nombre: String(row[1] || '').trim(),
-        departamento: String(row[2] || '').trim(),
-        distrito: String(row[3] || '').trim(),
+        departamento: _sanitizeTerritoryLabel(row[2] || ''),
+        distrito: _sanitizeTerritoryLabel(row[3] || ''),
         localidad: String(row[4] || '').trim(),
       };
     }
@@ -543,8 +543,8 @@ const InitialQuestionnaire = (() => {
       codigo_local: String(row.codigo_local || row.codigo || row.code || '').trim(),
       id_escuela: String(row.id_escuela || row.id || row.codigo_local || row.codigo || '').trim(),
       nombre: String(row.nombre || row.nombre_escuela || row.escuela || '').trim(),
-      departamento: String(row.departamento || '').trim(),
-      distrito: String(row.distrito || '').trim(),
+      departamento: _sanitizeTerritoryLabel(row.departamento || ''),
+      distrito: _sanitizeTerritoryLabel(row.distrito || ''),
       localidad: String(row.localidad || '').trim(),
     };
   }
@@ -662,6 +662,25 @@ const InitialQuestionnaire = (() => {
     });
     Object.keys(distritos_por_departamento).forEach(key => distritos_por_departamento[key].sort((a, b) => a.localeCompare(b)));
     return { departamentos, distritos, distritos_por_departamento };
+  }
+
+  function _sanitizeTerritoryLabel(value) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    const parsed = _parseSerializedTerritoryDate(text);
+    return parsed ? _formatTerritoryDate(parsed) : text;
+  }
+
+  function _parseSerializedTerritoryDate(text) {
+    if (!text) return null;
+    if (text.indexOf('GMT') === -1 && !/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s/i.test(text)) return null;
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function _formatTerritoryDate(date) {
+    const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+    return `${date.getDate()} DE ${months[date.getMonth()] || ''}`.trim();
   }
 
   function _demoSchoolList() {

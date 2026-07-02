@@ -8532,3 +8532,145 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Recomendaciones
 - Las visualizaciones experimentales pesadas deben quedar detras de una decision explicita o en rama/entorno de ensayo, no en el flujo principal de captura de campo.
 - Antes de incorporar WebGL u otro componente pesado en una PWA institucional, validar rendimiento en equipo real de campo y costo sobre offline/cache.
+
+---
+
+## Resumen nacional en Atlas departamental - 2026-07-02
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.201`.
+
+### Objetivo de la intervencion
+- Atender el pedido operativo de ver todos los departamentos al mismo tiempo en el Atlas, o al menos sus cantidades totales simultaneas.
+
+### Diagnostico inicial
+- El `Atlas departamental` existente resolvia bien el detalle territorial, pero trabajaba un solo departamento activo por vez.
+- El modulo ya generaba un PDF multipagina por departamento, pero faltaba una vista simultanea de resumen nacional dentro de la app.
+
+### Acciones realizadas
+- Se agrego un selector de modo dentro del Atlas con:
+  - `Resumen nacional`
+  - `Por departamento`
+- Se actualizo `assets/js/department-atlas.js` para:
+  - calcular resumenes por departamento;
+  - renderizar KPIs nacionales;
+  - mostrar una tabla simultanea con totales por departamento;
+  - permitir abrir el detalle de un departamento desde esa tabla;
+  - dibujar un mapa agregado por departamento para todo el pais;
+  - anteponer una hoja `Resumen nacional` al PDF del Atlas.
+- Se actualizo `index.html` para incorporar el toggle visual del Atlas.
+- Se agregaron estilos nuevos en `assets/css/app.css` para el cambio de modo y los accesos directos por departamento.
+- Se actualizo versionado/cache a `2.6.201` en `assets/js/config.js`, `index.html`, `sw.js`, `README.md` y `assets/js/department-atlas.js`.
+- Se actualizo la secuencia del proyecto.
+
+### Archivos modificados
+- `index.html`
+- `assets/css/app.css`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `sw.js`
+- `README.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+- `BITACORA.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/department-atlas.js`
+- `node --check assets/js/config.js`
+- `git diff --check -- index.html assets/css/app.css assets/js/config.js assets/js/department-atlas.js sw.js README.md`
+- `rg -n "2\\.6\\.201|Resumen nacional|data-atlas-open-department|atlas-mode-toggle|atlas-link-button|printOverviewPage|departmentSummaries" index.html assets/css/app.css assets/js/config.js assets/js/department-atlas.js sw.js README.md`
+
+### Resultados verificados
+- Sintaxis JavaScript correcta en `department-atlas.js` y `config.js`.
+- `git diff --check` sin errores funcionales; solo avisos LF/CRLF esperables del checkout Windows.
+- Se confirmo por inspeccion que:
+  - `index.html` carga `v2.6.201` y el contenedor `atlas-mode-toggle`;
+  - `department-atlas.js` contiene `Resumen nacional`, `setViewMode`, tabla enlazable por departamento y hoja impresa de resumen;
+  - `app.css` incorpora estilos `atlas-mode-toggle`, `atlas-mode-button` y `atlas-link-button`;
+  - `sw.js` actualiza cache a `cialpa-app-v2.6.201`.
+
+### Pendientes
+- Validacion visual del usuario en navegador real y URL publica luego de publicar esta version.
+- Si el equipo quiere, se puede agregar despues un tercer modo con puntos individuales de todas las escuelas al mismo tiempo, ademas del agregado departamental.
+
+### Riesgos
+- El modo `Resumen nacional` usa agregacion por departamento para priorizar legibilidad y rendimiento; no reemplaza el detalle escuela por escuela.
+- Si el navegador conserva cache previo, sera necesario pulsar `Actualizar app` o abrir con cache-busting tras publicar.
+
+---
+
+## Hotfix territorial para distritos convertidos en fecha - 2026-07-02
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.202`.
+
+### Objetivo de la intervencion
+- Corregir casos donde un distrito aparecia en filtros como texto de fecha con huso horario, alterando lectura y conteos territoriales.
+
+### Diagnostico inicial
+- En el selector territorial se observo el valor `Thu Dec 25 2025 00:00:00 GMT-0300 (hora estándar de Paraguay)` entre distritos de San Pedro.
+- Ese valor no correspondia a `Union`, sino a `25 DE DICIEMBRE` mal tipado como fecha en el origen o durante la serializacion.
+- La comparacion con el padron publico local mostro que:
+  - `UNION` figura aparte;
+  - `25 DE DICIEMBRE` es un distrito valido y, en el padron publico local disponible, aparece con `21` escuelas;
+  - `UNION` aparece con `10` escuelas en ese mismo padron publico local.
+
+### Acciones realizadas
+- Se agrego en `gas/sheets.gs` el helper `_territoryText_()` para:
+  - detectar objetos `Date` en campos territoriales;
+  - detectar cadenas serializadas tipo `Thu Dec 25 2025 ... GMT-0300`;
+  - reconvertirlas a etiquetas como `25 DE DICIEMBRE`.
+- Se aplico ese saneamiento en:
+  - `_normalizarEscuela`;
+  - `_r01PublicSchool_`;
+  - `_districtsByDepartment_`;
+  - `_r01NormalizeContact_`.
+- Se agrego saneamiento espejo en frontend para blindar:
+  - `assets/js/map.js`;
+  - `assets/js/initial-questionnaire.js`.
+- Se actualizo version/cache a `2.6.202`.
+
+### Archivos modificados
+- `gas/sheets.gs`
+- `assets/js/map.js`
+- `assets/js/initial-questionnaire.js`
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+- `BITACORA.md`
+
+### Comandos o scripts ejecutados
+- `node --check assets/js/map.js`
+- `node --check assets/js/initial-questionnaire.js`
+- `git diff --check -- gas/sheets.gs assets/js/map.js assets/js/initial-questionnaire.js assets/js/config.js assets/js/department-atlas.js index.html sw.js README.md`
+- Verificacion auxiliar en PowerShell sobre `assets/data/r01-schools-public.json` para contrastar conteos distritales.
+
+### Resultados verificados
+- Sintaxis JavaScript correcta en `map.js` e `initial-questionnaire.js`.
+- `git diff --check` sin errores funcionales; solo avisos LF/CRLF esperables del checkout Windows.
+- Confirmado por inspeccion:
+  - `map.js` y `initial-questionnaire.js` ya no toman el texto bruto serializado como distrito;
+  - `gas/sheets.gs` sanea `departamento` y `distrito` antes de construir respuestas publicas y metadatos territoriales;
+  - `sw.js` actualiza cache a `cialpa-app-v2.6.202`.
+
+### Pendientes
+- Publicar esta version en GitHub Pages y desplegar el GAS actualizado para que el backend deje de emitir esos distritos-fecha.
+- Validacion visual del usuario en navegador real, especialmente en filtros de mapa y cuestionario inicial.
+
+### Riesgos
+- Hasta desplegar el GAS corregido, un navegador que consulte el backend viejo todavia podria recibir el valor roto; el frontend nuevo lo filtra/sanea, pero el arreglo completo requiere ambos despliegues.
+- Si el navegador conserva cache previo, sera necesario pulsar `Actualizar app` o abrir con cache-busting tras publicar.

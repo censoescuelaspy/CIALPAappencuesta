@@ -179,11 +179,11 @@ const MapModule = (() => {
   }
 
   function _schoolDepartment(e = {}) {
-    return String(e.departamento || e.departamento_nombre || e.depto || '').trim();
+    return _sanitizeTerritoryLabel(e.departamento || e.departamento_nombre || e.depto || '');
   }
 
   function _schoolDistrict(e = {}) {
-    return String(e.distrito || e.distrito_nombre || '').trim();
+    return _sanitizeTerritoryLabel(e.distrito || e.distrito_nombre || '');
   }
 
   function _mergeSchoolRecord(base = {}, extra = {}) {
@@ -221,7 +221,7 @@ const MapModule = (() => {
   function _uniqueNormalizedOptions(values = []) {
     const seen = new Map();
     values.forEach(value => {
-      const label = String(value || '').trim();
+      const label = _sanitizeTerritoryLabel(value);
       const key = _normalizeFilterValue(label);
       if (!label || seen.has(key)) return;
       seen.set(key, label);
@@ -232,6 +232,26 @@ const MapModule = (() => {
   function _isUnassigned(e) {
     const label = _assignmentLabel(e);
     return !label || _sameFilterValue(label, 'No asignada') || _sameFilterValue(label, 'No asignado') || _sameFilterValue(label, 'Sin asignar');
+  }
+
+  function _sanitizeTerritoryLabel(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return '';
+    const parsed = _parseSerializedTerritoryDate(text);
+    if (!parsed) return text;
+    return _formatTerritoryDate(parsed);
+  }
+
+  function _parseSerializedTerritoryDate(text) {
+    if (!text) return null;
+    if (text.indexOf('GMT') === -1 && !/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s/i.test(text)) return null;
+    const parsed = new Date(text);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function _formatTerritoryDate(date) {
+    const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+    return `${date.getDate()} DE ${months[date.getMonth()] || ''}`.trim();
   }
 
   function _canRequestSurvey(e) {

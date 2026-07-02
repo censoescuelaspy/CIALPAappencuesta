@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * department-atlas.js, atlas departamental con mapa e impresion multipagina
- * Version: 2.6.200
+ * Version: 2.6.202
  */
 
 const DepartmentAtlasModule = (() => {
@@ -9,9 +9,12 @@ const DepartmentAtlasModule = (() => {
 
   const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
   const MAX_LIST_ROWS = 180;
+  const MAX_OVERVIEW_ROWS = 24;
   const SVG_WIDTH = 760;
   const SVG_HEIGHT = 420;
   const SVG_PAD = 36;
+  const VIEW_MODE_OVERVIEW = 'overview';
+  const VIEW_MODE_DEPARTMENT = 'department';
 
   const STATE_META = {
     pendiente: { label: 'Pendiente', color: '#b7791f', tone: 'warning' },
@@ -56,6 +59,7 @@ const DepartmentAtlasModule = (() => {
   let _printListenerBound = false;
   let _schools = [];
   let _departments = [];
+  let _viewMode = VIEW_MODE_OVERVIEW;
   let _selectedDepartment = 'Asuncion';
   let _lastLoadLabel = '';
   let _map = null;
@@ -113,8 +117,14 @@ const DepartmentAtlasModule = (() => {
   }
 
   function selectDepartment(department) {
+    _viewMode = VIEW_MODE_DEPARTMENT;
     const found = _departments.find(item => _sameDepartment(item.label, department));
     _selectedDepartment = found ? found.label : (department || 'Asuncion');
+    _renderAll();
+  }
+
+  function setViewMode(mode) {
+    _viewMode = mode === VIEW_MODE_DEPARTMENT ? VIEW_MODE_DEPARTMENT : VIEW_MODE_OVERVIEW;
     _renderAll();
   }
 
@@ -125,13 +135,25 @@ const DepartmentAtlasModule = (() => {
     }
     const root = document.getElementById('atlas-print-root');
     if (!root) return;
-    root.innerHTML = _departments.map(department => _printPage(department.label)).join('');
+    root.innerHTML = [_printOverviewPage()]
+      .concat(_departments.map(department => _printPage(department.label)))
+      .join('');
     root.setAttribute('aria-hidden', 'false');
     document.body.classList.add('atlas-printing');
     setTimeout(() => window.print(), 120);
   }
 
   function _bindEvents() {
+    const modeToggle = document.getElementById('atlas-mode-toggle');
+    if (modeToggle && modeToggle.dataset.bound !== 'true') {
+      modeToggle.dataset.bound = 'true';
+      modeToggle.addEventListener('click', event => {
+        const button = event.target.closest('[data-atlas-mode]');
+        if (!button) return;
+        setViewMode(button.dataset.atlasMode);
+      });
+    }
+
     const refreshBtn = document.getElementById('atlas-refresh-btn');
     if (refreshBtn && refreshBtn.dataset.bound !== 'true') {
       refreshBtn.dataset.bound = 'true';
@@ -159,8 +181,12 @@ const DepartmentAtlasModule = (() => {
       list.dataset.bound = 'true';
       list.addEventListener('click', event => {
         const button = event.target.closest('[data-atlas-sort]');
-        if (!button) return;
-        _toggleSort(button.dataset.atlasSort);
+        if (button) {
+          _toggleSort(button.dataset.atlasSort);
+          return;
+        }
+        const openButton = event.target.closest('[data-atlas-open-department]');
+        if (openButton) selectDepartment(openButton.dataset.atlasOpenDepartment);
       });
     }
 
@@ -171,13 +197,42 @@ const DepartmentAtlasModule = (() => {
   }
 
   function _renderAll() {
+    _renderModeToggle();
     _renderDepartmentButtons();
+    if (_viewMode === VIEW_MODE_OVERVIEW) {
+      const rows = _schools || [];
+      const metrics = _metrics(rows);
+      const summaries = _departmentSummaries(rows);
+      _renderKpis(metrics, { mode: VIEW_MODE_OVERVIEW, departmentCount: summaries.length });
+      _renderOverviewDetail(summaries, metrics);
+      _renderMap(rows, { mode: VIEW_MODE_OVERVIEW, summaries });
+      _setStatus(`${_lastLoadLabel || 'Padron cargado'}: ${_formatNumber(metrics.total)} escuelas en ${_formatNumber(summaries.length)} departamentos.`);
+      return;
+    }
     const rows = _schoolsForDepartment(_selectedDepartment);
     const metrics = _metrics(rows);
-    _renderKpis(metrics);
+    _renderKpis(metrics, { mode: VIEW_MODE_DEPARTMENT });
     _renderDetail(rows, metrics);
-    _renderMap(rows);
+    _renderMap(rows, { mode: VIEW_MODE_DEPARTMENT });
     _setStatus(`${_lastLoadLabel || 'Padron cargado'}: ${_formatNumber(_schools.length)} escuelas en el universo operativo.`);
+  }
+
+  function _renderModeToggle() {
+    const container = document.getElementById('atlas-mode-toggle');
+    if (!container) return;
+    const buttons = [
+      { mode: VIEW_MODE_OVERVIEW, label: 'Resumen nacional', note: 'Totales por departamento' },
+      { mode: VIEW_MODE_DEPARTMENT, label: 'Por departamento', note: _selectedDepartment || 'Detalle territorial' },
+    ];
+    container.innerHTML = buttons.map(item => `
+      <button
+        type="button"
+        class="atlas-mode-button${_viewMode === item.mode ? ' atlas-mode-button--active' : ''}"
+        data-atlas-mode="${_escapeAttr(item.mode)}"
+        aria-pressed="${_viewMode === item.mode ? 'true' : 'false'}">
+        <strong>${_escape(item.label)}</strong>
+        <span>${_escape(item.note)}</span>
+      </button>`).join('');
   }
 
   function _renderDepartmentButtons() {
@@ -199,18 +254,23 @@ const DepartmentAtlasModule = (() => {
     }).join('');
   }
 
-  function _renderKpis(metrics) {
+  function _renderKpis(metrics, options = {}) {
+    const mode = options.mode || VIEW_MODE_DEPARTMENT;
+    const scopeLabel = mode === VIEW_MODE_OVERVIEW ? 'Registros de todos los departamentos' : 'Registros del departamento';
+    const districtLabel = mode === VIEW_MODE_OVERVIEW
+      ? `${_formatNumber(options.departmentCount || 0)} departamentos con padron`
+      : 'Cobertura territorial';
     const grid = document.getElementById('atlas-kpi-grid');
     if (!grid) return;
     grid.innerHTML = [
-      _kpi('Total operativo', metrics.total, 'Registros del departamento', 'volume'),
+      _kpi('Total operativo', metrics.total, scopeLabel, 'volume'),
       _kpi('Pendientes', metrics.pendiente, `${_formatPercent(metrics.pendingPct)} del total`, 'warning'),
       _kpi('Relevadas', metrics.finalizada, `${_formatPercent(metrics.progressPct)} de avance`, 'success'),
       _kpi('En curso', metrics.en_curso, 'Sesiones o borradores activos', 'info'),
       _kpi('En mapa', metrics.withCoords, `${_formatPercent(metrics.geoPct)} georreferenciado`, 'map'),
       _kpi('Sin marcador', metrics.withoutCoords, 'Requiere coordenadas validas', metrics.withoutCoords ? 'danger' : 'success'),
       _kpi('Incidencias', metrics.incidencia, 'Casos para seguimiento', metrics.incidencia ? 'danger' : 'muted'),
-      _kpi('Distritos', metrics.districtCount, 'Cobertura territorial', 'muted'),
+      _kpi(mode === VIEW_MODE_OVERVIEW ? 'Departamentos' : 'Distritos', mode === VIEW_MODE_OVERVIEW ? (options.departmentCount || 0) : metrics.districtCount, districtLabel, 'muted'),
     ].join('');
   }
 
@@ -223,6 +283,17 @@ const DepartmentAtlasModule = (() => {
     _renderStatusBars(metrics);
     _renderDistricts(rows, metrics);
     _renderSchoolList(rows);
+  }
+
+  function _renderOverviewDetail(summaries, metrics) {
+    _setText('atlas-detail-title', 'Resumen nacional');
+    _setText(
+      'atlas-detail-summary',
+      `${_formatNumber(metrics.total)} escuelas en ${_formatNumber(summaries.length)} departamentos. ${_formatNumber(metrics.withCoords)} con marcador y ${_formatNumber(metrics.withoutCoords)} sin coordenadas validas.`
+    );
+    _renderStatusBars(metrics);
+    _renderOverviewDepartments(summaries);
+    _renderOverviewTable(summaries);
   }
 
   function _renderStatusBars(metrics) {
@@ -261,6 +332,28 @@ const DepartmentAtlasModule = (() => {
             <span>${_escape(item.label)}</span>
             <div class="atlas-status-track"><i style="width:${pct}%"></i></div>
             <strong>${_formatNumber(item.count)}</strong>
+          </div>`;
+      }).join('')}`;
+  }
+
+  function _renderOverviewDepartments(summaries) {
+    const container = document.getElementById('atlas-district-list');
+    if (!container) return;
+    if (!summaries.length) {
+      container.innerHTML = '<p class="atlas-empty">Sin departamentos cargados.</p>';
+      return;
+    }
+    const visible = summaries.slice(0, 8);
+    const maxTotal = Math.max(...visible.map(item => item.metrics.total), 1);
+    container.innerHTML = `
+      <h4>Departamentos con mayor carga</h4>
+      ${visible.map(item => {
+        const pct = Math.round((item.metrics.total / maxTotal) * 100);
+        return `
+          <div class="atlas-district-row">
+            <span>${_escape(item.label)}</span>
+            <div class="atlas-status-track"><i style="width:${pct}%;background:${STATE_META.finalizada.color}"></i></div>
+            <strong>${_formatNumber(item.metrics.total)}</strong>
           </div>`;
       }).join('')}`;
   }
@@ -309,6 +402,51 @@ const DepartmentAtlasModule = (() => {
         </table>
       </div>
       ${rows.length > visible.length ? `<p class="atlas-list-note">Mostrando ${visible.length} de ${rows.length} escuelas.</p>` : ''}`;
+  }
+
+  function _renderOverviewTable(summaries) {
+    const container = document.getElementById('atlas-school-list');
+    if (!container) return;
+    if (!summaries.length) {
+      container.innerHTML = '<p class="atlas-empty">Sin departamentos para resumir.</p>';
+      return;
+    }
+    const visible = summaries.slice(0, MAX_OVERVIEW_ROWS);
+    container.innerHTML = `
+      <h4>Totales por departamento</h4>
+      <div class="atlas-school-table">
+        <table>
+          <thead>
+            <tr>
+              <th>Departamento</th>
+              <th>Total</th>
+              <th>Pend.</th>
+              <th>Relevadas</th>
+              <th>En curso</th>
+              <th>En mapa</th>
+              <th>Sin marcador</th>
+              <th>Distritos</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${visible.map(item => `
+              <tr>
+                <td>
+                  <button type="button" class="atlas-link-button" data-atlas-open-department="${_escapeAttr(item.label)}">${_escape(item.label)}</button>
+                  <small>${_escape(_summaryStatusLine(item.metrics))}</small>
+                </td>
+                <td><strong>${_formatNumber(item.metrics.total)}</strong></td>
+                <td>${_formatNumber(item.metrics.pendiente)}</td>
+                <td>${_formatNumber(item.metrics.finalizada)}</td>
+                <td>${_formatNumber(item.metrics.en_curso)}</td>
+                <td>${_formatNumber(item.metrics.withCoords)}</td>
+                <td>${_formatNumber(item.metrics.withoutCoords)}</td>
+                <td>${_formatNumber(item.metrics.districtCount)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <p class="atlas-list-note">Pulse un departamento para abrir su mapa y su tabla detallada.</p>`;
   }
 
   function _sortHeader(key, label) {
@@ -366,7 +504,7 @@ const DepartmentAtlasModule = (() => {
     return String(a ?? '').localeCompare(String(b ?? ''), 'es', { numeric: true, sensitivity: 'base' });
   }
 
-  function _renderMap(rows) {
+  function _renderMap(rows, options = {}) {
     const mapEl = document.getElementById('atlas-map');
     if (!mapEl || !window.L) return;
     if (!_map) {
@@ -384,6 +522,36 @@ const DepartmentAtlasModule = (() => {
     }
     if (!_layer) _layer = L.layerGroup().addTo(_map);
     _layer.clearLayers();
+
+    if ((options.mode || VIEW_MODE_DEPARTMENT) === VIEW_MODE_OVERVIEW) {
+      const summaries = Array.isArray(options.summaries) ? options.summaries : _departmentSummaries(rows);
+      const points = summaries.map(summary => ({ summary, point: _summaryPoint(summary) })).filter(item => item.point);
+      const maxTotal = Math.max(...summaries.map(item => item.metrics.total), 1);
+      points.forEach(item => {
+        const meta = _summaryMeta(item.summary);
+        const radius = 8 + Math.round((item.summary.metrics.total / maxTotal) * 12);
+        const marker = L.circleMarker([item.point.lat, item.point.lng], {
+          radius,
+          stroke: true,
+          color: '#ffffff',
+          weight: 1.8,
+          fillColor: meta.color,
+          fillOpacity: 0.8,
+        });
+        marker.bindPopup(_departmentPopup(item.summary, meta), { maxWidth: 280 });
+        marker.addTo(_layer);
+      });
+      requestAnimationFrame(() => {
+        _map.invalidateSize();
+        if (points.length > 1) {
+          const bounds = L.latLngBounds(points.map(item => [item.point.lat, item.point.lng]));
+          _map.fitBounds(bounds.pad(0.18), { maxZoom: 8 });
+        } else {
+          _map.setView(APP_CONFIG.MAP_CENTER || [-23.4, -58.0], APP_CONFIG.MAP_ZOOM || 7);
+        }
+      });
+      return;
+    }
 
     const points = rows.map(school => ({ school, point: _point(school) })).filter(item => item.point);
     points.forEach(item => {
@@ -414,6 +582,49 @@ const DepartmentAtlasModule = (() => {
     });
   }
 
+  function _printOverviewPage() {
+    const summaries = _departmentSummaries(_schools || []);
+    const metrics = _metrics(_schools || []);
+    return `
+      <section class="atlas-print-page">
+        <header class="atlas-print-header">
+          <div>
+            <span>CIALPA - Atlas departamental</span>
+            <h1>Resumen nacional</h1>
+          </div>
+          <div>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.202')}</strong>
+            <small>${_escape(_formatDateTime(new Date()))}</small>
+          </div>
+        </header>
+
+        <div class="atlas-print-kpis">
+          ${_printKpi('Total', metrics.total)}
+          ${_printKpi('Departamentos', summaries.length)}
+          ${_printKpi('Pendientes', metrics.pendiente)}
+          ${_printKpi('Relevadas', metrics.finalizada)}
+          ${_printKpi('En curso', metrics.en_curso)}
+          ${_printKpi('En mapa', metrics.withCoords)}
+          ${_printKpi('Sin marcador', metrics.withoutCoords)}
+          ${_printKpi('Incidencias', metrics.incidencia)}
+        </div>
+
+        <div class="atlas-print-grid">
+          ${_renderOverviewPrintMap(summaries)}
+          <aside class="atlas-print-side">
+            <h2>Totales por departamento</h2>
+            ${_printDepartmentRows(summaries)}
+            <h2>Lectura GIS</h2>
+            <p>Esta hoja resume todo el pais al mismo tiempo con un marcador agregado por departamento y totales operativos comparables.</p>
+          </aside>
+        </div>
+
+        <footer class="atlas-print-footer">
+          Fuente: padron operativo CIALPA disponible en la app. Los totales se agrupan por departamento y los puntos usan centroide aproximado de cobertura.
+        </footer>
+      </section>`;
+  }
+
   function _printPage(department) {
     const rows = _schoolsForDepartment(department);
     const metrics = _metrics(rows);
@@ -425,7 +636,7 @@ const DepartmentAtlasModule = (() => {
             <h1>${_escape(department)}</h1>
           </div>
           <div>
-            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.200')}</strong>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.202')}</strong>
             <small>${_escape(_formatDateTime(new Date()))}</small>
           </div>
         </header>
@@ -489,6 +700,37 @@ const DepartmentAtlasModule = (() => {
       </div>`;
   }
 
+  function _renderOverviewPrintMap(summaries) {
+    const points = summaries.map(summary => ({ summary, point: _summaryPoint(summary) })).filter(item => item.point);
+    if (!points.length) {
+      return `
+        <div class="atlas-print-map atlas-print-map--empty">
+          <strong>Resumen nacional</strong>
+          <span>Sin coordenadas validas para imprimir el resumen del pais.</span>
+        </div>`;
+    }
+    const bounds = _pointBounds(points.map(item => item.point));
+    const circles = points.map(item => {
+      const x = _scale(item.point.lng, bounds.minLng, bounds.maxLng, SVG_PAD, SVG_WIDTH - SVG_PAD);
+      const y = _scale(item.point.lat, bounds.maxLat, bounds.minLat, SVG_PAD, SVG_HEIGHT - SVG_PAD);
+      const meta = _summaryMeta(item.summary);
+      const radius = 7 + Math.round((item.summary.metrics.total / Math.max(...summaries.map(row => row.metrics.total), 1)) * 8);
+      return `
+        <circle cx="${_round(x)}" cy="${_round(y)}" r="${radius}" fill="${meta.color}" fill-opacity="0.82" stroke="#ffffff" stroke-width="1.4" />
+        <text x="${_round(x)}" y="${_round(y + 0.8)}" font-size="9" text-anchor="middle" fill="#0f172a">${_escape(item.summary.label.slice(0, 3).toUpperCase())}</text>`;
+    }).join('');
+    return `
+      <div class="atlas-print-map">
+        <svg viewBox="0 0 ${SVG_WIDTH} ${SVG_HEIGHT}" role="img" aria-label="Mapa impreso resumen nacional">
+          <rect x="0" y="0" width="${SVG_WIDTH}" height="${SVG_HEIGHT}" rx="10" fill="#f8fafc" />
+          <path d="M${SVG_PAD} ${SVG_PAD}H${SVG_WIDTH - SVG_PAD}V${SVG_HEIGHT - SVG_PAD}H${SVG_PAD}Z" fill="#ffffff" stroke="#cbd5e1" />
+          ${_gridLines()}
+          ${circles}
+        </svg>
+        <div class="atlas-print-legend">${_legendHtml()}</div>
+      </div>`;
+  }
+
   function _printStatusRows(metrics) {
     return ['pendiente', 'en_curso', 'finalizada', 'incidencia'].map(key => {
       const meta = STATE_META[key] || STATE_META.pendiente;
@@ -509,6 +751,15 @@ const DepartmentAtlasModule = (() => {
       <div class="atlas-print-row">
         <span>${_escape(item.label)}</span>
         <strong>${_formatNumber(item.count)}</strong>
+      </div>`).join('');
+  }
+
+  function _printDepartmentRows(summaries) {
+    if (!summaries.length) return '<p>Sin departamentos cargados.</p>';
+    return summaries.map(item => `
+      <div class="atlas-print-row">
+        <span>${_escape(item.label)}</span>
+        <strong>${_formatNumber(item.metrics.total)}</strong>
       </div>`).join('');
   }
 
@@ -546,6 +797,20 @@ const DepartmentAtlasModule = (() => {
 
   function _schoolsForDepartment(department) {
     return (_schools || []).filter(school => _sameDepartment(_schoolDepartment(school), department));
+  }
+
+  function _departmentSummaries(schools) {
+    const byDepartment = new Map();
+    (schools || []).forEach(school => {
+      const label = _displayDepartment(_schoolDepartment(school));
+      const key = _departmentKey(label);
+      if (!key) return;
+      if (!byDepartment.has(key)) byDepartment.set(key, { key, label, schools: [] });
+      byDepartment.get(key).schools.push(school);
+    });
+    return Array.from(byDepartment.values())
+      .map(item => ({ ...item, metrics: _metrics(item.schools) }))
+      .sort((a, b) => b.metrics.total - a.metrics.total || a.label.localeCompare(b.label, 'es'));
   }
 
   function _metrics(rows) {
@@ -634,6 +899,42 @@ const DepartmentAtlasModule = (() => {
       const meta = STATE_META[key];
       return `<span><i style="background:${meta.color}"></i>${_escape(meta.label)}</span>`;
     }).join('');
+  }
+
+  function _summaryPoint(summary) {
+    const points = (summary?.schools || []).map(_point).filter(Boolean);
+    if (points.length) {
+      const lat = points.reduce((acc, point) => acc + point.lat, 0) / points.length;
+      const lng = points.reduce((acc, point) => acc + point.lng, 0) / points.length;
+      return { lat: _round(lat, 6), lng: _round(lng, 6) };
+    }
+    const center = _centerForDepartment(summary?.label);
+    if (!Array.isArray(center) || center.length < 2) return null;
+    return { lat: Number(center[0]), lng: Number(center[1]) };
+  }
+
+  function _summaryMeta(summary) {
+    if ((summary?.metrics?.incidencia || 0) > 0) return STATE_META.incidencia;
+    if ((summary?.metrics?.pendiente || 0) >= (summary?.metrics?.finalizada || 0)) return STATE_META.pendiente;
+    if ((summary?.metrics?.en_curso || 0) > 0) return STATE_META.en_curso;
+    return STATE_META.finalizada;
+  }
+
+  function _departmentPopup(summary, meta) {
+    const point = _summaryPoint(summary);
+    return `
+      <div class="atlas-popup">
+        <strong>${_escape(summary?.label || 'Departamento')}</strong>
+        <small>${_formatNumber(summary?.metrics?.districtCount || 0)} distritos</small>
+        <span style="background:${meta.color}">${_escape(meta.label)}</span>
+        <p>Total: ${_formatNumber(summary?.metrics?.total || 0)} | En mapa: ${_formatNumber(summary?.metrics?.withCoords || 0)}</p>
+        <p>Pendientes: ${_formatNumber(summary?.metrics?.pendiente || 0)} | Relevadas: ${_formatNumber(summary?.metrics?.finalizada || 0)}</p>
+        ${point ? `<p>${_round(point.lat, 4)}, ${_round(point.lng, 4)}</p>` : ''}
+      </div>`;
+  }
+
+  function _summaryStatusLine(metrics) {
+    return `${_formatNumber(metrics.finalizada)} relevadas, ${_formatNumber(metrics.pendiente)} pendientes, ${_formatNumber(metrics.withCoords)} en mapa`;
   }
 
   function _popup(school, meta) {
@@ -841,6 +1142,7 @@ const DepartmentAtlasModule = (() => {
   return {
     init,
     refresh,
+    setViewMode,
     selectDepartment,
     printPdf,
   };

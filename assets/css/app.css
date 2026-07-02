@@ -1044,6 +1044,55 @@ td {
   overflow-x: hidden;
 }
 
+.atlas-mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 260px));
+  gap: .55rem;
+}
+
+.atlas-mode-button {
+  display: grid;
+  gap: .14rem;
+  min-height: 52px;
+  padding: .58rem .72rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), box-shadow var(--transition), color var(--transition);
+}
+
+.atlas-mode-button strong {
+  font-size: .84rem;
+  line-height: 1.15;
+}
+
+.atlas-mode-button span {
+  color: var(--color-text-muted);
+  font-size: .72rem;
+  line-height: 1.2;
+}
+
+.atlas-mode-button:hover,
+.atlas-mode-button:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  background: #fff7ed;
+}
+
+.atlas-mode-button--active {
+  border-color: var(--color-primary);
+  background: #fff3e8;
+  color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .14);
+}
+
+.atlas-mode-button--active span {
+  color: currentColor;
+}
+
 .atlas-department-buttons {
   display: flex;
   flex-wrap: nowrap;
@@ -1391,6 +1440,25 @@ td {
 .atlas-school-table small {
   display: block;
   color: var(--color-text-muted);
+}
+
+.atlas-link-button {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  text-align: left;
+}
+
+.atlas-link-button:hover,
+.atlas-link-button:focus-visible {
+  outline: none;
+  text-decoration: underline;
 }
 
 .atlas-state-pill {
@@ -4347,6 +4415,10 @@ td {
   .atlas-kpi-grid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
+
+  .atlas-mode-toggle {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -4361,6 +4433,10 @@ td {
 
   .atlas-page {
     overflow-y: auto;
+  }
+
+  .atlas-mode-toggle {
+    grid-template-columns: 1fr;
   }
 
   .atlas-department-button {

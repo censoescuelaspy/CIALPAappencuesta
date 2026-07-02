@@ -1,10 +1,10 @@
-# Secuencia de prompts - CIALPA - ultima edicion 2026-06-23
+# Secuencia de prompts - CIALPA - ultima edicion 2026-07-02
 
 ## Proyecto
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.200`.
+- Version vigente de esta intervencion: `2.6.202`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -27,6 +27,8 @@
 - Luego se reporto que `Registro guiado` dejo de funcionar con el error `No se pudo cargar assets/js/mec-form.js`.
 - Luego se reporto que no se notaba ningun cambio ni novedad del ensayo 3D.
 - Luego se reporto que el ensayo 3D resultaba muy pesado y se pidio eliminar todo lo relacionado al plano 3D.
+- Finalmente se pidio responder y resolver una consulta operativa del Atlas: ver todos los departamentos al mismo tiempo o, al menos, los totales departamentales simultaneos.
+- Luego se reporto un problema territorial adicional: algunos distritos aparecian como textos de fecha con huso horario, por ejemplo `Thu Dec 25 2025 00:00:00 GMT-0300`, afectando nombres y conteos.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -58,6 +60,13 @@
 - Para `2.6.193`, se agrego `Atlas departamental`: vista supervisor/admin con Asuncion por defecto, botones por departamento, KPIs departamentales, mapa Leaflet y salida de impresion/PDF con una pagina por departamento.
 - La decision tecnica de impresion fue usar SVG de puntos generado desde latitud/longitud para evitar fallas de tiles Leaflet o servicios externos durante la exportacion PDF.
 - Para `2.6.194`, el Atlas normaliza `CAPITAL`, `Distrito Capital`, `Capital Asuncion` y `Ciudad de Asuncion` como `Asuncion`.
+- Para `2.6.201`, el Atlas agrega `Resumen nacional` como nueva vista principal del modulo.
+- En `Resumen nacional`, el mapa deja de exigir entrar departamento por departamento y muestra un agregado por departamento para todo el pais al mismo tiempo.
+- La tabla lateral del Atlas ahora puede listar simultaneamente los totales por departamento y permite abrir el detalle de cualquier departamento con un clic.
+- El PDF del Atlas ahora arranca con una hoja nacional de resumen antes de las paginas individuales por departamento.
+- Para `2.6.202`, se identifico que el caso de San Pedro no era `Union`, sino el distrito `25 DE DICIEMBRE` mal interpretado como fecha desde la hoja/serializacion.
+- Se agrego saneamiento de etiquetas territoriales en frontend y backend para convertir esos textos de fecha nuevamente a nombres como `25 DE DICIEMBRE`.
+- El mapa y el cuestionario inicial dejan de poblar selectores con opciones tipo `Thu Dec 25 2025 ... GMT-0300`, evitando conteos mezclados entre distritos validos.
 - En `2.6.194`, el panel de detalle/lista del Atlas pasa a una zona amplia debajo del mapa y la tabla suma columnas: codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
 - Para `2.6.195`, el Atlas separa mapa/tabla con contexto de apilamiento, scroll del modulo, breakpoint menor a 1180 px sin scroll intermedio y encabezados sticky.
 - En `2.6.195`, los encabezados de tabla son botones sortables por codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.

@@ -2829,8 +2829,8 @@ const SheetsService = (() => {
       id_escuela: _txt(id),
       codigo_local: _txt(codigo),
       nombre: _txt(_first(r, ['nombre', 'NOMBRE', 'Nombre', 'Nombre del local escolar (*)', 'Nombre de Local Escolar', 'NOMBRE_LOCAL', 'NOMBRE_INSTITUCION', 'nombre_institucion', 'INSTITUCION', 'institucion', 'LOCAL', 'local'])),
-      departamento: _txt(_first(r, ['departamento', 'DEPTO', 'Departamento', 'DEPARTAMENTO', 'departamento_nombre'])),
-      distrito: _txt(_first(r, ['distrito', 'DIST', 'Distrito', 'DISTRITO', 'distrito_nombre'])),
+      departamento: _territoryText_(_first(r, ['departamento', 'DEPTO', 'Departamento', 'DEPARTAMENTO', 'departamento_nombre'])),
+      distrito: _territoryText_(_first(r, ['distrito', 'DIST', 'Distrito', 'DISTRITO', 'distrito_nombre'])),
       localidad: _txt(_first(r, ['localidad', 'LOCALIDAD', 'Localidad', 'BARRIO_LOCALIDAD', 'barrio_localidad'])),
       zona: _zona(_first(r, ['zona', 'ZONA', 'Zona', 'AREA', 'area', 'AMBITO', 'ambito'])),
       latitud: _coord(lat, 'lat'),
@@ -3469,6 +3469,29 @@ const SheetsService = (() => {
     return String(v).trim();
   }
 
+  function _territoryText_(v) {
+    if (v === undefined || v === null) return '';
+    if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v.getTime())) {
+      return _formatTerritoryDate_(v);
+    }
+    const text = String(v).trim();
+    if (!text) return '';
+    const parsed = _parseSerializedDateText_(text);
+    return parsed ? _formatTerritoryDate_(parsed) : text;
+  }
+
+  function _formatTerritoryDate_(date) {
+    const months = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+    return `${date.getDate()} DE ${months[date.getMonth()] || ''}`.trim();
+  }
+
+  function _parseSerializedDateText_(text) {
+    if (!text) return null;
+    if (text.indexOf('GMT') === -1 && !/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s/i.test(text)) return null;
+    const parsed = new Date(text);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  }
+
   function _clientMutationId(params) {
     return _txt(params && (params.clientMutationId || params.id_offline_queue));
   }
@@ -3488,8 +3511,8 @@ const SheetsService = (() => {
       id_escuela: _txt(row.id_escuela),
       codigo_local: _txt(row.codigo_local),
       nombre: _txt(row.nombre),
-      departamento: _txt(row.departamento),
-      distrito: _txt(row.distrito),
+      departamento: _territoryText_(row.departamento),
+      distrito: _territoryText_(row.distrito),
       localidad: _txt(row.localidad),
     };
   }
@@ -3514,8 +3537,8 @@ const SheetsService = (() => {
   function _districtsByDepartment_(rows) {
     const grouped = {};
     (rows || []).forEach(function(row) {
-      const departamento = _txt(row.departamento);
-      const distrito = _txt(row.distrito);
+      const departamento = _territoryText_(row.departamento);
+      const distrito = _territoryText_(row.distrito);
       if (!departamento || !distrito) return;
       const key = _r01TerritoryKey_(departamento);
       if (!grouped[departamento]) grouped[departamento] = [];
@@ -3548,8 +3571,8 @@ const SheetsService = (() => {
       director_nombre: _txt(row.director_nombre || row.director || row.directora || row.responsable || row.contacto),
       correo: _txt(row.correo || row.email || row.mail),
       celular: _txt(row.celular || row.telefono || row.whatsapp || row.numero),
-      departamento: _txt(row.departamento),
-      distrito: _txt(row.distrito),
+      departamento: _territoryText_(row.departamento),
+      distrito: _territoryText_(row.distrito),
       localidad: _txt(row.localidad || row.barrio || row.compania),
       url_cuestionario: _txt(row.url_cuestionario),
       estado_envio: _txt(row.estado_envio || row.estado),
