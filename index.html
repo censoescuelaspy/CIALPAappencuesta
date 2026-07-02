@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="CIALPA — Sistema de gestión del relevamiento escolar en Paraguay" />
+  <meta name="theme-color" content="#1F3864" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="CIALPA" />
+  <title>CIALPA — Relevamiento Escolar</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.205" />
+
+  <!-- Favicon placeholder -->
+  <link rel="icon" type="image/png" href="assets/img/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.205" />
+</head>
+<body>
+
+<!-- ── Global Loading Overlay ───────────────────────────────── -->
+<div id="global-loading" aria-live="assertive" role="status">
+  <div class="loading-spinner"></div>
+  <span class="loading-message">Cargando...</span>
+</div>
+
+<!-- ── Toast Container ──────────────────────────────────────── -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ────────────────────────────────────────────────────────────
+     LOGIN SCREEN
+     ──────────────────────────────────────────────────────────── -->
+<div id="login-screen" style="display:flex;">
+  <div class="login-card">
+    <div class="login-card__logo">
+      <img src="assets/img/logo.png" alt="CIALPA Logo"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+      <div class="login-card__logo-placeholder" style="display:none;">C</div>
+    </div>
+    <h1 class="login-card__title">CIALPA</h1>
+    <p class="login-card__subtitle">Relevamiento Escolar · Paraguay</p>
+
+    <p id="login-error" class="login-error"></p>
+
+    <!-- Demo mode notice — shown by JS when GAS_URL is not configured -->
+    <div id="demo-notice" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:.6rem .9rem;margin-bottom:.75rem;font-size:.82rem;color:#856404;line-height:1.4;">
+      <strong>Modo DEMO</strong> — Backend no configurado.<br>
+      Credenciales de prueba:<br>
+      &nbsp;• <code>admin</code> / <code>admin123</code><br>
+      &nbsp;• Primer acceso: <code>nombre.apellido</code> / clave numérica de 6 dígitos
+    </div>
+
+    <div class="auth-tabs" role="tablist" aria-label="Acceso">
+      <button type="button" class="auth-tab auth-tab--active" data-auth-panel="login" aria-pressed="true">Ingresar</button>
+      <button type="button" class="auth-tab" data-auth-panel="register" aria-pressed="false">Crear usuario</button>
+      <button type="button" class="auth-tab" data-auth-panel="recover" aria-pressed="false">Recuperar clave</button>
+    </div>
+
+    <form id="login-form" data-auth-form="login" autocomplete="on" novalidate>
+      <div class="form-group">
+        <label for="login-usuario">Usuario</label>
+        <input
+          id="login-usuario"
+          type="text"
+          class="form-control"
+          name="usuario"
+          placeholder="nombre.apellido"
+          autocomplete="username"
+          required
+          autofocus
+        />
+      </div>
+      <div class="form-group">
+        <label for="login-password">Contraseña</label>
+        <input
+          id="login-password"
+          type="password"
+          class="form-control"
+          name="password"
+          placeholder="Contraseña"
+          minlength="6"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem;">
+        Ingresar
+      </button>
+    </form>
+
+    <form id="register-form" data-auth-form="register" autocomplete="on" novalidate hidden>
+      <div class="form-group">
+        <label for="register-usuario">Usuario *</label>
+        <input id="register-usuario" type="text" class="form-control" name="usuario" placeholder="nombre.apellido" autocomplete="username" required />
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="register-nombres">Nombres *</label>
+          <input id="register-nombres" type="text" class="form-control" name="nombres" autocomplete="given-name" required />
+        </div>
+        <div class="form-group">
+          <label for="register-apellidos">Apellidos *</label>
+          <input id="register-apellidos" type="text" class="form-control" name="apellidos" autocomplete="family-name" required />
+        </div>
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="register-documento">Documento</label>
+          <input id="register-documento" type="text" class="form-control" name="documento" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="register-telefono">Telefono</label>
+          <input id="register-telefono" type="tel" class="form-control" name="telefono" autocomplete="tel" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="register-correo">Correo</label>
+        <input id="register-correo" type="email" class="form-control" name="correo" autocomplete="email" />
+        <small class="auth-help">Cargue correo o documento para recuperar la contrasena mas adelante.</small>
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="register-password">Contrasena *</label>
+          <input id="register-password" type="password" class="form-control" name="password" minlength="6" autocomplete="new-password" required />
+        </div>
+        <div class="form-group">
+          <label for="register-password-confirm">Repetir *</label>
+          <input id="register-password-confirm" type="password" class="form-control" name="password_confirm" minlength="6" autocomplete="new-password" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem;">
+        Crear usuario e ingresar
+      </button>
+    </form>
+
+    <form id="recover-form" data-auth-form="recover" autocomplete="on" novalidate hidden>
+      <div class="form-group">
+        <label for="recover-usuario">Usuario *</label>
+        <input id="recover-usuario" type="text" class="form-control" name="usuario" autocomplete="username" required />
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="recover-documento">Documento registrado</label>
+          <input id="recover-documento" type="text" class="form-control" name="documento" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label for="recover-correo">Correo registrado</label>
+          <input id="recover-correo" type="email" class="form-control" name="correo" autocomplete="email" />
+        </div>
+      </div>
+      <div class="form-row form-row--compact">
+        <div class="form-group">
+          <label for="recover-password">Nueva contrasena *</label>
+          <input id="recover-password" type="password" class="form-control" name="password" minlength="6" autocomplete="new-password" required />
+        </div>
+        <div class="form-group">
+          <label for="recover-password-confirm">Repetir *</label>
+          <input id="recover-password-confirm" type="password" class="form-control" name="password_confirm" minlength="6" autocomplete="new-password" required />
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top:.5rem;">
+        Actualizar contrasena
+      </button>
+    </form>
+
+    <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
+      Edición vigente <span class="app-version">v2.6.205</span> &mdash; CIALPA &copy; 2026
+    </p>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────
+     APP SHELL
+     ──────────────────────────────────────────────────────────── -->
+<div id="app-shell" style="display:none;">
+  <div id="sidebar-hotzone" aria-hidden="true"></div>
+
+  <!-- ── Sidebar ──────────────────────────────────────────── -->
+  <aside id="sidebar" role="navigation" aria-label="Navegación principal">
+    <div class="sidebar__logo">
+      <img src="assets/img/logo.png" alt="CIALPA"
+           onerror="this.style.display='none';" />
+      <div class="sidebar__logo-text">
+        CIALPA
+        <small>Relevamiento Escolar</small>
+      </div>
+    </div>
+
+    <ul id="sidebar-nav">
+      <!-- Populated by AppController._buildSidebar() -->
+    </ul>
+
+    <div class="sidebar__footer">
+      Edición vigente<br><strong class="app-version">v2.6.205</strong>
+      <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
+    </div>
+  </aside>
+
+  <!-- ── Main Area ─────────────────────────────────────────── -->
+  <div id="main-area">
+
+    <!-- Header bar -->
+    <header id="app-header">
+      <button id="sidebar-toggle" aria-label="Ocultar menú" aria-expanded="true" title="Menú">☰</button>
+      <span id="page-title">CIALPA — Relevamiento Escolar</span>
+      <div id="user-bar">
+        <!-- Populated by AppController._renderUserBar() -->
+      </div>
+      <button id="app-logout-fallback" class="btn btn-sm btn-outline app-header__logout" type="button" onclick="AppController.logout()">Salir</button>
+    </header>
+
+    <!-- Content area -->
+    <main id="content-area" role="main">
+
+      <!-- ======================================================
+           MODULE: INICIO
+           ====================================================== -->
+      <div id="module-inicio" class="module-panel module-panel--active">
+        <div class="page-header">
+          <h2>Inicio</h2>
+          <span id="inicio-fecha" class="text-muted" style="font-size:.875rem;"></span>
+        </div>
+        <div class="page-content">
+
+          <div class="inicio-hero">
+            <h2>Bienvenido al Sistema de Relevamiento Escolar</h2>
+            <p>Gestioná las encuestas de infraestructura escolar desde este panel.</p>
+          </div>
+
+          <div class="card" id="inicio-escuela-ejemplo">
+            <div class="card__header">
+              <h4 class="card__title">Escuela ficticia de ejemplo</h4>
+              <span class="badge badge--in-progress">Datos completos</span>
+            </div>
+            <p><strong>Escuela Ficticia CIALPA - Modelo Integral</strong></p>
+            <p class="text-muted">Incluye 3 bloques, Bloque 1 con 2 pisos, aulas operativas, aula en construccion y sanitarios cargados en cada piso.</p>
+            <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="SurveyModule.selectEscuela('ESC_DEMO_CIALPA')">Abrir ejemplo</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('mapa')">Ver en mapa</button>
+              <button class="btn btn-outline" onclick="SurveyModule.selectEscuela('ESC_DEMO_CIALPA'); setTimeout(() => AppController.showModule('mec'), 150)">Ver cuestionario MEC</button>
+            </div>
+          </div>
+
+          <div class="inicio-grid">
+            <div class="kpi-card" id="inicio-kpi-total" style="border-top-color:#1F3864;">
+              <span class="kpi-value" id="inicio-total">—</span>
+              <span class="kpi-label">Total Escuelas</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-final" style="border-top-color:#28a745;">
+              <span class="kpi-value" id="inicio-final">—</span>
+              <span class="kpi-label">Relevadas</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-curso" style="border-top-color:#fd7e14;">
+              <span class="kpi-value" id="inicio-curso">—</span>
+              <span class="kpi-label">En Curso</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-pendiente" style="border-top-color:#6c757d;">
+              <span class="kpi-value" id="inicio-pendiente">—</span>
+              <span class="kpi-label">Pendientes operativas</span>
+            </div>
+            <div class="kpi-card" id="inicio-kpi-avance" style="border-top-color:#E84C22;">
+              <span class="kpi-value" id="inicio-avance">—</span>
+              <span class="kpi-label">% Avance</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">Acciones rápidas</h4>
+            </div>
+            <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="AppController.showModule('mapa')">Ver Mapa</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('atlas')">Atlas departamental</button>
+              <button class="btn btn-secondary" onclick="AppController.showModule('encuesta')">Migrar datos al RUE-MEC</button>
+              <button class="btn btn-primary" onclick="AppController.showModule('registro')">Registro guiado</button>
+              <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Cuestionario inicial</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Planificación</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('arquitectura')">Metodologia</button>
+              <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">App, registros y evidencias</h4>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.205</span></span>
+            </div>
+            <div class="ops-actions">
+              <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
+              <button class="btn btn-outline" onclick="AppController.updateApp()">Actualizar app</button>
+              <button class="btn btn-outline" onclick="AppController.openWorkbook()">Libro en línea</button>
+              <button class="btn btn-outline" onclick="AppController.openEvidenceFolder()">Fotos y evidencias</button>
+              <button class="btn btn-primary" onclick="AppController.showModule('registro')">Abrir registro guiado</button>
+              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Gestionar cuestionario inicial</button>
+              <button class="btn btn-outline" onclick="AppController.showModule('plano')">Ver plano escuela</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: MAPA
+           ====================================================== -->
+      <div id="module-mapa" class="module-panel">
+        <div class="page-header">
+          <h2>Mapa de Escuelas</h2>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
+            <span id="map-count-summary" class="map-count-summary">Vista del mapa: cargando conteos...</span>
+            <span class="badge" style="background:var(--state-pendiente)" title="Pendientes dentro de la vista/filtros actuales del mapa">Pend. vista: <span id="map-count-pendiente">0</span></span>
+            <span class="badge" style="background:var(--state-en-curso)" title="En curso dentro de la vista/filtros actuales del mapa">Curso vista: <span id="map-count-en_curso">0</span></span>
+            <span class="badge" style="background:var(--state-finalizada)" title="Finalizadas dentro de la vista/filtros actuales del mapa">Final vista: <span id="map-count-finalizada">0</span></span>
+            <span class="badge" style="background:var(--state-incidencia)" title="Incidencias dentro de la vista/filtros actuales del mapa">Inc. vista: <span id="map-count-incidencia">0</span></span>
+            <span class="badge" style="background:#b7791f">Perim: <span id="map-count-perimeters">0</span></span>
+            <span class="badge" style="background:var(--color-secondary)" title="Total de escuelas dentro de la vista/filtros actuales del mapa">Total vista: <span id="map-count-total">0</span></span>
+            <div class="map-jump-controls" aria-label="Recorrer escuelas filtradas">
+              <button class="btn btn-sm btn-outline" type="button" title="Escuela anterior filtrada" onclick="MapModule.jumpFilteredSchool(-1)">Anterior</button>
+              <span id="map-jump-state" class="map-jump-state">0/0</span>
+              <button class="btn btn-sm btn-outline" type="button" title="Escuela siguiente filtrada" onclick="MapModule.jumpFilteredSchool(1)">Siguiente</button>
+            </div>
+            <button class="btn btn-sm btn-outline" onclick="MapModule.toggleRoutes()">Rutas</button>
+            <button id="map-perimeters-btn" class="btn btn-sm btn-outline" type="button" aria-pressed="false" onclick="MapModule.togglePerimeters()">Planos/perimetros</button>
+            <button id="map-cadastral-btn" class="btn btn-sm btn-outline" type="button" aria-pressed="false" onclick="MapModule.toggleCadastralLayer()">Catastro SNC</button>
+            <button class="btn btn-sm btn-outline" onclick="MapModule.exportCadastralCache('json')">Exportar catastro</button>
+            <button class="btn btn-sm btn-outline" onclick="MapModule.openCadastralDownloads()">Municipios SNC</button>
+            <button class="btn btn-sm btn-outline" onclick="MapModule.cacheVisibleMap()">Guardar mapa offline</button>
+            <button class="btn btn-sm btn-primary" data-min-role="admin" onclick="MapModule.promptAutoAssign()">Asignar sectores</button>
+          </div>
+        </div>
+
+        <div class="map-layout">
+          <!-- Sidebar -->
+          <div class="map-sidebar">
+            <div class="map-sidebar__filters">
+              <form id="map-filter-form" class="map-filter-form">
+                <div class="map-filter-search">
+                  <label for="filter-search">Buscar escuela</label>
+                  <input id="filter-search" type="text" class="form-control form-control-sm"
+                    placeholder="Nombre, codigo, distrito o localidad" autocomplete="off" />
+                </div>
+
+                <details class="map-filter-group" open>
+                  <summary>
+                    <span>Territorio</span>
+                    <small>Departamento, distrito y zona</small>
+                  </summary>
+                  <div class="map-filter-group__body">
+                    <div class="map-filter-field">
+                      <label class="map-filter-label">Departamento</label>
+                      <select id="filter-departamento" class="form-control form-control-sm map-filter-select">
+                        <option value="">Todos</option>
+                      </select>
+                    </div>
+                    <div class="map-filter-field">
+                      <label class="map-filter-label">Distrito</label>
+                      <select id="filter-distrito" class="form-control form-control-sm map-filter-select">
+                        <option value="">Todos</option>
+                      </select>
+                    </div>
+                    <div class="map-filter-field">
+                      <label class="map-filter-label">Zona</label>
+                      <input id="filter-zona" type="hidden" value="" />
+                      <div class="choice-button-strip choice-button-strip--scroll">
+                        <button class="choice-button choice-button--active" type="button" data-choice-target="filter-zona" data-choice-value="">Todas</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-zona" data-choice-value="Urbana">Urbana</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-zona" data-choice-value="Rural">Rural</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-zona" data-choice-value="Rural Remota">Rural Remota</button>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+
+                <details class="map-filter-group" open>
+                  <summary>
+                    <span>Operacion</span>
+                    <small>Estado, encuestador y muestra</small>
+                  </summary>
+                  <div class="map-filter-group__body">
+                    <div class="map-filter-field">
+                      <label class="map-filter-label">Estado</label>
+                      <input id="filter-estado" type="hidden" value="" />
+                      <div class="choice-button-strip choice-button-strip--scroll">
+                        <button class="choice-button choice-button--active" type="button" data-choice-target="filter-estado" data-choice-value="">Todos</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="pendiente">Pendiente</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="en_curso">En curso</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="finalizada">Finalizada</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-estado" data-choice-value="incidencia">Incidencia</button>
+                      </div>
+                    </div>
+                    <div class="map-filter-field">
+                      <label class="map-filter-label">Encuestador</label>
+                      <input id="filter-encuestador" type="hidden" value="" />
+                      <div class="choice-button-strip choice-button-strip--scroll" data-choice-list="filter-encuestador">
+                        <button class="choice-button choice-button--active" type="button" data-choice-target="filter-encuestador" data-choice-value="">Todos</button>
+                      </div>
+                    </div>
+                    <div class="map-filter-field">
+                      <label class="map-filter-label">Muestra</label>
+                      <input id="filter-piloto" type="hidden" value="" />
+                      <div class="choice-button-strip choice-button-strip--scroll">
+                        <button class="choice-button choice-button--active" type="button" data-choice-target="filter-piloto" data-choice-value="">Todo el padron</button>
+                        <button class="choice-button" type="button" data-choice-target="filter-piloto" data-choice-value="true">Piloto sorteada</button>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </form>
+              <div class="map-sidebar__filter-btns">
+                <button id="map-filter-apply" type="button" class="btn btn-sm btn-outline" style="flex:1;">Filtrado automatico</button>
+                <button id="map-filter-clear" type="button" class="btn btn-sm btn-outline">Limpiar</button>
+              </div>
+            </div>
+
+            <div id="map-school-list">
+              <p class="map-list__empty">Cargando escuelas...</p>
+            </div>
+          </div>
+
+          <!-- Map container -->
+          <div class="map-main">
+            <div id="map-offline-state" class="map-offline-state">Mapa offline: calculando...</div>
+            <div id="map-perimeters-state" class="map-perimeters-state">Planos/perimetros: cargando...</div>
+            <div id="map-cadastral-state" class="map-cadastral-state">Catastro SNC: desactivado</div>
+            <div id="map-container"></div>
+            <div id="map-info-panel" class="map-info-panel"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: ATLAS DEPARTAMENTAL
+           ====================================================== -->
+      <div id="module-atlas" class="module-panel department-atlas-module" data-min-role="supervisor">
+        <div class="page-header">
+          <div>
+            <h2>Atlas departamental de escuelas</h2>
+            <p id="atlas-status" class="text-muted">Cargando padron territorial...</p>
+          </div>
+          <div class="atlas-actions">
+            <button id="atlas-refresh-btn" class="btn btn-sm btn-outline" type="button">Actualizar</button>
+            <button id="atlas-copy-btn" class="btn btn-sm btn-outline" type="button">Copiar imagen</button>
+            <button id="atlas-print-map-only-btn" class="btn btn-sm btn-outline" type="button">Imprimir solo mapa</button>
+            <button id="atlas-print-btn" class="btn btn-sm btn-primary" type="button">Imprimir vista</button>
+          </div>
+        </div>
+
+        <div class="page-content atlas-page">
+          <div id="atlas-mode-toggle" class="atlas-mode-toggle" aria-label="Modo del atlas"></div>
+          <div id="atlas-department-buttons" class="atlas-department-buttons" aria-label="Departamentos"></div>
+
+          <section class="atlas-workbench">
+            <div class="atlas-main">
+              <div id="atlas-kpi-grid" class="atlas-kpi-grid" aria-live="polite"></div>
+              <div class="atlas-map-card">
+                <div id="atlas-map"></div>
+              </div>
+            </div>
+
+            <aside class="atlas-detail-panel">
+              <div class="atlas-detail-header">
+                <span class="eyebrow">Vista activa</span>
+                <h3 id="atlas-detail-title">Resumen nacional</h3>
+                <p id="atlas-detail-summary">Sin datos cargados.</p>
+              </div>
+              <div id="atlas-status-bars" class="atlas-status-bars"></div>
+              <div id="atlas-district-list" class="atlas-district-list"></div>
+              <div id="atlas-school-list" class="atlas-school-list"></div>
+            </aside>
+          </section>
+        </div>
+
+      </div>
+
+      <!-- ======================================================
+           MODULE: MIGRAR DATOS RUE-MEC
+           ====================================================== -->
+      <div id="module-encuesta" class="module-panel">
+        <div class="page-header">
+          <h2>Migrar datos al RUE-MEC</h2>
+          <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mapa')">
+            Seleccionar en mapa
+          </button>
+        </div>
+        <div class="page-content">
+          <div id="survey-panel">
+            <div class="survey-empty">
+              <h3>En desarrollo</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: CUESTIONARIO MEC
+           ====================================================== -->
+      <div id="module-mec" class="module-panel">
+        <div class="page-content">
+          <div id="mec-form-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: REGISTRO GUIADO
+           ====================================================== -->
+      <div id="module-registro" class="module-panel">
+        <div class="page-content page-content--flush">
+          <div id="guided-register-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: PLANO ESCUELA
+           ====================================================== -->
+      <div id="module-plano" class="module-panel">
+        <div class="page-header">
+          <div>
+            <h2>Plano escuela</h2>
+            <p class="text-muted">Vista tecnica del plano general y resumen dimensional del relevamiento cargado.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="AppController.printPlanPdf()">Imprimir PDF</button>
+            <a class="btn btn-primary btn-sm" href="mec-ficha.html" target="_blank" rel="noopener">Registro arquitectónico</a>
+            <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mec')">Editar cuestionario</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="school-plan-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: METODOLOGIA Y DATOS
+           ====================================================== -->
+      <div id="module-arquitectura" class="module-panel">
+        <div class="page-header">
+          <div>
+            <h2>Metodologia de funcionamiento y datos</h2>
+            <p class="text-muted">Como opera CIALPA de punta a punta: herramientas usadas, interconexion, captura offline, resguardo formal, integridad y trazabilidad.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="AppController.showModule('mec')">Abrir cuestionario</button>
+            <button class="btn btn-outline btn-sm" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Ver planificacion</button>
+            <button class="btn btn-primary btn-sm" onclick="AppController.showModule('plano')">Ver plano</button>
+          </div>
+        </div>
+        <div class="page-content architecture-page">
+          <section class="method-hero">
+            <div>
+              <span class="eyebrow">Modelo operativo CIALPA</span>
+              <h3>La app combina captura de campo, respaldo local, backend auditable y una ruta de base de datos transaccional.</h3>
+              <p>El flujo actual conserva la operacion simple con Google Sheets y Drive, pero ya deja preparada la maduracion hacia PostgreSQL mediante una cola idempotente y una API de sincronizacion. El objetivo es que cada respuesta tenga autor, momento, dispositivo, version del formulario, escuela, institucion, estado y evidencia relacionada.</p>
+            </div>
+            <div class="method-hero__metrics" aria-label="Criterios de gobierno de datos">
+              <article><strong>1</strong><span>dato capturado una vez, reutilizable para campo, gabinete y MEC.</span></article>
+              <article><strong>3</strong><span>niveles de resguardo: dispositivo, Sheets/Drive y base formal.</span></article>
+              <article><strong>100%</strong><span>de escrituras criticas con usuario, fecha, version y estado.</span></article>
+            </div>
+          </section>
+
+          <section class="architecture-flow" aria-label="Diagrama funcional del sistema">
+            <article class="architecture-node architecture-node--field">
+              <span>1</span>
+              <h3>Captura en campo</h3>
+              <p>Encuestador, supervisor o director registra escuela, servicios, bloques, pisos, aulas, sanitarios, exteriores, fotos, GPS y tiempos.</p>
+              <small>Tablet, celular, notebook</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--app">
+              <span>2</span>
+              <h3>App web PWA</h3>
+              <p>GitHub Pages entrega HTML, CSS y JS versionados. El Service Worker guarda el app shell para abrir la app aun con conectividad inestable.</p>
+              <small>HTML, CSS, JS, Cache API</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--capture">
+              <span>3</span>
+              <h3>Borrador local</h3>
+              <p>La ficha MEC, el plano, evidencias y cola offline se guardan en el navegador antes de depender del servidor.</p>
+              <small>localStorage, IndexedDB</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--local">
+              <span>4</span>
+              <h3>Backend auditable</h3>
+              <p>Google Apps Script valida usuario, rol, escuela asignada, estructura del paquete y registra logs, errores y sesiones.</p>
+              <small>GAS Web App, HTTPS</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--sync">
+              <span>5</span>
+              <h3>Repositorio operativo</h3>
+              <p>Sheets conserva datos tabulares y Drive organiza fotos, anexos, JSON y paquetes de sincronizacion.</p>
+              <small>Sheets, Drive, LOG</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--repo">
+              <span>6</span>
+              <h3>Cola formal</h3>
+              <p>Cada guardado MEC deja una mutacion idempotente en <code>db_sync_queue</code> para reintentar, auditar y migrar sin perder datos.</p>
+              <small>clientMutationId, JSON</small>
+            </article>
+            <i aria-hidden="true"></i>
+            <article class="architecture-node architecture-node--decision">
+              <span>7</span>
+              <h3>Base transaccional</h3>
+              <p>La ruta de maduracion normaliza escuelas, instituciones, bloques, ambientes, sanitarios, evidencias y auditoria en PostgreSQL.</p>
+              <small>Cloud SQL, Supabase o AlloyDB</small>
+            </article>
+          </section>
+
+          <section class="architecture-grid">
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Ciclo metodologico del dato</h3>
+              <div class="method-timeline">
+                <div><strong>1. Identificacion</strong><span>Se selecciona escuela/local escolar desde padron, asignacion o enlace publico. Se fijan codigo local, nombre, departamento, distrito, localidad, usuario y version de app.</span></div>
+                <div><strong>2. Captura guiada</strong><span>El Registro guiado pregunta por etapas: ubicacion base, perimetro, bloques, pisos, aulas, sanitarios, exteriores, servicios, electricidad, evidencias y revision final.</span></div>
+                <div><strong>3. Autoguardado</strong><span>Cada avance actualiza el borrador local. Si no hay conexion, el registro queda en cola local y se sincroniza al volver Internet.</span></div>
+                <div><strong>4. Sincronizacion</strong><span>La capa API envia el paquete al Web App de Apps Script. El backend valida token, permisos, columnas y estado antes de escribir.</span></div>
+                <div><strong>5. Resguardo operativo</strong><span>Sheets recibe filas consultables; Drive recibe fotos y JSON; LOG/ERRORES registran eventos, fallas y trazabilidad tecnica.</span></div>
+                <div><strong>6. Consolidacion formal</strong><span>El paquete puede reprocesarse desde <code>db_sync_queue</code>, <code>mec_borradores</code> o JSONL con <code>npm run db:consolidate</code>.</span></div>
+                <div><strong>7. Uso institucional</strong><span>Mapa, tableros, planificacion, auditoria, reportes y exportaciones consultan datos con filtros por territorio, escuela, institucion, fecha, usuario y estado.</span></div>
+              </div>
+            </article>
+
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Que se guarda, donde y con que finalidad</h3>
+              <div class="architecture-table-wrap">
+                <table class="architecture-table">
+                  <thead>
+                    <tr><th>Dato</th><th>Captura o clave tecnica</th><th>Destino actual</th><th>Destino formal</th><th>Uso operativo</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td>Sesion de usuario</td><td><code>sessionStorage: cialpa_session</code>, usuario, rol, token y expiracion</td><td>Validacion por Apps Script</td><td><code>users</code>, <code>survey_sessions</code>, <code>audit_log</code></td><td>Autenticacion, permisos y responsabilidad de cada accion.</td></tr>
+                    <tr><td>Escuela/local e institucion</td><td><code>codigo_local</code>, <code>id_escuela</code>, nombre, territorio y muestra</td><td><code>escuelas_seleccionadas</code>, padron oficial</td><td><code>schools</code>, <code>school_institutions</code>, <code>assignments</code></td><td>Unidad territorial y edilicia para todos los cruces.</td></tr>
+                    <tr><td>Borrador MEC y plano</td><td><code>cialpa_mec_form_draft_v1</code>, bloques, pisos, aulas, sanitarios, exteriores y geometria</td><td><code>mec_borradores</code>, JSON de Drive</td><td><code>mec_drafts</code> JSONB + tablas normalizadas</td><td>Continuidad de carga, revision tecnica y recuperacion.</td></tr>
+                    <tr><td>Respuestas del cuestionario inicial</td><td>Token publico, escuela, contacto, agua, sanitarios, Internet, CCTV, energia y adjuntos</td><td><code>r01_cuestionario_inicial</code>, <code>r01_envios_cuestionario</code></td><td><code>previsit_surveys</code>, <code>evidence_files</code></td><td>Preparar visita y contrastar respuestas con relevamiento in situ.</td></tr>
+                    <tr><td>Evidencias y anexos</td><td>Foto, PDF, croquis, entidad vinculada, usuario y contexto escolar</td><td>Google Drive + hoja <code>evidencias</code></td><td><code>evidence_files</code> con URL, hash, entidad y version</td><td>Soporte fotografico y documental verificable.</td></tr>
+                    <tr><td>Tiempos logisticos</td><td><code>timeTracking</code>, inicio, cierre, minutos por escuela/aula/sanitario/exterior</td><td><code>mec_borradores</code> y planificacion</td><td><code>time_tracking_items</code>, columnas resumen en <code>mec_drafts</code></td><td>Calcular productividad, rutas, cargas de trabajo y costos.</td></tr>
+                    <tr><td>Cola offline y reintentos</td><td><code>IndexedDB: cialpa_offline_store</code>, endpoint, payload, intentos y ultimo error</td><td>Reintento desde la app al volver conexion</td><td><code>sync_mutations</code> con idempotencia</td><td>No perder respuestas por cortes de Internet.</td></tr>
+                    <tr><td>Auditoria</td><td>login, guardado, cierre, error, exportacion, cambio de usuario o configuracion</td><td>Hojas <code>LOG</code> y <code>ERRORES</code></td><td><code>audit_log</code> inmutable</td><td>Reconstruir quien hizo que, cuando, desde donde y con que version.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Herramientas y responsabilidades</h3>
+              <ul class="architecture-list">
+                <li><strong>GitHub Pages:</strong> publica la app estatica y permite cache-busting por version.</li>
+                <li><strong>Service Worker:</strong> conserva app shell, evita pantalla en blanco y renueva cache con <code>Actualizar app</code>.</li>
+                <li><strong>JavaScript PWA:</strong> coordina login, mapa, formularios, plano, tableros, cola offline y sincronizacion.</li>
+                <li><strong>Google Apps Script:</strong> funciona como API auditable y puente de integracion con Sheets, Drive y la base formal.</li>
+                <li><strong>Google Sheets:</strong> base operativa visible para administracion, control rapido y contingencia.</li>
+                <li><strong>Google Drive:</strong> resguarda fotos, anexos, PDFs, JSON completos y payloads de sincronizacion.</li>
+                <li><strong>PostgreSQL:</strong> destino formal para integridad referencial, auditoria, consultas y escalamiento.</li>
+                <li><strong>Consolidador DB:</strong> reenvia exportes historicos y errores de cola a la API transaccional con idempotencia.</li>
+                <li><strong>Leaflet, OSM y Canvas:</strong> mapa territorial, base mapa de escuela y plano tecnico editable.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Integridad, consistencia y trazabilidad</h3>
+              <ul class="architecture-list architecture-list--checks">
+                <li>Cada registro debe tener <code>id_registro</code>, <code>app_version</code>, usuario, rol, fecha cliente y fecha servidor.</li>
+                <li>Cada sincronizacion debe usar <code>clientMutationId</code> para que un reintento no duplique filas.</li>
+                <li>El backend valida permisos por rol y escuela asignada; la interfaz solo ayuda, no es la autoridad.</li>
+                <li>Las entidades se relacionan por <code>school_key</code>, <code>institution_key</code>, bloque, piso, ambiente, sanitario y evidencia.</li>
+                <li>Los cambios sensibles quedan en LOG/ERRORES y, al migrar, en <code>audit_log</code> inmutable.</li>
+                <li>Los cierres finales no deben degradarse a borrador por autoguardados posteriores.</li>
+                <li>Las fotos quedan vinculadas a escuela y entidad tecnica; no se guardan como archivos sueltos sin contexto.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Modelo de base de datos formal propuesto</h3>
+              <div class="method-schema">
+                <div><strong>Identidad y acceso</strong><span><code>users</code>, <code>roles</code>, <code>assignments</code>, <code>survey_sessions</code></span></div>
+                <div><strong>Territorio escolar</strong><span><code>schools</code>, <code>school_institutions</code>, <code>school_samples</code></span></div>
+                <div><strong>Captura MEC</strong><span><code>mec_drafts</code>, <code>school_submissions</code>, <code>buildings</code>, <code>floors</code>, <code>rooms</code></span></div>
+                <div><strong>Objetos y servicios</strong><span><code>room_objects</code>, <code>sanitary_groups</code>, <code>sanitary_objects</code>, <code>site_elements</code></span></div>
+                <div><strong>Evidencias</strong><span><code>evidence_files</code> con URL, hash, entidad, usuario y version</span></div>
+                <div><strong>Sincronizacion</strong><span><code>sync_mutations</code>, estado, intentos, error y payload resumido</span></div>
+                <div><strong>Auditoria</strong><span><code>audit_log</code> para accion, usuario, rol, IP/dispositivo, modulo y detalle</span></div>
+                <div><strong>Analitica</strong><span>vistas materializadas o consultas para tableros, tiempos, avance tecnico, danos y fallas</span></div>
+              </div>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Estados del dato</h3>
+              <ul class="architecture-list">
+                <li><strong>BORRADOR LOCAL:</strong> existe solo en el dispositivo y puede editarse.</li>
+                <li><strong>PENDIENTE_SYNC:</strong> ficha completa o parcial esta en cola por falta de conexion.</li>
+                <li><strong>RECIBIDO:</strong> Apps Script confirmo escritura en Sheets/Drive.</li>
+                <li><strong>EN_COLA_DB:</strong> el paquete quedo registrado para base formal.</li>
+                <li><strong>SINCRONIZADO_DB:</strong> PostgreSQL aplico transaccion e idempotencia.</li>
+                <li><strong>VALIDADO / OBSERVADO / ANULADO:</strong> supervision institucional decide consistencia tecnica y vigencia.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel">
+              <h3>Controles tecnicos</h3>
+              <ul class="architecture-list">
+                <li>Validaciones frontend para campos obligatorios, formatos, coordenadas, montos, fechas y dependencias.</li>
+                <li>Validaciones backend para token, rol, escuela, encabezados, duplicados y estado permitido.</li>
+                <li>Reglas condicionales para no enviar campos ocultos cuando la respuesta base no corresponde.</li>
+                <li>Cache de catalogos y padron para evitar bloqueos si el backend no responde.</li>
+                <li>Revision por tableros: inconsistencias, alertas territoriales, evidencias, tiempos y cobertura.</li>
+                <li>Versionado de app y Service Worker para reproducir con que codigo fue levantado cada dato.</li>
+              </ul>
+            </article>
+
+            <article class="architecture-panel architecture-panel--wide">
+              <h3>Ruta de maduracion hacia base formal</h3>
+              <div class="architecture-roadmap">
+                <div>
+                  <strong>Fase 1 - Operacion actual</strong>
+                  <span>GitHub Pages + Apps Script + Sheets/Drive + offline local, con LOG y evidencias.</span>
+                </div>
+                <div>
+                  <strong>Fase 2 - Doble escritura</strong>
+                  <span>Guardar en Sheets y en <code>db_sync_queue</code>; reenviar a API PostgreSQL sin bloquear campo.</span>
+                </div>
+                <div>
+                  <strong>Fase 2B - Consolidacion historica</strong>
+                  <span>Usar <code>npm run db:consolidate</code> para pasar exportes de cola, borradores o JSONL a PostgreSQL y comparar conteos.</span>
+                </div>
+                <div>
+                  <strong>Fase 3 - Fuente oficial</strong>
+                  <span>PostgreSQL pasa a fuente primaria; Sheets queda como exportacion y control operativo.</span>
+                </div>
+                <div>
+                  <strong>Fase 4 - Gobierno nacional</strong>
+                  <span>Backups, retencion, vistas analiticas, catalogo de datos, auditoria completa y reportes MEC.</span>
+                </div>
+              </div>
+            </article>
+          </section>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: ENCUESTADORES (admin only)
+           ====================================================== -->
+      <div id="module-encuestadores" class="module-panel" data-min-role="admin">
+        <div class="page-header">
+          <div>
+            <h2>Administrar encuestadores</h2>
+            <p class="text-muted">Alta, edicion, estado y roles de usuarios de campo.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="AdminModule.loadEncuestadores()">Actualizar</button>
+            <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo encuestador</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div class="enc-admin-summary">
+            <div class="enc-admin-kpi">
+              <small>Total</small>
+              <strong id="enc-total">0</strong>
+            </div>
+            <div class="enc-admin-kpi enc-admin-kpi--active">
+              <small>Activos</small>
+              <strong id="enc-activos">0</strong>
+            </div>
+            <div class="enc-admin-kpi enc-admin-kpi--inactive">
+              <small>Inactivos</small>
+              <strong id="enc-inactivos">0</strong>
+            </div>
+            <div class="enc-admin-kpi enc-admin-kpi--role">
+              <small>Supervisores/admin</small>
+              <strong id="enc-supervisores">0</strong>
+            </div>
+          </div>
+
+          <div id="solicitudes-relevamiento-admin" class="card" style="margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+              <div>
+                <strong>Solicitudes de relevamiento pendientes</strong>
+                <p class="text-muted" style="margin:.35rem 0 0;">Cargando solicitudes de usuarios...</p>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="AdminModule.loadSolicitudesRelevamiento()">Actualizar</button>
+            </div>
+          </div>
+
+          <section id="formularios-mec-admin-panel" class="card" style="margin-bottom:1rem;">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;flex-wrap:wrap;">
+              <div>
+                <strong>Formularios MEC cargados por censista</strong>
+                <p class="text-muted" style="margin:.35rem 0 0;">Listado administrativo de fichas guardadas y finalizadas.</p>
+              </div>
+              <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button class="btn btn-outline btn-sm" type="button" onclick="AdminModule.exportFormulariosMecCsv()">CSV</button>
+                <button class="btn btn-outline btn-sm" type="button" onclick="AdminModule.loadFormulariosMec()">Actualizar</button>
+              </div>
+            </div>
+            <div class="enc-admin-summary" style="margin-top:.85rem;">
+              <div class="enc-admin-kpi"><small>Formularios</small><strong id="formularios-mec-total">0</strong></div>
+              <div class="enc-admin-kpi"><small>Censistas</small><strong id="formularios-mec-censistas">0</strong></div>
+              <div class="enc-admin-kpi"><small>Escuelas</small><strong id="formularios-mec-escuelas">0</strong></div>
+              <div class="enc-admin-kpi enc-admin-kpi--active"><small>Finalizados</small><strong id="formularios-mec-finalizados">0</strong></div>
+              <div class="enc-admin-kpi"><small>Elementos</small><strong id="formularios-mec-elementos">0</strong></div>
+              <div class="enc-admin-kpi"><small>Evidencias</small><strong id="formularios-mec-evidencias">0</strong></div>
+            </div>
+            <div id="formularios-mec-user-summary" class="enc-admin-user-summary"></div>
+            <form id="formularios-mec-filter-form" class="enc-admin-toolbar" style="margin-top:.85rem;">
+              <div class="enc-admin-filter">
+                <label for="formularios-mec-filter-usuario">Censista</label>
+                <select id="formularios-mec-filter-usuario" class="form-control form-control-sm">
+                  <option value="">Todos los censistas</option>
+                </select>
+              </div>
+              <div class="enc-admin-filter">
+                <label for="formularios-mec-filter-estado">Estado</label>
+                <select id="formularios-mec-filter-estado" class="form-control form-control-sm">
+                  <option value="">Todos los estados</option>
+                </select>
+              </div>
+              <div class="enc-admin-search">
+                <label for="formularios-mec-filter-search">Buscar</label>
+                <input id="formularios-mec-filter-search" type="text" class="form-control form-control-sm" placeholder="Escuela, codigo, distrito o censista" autocomplete="off" />
+              </div>
+              <div style="align-self:flex-end;">
+                <button type="submit" class="btn btn-sm btn-primary">Filtrar</button>
+              </div>
+            </form>
+            <div class="table-wrapper" style="margin-top:.85rem;">
+              <table class="enc-admin-table">
+                <thead>
+                  <tr>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="usuario" onclick="AdminModule.sortFormulariosMec('usuario')">Censista</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="actualizado" onclick="AdminModule.sortFormulariosMec('actualizado')">Actualizado</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="escuela" onclick="AdminModule.sortFormulariosMec('escuela')">Escuela</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="ubicacion" onclick="AdminModule.sortFormulariosMec('ubicacion')">Ubicacion</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="estado" onclick="AdminModule.sortFormulariosMec('estado')">Estado</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="bloques" onclick="AdminModule.sortFormulariosMec('bloques')">Bloques</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="aulas" onclick="AdminModule.sortFormulariosMec('aulas')">Aulas</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="sanitarios" onclick="AdminModule.sortFormulariosMec('sanitarios')">Sanitarios</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="exteriores" onclick="AdminModule.sortFormulariosMec('exteriores')">Exteriores</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="evidencias" onclick="AdminModule.sortFormulariosMec('evidencias')">Evid.</button></th>
+                    <th><button class="table-sort-button" type="button" data-formularios-sort="tiempo" onclick="AdminModule.sortFormulariosMec('tiempo')">Tiempo</button></th>
+                    <th>Accion</th>
+                  </tr>
+                </thead>
+                <tbody id="formularios-mec-tbody">
+                  <tr><td colspan="12" class="text-center text-muted">Cargando formularios...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <form id="enc-filter-form" class="enc-admin-toolbar">
+            <div class="enc-admin-search">
+              <label for="enc-filter-search">Buscar</label>
+              <input id="enc-filter-search" type="text" class="form-control form-control-sm" placeholder="Usuario, nombre, documento, telefono o zona" autocomplete="off" />
+            </div>
+            <div class="enc-admin-filter">
+              <label>Estado</label>
+              <input id="enc-filter-estado" type="hidden" value="" />
+              <div class="choice-button-strip">
+                <button class="choice-button choice-button--active" type="button" data-choice-target="enc-filter-estado" data-choice-value="">Todos</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-estado" data-choice-value="activo">Activos</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-estado" data-choice-value="inactivo">Inactivos</button>
+              </div>
+            </div>
+            <div class="enc-admin-filter">
+              <label>Rol</label>
+              <input id="enc-filter-rol" type="hidden" value="" />
+              <div class="choice-button-strip">
+                <button class="choice-button choice-button--active" type="button" data-choice-target="enc-filter-rol" data-choice-value="">Todos</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-rol" data-choice-value="encuestador">Encuestador</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-rol" data-choice-value="supervisor">Supervisor</button>
+                <button class="choice-button" type="button" data-choice-target="enc-filter-rol" data-choice-value="admin">Admin</button>
+              </div>
+            </div>
+          </form>
+
+          <div class="table-wrapper card">
+            <table class="enc-admin-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Usuario</th>
+                  <th>Nombre</th>
+                  <th>Rol</th>
+                  <th>Documento</th>
+                  <th>Teléfono</th>
+                  <th>Correo</th>
+                  <th>Zona</th>
+                  <th>Estado</th>
+                  <th>Alta</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="enc-tbody">
+                <tr><td colspan="11" class="text-center text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: MANUAL
+           ====================================================== -->
+      <div id="module-manual" class="module-panel">
+        <div class="page-header">
+          <h2>Manual del Encuestador</h2>
+          <a href="manual/index.html" target="_blank" class="btn btn-outline btn-sm">Ver manual completo</a>
+        </div>
+        <div class="page-content">
+          <div class="card">
+            <p>El manual del encuestador está disponible como panel lateral y como documento completo en formato Markdown. Use este material para operar la app web CIALPA, registrar evidencias y preparar la futura migración al RUE-MEC.</p>
+            <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
+              <button class="btn btn-primary" onclick="ManualModule.open()">Abrir manual</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('aplicar')">Migración RUE-MEC</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('incidencias')">Incidencias</button>
+              <button class="btn btn-outline" onclick="ManualModule.open('errores')">Errores frecuentes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: INCIDENCIAS
+           ====================================================== -->
+      <div id="module-incidencias" class="module-panel">
+        <div class="page-header">
+          <h2>Incidencias</h2>
+          <button class="btn btn-sm btn-danger" onclick="IncidenciasModule.openNew('')">
+            + Nueva Incidencia
+          </button>
+        </div>
+        <div class="page-content">
+          <div class="table-wrapper card">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha/Hora</th>
+                  <th>Escuela</th>
+                  <th>Encuestador</th>
+                  <th>Tipo</th>
+                  <th>Prioridad</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="incidencias-tbody">
+                <tr><td colspan="7" class="text-center text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: COMENTARIOS Y MEJORAS DE LA APP
+           ====================================================== -->
+      <div id="module-comentarios" class="module-panel">
+        <div class="page-header">
+          <h2>Comentarios y mejoras</h2>
+          <button class="btn btn-sm btn-primary" onclick="FeedbackModule.focusForm()">
+            + Nuevo comentario
+          </button>
+        </div>
+        <div class="page-content feedback-module">
+          <section class="feedback-layout">
+            <form id="feedback-form" class="card feedback-form" autocomplete="off">
+              <div class="card__header">
+                <h3 class="card__title">Enviar comentario sobre la app</h3>
+                <span id="feedback-user-context" class="text-muted"></span>
+              </div>
+              <div class="form-row form-row--compact">
+                <div class="form-group">
+                  <label>Categoria *</label>
+                  <input id="feedback-categoria" name="categoria" type="hidden" value="mejora" />
+                  <div class="choice-button-grid feedback-choice-grid">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="feedback-categoria" data-choice-value="mejora">Mejora</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="error">Error</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="interfaz">Interfaz</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="rendimiento">Rendimiento</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="datos">Datos</button>
+                    <button class="choice-button" type="button" data-choice-target="feedback-categoria" data-choice-value="otro">Otro</button>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Prioridad *</label>
+                  <input id="feedback-prioridad" name="prioridad" type="hidden" value="media" />
+                  <div class="choice-button-strip">
+                    <button class="choice-button choice-button--success" type="button" data-choice-target="feedback-prioridad" data-choice-value="baja">Baja</button>
+                    <button class="choice-button choice-button--warning choice-button--active" type="button" data-choice-target="feedback-prioridad" data-choice-value="media">Media</button>
+                    <button class="choice-button choice-button--danger" type="button" data-choice-target="feedback-prioridad" data-choice-value="alta">Alta</button>
+                    <button class="choice-button choice-button--danger" type="button" data-choice-target="feedback-prioridad" data-choice-value="critica">Critica</button>
+                  </div>
+                </div>
+              </div>
+              <div class="form-row form-row--compact">
+                <div class="form-group">
+                  <label for="feedback-modulo">Modulo o vista</label>
+                  <select id="feedback-modulo" name="modulo" class="form-control">
+                    <option value="Actual">Vista actual</option>
+                    <option value="Inicio">Inicio</option>
+                    <option value="Mapa">Mapa</option>
+                    <option value="Registro guiado">Registro guiado</option>
+                    <option value="Plano escuela">Plano escuela</option>
+                    <option value="Infraestructura MEC">Infraestructura MEC</option>
+                    <option value="Administracion">Administracion</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="feedback-titulo">Titulo breve *</label>
+                  <input id="feedback-titulo" name="titulo" type="text" class="form-control" maxlength="140" placeholder="Ej.: Boton de calles no responde" required />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="feedback-descripcion">Comentario o sugerencia *</label>
+                <textarea id="feedback-descripcion" name="descripcion" class="form-control" rows="5" placeholder="Explique que ocurre, que esperaba que pasara o que mejora propone." required></textarea>
+              </div>
+              <div class="form-group">
+                <label for="feedback-pasos">Pasos para reproducir o contexto</label>
+                <textarea id="feedback-pasos" name="pasos_reproduccion" class="form-control" rows="3" placeholder="Ej.: 1. Abrir Perimetro predio. 2. Insertar puerta. 3. El zoom cambia."></textarea>
+              </div>
+              <div class="feedback-form__footer">
+                <small id="feedback-context-preview" class="text-muted"></small>
+                <button class="btn btn-primary" type="submit">Enviar comentario</button>
+              </div>
+            </form>
+
+            <section class="card feedback-board">
+              <div class="card__header feedback-board__header">
+                <div>
+                  <h3 class="card__title" id="feedback-list-title">Mis comentarios</h3>
+                  <p id="feedback-list-subtitle" class="text-muted">Seguimiento de comentarios enviados.</p>
+                </div>
+                <button class="btn btn-sm btn-outline" type="button" onclick="FeedbackModule.loadList()">Actualizar</button>
+              </div>
+              <div id="feedback-admin-tools" class="feedback-admin-tools" data-min-role="admin">
+                <div class="form-group">
+                  <label for="feedback-filter-estado">Estado</label>
+                  <select id="feedback-filter-estado" class="form-control">
+                    <option value="">Todos</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_revision">En revision</option>
+                    <option value="resuelto">Resuelto</option>
+                    <option value="descartado">Descartado</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="feedback-filter-prioridad">Prioridad</label>
+                  <select id="feedback-filter-prioridad" class="form-control">
+                    <option value="">Todas</option>
+                    <option value="critica">Critica</option>
+                    <option value="alta">Alta</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                  </select>
+                </div>
+              </div>
+              <div class="table-wrapper feedback-table-wrapper">
+                <table class="feedback-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Usuario</th>
+                      <th>Modulo</th>
+                      <th>Comentario</th>
+                      <th>Prioridad</th>
+                      <th>Estado</th>
+                      <th data-min-role="admin">Gestion</th>
+                    </tr>
+                  </thead>
+                  <tbody id="feedback-tbody">
+                    <tr><td colspan="7" class="text-center text-muted">Cargando comentarios...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: MI JORNADA
+           ====================================================== -->
+      <div id="module-jornada" class="module-panel">
+        <div class="page-header">
+          <h2>Mi Jornada</h2>
+          <button id="jornada-refresh" class="btn btn-sm btn-outline">↺ Actualizar</button>
+        </div>
+        <div class="page-content">
+          <div id="jornada-user-card">
+            <!-- Rendered by JornadaModule -->
+          </div>
+
+          <div class="kpi-grid" style="margin-bottom:1.5rem;">
+            <div class="kpi-card" style="border-top-color:#1F3864;">
+              <span class="kpi-value" id="jornada-kpi-hoy">—</span>
+              <span class="kpi-label">Sesiones hoy</span>
+            </div>
+            <div class="kpi-card" style="border-top-color:#28a745;">
+              <span class="kpi-value" id="jornada-kpi-fin">—</span>
+              <span class="kpi-label">Finalizadas hoy</span>
+            </div>
+            <div class="kpi-card" style="border-top-color:#dc3545;">
+              <span class="kpi-value" id="jornada-kpi-inc">—</span>
+              <span class="kpi-label">Incidencias hoy</span>
+            </div>
+            <div class="kpi-card" style="border-top-color:#E84C22;">
+              <span class="kpi-value" id="jornada-kpi-min">—</span>
+              <span class="kpi-label">Tiempo total</span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:1.25rem;">
+            <div class="card__header" style="flex-wrap:wrap;gap:.5rem;">
+              <h4 class="card__title">Mis relevamientos</h4>
+              <div id="jornada-toolbar" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;"></div>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead id="jornada-sessions-thead">
+                  <tr>
+                    <th>Escuela</th>
+                    <th>Fecha</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th>Duración</th>
+                    <th>Estado</th>
+                    <th>Observaciones</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="jornada-sessions-tbody">
+                  <tr><td colspan="8" class="text-center text-muted">Cargando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card__header">
+              <h4 class="card__title">Mis incidencias</h4>
+            </div>
+            <div id="jornada-incidencias">
+              <!-- Rendered by JornadaModule -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: PANEL ESTADÍSTICO (supervisor/admin)
+           ====================================================== -->
+      <div id="module-estadisticas" class="module-panel stats-module" data-min-role="supervisor">
+        <div class="stats-hero">
+          <div>
+            <span class="eyebrow">Resultados globales</span>
+            <h2>Tablero ejecutivo CIALPA</h2>
+            <p>Avance territorial, desempeño de campo, evidencias y alertas en una vista navegable.</p>
+          </div>
+          <div class="stats-hero__actions">
+            <button class="btn btn-sm btn-outline" onclick="AppController.showModule('infraestructura')">Infraestructura MEC</button>
+            <button class="btn btn-sm btn-outline" onclick="StatsModule.exportCSV()">Exportar CSV</button>
+            <button class="btn btn-sm btn-outline" onclick="StatsModule.exportLocalJson()">JSON local</button>
+            <button class="btn btn-sm btn-primary" onclick="StatsModule.loadStats()">Actualizar</button>
+          </div>
+        </div>
+        <div class="page-content stats-page">
+          <div class="stats-workbench">
+            <aside class="stats-filter-panel">
+              <form id="stats-filter-form">
+                <div class="stats-filter-panel__head">
+                  <strong>Explorar resultados</strong>
+                  <span>Filtros activos</span>
+                </div>
+                <div class="stats-filter-row">
+                  <label>Fecha desde</label>
+                  <input type="date" name="fecha_desde" class="form-control form-control-sm" />
+                </div>
+                <div class="stats-filter-row">
+                  <label>Fecha hasta</label>
+                  <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
+                </div>
+                <div class="stats-filter-row">
+                  <label>Etapa</label>
+                  <input id="stats-filter-etapa" name="etapa" type="hidden" value="" />
+                  <div class="choice-button-strip stats-choice-strip">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-etapa" data-choice-value="">Todas</button>
+                    <button class="choice-button" type="button" data-choice-target="stats-filter-etapa" data-choice-value="piloto">Piloto muestral</button>
+                    <button class="choice-button" type="button" data-choice-target="stats-filter-etapa" data-choice-value="censal">Etapa censal</button>
+                  </div>
+                </div>
+                <div class="stats-filter-row">
+                  <label>Departamento</label>
+                  <input id="stats-filter-departamento" name="departamento" type="hidden" value="" />
+                  <div id="stats-dep-choices" class="choice-button-strip stats-choice-strip">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-departamento" data-choice-value="">Todos</button>
+                  </div>
+                </div>
+                <div class="stats-filter-row">
+                  <label>Encuestador</label>
+                  <input id="stats-filter-encuestador" name="encuestador" type="hidden" value="" />
+                  <div id="stats-enc-choices" class="choice-button-strip stats-choice-strip">
+                    <button class="choice-button choice-button--active" type="button" data-choice-target="stats-filter-encuestador" data-choice-value="">Todos</button>
+                  </div>
+                </div>
+                <div class="stats-filter-actions">
+                  <button id="stats-filter-apply" type="button" class="btn btn-sm btn-primary">Aplicar</button>
+                  <button id="stats-filter-reset" type="button" class="btn btn-sm btn-outline">Limpiar</button>
+                </div>
+              </form>
+            </aside>
+
+            <main class="stats-main-panel">
+              <div id="stats-executive-dashboard"></div>
+
+              <div class="stats-grid stats-grid--premium">
+                <div class="kpi-card stats-kpi-card" id="kpi-total">
+                  <span class="kpi-label">Universo</span>
+                  <span class="kpi-value" id="kpi-total-val">—</span>
+                  <small data-kpi-note>Escuelas monitoreadas</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-finalizadas">
+                  <span class="kpi-label">Relevadas</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Cerradas</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-en-curso">
+                  <span class="kpi-label">En curso</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Trabajo activo</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-pendientes">
+                  <span class="kpi-label">Pendientes</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Por iniciar</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-incidencias">
+                  <span class="kpi-label">Incidencias</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Alertas</small>
+                </div>
+                <div class="kpi-card stats-kpi-card" id="kpi-avance">
+                  <span class="kpi-label">Avance</span>
+                  <span class="kpi-value">—</span>
+                  <small data-kpi-note>Progreso general</small>
+                </div>
+              </div>
+
+              <section class="stats-progress-panel">
+                <div>
+                  <strong>Avance general</strong>
+                  <span>Progreso consolidado del operativo</span>
+                </div>
+                <div class="progress-track">
+                  <div id="stats-progress-bar" class="progress-bar" style="width:0%;">0%</div>
+                </div>
+              </section>
+
+              <div id="stats-insights" class="stats-insights-grid"></div>
+
+              <div class="charts-grid charts-grid--premium">
+                <div class="chart-card chart-card--full chart-card--premium">
+                  <div class="chart-card__head">
+                    <div>
+                      <span class="eyebrow">Territorio</span>
+                      <h4>Estado por departamento</h4>
+                    </div>
+                  </div>
+                  <canvas id="chart-departamento"></canvas>
+                </div>
+                <div class="chart-card chart-card--premium">
+                  <div class="chart-card__head">
+                    <div>
+                      <span class="eyebrow">Composición</span>
+                      <h4>Distribución general</h4>
+                    </div>
+                  </div>
+                  <canvas id="chart-donut"></canvas>
+                </div>
+                <div class="chart-card chart-card--premium">
+                  <div class="chart-card__head">
+                    <div>
+                      <span class="eyebrow">Ritmo</span>
+                      <h4>Progreso diario</h4>
+                    </div>
+                  </div>
+                  <canvas id="chart-daily"></canvas>
+                </div>
+              </div>
+
+              <section class="stats-section-grid">
+                <div class="card stats-territory-panel">
+                  <div class="card__header">
+                    <h4 class="card__title">Navegación territorial</h4>
+                  </div>
+                  <div id="stats-territory-board" class="territory-grid">
+                    <p class="text-muted text-center">Cargando...</p>
+                  </div>
+                </div>
+
+                <div class="card stats-activity-panel">
+                  <div class="card__header">
+                    <h4 class="card__title">Actividad reciente</h4>
+                  </div>
+                  <div id="stats-activity">
+                    <p class="text-muted text-center">Cargando...</p>
+                  </div>
+                </div>
+              </section>
+
+              <div class="card stats-ranking-panel">
+                <div class="card__header">
+                  <h4 class="card__title">Desempeño por encuestador</h4>
+                </div>
+                <div class="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Encuestador</th>
+                        <th>Asignadas</th>
+                        <th>Finalizadas</th>
+                        <th>Incidencias</th>
+                        <th>Tiempo promedio</th>
+                      </tr>
+                    </thead>
+                    <tbody id="stats-enc-tbody">
+                      <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div id="offline-dashboard" class="offline-dashboard"></div>
+              <div id="infra-dashboard" class="infra-dashboard"></div>
+            </main>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: INFRAESTRUCTURA MEC (supervisor/admin)
+           ====================================================== -->
+      <div id="module-infraestructura" class="module-panel mec-infra-module" data-min-role="supervisor">
+        <div class="stats-hero">
+          <div>
+            <span class="eyebrow">Infraestructura MEC</span>
+            <h2>Inteligencia de infraestructura escolar</h2>
+            <p>KPIs, mapas, tablas, figuras y segmentación territorial para convertir el relevamiento CIALPA en decisiones rápidas para el MEC.</p>
+          </div>
+          <div class="stats-hero__actions">
+            <button class="btn btn-sm btn-outline" onclick="StatsModule.loadMecInfrastructureDemo()">Demo 1000</button>
+            <button class="btn btn-sm btn-outline" onclick="StatsModule.exportMecInfrastructureJson()">JSON técnico</button>
+            <button class="btn btn-sm btn-primary" onclick="StatsModule.loadMecInfrastructure()">Actualizar</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="mec-infra-root">
+            <div class="loading-state">Cargando tablero de infraestructura MEC...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: UBICACION REAL (supervisor/admin)
+           ====================================================== -->
+      <div id="module-ubicacion" class="module-panel location-audit-module" data-min-role="supervisor">
+        <div class="page-header">
+          <div>
+            <h2>Ubicación real</h2>
+            <p class="text-muted">Coordenadas, enlaces de revisión y auditoría privada para ajustar el plano sobre el predio real.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="LocationAuditModule.exportBaseCsv()">CSV base</button>
+            <button class="btn btn-sm btn-primary" onclick="LocationAuditModule.load({ forceNetwork: true })">Actualizar</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="location-audit-root">
+            <div class="loading-state">Preparando revisión de ubicación...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: CUESTIONARIO INICIAL R01 (supervisor/admin)
+           ====================================================== -->
+      <div id="module-cuestionario-inicial" class="module-panel" data-min-role="supervisor">
+        <div class="page-header">
+          <div>
+            <h2>Cuestionario inicial R01</h2>
+            <p class="text-muted">Envio previo a directores, carga de contactos y seguimiento de respuestas antes de la visita in situ.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <a class="btn btn-sm btn-outline" href="cuestionario_inicial/" target="_blank" rel="noopener">Ver formulario publico</a>
+            <button class="btn btn-sm btn-primary" onclick="InitialQuestionnaire.loadDemoContacts()">Simular 50 contactos</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="initial-questionnaire-admin-root">
+            <div class="loading-state">Preparando gestor del cuestionario inicial...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: PLANIFICACION OPERATIVA (supervisor/admin)
+           ====================================================== -->
+      <div id="module-planificacion" class="module-panel" data-min-role="supervisor">
+        <div class="page-header">
+          <div>
+            <h2>Planificación operativa</h2>
+            <p class="text-muted">Estimación mínima de tiempos y distribución de escuelas por encuestador.</p>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+            <button class="btn btn-sm btn-outline" onclick="PlanningModule.exportCSV()">Exportar CSV</button>
+            <button class="btn btn-sm btn-success" data-min-role="supervisor" onclick="PlanningModule.saveAssignments()">Guardar cambios</button>
+            <button class="btn btn-sm btn-primary" onclick="PlanningModule.load({ forceNetwork: true })">↺ Actualizar</button>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="planning-root"></div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: CONFIGURACIÓN (admin only)
+           ====================================================== -->
+      <div id="module-configuracion" class="module-panel" data-min-role="admin">
+        <div class="page-header">
+          <div>
+            <h2>Configuracion de usuarios</h2>
+            <p class="text-muted">Alta, baja, edicion y reactivacion de encuestadores, supervisores y administradores.</p>
+          </div>
+        </div>
+        <div class="page-content">
+          <div id="admin-config-panel">
+            <div class="admin-tabs">
+              <button data-admin-tab="encuestadores" class="active" onclick="AdminModule._switchTab ? AdminModule._switchTab('encuestadores') : null">Encuestadores</button>
+              <button data-admin-tab="config" onclick="AdminModule._switchTab ? AdminModule._switchTab('config') : null">Parámetros</button>
+              <button data-admin-tab="auditoria" onclick="AdminModule._switchTab ? AdminModule._switchTab('auditoria') : null">Auditoría</button>
+            </div>
+
+            <div data-admin-content="config">
+              <div id="admin-config-list">
+                <p class="text-muted text-center" style="padding:2rem;">Cargando configuración...</p>
+              </div>
+            </div>
+
+            <div data-admin-content="encuestadores" class="active">
+              <div class="card" style="margin-bottom:1rem;">
+                <strong>Registro de nuevo encuestador</strong>
+                <p class="text-muted" style="margin:.35rem 0 0;">Los usuarios pueden registrarse desde el acceso inicial. El admin puede editar datos, estado, rol y luego asignar escuelas.</p>
+                <div style="margin-top:.75rem;">
+                  <button class="btn btn-outline btn-sm" onclick="AppController.showModule('planificacion'); setTimeout(() => PlanningModule.switchTab('asignaciones'), 150)">Asignar escuelas</button>
+                </div>
+              </div>
+              <div id="solicitudes-relevamiento-config" class="card" style="margin-bottom:1rem;">
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap;">
+                  <div>
+                    <strong>Solicitudes de relevamiento pendientes</strong>
+                    <p class="text-muted" style="margin:.35rem 0 0;">Cargando solicitudes de usuarios...</p>
+                  </div>
+                  <button class="btn btn-outline btn-sm" onclick="AdminModule.loadSolicitudesRelevamiento()">Actualizar</button>
+                </div>
+              </div>
+              <div style="margin-bottom:1rem;display:flex;justify-content:flex-end;">
+                <button class="btn btn-primary btn-sm" onclick="AdminModule.openNewEncuestador()">+ Nuevo Encuestador</button>
+              </div>
+              <div class="table-wrapper card">
+                <table>
+                  <thead>
+                    <tr><th>ID</th><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Documento</th><th>Teléfono</th><th>Correo</th><th>Zona</th><th>Estado</th><th>Alta</th><th>Acciones</th></tr>
+                  </thead>
+                  <tbody id="enc-tbody-admin">
+                    <tr><td colspan="11" class="text-center text-muted">Cargando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div data-admin-content="auditoria">
+              <div class="audit-filters">
+                <form id="audit-filter-form" class="form-row">
+                  <div class="form-group" style="margin:0;">
+                    <label>Usuario</label>
+                    <input type="text" name="usuario" class="form-control form-control-sm" placeholder="Usuario..." />
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>Acción</label>
+                    <input type="text" name="accion" class="form-control form-control-sm" placeholder="Acción..." />
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>Desde</label>
+                    <input type="date" name="fecha_desde" class="form-control form-control-sm" />
+                  </div>
+                  <div class="form-group" style="margin:0;">
+                    <label>Hasta</label>
+                    <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
+                  </div>
+                  <div style="align-self:flex-end;">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="AdminModule.applyAuditFilters()">Filtrar</button>
+                  </div>
+                </form>
+              </div>
+              <div class="table-wrapper card">
+                <table>
+                  <thead>
+                    <tr><th>ID</th><th>Fecha/Hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>
+                  </thead>
+                  <tbody id="audit-tbody">
+                    <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div id="audit-pagination" style="margin-top:.75rem;text-align:center;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ======================================================
+           MODULE: AUDITORÍA (admin only — standalone nav item)
+           ====================================================== -->
+      <div id="module-auditoria" class="module-panel" data-min-role="admin">
+        <div class="page-header">
+          <h2>Auditoría del Sistema</h2>
+        </div>
+        <div class="page-content">
+          <div class="audit-filters">
+            <form id="audit-filter-form-standalone" class="form-row">
+              <div class="form-group" style="margin:0;"><label>Usuario</label>
+                <input type="text" name="usuario" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label>Acción</label>
+                <input type="text" name="accion" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label>Desde</label>
+                <input type="date" name="fecha_desde" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label>Hasta</label>
+                <input type="date" name="fecha_hasta" class="form-control form-control-sm" /></div>
+              <div style="align-self:flex-end;">
+                <button type="button" class="btn btn-sm btn-primary" onclick="AdminModule.applyAuditFilters()">Filtrar</button>
+              </div>
+            </form>
+          </div>
+          <div class="table-wrapper card">
+            <table>
+              <thead>
+                <tr><th>ID</th><th>Fecha/Hora</th><th>Usuario</th><th>Acción</th><th>Detalle</th><th>IP</th></tr>
+              </thead>
+              <tbody id="audit-tbody-standalone">
+                <tr><td colspan="6" class="text-center text-muted">Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="audit-pagination-standalone" style="margin-top:.75rem;text-align:center;"></div>
+        </div>
+      </div>
+
+    </main><!-- /content-area -->
+  </div><!-- /main-area -->
+</div><!-- /app-shell -->
+
+<div id="atlas-print-root" class="atlas-print-root" aria-hidden="true"></div>
+
+<!-- ── Manual FAB ────────────────────────────────────────────── -->
+<button id="manual-fab" title="Abrir manual" aria-label="Abrir manual del Encuestador">?</button>
+
+<!-- ────────────────────────────────────────────────────────────
+     MODAL: Incidencia
+     ──────────────────────────────────────────────────────────── -->
+<div id="modal-incidencia" class="modal" style="display:none;">
+  <div class="modal__overlay" onclick="UI.closeModal('modal-incidencia')"></div>
+  <div class="modal__panel modal__panel--dialog">
+    <div class="modal__header">
+      <h3>Registrar Incidencia</h3>
+      <button class="modal__close" onclick="UI.closeModal('modal-incidencia')">&times;</button>
+    </div>
+    <div class="modal__body">
+      <form id="form-incidencia">
+        <input type="hidden" name="id_escuela" />
+        <div class="form-group">
+          <label>Tipo de incidencia *</label>
+          <input id="inc-tipo" name="tipo_incidencia" type="hidden" value="" />
+          <div class="choice-button-grid">
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Escuela cerrada">Escuela cerrada</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Acceso bloqueado">Acceso bloqueado</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Director/a ausente">Director/a ausente</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Formulario incompleto">Formulario incompleto</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Problema técnico">Problema técnico</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Seguridad / riesgo">Seguridad / riesgo</button>
+            <button class="choice-button" type="button" data-choice-target="inc-tipo" data-choice-value="Otra">Otra</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Prioridad *</label>
+          <input id="inc-prioridad" name="prioridad" type="hidden" value="media" />
+          <div class="choice-button-strip">
+            <button class="choice-button choice-button--danger" type="button" data-choice-target="inc-prioridad" data-choice-value="alta">Alta</button>
+            <button class="choice-button choice-button--warning choice-button--active" type="button" data-choice-target="inc-prioridad" data-choice-value="media">Media</button>
+            <button class="choice-button choice-button--success" type="button" data-choice-target="inc-prioridad" data-choice-value="baja">Baja</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Descripción *</label>
+          <textarea name="descripcion" class="form-control" rows="4"
+            placeholder="Describí el problema con el mayor detalle posible..." required></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-incidencia')">Cancelar</button>
+      <button class="btn btn-danger" onclick="IncidenciasModule.save()">Registrar Incidencia</button>
+    </div>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────
+     MODAL: Encuestador
+     ──────────────────────────────────────────────────────────── -->
+<div id="modal-encuestador" class="modal" style="display:none;">
+  <div class="modal__overlay" onclick="UI.closeModal('modal-encuestador')"></div>
+  <div class="modal__panel modal__panel--wide">
+    <div class="modal__header">
+      <h3 class="modal__title">Encuestador</h3>
+      <button class="modal__close" onclick="UI.closeModal('modal-encuestador')">&times;</button>
+    </div>
+    <div class="modal__body">
+      <form id="form-encuestador">
+        <input type="hidden" name="id_encuestador" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Usuario *</label>
+            <input type="text" name="usuario" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Contraseña (dejar vacío para no cambiar)</label>
+            <input type="password" name="password" class="form-control" autocomplete="new-password" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombres *</label>
+            <input type="text" name="nombres" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label>Apellidos *</label>
+            <input type="text" name="apellidos" class="form-control" required />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Documento</label>
+            <input type="text" name="documento" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Teléfono</label>
+            <input type="tel" name="telefono" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label>Correo</label>
+            <input type="email" name="correo" class="form-control" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Zona asignada</label>
+            <input id="enc-zona" name="zona_asignada" type="hidden" value="" />
+            <div class="choice-button-strip">
+              <button class="choice-button choice-button--active" type="button" data-choice-target="enc-zona" data-choice-value="">Sin asignar</button>
+              <button class="choice-button" type="button" data-choice-target="enc-zona" data-choice-value="Urbana">Urbana</button>
+              <button class="choice-button" type="button" data-choice-target="enc-zona" data-choice-value="Rural">Rural</button>
+              <button class="choice-button" type="button" data-choice-target="enc-zona" data-choice-value="Rural Remota">Rural Remota</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Rol</label>
+            <input id="enc-rol" name="rol" type="hidden" value="encuestador" />
+            <div class="choice-button-strip">
+              <button class="choice-button choice-button--active" type="button" data-choice-target="enc-rol" data-choice-value="encuestador">Encuestador</button>
+              <button class="choice-button" type="button" data-choice-target="enc-rol" data-choice-value="supervisor">Supervisor</button>
+              <button class="choice-button" type="button" data-choice-target="enc-rol" data-choice-value="admin">Admin</button>
+            </div>
+          </div>
+          <div class="form-group" style="display:flex;align-items:center;gap:.5rem;padding-top:1.5rem;">
+            <input type="checkbox" name="activo" id="enc-activo" checked style="width:auto;" />
+            <label for="enc-activo" style="margin:0;">Activo</label>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal__footer">
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-encuestador')">Cancelar</button>
+      <button class="btn btn-primary" onclick="AdminModule.saveEncuestador()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ────────────────────────────────────────────────────────────
+     SCRIPTS (order matters)
+     ──────────────────────────────────────────────────────────── -->
+
+<!-- Leaflet -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet MarkerCluster -->
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<!-- App scripts -->
+<script src="assets/js/config.js?v=2.6.205"></script>
+<script src="assets/js/local-store.js?v=2.6.205"></script>
+<script src="assets/js/geo-measure.js?v=2.6.205"></script>
+<script src="assets/js/api.js?v=2.6.205"></script>
+<script src="assets/js/auth.js?v=2.6.205"></script>
+<script src="assets/js/map.js?v=2.6.205"></script>
+<script src="assets/js/survey.js?v=2.6.205"></script>
+<script src="assets/js/stats.js?v=2.6.205"></script>
+<script src="assets/js/department-atlas.js?v=2.6.205"></script>
+<script src="assets/js/location-audit.js?v=2.6.205"></script>
+<script src="assets/js/planning.js?v=2.6.205"></script>
+<script src="assets/js/admin.js?v=2.6.205"></script>
+<script src="assets/js/jornada.js?v=2.6.205"></script>
+<script src="assets/js/manual.js?v=2.6.205"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.205"></script>
+<script src="assets/js/app.js?v=2.6.205"></script>
+
+<script>
+  // Set today's date in Inicio module
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('inicio-fecha');
+    if (el) el.textContent = new Date().toLocaleDateString('es-PY', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+  });
+</script>
+
+</body>
+</html>

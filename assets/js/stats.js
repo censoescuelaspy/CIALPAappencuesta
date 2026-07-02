@@ -1,0 +1,2271 @@
+/**
+ * CIALPA — Relevamiento Escolar
+ * stats.js — Panel estadistico con fallback offline/local.
+ * Version: 2.6.165
+ */
+
+const StatsModule = (() => {
+  'use strict';
+
+  let _charts = {};
+  let _statsData = null;
+  let _statsBaseData = null;
+  let _localAnalytics = null;
+  let _statsBaseLocal = null;
+  let _statsCache = {};
+  let _infraCache = null;
+  let _infraData = null;
+  let _infraMap = null;
+  let _statsInitialized = false;
+  let _mecInitialized = false;
+  let _infraFilters = {
+    etapa: '',
+    departamento: '',
+    distrito: '',
+    nivel: '',
+    tipoBloque: '',
+    falla: '',
+    metric: 'risk',
+  };
+  let _chartLoader = null;
+  const STATS_CACHE_TTL = 5 * 60 * 1000;
+  const PILOT_STAGE_SHARE = 0.086;
+  const CHART_JS_URL = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+  const DEMO_INFRA_URL = 'assets/data/demo-infraestructura-mec.json';
+  const STAGE_LABELS = {
+    piloto: 'Piloto muestral',
+    censal: 'Etapa censal',
+  };
+  const MEC_MAP_METRICS = {
+    risk: { label: 'Riesgo tecnico', unit: '%', key: 'risk', tone: 'risk', invert: false },
+    damages: { label: 'Fallas', unit: '', key: 'damages', tone: 'risk', invert: false },
+    schools: { label: 'Escuelas', unit: '', key: 'schools', tone: 'volume', invert: false },
+    evidencePct: { label: 'Evidencia', unit: '%', key: 'evidencePct', tone: 'evidence', invert: true },
+    area: { label: 'Area relevada', unit: ' m2', key: 'area', tone: 'volume', invert: false },
+  };
+  const PARAGUAY_TERRITORY_CENTERS = {
+    capital: [-25.2867, -57.3333],
+    asuncion: [-25.2867, -57.3333],
+    concepcion: [-23.4064, -57.4344],
+    sanpedro: [-24.1067, -56.5206],
+    cordillera: [-25.2289, -57.0111],
+    guaira: [-25.7829, -56.4487],
+    caaguazu: [-25.4646, -56.0139],
+    caazapa: [-26.1828, -56.3719],
+    itapua: [-27.3306, -55.8667],
+    misiones: [-26.8434, -57.1018],
+    paraguari: [-25.6333, -57.1500],
+    altoparana: [-25.5167, -54.6167],
+    central: [-25.3200, -57.5200],
+    neembucu: [-26.8569, -58.2933],
+    amambay: [-22.9200, -56.4700],
+    canindeyu: [-24.0500, -55.7000],
+    presidentehayes: [-23.7500, -58.9000],
+    boqueron: [-21.6000, -60.9000],
+    altoparaguay: [-20.8000, -59.9000],
+  };
+
+  async function init() {
+    if (!Auth.canAccess('supervisor')) {
+      const dashboard = document.getElementById('offline-dashboard');
+      if (dashboard) dashboard.innerHTML = '<p class="access-denied">Acceso restringido a supervisores y administradores.</p>';
+      return;
+    }
+    _bindFilterEvents();
+    if (_statsInitialized && _statsBaseData) {
+      await _applyStatsFilters();
+      return;
+    }
+    _statsInitialized = true;
+    await loadStats({ forceNetwork: false, preferCache: true });
+  }
+
+  function _bindFilterEvents() {
+    const form = document.getElementById('stats-filter-form');
+    if (form && form.dataset.bound !== 'true') {
+      form.dataset.bound = 'true';
+      let timer = null;
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(_applyStatsFilters, 80);
+      };
+      form.addEventListener('change', schedule);
+      form.addEventListener('click', event => {
+        if (event.target.closest('[data-choice-target][data-choice-value]')) {
+          setTimeout(schedule, 0);
+        }
+      });
+    }
+
+    const applyBtn = document.getElementById('stats-filter-apply');
+    if (applyBtn && applyBtn.dataset.bound !== 'true') {
+      applyBtn.dataset.bound = 'true';
+      applyBtn.addEventListener('click', _applyStatsFilters);
+    }
+
+    const resetBtn = document.getElementById('stats-filter-reset');
+    if (resetBtn && resetBtn.dataset.bound !== 'true') {
+      resetBtn.dataset.bound = 'true';
+      resetBtn.addEventListener('click', () => {
+        const form = document.getElementById('stats-filter-form');
+        form?.reset();
+        UI.refreshButtonChoices(form);
+        _applyStatsFilters();
+      });
+    }
+  }
+
+  async function loadStats(options = {}) {
+    const { forceNetwork = true, preferCache = false } = options || {};
+    const filters = _getFilters();
+    const cacheKey = JSON.stringify(filters);
+    const cached = _statsCache[cacheKey];
+    if (!forceNetwork && cached && (Date.now() - cached.time < STATS_CACHE_TTL)) {
+      _statsData = cached.stats;
+      _localAnalytics = cached.local;
+      _statsData = await _enrichStatsWithGeoCoverage(_statsData);
+      if (!Object.keys(filters).length) {
+        _statsBaseData = _statsData;
+        _statsBaseLocal = cached.local;
+      }
+      await _renderStatsView();
+      return;
+    }
+
+    if (!forceNetwork && preferCache) {
+      const cachedApi = await _getCachedStats(filters);
+      if (cachedApi) {
+        _statsData = cachedApi.stats;
+        _localAnalytics = cachedApi.local;
+        _statsData = await _enrichStatsWithGeoCoverage(_statsData);
+        if (!Object.keys(filters).length) {
+          _statsBaseData = _statsData;
+          _statsBaseLocal = cachedApi.local;
+        }
+        _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
+        await _renderStatsView();
+        _refreshStatsInBackground();
+        return;
+      }
+    }
+
+    let remoteStats = null;
+    let remoteResult = null;
+    let remoteError = null;
+
+    try {
+      remoteResult = await API.getStats(filters);
+      if (remoteResult.status !== 'ok') throw new Error(remoteResult.message || 'Respuesta invalida');
+      remoteStats = remoteResult.data;
+    } catch (err) {
+      remoteError = err;
+    }
+
+    try {
+      if (remoteResult?.localAnalytics) {
+        _localAnalytics = remoteResult.localAnalytics;
+      } else if (typeof CialpaLocalStore !== 'undefined') {
+        _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats, filters);
+      }
+    } catch (err) {
+      console.warn('No se pudo construir analitica local:', err);
+    }
+
+    if (!remoteStats && _localAnalytics?.stats) remoteStats = _localAnalytics.stats;
+    if (!remoteStats) {
+      remoteStats = {};
+      if (remoteError) UI.showToast('No se pudieron cargar estadisticas: ' + remoteError.message, 'error');
+    } else if (remoteResult?.offline || remoteError) {
+      UI.showToast('Panel calculado con datos locales del dispositivo.', 'info', 5000);
+    }
+
+    _statsData = _normalizeStats(remoteStats);
+    if (_localAnalytics?.stats && _hasInteractiveStatsFilters(filters)) {
+      _statsData = _normalizeStats(_localAnalytics.stats);
+    }
+    _statsData = await _enrichStatsWithGeoCoverage(_statsData);
+    if (!Object.keys(filters).length) {
+      _statsBaseData = _statsData;
+      _statsBaseLocal = _localAnalytics;
+    }
+    if (!remoteError) _statsCache[cacheKey] = { stats: _statsData, local: _localAnalytics, time: Date.now() };
+    await _renderStatsView();
+  }
+
+  async function _getCachedStats(filters = {}) {
+    if (typeof CialpaLocalStore === 'undefined') return null;
+    try {
+      const cached = await CialpaLocalStore.getApi('getStats', filters);
+      const savedAt = cached?.savedAt ? Date.parse(cached.savedAt) : 0;
+      const requestMatches = _sameFilters(cached?.request || {}, filters);
+      if (!cached?.response?.data || !requestMatches || (savedAt && Date.now() - savedAt > STATS_CACHE_TTL)) return null;
+      const local = await CialpaLocalStore.buildLocalAnalytics(cached.response.data, filters).catch(() => null);
+      return {
+        stats: _normalizeStats(local?.stats || cached.response.data),
+        local,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function _refreshStatsInBackground() {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    setTimeout(() => {
+      loadStats({ forceNetwork: true }).catch(err =>
+        console.warn('No se pudo refrescar estadisticas en segundo plano:', err)
+      );
+    }, 60);
+  }
+
+  async function _applyStatsFilters() {
+    const filters = _getFilters();
+    const baseStats = _statsBaseData || _statsData;
+    if (!baseStats) {
+      await loadStats({ forceNetwork: false, preferCache: true });
+      return;
+    }
+
+    let local = _statsBaseLocal || _localAnalytics;
+    if (typeof CialpaLocalStore !== 'undefined' && _hasInteractiveStatsFilters(filters)) {
+      try {
+        local = await CialpaLocalStore.buildLocalAnalytics(baseStats, filters);
+      } catch (err) {
+        console.warn('No se pudo recalcular analitica filtrada:', err);
+      }
+    }
+
+    _localAnalytics = local || _statsBaseLocal || _localAnalytics;
+    _statsData = _normalizeStats(local?.stats || _deriveStatsForFilters(baseStats, filters));
+    _statsData = await _enrichStatsWithGeoCoverage(_statsData);
+    await _renderStatsView();
+  }
+
+  function _hasInteractiveStatsFilters(filters = {}) {
+    return Boolean(filters.etapa || filters.etapa_operativa || filters.muestra || filters.departamento || filters.distrito || filters.encuestador || filters.usuario);
+  }
+
+  function _deriveStatsForFilters(baseStats, filters = {}) {
+    const data = _normalizeStats(_clone(baseStats || {}));
+    const hasStageOnly = (filters.etapa || filters.etapa_operativa || filters.muestra) && !filters.departamento && !filters.encuestador;
+    if (hasStageOnly) return _scaleStatsByStage(data, filters.etapa || filters.etapa_operativa || filters.muestra);
+
+    if (filters.departamento) {
+      const row = (baseStats?.por_departamento || []).find(item => String(item.departamento || '') === String(filters.departamento));
+      if (row) {
+        data.total = Number(row.total || 0);
+        data.finalizadas = Number(row.finalizadas || 0);
+        data.en_curso = Number(row.en_curso || 0);
+        data.pendientes = Number(row.pendientes || 0);
+        data.con_incidencia = Number(row.incidencias || row.con_incidencia || 0);
+        data.pct_avance = _pct(data.finalizadas, data.total);
+        data.por_departamento = [row];
+      }
+    }
+
+    if (filters.encuestador) {
+      const row = (baseStats?.por_encuestador || []).find(item => String(item.encuestador || '') === String(filters.encuestador));
+      if (row) {
+        const finished = Math.max(Number(row.finalizadas || 0), Number(row.registros_completados || 0));
+        data.total = Math.max(Number(row.total_asignadas || 0), finished);
+        data.finalizadas = finished;
+        data.en_curso = Number(row.sesiones || 0);
+        data.con_incidencia = Number(row.incidencias || 0);
+        data.pendientes = Math.max(0, data.total - data.finalizadas);
+        data.pct_avance = _pct(data.finalizadas, data.total);
+        data.por_encuestador = [row];
+      }
+    }
+
+    if (filters.etapa || filters.etapa_operativa || filters.muestra) {
+      return _scaleStatsByStage(data, filters.etapa || filters.etapa_operativa || filters.muestra);
+    }
+    return data;
+  }
+
+  function _scaleStatsByStage(data, stageValue) {
+    const stage = _normalizeToken(stageValue);
+    if (!stage) return data;
+    const factor = stage === 'piloto' ? PILOT_STAGE_SHARE : (stage === 'censal' ? 1 - PILOT_STAGE_SHARE : 1);
+    if (factor >= 0.999) return data;
+    const scaled = _clone(data);
+    ['total', 'finalizadas', 'en_curso', 'pendientes', 'con_incidencia'].forEach(key => {
+      scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
+    });
+    scaled.pct_avance = _pct(scaled.finalizadas, scaled.total);
+    scaled.por_departamento = (scaled.por_departamento || []).map(row => _scaleStatsRow(row, factor));
+    scaled.por_encuestador = (scaled.por_encuestador || []).map(row => _scaleStatsRow(row, factor));
+    return scaled;
+  }
+
+  function _scaleStatsRow(row, factor) {
+    const scaled = { ...row };
+    [
+      'total',
+      'finalizadas',
+      'finalizada',
+      'en_curso',
+      'pendientes',
+      'pendiente',
+      'incidencias',
+      'con_incidencia',
+      'total_asignadas',
+      'sesiones',
+      'registros_completados',
+      'con_coordenadas',
+      'sin_coordenadas',
+      'pendientes_con_coordenadas',
+      'pendientes_sin_coordenadas',
+    ].forEach(key => {
+      if (scaled[key] !== undefined && scaled[key] !== null && scaled[key] !== '') {
+        scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
+      }
+    });
+    return scaled;
+  }
+
+  function _sameFilters(a = {}, b = {}) {
+    return JSON.stringify(_compactObject(a)) === JSON.stringify(_compactObject(b));
+  }
+
+  function _compactObject(obj = {}) {
+    return Object.fromEntries(Object.keys(obj || {})
+      .sort()
+      .filter(key => obj[key] !== undefined && obj[key] !== null && obj[key] !== '')
+      .map(key => [key, String(obj[key])]));
+  }
+
+  function _clone(value) {
+    try { return JSON.parse(JSON.stringify(value || {})); }
+    catch { return { ...(value || {}) }; }
+  }
+
+  function _normalizeToken(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  async function initMecInfrastructure() {
+    if (!Auth.canAccess('supervisor')) {
+      const root = document.getElementById('mec-infra-root');
+      if (root) root.innerHTML = '<p class="access-denied">Acceso restringido a supervisores y administradores.</p>';
+      return;
+    }
+    if (_mecInitialized && _infraData) {
+      _renderMecInfrastructurePanel(_infraData);
+      return;
+    }
+    _mecInitialized = true;
+    await loadMecInfrastructure({ forceNetwork: false });
+  }
+
+  async function loadMecInfrastructure(options = {}) {
+    const { forceNetwork = true } = options || {};
+    const root = document.getElementById('mec-infra-root');
+    if (!root) return;
+    root.innerHTML = '<div class="loading-state">Preparando tablero de infraestructura MEC...</div>';
+    if (!forceNetwork && _infraCache && Date.now() - _infraCache.time < STATS_CACHE_TTL) {
+      _infraData = _infraCache.data;
+      _renderMecInfrastructurePanel(_infraData);
+      return;
+    }
+
+    let remoteStats = _statsData;
+    let remoteError = null;
+    try {
+      const result = await API.getStats({ infraestructura_mec: true }, { skipLoading: true });
+      if (result.status !== 'ok') throw new Error(result.message || 'Respuesta invalida');
+      remoteStats = _normalizeStats(result.data || {});
+      _statsData = remoteStats;
+      if (result.localAnalytics) _localAnalytics = result.localAnalytics;
+    } catch (err) {
+      remoteError = err;
+      if (!_localAnalytics && typeof CialpaLocalStore !== 'undefined') {
+        try {
+          _localAnalytics = await CialpaLocalStore.buildLocalAnalytics(remoteStats, _getFilters());
+        } catch (localErr) {
+          console.warn('No se pudo construir analitica local MEC:', localErr);
+        }
+      }
+    }
+
+    const localMec = _localAnalytics?.mec || (typeof CialpaLocalStore !== 'undefined' ? CialpaLocalStore.mecMetrics() : null);
+    _infraData = _normalizeMecInfrastructure(remoteStats?.infraestructura_mec || remoteStats?.infraestructura || null, localMec);
+    if (!_hasInfrastructureData(_infraData)) {
+      const demo = await _loadMecInfrastructureDemo();
+      if (demo) _infraData = demo;
+    }
+    _infraCache = { data: _infraData, time: Date.now() };
+    _renderMecInfrastructurePanel(_infraData);
+    if (remoteError) UI.showToast('Infraestructura MEC calculada con datos locales. Falta publicar/consultar el agregado del servidor.', 'warning', 6500);
+  }
+
+  async function loadMecInfrastructureDemo() {
+    const demo = await _loadMecInfrastructureDemo({ force: true });
+    if (!demo) {
+      UI.showToast('No se pudo cargar la demo de infraestructura MEC.', 'warning');
+      return;
+    }
+    _infraData = demo;
+    _infraCache = { data: _infraData, time: Date.now() };
+    _renderMecInfrastructurePanel(_infraData);
+    UI.showToast('Demo de 1000 respuestas sinteticas cargada.', 'info', 5000);
+  }
+
+  async function _loadMecInfrastructureDemo() {
+    try {
+      const response = await fetch(`${DEMO_INFRA_URL}?v=${APP_CONFIG.VERSION}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const raw = await response.json();
+      return _normalizeMecInfrastructure(raw, null);
+    } catch (err) {
+      console.warn('No se pudo cargar demo infraestructura MEC:', err);
+      return null;
+    }
+  }
+
+  async function _renderStatsView() {
+    _renderFilterChoices(_statsBaseData || _statsData);
+    _renderExecutiveDashboard(_statsData, _localAnalytics);
+    _renderInsightCards(_statsData, _localAnalytics);
+    _renderTerritoryBoard(_statsData.por_departamento || []);
+    _renderOfflineDashboard(_localAnalytics);
+    _renderInfrastructureDashboard(_localAnalytics);
+    _renderKPIs(_statsData);
+    _renderCharts(_statsData);
+    _scheduleChartUpgrade(_statsData);
+    _renderEncuestadoresTable(_statsData.por_encuestador || []);
+    _renderRecentActivity(_statsData.actividad_reciente || []);
+  }
+
+  function _scheduleChartUpgrade(data) {
+    if (window.Chart) return;
+    const run = () => {
+      _ensureChartLibrary()
+        .then(() => {
+          if (data === _statsData) _renderCharts(_statsData);
+        })
+        .catch(err => console.warn('No se pudo cargar Chart.js, se usaran vistas compactas:', err));
+    };
+    if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 1800 });
+    else setTimeout(run, 120);
+  }
+
+  function _ensureChartLibrary() {
+    if (window.Chart) return Promise.resolve();
+    if (_chartLoader) return _chartLoader;
+    _chartLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = CHART_JS_URL;
+      script.defer = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('No se pudo cargar la libreria de graficos.'));
+      document.body.appendChild(script);
+    });
+    return _chartLoader;
+  }
+
+  function _getFilters() {
+    const form = document.getElementById('stats-filter-form');
+    if (!form) return {};
+    const data = new FormData(form);
+    return Object.fromEntries([...data.entries()].filter(([, v]) => v));
+  }
+
+  function _renderFilterChoices(data) {
+    const form = document.getElementById('stats-filter-form');
+    if (!form) return;
+    const depInput = document.getElementById('stats-filter-departamento');
+    const encInput = document.getElementById('stats-filter-encuestador');
+    const depStrip = document.getElementById('stats-dep-choices');
+    const encStrip = document.getElementById('stats-enc-choices');
+    if (depStrip) {
+      const current = depInput?.value || '';
+      const rows = (data?.por_departamento || [])
+        .filter(row => row.departamento)
+        .sort((a, b) => (b.total || 0) - (a.total || 0))
+        .slice(0, 8);
+      depStrip.innerHTML = _choiceButton('stats-filter-departamento', '', 'Todos', current === '')
+        + rows.map(row => _choiceButton('stats-filter-departamento', row.departamento, `${row.departamento} (${row.total || 0})`, current === row.departamento)).join('');
+    }
+    if (encStrip) {
+      const current = encInput?.value || '';
+      const rows = (data?.por_encuestador || [])
+        .filter(row => row.encuestador)
+        .sort((a, b) => _encuestadorActivity(b) - _encuestadorActivity(a))
+        .slice(0, 8);
+      encStrip.innerHTML = _choiceButton('stats-filter-encuestador', '', 'Todos', current === '')
+        + rows.map(row => _choiceButton('stats-filter-encuestador', row.encuestador, `${_shortLabel(row.encuestador)} (${_encuestadorCount(row)})`, current === row.encuestador)).join('');
+    }
+    UI.refreshButtonChoices?.(form);
+  }
+
+  function _choiceButton(target, value, label, active) {
+    return `<button class="choice-button ${active ? 'choice-button--active' : ''}" type="button" data-choice-target="${_escape(target)}" data-choice-value="${_escape(value)}">${_escape(label)}</button>`;
+  }
+
+  function _encuestadorActivity(row) {
+    return Number(row?.total_asignadas || 0)
+      + Number(row?.finalizadas || 0)
+      + Number(row?.registros_completados || 0)
+      + Number(row?.sesiones || 0);
+  }
+
+  function _encuestadorCount(row) {
+    return Math.max(
+      Number(row?.total_asignadas || 0),
+      Number(row?.finalizadas || 0),
+      Number(row?.registros_completados || 0),
+      Number(row?.sesiones || 0)
+    );
+  }
+
+  function _normalizeStats(data) {
+    if (typeof CialpaLocalStore !== 'undefined') return CialpaLocalStore.normalizeStats(data || {});
+    const total = Number(data?.total || 0);
+    const finalizadas = Number(data?.finalizadas ?? data?.finalizada ?? 0);
+    const enCurso = Number(data?.en_curso ?? 0);
+    return {
+      total,
+      finalizadas,
+      en_curso: enCurso,
+      pendientes: Number(data?.pendientes ?? data?.pendiente ?? Math.max(0, total - finalizadas - enCurso)),
+      con_incidencia: Number(data?.con_incidencia ?? data?.incidencias ?? data?.incidencia ?? 0),
+      pct_avance: total ? Math.round((finalizadas / total) * 100) : 0,
+      por_departamento: data?.por_departamento || [],
+      por_encuestador: data?.por_encuestador || [],
+      por_dia: data?.por_dia || data?.historico || [],
+      actividad_reciente: data?.actividad_reciente || [],
+    };
+  }
+
+  async function _enrichStatsWithGeoCoverage(stats) {
+    if (!stats || typeof API === 'undefined') return stats;
+    const rows = stats.por_departamento || [];
+    const needsGeo = rows.some(row => Number(row.total || 0) && !Number(row.con_coordenadas || 0) && !Number(row.sin_coordenadas || 0));
+    if (!needsGeo) return stats;
+    try {
+      const result = await API.getEscuelas({}, { preferCache: true, cacheMaxAgeMs: 24 * 60 * 60 * 1000 });
+      if (result.status !== 'ok' || !Array.isArray(result.data) || !result.data.length) return stats;
+      const byDepartment = _geoCoverageByDepartment(result.data);
+      return {
+        ...stats,
+        por_departamento: rows.map(row => {
+          const key = _normalizeToken(row.departamento || 'Sin dato') || 'sin_dato';
+          const geo = byDepartment[key];
+          return geo ? { ...row, ...geo } : row;
+        }),
+      };
+    } catch (err) {
+      console.warn('No se pudo enriquecer estadisticas con coordenadas del padron:', err);
+      return stats;
+    }
+  }
+
+  function _geoCoverageByDepartment(schools = []) {
+    const acc = {};
+    (schools || []).forEach(item => {
+      const label = item.departamento || 'Sin dato';
+      const key = _normalizeToken(label) || 'sin_dato';
+      const state = _normalizeStateForGeo(item.estado_relevamiento || item.estado);
+      const hasCoords = _hasValidCoords(item);
+      if (!acc[key]) {
+        acc[key] = {
+          con_coordenadas: 0,
+          sin_coordenadas: 0,
+          pendientes_con_coordenadas: 0,
+          pendientes_sin_coordenadas: 0,
+        };
+      }
+      if (hasCoords) acc[key].con_coordenadas += 1;
+      else acc[key].sin_coordenadas += 1;
+      if (state === 'pendiente') {
+        if (hasCoords) acc[key].pendientes_con_coordenadas += 1;
+        else acc[key].pendientes_sin_coordenadas += 1;
+      }
+    });
+    return acc;
+  }
+
+  function _hasValidCoords(item = {}) {
+    const lat = Number(String(item.latitud ?? item.lat ?? item.latitude ?? '').replace(',', '.'));
+    const lng = Number(String(item.longitud ?? item.lng ?? item.lon ?? item.longitude ?? '').replace(',', '.'));
+    return Number.isFinite(lat) && Number.isFinite(lng);
+  }
+
+  function _normalizeStateForGeo(value) {
+    const text = _normalizeToken(value || 'pendiente');
+    if (text.includes('final') || text.includes('complet') || text.includes('cerr')) return 'finalizada';
+    if (text.includes('curso') || text.includes('proceso')) return 'en_curso';
+    if (text.includes('inci') || text.includes('problema')) return 'incidencia';
+    return 'pendiente';
+  }
+
+  function _renderExecutiveDashboard(data, local) {
+    const container = document.getElementById('stats-executive-dashboard');
+    if (!container) return;
+    const total = Number(data?.total || 0);
+    const pct = Math.max(0, Math.min(100, Number(data?.pct_avance || 0)));
+    const activeTeam = (data?.por_encuestador || []).filter(row => _encuestadorActivity(row) > 0).length;
+    const territoryCount = (data?.por_departamento || []).filter(row => Number(row.total || 0) > 0).length;
+    const riskPct = total ? Math.round((Number(data?.con_incidencia || 0) / total) * 100) : 0;
+    const synced = Number(local?.queuePending || 0) === 0;
+    const leadingTerritory = [...(data?.por_departamento || [])].sort((a, b) => (b.finalizadas || 0) - (a.finalizadas || 0))[0];
+    const pace = _dailyPace(data?.por_dia || []);
+    container.innerHTML = `
+      <section class="stats-command-center">
+        <div class="stats-radial" style="--pct:${pct}%;--accent:${_colorForPct(pct)}">
+          <strong>${pct}%</strong>
+          <span>Avance</span>
+        </div>
+        <div class="stats-command-copy">
+          <span class="eyebrow">Centro ejecutivo</span>
+          <h3>Resultados globales CIALPA</h3>
+          <div class="stats-command-chips">
+            <span>${_escape(total)} escuelas</span>
+            <span>${territoryCount} territorios</span>
+            <span>${activeTeam} responsables</span>
+            <span class="${synced ? 'chip-ok' : 'chip-warn'}">${synced ? 'Sin cola pendiente' : `${Number(local?.queuePending || 0)} en cola`}</span>
+          </div>
+        </div>
+        <div class="stats-command-metrics">
+          ${_executiveMetric('Relevadas', data.finalizadas || 0, `${_pct(data.finalizadas || 0, total)}% del universo`, '#207c55')}
+          ${_executiveMetric('En curso', data.en_curso || 0, 'Operativo activo', '#b86b00')}
+          ${_executiveMetric('Riesgo', `${riskPct}%`, `${data.con_incidencia || 0} incidencias`, '#b42318')}
+          ${_executiveMetric('Ritmo', pace.value, pace.label, '#1d4ed8')}
+        </div>
+        <div class="stats-command-focus">
+          <span>Territorio lider</span>
+          <strong>${_escape(leadingTerritory?.departamento || 'Sin datos')}</strong>
+          <small>${Number(leadingTerritory?.finalizadas || 0)} finalizadas de ${Number(leadingTerritory?.total || 0)}</small>
+        </div>
+      </section>`;
+  }
+
+  function _executiveMetric(label, value, note, color) {
+    return `
+      <article class="stats-exec-metric" style="--accent:${color}">
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note)}</small>
+      </article>`;
+  }
+
+  function _renderInsightCards(data, local) {
+    const container = document.getElementById('stats-insights');
+    if (!container) return;
+    const total = Number(data?.total || 0);
+    const rows = data?.por_departamento || [];
+    const mostPending = [...rows].sort((a, b) => (b.pendientes || 0) - (a.pendientes || 0))[0];
+    const bestProgress = [...rows].filter(row => Number(row.total || 0) > 0)
+      .sort((a, b) => _pct(b.finalizadas || 0, b.total || 0) - _pct(a.finalizadas || 0, a.total || 0))[0];
+    const weakestProgress = [...rows].filter(row => Number(row.total || 0) > 0)
+      .sort((a, b) => _pct(a.finalizadas || 0, a.total || 0) - _pct(b.finalizadas || 0, b.total || 0))[0];
+    const evidence = local?.mec?.evidenceTotal || 0;
+    const cards = [
+      {
+        label: 'Prioridad operativa',
+        value: mostPending?.departamento || 'Sin datos',
+        note: `${Number(mostPending?.pendientes || data?.pendientes || 0)} pendientes por resolver`,
+        tone: 'warning',
+      },
+      {
+        label: 'Mejor avance',
+        value: bestProgress?.departamento || 'Sin datos',
+        note: `${_pct(bestProgress?.finalizadas || 0, bestProgress?.total || 0)}% finalizado`,
+        tone: 'success',
+      },
+      {
+        label: 'Punto de atencion',
+        value: weakestProgress?.departamento || 'Sin datos',
+        note: total ? `${_pct(weakestProgress?.finalizadas || 0, weakestProgress?.total || 0)}% finalizado` : 'Esperando registros',
+        tone: 'danger',
+      },
+      {
+        label: 'Evidencias locales',
+        value: evidence,
+        note: `${Number(local?.mec?.evidencePending || 0)} campos pendientes`,
+        tone: 'info',
+      },
+    ];
+    container.innerHTML = cards.map(card => `
+      <article class="stats-insight stats-insight--${card.tone}">
+        <span>${_escape(card.label)}</span>
+        <strong>${_escape(card.value)}</strong>
+        <small>${_escape(card.note)}</small>
+      </article>`).join('');
+  }
+
+  function _renderTerritoryBoard(rows) {
+    const container = document.getElementById('stats-territory-board');
+    if (!container) return;
+    const sorted = [...rows].sort((a, b) => (b.total || 0) - (a.total || 0)).slice(0, 10);
+    if (!sorted.length) {
+      container.innerHTML = '<p class="text-muted text-center">Sin territorios para mostrar.</p>';
+      return;
+    }
+    container.innerHTML = sorted.map(row => {
+      const pct = _pct(row.finalizadas || 0, row.total || 0);
+      const active = Number(row.en_curso || 0);
+      const pending = Number(row.pendientes || 0);
+      const withCoords = Number(row.con_coordenadas || 0);
+      const withoutCoords = Number(row.sin_coordenadas || Math.max(0, Number(row.total || 0) - withCoords));
+      const pendingWithoutCoords = Number(row.pendientes_sin_coordenadas || 0);
+      return `
+        <article class="territory-card">
+          <div class="territory-card__head">
+            <strong>${_escape(row.departamento || 'Sin dato')}</strong>
+            <span>${pct}%</span>
+          </div>
+          <div class="territory-card__bar">
+            <i style="width:${pct}%;background:${_colorForPct(pct)}"></i>
+          </div>
+          <div class="territory-card__meta">
+            <span>${Number(row.finalizadas || 0)} finalizadas</span>
+            <span>${active} en curso</span>
+            <span>${pending} pendientes</span>
+            <span>${withCoords} en mapa</span>
+            ${withoutCoords ? `<span>${withoutCoords} sin marcador${pendingWithoutCoords ? ` (${pendingWithoutCoords} pend.)` : ''}</span>` : ''}
+          </div>
+        </article>`;
+    }).join('');
+  }
+
+  function _renderOfflineDashboard(local) {
+    const container = document.getElementById('offline-dashboard');
+    if (!container) return;
+    const mec = local?.mec || (typeof CialpaLocalStore !== 'undefined' ? CialpaLocalStore.mecMetrics() : {});
+    const evidencePct = mec.evidenceFields ? Math.round((mec.evidenceCovered / mec.evidenceFields) * 100) : 0;
+    const qualityTotal = Object.values(mec.quality || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+
+    container.innerHTML = `
+      <section class="offline-panel">
+        <div class="offline-panel__head">
+          <div>
+            <span class="eyebrow">Centro de datos local</span>
+            <h3>Tablero operativo offline</h3>
+            <p>El dispositivo conserva cache, borrador MEC, evidencias referenciadas y cola de sincronizacion para trabajo sin conexion.</p>
+          </div>
+          <div class="offline-panel__badges">
+            <span class="offline-chip ${local?.online ? 'offline-chip--online' : 'offline-chip--offline'}">${local?.online ? 'En linea' : 'Sin conexion'}</span>
+            <span class="offline-chip">Fuente: ${_escape(local?.source || 'Borrador local')}</span>
+            <span class="offline-chip">Cola: ${Number(local?.queuePending || 0)}</span>
+            <button class="offline-sync-btn" type="button" onclick="StatsModule.syncQueue()">Sincronizar cola</button>
+          </div>
+        </div>
+
+        <div class="offline-metric-grid">
+          ${_localMetric('Escuelas cacheadas', local?.schoolsCount ?? 0, _formatDate(local?.schoolsCachedAt) || 'Aun sin cache')}
+          ${_localMetric('Area relevada', `${Number(mec.areaTotal || 0).toFixed(1)} m2`, `${mec.classrooms || 0} aulas · ${mec.sanitaries || 0} sanitarios`)}
+          ${_localMetric('Evidencias', mec.evidenceTotal || 0, `${mec.evidencePending || 0} campos pendientes`)}
+          ${_localMetric('Objetos del plano', Number(mec.doors || 0) + Number(mec.windows || 0) + Number(mec.outlets || 0), `${mec.doors || 0} puertas · ${mec.windows || 0} ventanas · ${mec.outlets || 0} tomas`)}
+        </div>
+
+        <div class="offline-insights">
+          <article>
+            <div class="offline-insight__top">
+              <strong>Cobertura fotográfica</strong>
+              <span>${evidencePct}%</span>
+            </div>
+            <div class="mini-progress"><i style="width:${Math.min(100, evidencePct)}%"></i></div>
+            <small>${mec.evidenceCovered || 0} de ${mec.evidenceFields || 0} campos con evidencia obligatoria/recomendada.</small>
+          </article>
+          <article>
+            <div class="offline-insight__top">
+              <strong>Estado de elementos</strong>
+              <span>${qualityTotal}</span>
+            </div>
+            <div class="quality-strip">
+              ${_qualitySegment('Bueno', mec.quality?.Bueno || 0, qualityTotal, '#5fbf7a')}
+              ${_qualitySegment('Regular', mec.quality?.Regular || 0, qualityTotal, '#f2ad5c')}
+              ${_qualitySegment('Malo', mec.quality?.Malo || 0, qualityTotal, '#df6b6b')}
+              ${_qualitySegment('Sin estado', mec.quality?.['Sin estado'] || 0, qualityTotal, '#9aa4b2')}
+            </div>
+            <small>Bueno ${mec.quality?.Bueno || 0} · Regular ${mec.quality?.Regular || 0} · Malo ${mec.quality?.Malo || 0} · Sin estado ${mec.quality?.['Sin estado'] || 0}</small>
+          </article>
+        </div>
+      </section>`;
+  }
+
+  function _renderInfrastructureDashboard(local) {
+    const container = document.getElementById('infra-dashboard');
+    if (!container) return;
+    const mec = local?.mec || (typeof CialpaLocalStore !== 'undefined' ? CialpaLocalStore.mecMetrics() : null);
+    if (!mec || (!mec.blocks && !mec.classrooms && !mec.sanitaries && !mec.evidenceTotal)) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const rows = [
+      ['Bloques', mec.blocks || 0, 'Estructuras registradas'],
+      ['Aulas', mec.classrooms || 0, `${Number(mec.areaClassrooms || 0).toFixed(1)} m2`],
+      ['Sanitarios', mec.sanitaries || 0, `${Number(mec.areaSanitaries || 0).toFixed(1)} m2`],
+      ['Puertas', mec.doors || 0, 'Aberturas dibujadas'],
+      ['Ventanas', mec.windows || 0, 'Aberturas dibujadas'],
+      ['Tomas', mec.outlets || 0, 'Electricidad en croquis'],
+      ['Daños', mec.damages || 0, 'Alertas visibles'],
+      ['Escaleras', mec.stairs || 0, 'Circulacion vertical'],
+      ['Fotos de campos', mec.fieldEvidenceCount || 0, `${mec.evidencePending || 0} pendientes`],
+      ['Fotos de objetos', mec.objectEvidenceCount || 0, 'Puertas, ventanas, daños, etc.'],
+      ['Fotos sanitarias', mec.sanitaryEvidenceCount || 0, 'Banos y cabinas'],
+    ];
+
+    container.innerHTML = `
+      <section class="infra-panel">
+        <div class="card__header">
+          <h4 class="card__title">Reporte local de infraestructura</h4>
+          <span class="badge badge--info">${_escape(_formatDate(mec.savedAt) || 'Borrador local')}</span>
+        </div>
+        <div class="infra-grid">
+          ${rows.map(([label, value, note]) => `
+            <article class="infra-item">
+              <span>${_escape(label)}</span>
+              <strong>${_escape(value)}</strong>
+              <small>${_escape(note)}</small>
+            </article>`).join('')}
+        </div>
+      </section>`;
+  }
+
+  function _normalizeMecInfrastructure(raw, localMec) {
+    raw = raw || {};
+    localMec = localMec || {};
+    const nested = (obj, key) => obj && typeof obj === 'object' ? (obj[key] || {}) : {};
+    const electrical = nested(raw, 'electricidad');
+    const accessibility = nested(raw, 'accesibilidad');
+    const times = nested(raw, 'tiempos');
+    const qualityRaw = raw.calidad || localMec.quality || {};
+    const evidenceFields = _pickNumber(raw, ['campos_evidencia', 'evidence_fields'], localMec.evidenceFields);
+    const evidenceCovered = _pickNumber(raw, ['campos_evidencia_con_foto', 'evidence_covered'], localMec.evidenceCovered);
+    const evidencePending = _pickNumber(raw, ['evidencias_pendientes', 'evidence_pending'], localMec.evidencePending || Math.max(0, evidenceFields - evidenceCovered));
+    const infra = {
+      source: raw.source || (Object.keys(raw).length ? 'Servidor MEC' : 'Borrador local del dispositivo'),
+      demo: Boolean(raw.demo),
+      generatedAt: raw.generated_at || localMec.savedAt || new Date().toISOString(),
+      schools: _pickNumber(raw, ['escuelas_con_borrador', 'schools_with_mec', 'schools'], localMec.blocks || localMec.classrooms || localMec.sanitaries ? 1 : 0),
+      drafts: _pickNumber(raw, ['borradores_total', 'drafts_total', 'drafts'], 0),
+      blocks: _pickNumber(raw, ['bloques', 'blocks'], localMec.blocks),
+      floors: _pickNumber(raw, ['pisos', 'floors'], localMec.floors),
+      classrooms: _pickNumber(raw, ['aulas', 'classrooms'], localMec.classrooms),
+      otherSpaces: _pickNumber(raw, ['otros_espacios', 'other_spaces'], localMec.otherSpaces),
+      sanitaries: _pickNumber(raw, ['sanitarios', 'sanitaries'], localMec.sanitaries),
+      siteElements: _pickNumber(raw, ['exteriores', 'site_elements', 'siteElements'], localMec.siteElements),
+      evidences: _pickNumber(raw, ['evidencias', 'evidence_total'], localMec.evidenceTotal),
+      evidenceFields,
+      evidenceCovered,
+      evidencePending,
+      areaClassrooms: _pickNumber(raw, ['area_aulas_m2', 'area_classrooms_m2'], localMec.areaClassrooms),
+      areaSanitaries: _pickNumber(raw, ['area_sanitarios_m2', 'area_sanitaries_m2'], localMec.areaSanitaries),
+      areaExteriors: _pickNumber(raw, ['area_exteriores_m2', 'area_exteriors_m2'], localMec.areaExteriors),
+      doors: _pickNumber(raw, ['puertas', 'doors'], localMec.doors),
+      windows: _pickNumber(raw, ['ventanas', 'windows'], localMec.windows),
+      outlets: _pickNumber(raw, ['tomas', 'outlets'], _pickNumber(electrical, ['tomas'], localMec.outlets)),
+      lights: _pickNumber(raw, ['luces', 'lights'], _pickNumber(electrical, ['luces'], localMec.lights)),
+      fans: _pickNumber(raw, ['ventiladores', 'fans'], localMec.fans),
+      airConditioners: _pickNumber(raw, ['aires', 'air_conditioners'], localMec.airConditioners),
+      switchboards: _pickNumber(raw, ['tableros', 'switchboards'], _pickNumber(electrical, ['tableros'], localMec.switchboards)),
+      damages: _pickNumber(raw, ['danos', 'daños', 'damages'], localMec.damages),
+      stairs: _pickNumber(raw, ['escaleras', 'stairs'], _pickNumber(accessibility, ['escaleras'], localMec.stairs)),
+      ramps: _pickNumber(raw, ['rampas', 'ramps'], _pickNumber(accessibility, ['rampas'], localMec.ramps)),
+      sanitaryAccessible: _pickNumber(raw, ['sanitarios_accesibles'], _pickNumber(accessibility, ['sanitarios_accesibles'], localMec.sanitaryAccessible)),
+      sanitaryBad: _pickNumber(raw, ['sanitarios_fuera_servicio', 'sanitarios_malos'], localMec.sanitaryBad),
+      grounding: _pickNumber(raw, ['puesta_tierra_si'], _pickNumber(electrical, ['puesta_tierra_si'], localMec.blocksWithGrounding)),
+      differential: _pickNumber(raw, ['diferencial_si'], _pickNumber(electrical, ['diferencial_si'], localMec.blocksWithDifferential)),
+      circuitsIdentified: _pickNumber(raw, ['circuitos_identificados'], _pickNumber(electrical, ['circuitos_identificados'], localMec.circuitsIdentified)),
+      schoolTimeAvg: _pickNumber(times, ['escuela_promedio_min'], _pickNumber(raw, ['tiempo_escuela_promedio_min'], 0)),
+      classroomTimeAvg: _pickNumber(times, ['aulas_promedio_min'], _pickNumber(raw, ['tiempo_aulas_promedio_min'], 0)),
+      sanitaryTimeAvg: _pickNumber(times, ['sanitarios_promedio_min'], _pickNumber(raw, ['tiempo_sanitarios_promedio_min'], 0)),
+      exteriorTimeAvg: _pickNumber(times, ['exteriores_promedio_min'], _pickNumber(raw, ['tiempo_exteriores_promedio_min'], 0)),
+      quality: {
+        Bueno: Number(qualityRaw.Bueno || qualityRaw.bueno || 0),
+        Regular: Number(qualityRaw.Regular || qualityRaw.regular || 0),
+        Malo: Number(qualityRaw.Malo || qualityRaw.malo || 0),
+        'Sin estado': Number(qualityRaw['Sin estado'] || qualityRaw.sin_estado || qualityRaw.sinEstado || 0),
+      },
+    };
+    infra.areaTotal = _pickNumber(raw, ['area_total_m2', 'areaTotal'], infra.areaClassrooms + infra.areaSanitaries + infra.areaExteriors);
+    infra.territories = _normalizeInfraTerritories(raw, infra);
+    infra.educationLevels = _normalizeInfraEducationLevels(raw, infra);
+    infra.blockTypes = _normalizeInfraBlockTypes(raw, infra);
+    infra.failureSegments = _normalizeInfraFailureSegments(raw, infra);
+    infra.alerts = Array.isArray(raw.alertas) && raw.alertas.length ? raw.alertas : _mecInfraAlerts(infra);
+    return infra;
+  }
+
+  function _renderMecInfrastructurePanel(infra) {
+    const root = document.getElementById('mec-infra-root');
+    if (!root) return;
+    if (!_hasInfrastructureData(infra)) {
+      root.innerHTML = `
+        <section class="mec-infra-empty">
+          <span class="eyebrow">Infraestructura MEC</span>
+          <h3>Todavia no hay borradores MEC para consolidar.</h3>
+          <p>Cuando las escuelas empiecen a guardar el Registro guiado, este panel va a mostrar ambientes, sanitarios, electricidad, accesibilidad, daños y evidencias.</p>
+          <button class="btn btn-sm btn-primary" type="button" onclick="StatsModule.loadMecInfrastructureDemo()">Cargar demo 1000 respuestas</button>
+        </section>`;
+      return;
+    }
+
+    const evidencePct = infra.evidenceFields ? _pct(infra.evidenceCovered, infra.evidenceFields) : (infra.evidences ? 100 : 0);
+    const qualityTotal = Object.values(infra.quality || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+    const aulaSanitarioRatio = infra.sanitaries ? `${(Number(infra.classrooms || 0) / Number(infra.sanitaries || 1)).toFixed(1)} aulas/sanitario` : 'Sin sanitarios cargados';
+    const electricalCoverage = infra.blocks ? _pct(infra.grounding + infra.differential + infra.circuitsIdentified, infra.blocks * 3) : 0;
+    const accessibilityScore = infra.sanitaries ? _pct(infra.sanitaryAccessible + infra.ramps, infra.sanitaries + infra.blocks) : _pct(infra.ramps, infra.blocks);
+    const failurePct = infra.blocks ? _pct(infra.damages + infra.sanitaryBad, infra.blocks + infra.sanitaries) : _pct(infra.damages, infra.classrooms + infra.otherSpaces + infra.sanitaries);
+    const view = _mecInfraView(infra);
+    const areaPerSchool = infra.schools ? Math.round((Number(infra.areaTotal || 0) / Math.max(1, Number(infra.schools || 0))) * 10) / 10 : 0;
+    const classroomDensity = infra.schools ? Math.round(((Number(infra.classrooms || 0) + Number(infra.otherSpaces || 0)) / Math.max(1, Number(infra.schools || 0))) * 10) / 10 : 0;
+    const highRiskTerritories = (infra.territories || []).filter(row => Number(row.risk || 0) >= 55).length;
+    const dataDepth = _pct(
+      Number(infra.blocks || 0) + Number(infra.classrooms || 0) + Number(infra.sanitaries || 0) + Number(infra.siteElements || 0),
+      Math.max(1, Number(infra.schools || 0) * 12)
+    );
+
+    root.innerHTML = `
+      <div class="mec-infra-page">
+        <section class="mec-infra-command">
+          <div class="mec-infra-radial" style="--pct:${evidencePct}%">
+            <strong>${evidencePct}%</strong>
+            <span>Evidencia</span>
+          </div>
+          <div class="mec-infra-copy">
+            <span class="eyebrow">Infraestructura escolar MEC</span>
+            <p>KPIs, mapas, ranking territorial, tablas y figuras tecnicas para priorizar mantenimiento, inversion y recorridos.</p>
+            <div class="mec-infra-chips">
+              ${infra.demo ? '<span class="mec-demo-chip">Modo demo</span>' : ''}
+              <span>${infra.schools} escuelas con ficha MEC</span>
+              <span>${_formatArea(infra.areaTotal)} relevados</span>
+              <span>${infra.source}</span>
+              <span>${_formatDate(infra.generatedAt) || 'Actualizado ahora'}</span>
+            </div>
+          </div>
+          <div class="mec-infra-topline">
+            ${_infraMiniMetric('Aulas/ambientes', infra.classrooms + infra.otherSpaces, `${_formatArea(infra.areaClassrooms)} pedagógicos`)}
+            ${_infraMiniMetric('Sanitarios', infra.sanitaries, aulaSanitarioRatio)}
+            ${_infraMiniMetric('Riesgo técnico', `${failurePct}%`, 'Fallas, daños y servicios críticos')}
+            ${_infraMiniMetric('Evidencias', infra.evidences, `${infra.evidencePending} campos pendientes`)}
+          </div>
+        </section>
+
+        <section class="mec-diagnostic-grid" aria-label="Diagnostico ejecutivo MEC">
+          ${_mecDiagnosticCard('Profundidad de carga', `${dataDepth}%`, 'Objetos tecnicos registrados por escuela', dataDepth >= 70 ? 'success' : dataDepth >= 35 ? 'warning' : 'danger')}
+          ${_mecDiagnosticCard('Area media', _formatArea(areaPerSchool), 'm2 relevados por escuela', 'info')}
+          ${_mecDiagnosticCard('Ambientes/escuela', classroomDensity, 'Aulas y otros ambientes declarados', 'success')}
+          ${_mecDiagnosticCard('Territorios criticos', highRiskTerritories, 'Con prioridad tecnica alta', highRiskTerritories ? 'danger' : 'success')}
+          ${_mecDiagnosticCard('Cobertura evidencia', `${evidencePct}%`, `${infra.evidenceCovered || 0} de ${infra.evidenceFields || 0} campos`, evidencePct >= 80 ? 'success' : evidencePct >= 50 ? 'warning' : 'danger')}
+          ${_mecDiagnosticCard('Seguridad electrica', `${electricalCoverage}%`, 'Puesta a tierra, diferencial y circuitos', electricalCoverage >= 70 ? 'success' : electricalCoverage >= 35 ? 'warning' : 'danger')}
+        </section>
+
+        <section class="mec-intel-filters" aria-label="Segmentación de infraestructura">
+          <div class="mec-intel-filters__intro">
+            <span class="eyebrow">Explorador segmentable</span>
+            <h4>Cruce por territorio, nivel, bloque y presencia de fallas</h4>
+            <p>La misma base puede verse por departamento, distrito, nivel educativo, tipología edilicia o criticidad técnica.</p>
+          </div>
+          <div class="mec-intel-filter-grid">
+            ${_infraSelect('mec-infra-filter-etapa', 'Etapa', _infraStageOptions(), view.filters.etapa, 'etapa')}
+            ${_infraSelect('mec-infra-filter-departamento', 'Departamento', _infraOptions(['Todos los departamentos', ''], view.departments), view.filters.departamento, 'departamento')}
+            ${_infraSelect('mec-infra-filter-distrito', 'Distrito', _infraOptions(['Todos los distritos', ''], view.districts), view.filters.distrito, 'distrito')}
+            ${_infraSelect('mec-infra-filter-nivel', 'Nivel educativo', _infraOptions(['Todos los niveles', ''], infra.educationLevels.map(row => row.label)), view.filters.nivel, 'nivel')}
+            ${_infraSelect('mec-infra-filter-bloque', 'Tipo de bloque', _infraOptions(['Todos los bloques', ''], infra.blockTypes.map(row => row.label)), view.filters.tipoBloque, 'tipoBloque')}
+            ${_infraSelect('mec-infra-filter-falla', 'Fallas', _infraOptions(['Todos los estados', ''], infra.failureSegments.map(row => row.label)), view.filters.falla, 'falla')}
+            ${_infraSelect('mec-infra-filter-metric', 'Capa mapa', _infraMetricOptions(), view.filters.metric, 'metric')}
+            <button class="btn btn-sm btn-outline" type="button" data-mec-infra-reset>Limpiar</button>
+          </div>
+        </section>
+
+        <section class="mec-decision-grid">
+          ${_mecDecisionCard('Ambientes pedagógicos', infra.classrooms, [
+            ['Otros espacios', infra.otherSpaces],
+            ['Puertas', infra.doors],
+            ['Ventanas', infra.windows],
+            ['Area', _formatArea(infra.areaClassrooms)],
+          ], '#0b5d3b')}
+          ${_mecDecisionCard('Sanitarios y saneamiento', infra.sanitaries, [
+            ['Accesibles', infra.sanitaryAccessible],
+            ['Con alerta', infra.sanitaryBad],
+            ['Ratio', aulaSanitarioRatio],
+            ['Area', _formatArea(infra.areaSanitaries)],
+          ], '#1d4ed8')}
+          ${_mecDecisionCard('Electricidad y seguridad', `${electricalCoverage}%`, [
+            ['Tableros', infra.switchboards],
+            ['Tomas', infra.outlets],
+            ['Puesta a tierra', infra.grounding],
+            ['Diferencial', infra.differential],
+          ], '#b7791f')}
+          ${_mecDecisionCard('Accesibilidad y circulacion', `${accessibilityScore}%`, [
+            ['Rampas', infra.ramps],
+            ['Escaleras', infra.stairs],
+            ['Sanitarios accesibles', infra.sanitaryAccessible],
+            ['Exteriores', infra.siteElements],
+          ], '#7c3aed')}
+        </section>
+
+        <section class="mec-intel-grid">
+          <article class="mec-infra-board mec-map-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Mapa territorial</span>
+                <h4>Calor de infraestructura y criticidad</h4>
+              </div>
+              <strong>${view.scope.schools}</strong>
+            </div>
+            <div id="mec-infra-map" class="mec-infra-map" role="img" aria-label="Mapa de infraestructura MEC"></div>
+            <div class="mec-map-legend">
+              ${_infraLegend('Baja prioridad', '', '#0b5d3b')}
+              ${_infraLegend('Media', '', '#c8a24a')}
+              ${_infraLegend('Alta', '', '#b42318')}
+            </div>
+          </article>
+
+          <article class="mec-infra-board mec-scope-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Vista filtrada</span>
+                <h4>${_escape(view.scopeLabel)}</h4>
+              </div>
+              <strong>${view.scope.risk}%</strong>
+            </div>
+            <div class="mec-scope-metrics">
+              ${_infraMiniMetric('Escuelas', view.scope.schools, 'en el segmento')}
+              ${_infraMiniMetric('Aulas', view.scope.classrooms, 'ambientes pedagógicos')}
+              ${_infraMiniMetric('Sanitarios', view.scope.sanitaries, 'servicios relevados')}
+              ${_infraMiniMetric('Fallas', view.scope.damages, 'daños e incidencias')}
+            </div>
+            <div class="mec-segment-focus">
+              ${_segmentFocusCard('Nivel educativo', view.level, 'schools', 'escuelas')}
+              ${_segmentFocusCard('Tipo de bloque', view.blockType, 'blocks', 'bloques')}
+              ${_segmentFocusCard('Fallas', view.failure, 'schools', 'escuelas')}
+            </div>
+          </article>
+        </section>
+
+        <section class="mec-infra-section-grid">
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Semáforo técnico</span>
+                <h4>Estado declarado de elementos</h4>
+              </div>
+              <strong>${qualityTotal}</strong>
+            </div>
+            <div class="mec-condition-strip">
+              ${_qualitySegment('Bueno', infra.quality.Bueno || 0, qualityTotal, '#5fbf7a')}
+              ${_qualitySegment('Regular', infra.quality.Regular || 0, qualityTotal, '#f2ad5c')}
+              ${_qualitySegment('Malo', infra.quality.Malo || 0, qualityTotal, '#df6b6b')}
+              ${_qualitySegment('Sin estado', infra.quality['Sin estado'] || 0, qualityTotal, '#9aa4b2')}
+            </div>
+            <div class="mec-quality-legend">
+              ${_infraLegend('Bueno', infra.quality.Bueno, '#5fbf7a')}
+              ${_infraLegend('Regular', infra.quality.Regular, '#f2ad5c')}
+              ${_infraLegend('Malo', infra.quality.Malo, '#df6b6b')}
+              ${_infraLegend('Sin estado', infra.quality['Sin estado'], '#9aa4b2')}
+            </div>
+          </article>
+
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Lectura para decision</span>
+                <h4>Alertas que el MEC necesita ver primero</h4>
+              </div>
+              <strong>${infra.alerts.length}</strong>
+            </div>
+            <div class="mec-alert-list">
+              ${infra.alerts.map(_infraAlert).join('')}
+            </div>
+          </article>
+        </section>
+
+        <section class="mec-figures-grid">
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Niveles educativos</span>
+                <h4>Lectura comparativa por oferta</h4>
+              </div>
+            </div>
+            <div class="mec-segment-bars">
+              ${_segmentBars(infra.educationLevels, 'schools', infra.schools, 'escuelas')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Tipología de bloques</span>
+                <h4>Donde se concentra la infraestructura</h4>
+              </div>
+            </div>
+            <div class="mec-segment-bars">
+              ${_segmentBars(infra.blockTypes, 'blocks', infra.blocks, 'bloques')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Prioridad territorial</span>
+                <h4>Top de riesgo por fallas y evidencia</h4>
+              </div>
+            </div>
+            <div class="mec-risk-bars">
+              ${_territoryRiskBars(view.territories)}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Coberturas criticas</span>
+                <h4>Evidencia, electricidad y accesibilidad</h4>
+              </div>
+            </div>
+            <div class="mec-coverage-stack">
+              ${_coverageMeter('Evidencia fotografica', evidencePct, `${infra.evidencePending || 0} pendientes`, '#0b5d3b')}
+              ${_coverageMeter('Seguridad electrica', electricalCoverage, `${infra.switchboards || 0} tableros registrados`, '#b7791f')}
+              ${_coverageMeter('Accesibilidad', accessibilityScore, `${infra.ramps || 0} rampas / ${infra.sanitaryAccessible || 0} sanitarios`, '#1d4ed8')}
+              ${_coverageMeter('Fallas tecnicas', failurePct, `${infra.damages + infra.sanitaryBad} alertas`, '#b42318')}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Matriz territorial</span>
+                <h4>Escuelas, fallas y evidencia</h4>
+              </div>
+            </div>
+            <div class="mec-risk-matrix">
+              ${_riskMatrix(view.territories)}
+            </div>
+          </article>
+          <article class="mec-infra-board">
+            <div class="mec-infra-board__head">
+              <div>
+                <span class="eyebrow">Productividad</span>
+                <h4>Tiempos técnicos promedio</h4>
+              </div>
+            </div>
+            <div class="mec-time-grid">
+              ${_infraBar('Escuela completa', infra.schoolTimeAvg, 180, 'min promedio')}
+              ${_infraBar('Aulas/ambientes', infra.classroomTimeAvg, 90, 'min promedio')}
+              ${_infraBar('Sanitarios', infra.sanitaryTimeAvg, 60, 'min promedio')}
+              ${_infraBar('Exteriores', infra.exteriorTimeAvg, 60, 'min promedio')}
+            </div>
+          </article>
+        </section>
+
+        <section class="mec-infra-board mec-infra-board--wide">
+          <div class="mec-infra-board__head">
+            <div>
+              <span class="eyebrow">Tabla ejecutiva segmentada</span>
+              <h4>Ranking de territorios para priorizar recorridos, inversión y mantenimiento</h4>
+            </div>
+            <strong>${view.territories.length}</strong>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table mec-territory-table">
+              <thead>
+                <tr>
+                  <th>Territorio</th>
+                  <th>Escuelas</th>
+                  <th>Aulas</th>
+                  <th>Sanitarios</th>
+                  <th>Fallas</th>
+                  <th>Evidencia</th>
+                  <th>Prioridad</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${view.territories.slice(0, 12).map(_territoryRow).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>`;
+    _bindMecInfraControls(infra);
+    _renderMecInfrastructureMap(infra, view);
+  }
+
+  function _asArray(value) {
+    return Array.isArray(value) ? value : [];
+  }
+
+  function _pickText(obj, keys, fallback = '') {
+    for (const key of keys || []) {
+      const value = obj && obj[key];
+      if (value !== undefined && value !== null && String(value).trim() !== '') return String(value).trim();
+    }
+    return fallback;
+  }
+
+  function _normalizeInfraStage(value) {
+    const token = _normalizeToken(value);
+    if (!token) return '';
+    if (token.includes('piloto') || token.includes('muestra')) return 'piloto';
+    if (token.includes('censal') || token.includes('censo')) return 'censal';
+    return token;
+  }
+
+  function _normalizeInfraTerritories(raw, infra) {
+    const rows = _asArray(raw.territorios || raw.territories || raw.por_territorio || raw.por_departamento);
+    if (!rows.length) return [_aggregateTerritory(infra)];
+    return rows.map(row => {
+      const schools = _pickNumber(row, ['escuelas', 'schools', 'total'], 0);
+      const classrooms = _pickNumber(row, ['aulas', 'classrooms'], 0);
+      const sanitaries = _pickNumber(row, ['sanitarios', 'sanitaries'], 0);
+      const damages = _pickNumber(row, ['fallas', 'danos', 'daños', 'damages', 'incidencias'], 0);
+      const evidencePct = _pickNumber(row, ['evidencia_pct', 'evidence_pct', 'evidencePct'], 0);
+      const risk = _pickNumber(row, ['riesgo', 'risk', 'prioridad_pct'], _pct(damages, Math.max(1, classrooms + sanitaries)));
+      return {
+        departamento: _pickText(row, ['departamento', 'department'], 'Sin departamento'),
+        distrito: _pickText(row, ['distrito', 'district'], ''),
+        etapa: _normalizeInfraStage(_pickText(row, ['etapa', 'etapa_operativa', 'stage', 'muestra'], '')),
+        schools,
+        classrooms,
+        sanitaries,
+        blocks: _pickNumber(row, ['bloques', 'blocks'], 0),
+        damages,
+        evidencePct,
+        risk,
+        area: _pickNumber(row, ['area_m2', 'area', 'area_total_m2'], 0),
+        lat: _pickNumber(row, ['lat', 'latitud', 'latitude'], 0),
+        lng: _pickNumber(row, ['lng', 'lon', 'longitud', 'longitude'], 0),
+      };
+    }).sort((a, b) => (b.risk || 0) - (a.risk || 0));
+  }
+
+  function _aggregateTerritory(infra) {
+    return {
+      departamento: 'Todo el pais',
+      distrito: '',
+      etapa: '',
+      schools: Number(infra.schools || 0),
+      classrooms: Number(infra.classrooms || 0) + Number(infra.otherSpaces || 0),
+      sanitaries: Number(infra.sanitaries || 0),
+      blocks: Number(infra.blocks || 0),
+      damages: Number(infra.damages || 0) + Number(infra.sanitaryBad || 0),
+      evidencePct: infra.evidenceFields ? _pct(infra.evidenceCovered, infra.evidenceFields) : 0,
+      risk: _pct(Number(infra.damages || 0) + Number(infra.sanitaryBad || 0), Math.max(1, Number(infra.blocks || 0) + Number(infra.sanitaries || 0))),
+      area: Number(infra.areaTotal || 0),
+      lat: -23.45,
+      lng: -58.44,
+    };
+  }
+
+  function _normalizeInfraEducationLevels(raw, infra) {
+    const rows = _asArray(raw.niveles_educativos || raw.education_levels || raw.niveles);
+    if (rows.length) {
+      return rows.map(row => ({
+        label: _pickText(row, ['nivel', 'label', 'name'], 'Sin nivel'),
+        schools: _pickNumber(row, ['escuelas', 'schools', 'total'], 0),
+        classrooms: _pickNumber(row, ['aulas', 'classrooms'], 0),
+        sanitaries: _pickNumber(row, ['sanitarios', 'sanitaries'], 0),
+        damages: _pickNumber(row, ['fallas', 'danos', 'damages'], 0),
+        evidencePct: _pickNumber(row, ['evidencia_pct', 'evidence_pct', 'evidencePct'], 0),
+      }));
+    }
+    if (!infra.demo) return [{ label: 'Todos los niveles', schools: infra.schools, classrooms: infra.classrooms, sanitaries: infra.sanitaries, damages: infra.damages, evidencePct: 0 }];
+    return [
+      _proportionalSegment('Inicial', infra, .22, .16, .14, .12),
+      _proportionalSegment('Educacion Escolar Basica', infra, .68, .74, .71, .69),
+      _proportionalSegment('Educacion Media', infra, .41, .38, .34, .45),
+      _proportionalSegment('Tecnica / Formacion laboral', infra, .09, .12, .08, .15),
+    ];
+  }
+
+  function _normalizeInfraBlockTypes(raw, infra) {
+    const rows = _asArray(raw.tipos_bloque || raw.block_types || raw.bloques_tipo);
+    if (rows.length) {
+      return rows.map(row => ({
+        label: _pickText(row, ['tipo', 'label', 'name'], 'Sin tipo'),
+        blocks: _pickNumber(row, ['bloques', 'blocks', 'total'], 0),
+        classrooms: _pickNumber(row, ['aulas', 'classrooms'], 0),
+        sanitaries: _pickNumber(row, ['sanitarios', 'sanitaries'], 0),
+        damages: _pickNumber(row, ['fallas', 'danos', 'damages'], 0),
+        area: _pickNumber(row, ['area_m2', 'area'], 0),
+      }));
+    }
+    if (!infra.demo) return [{ label: 'Todos los bloques', blocks: infra.blocks, classrooms: infra.classrooms, sanitaries: infra.sanitaries, damages: infra.damages, area: infra.areaTotal }];
+    return [
+      _blockTypeSegment('Aulas en linea', infra, .42, .48, .21, .31),
+      _blockTypeSegment('Bloque mixto', infra, .28, .27, .39, .37),
+      _blockTypeSegment('Sanitario independiente', infra, .12, .02, .28, .18),
+      _blockTypeSegment('Administrativo / apoyo', infra, .11, .15, .07, .08),
+      _blockTypeSegment('Taller / laboratorio', infra, .07, .08, .05, .06),
+    ];
+  }
+
+  function _normalizeInfraFailureSegments(raw, infra) {
+    const rows = _asArray(raw.fallas_segmentos || raw.failure_segments || raw.fallas);
+    if (rows.length) {
+      return rows.map(row => ({
+        label: _pickText(row, ['estado', 'label', 'name'], 'Sin estado'),
+        schools: _pickNumber(row, ['escuelas', 'schools', 'total'], 0),
+        blocks: _pickNumber(row, ['bloques', 'blocks'], 0),
+        damages: _pickNumber(row, ['fallas', 'danos', 'damages'], 0),
+        risk: _pickNumber(row, ['riesgo', 'risk'], 0),
+      }));
+    }
+    const criticalSchools = Math.round(Number(infra.schools || 0) * (infra.demo ? .36 : _pct(infra.damages, Math.max(1, infra.schools)) / 100));
+    const watchSchools = Math.round(Number(infra.schools || 0) * (infra.demo ? .28 : .1));
+    return [
+      { label: 'Con fallas criticas', schools: criticalSchools, blocks: Math.round(Number(infra.blocks || 0) * .32), damages: Math.round(Number(infra.damages || 0) * .68), risk: 72 },
+      { label: 'Con observaciones leves', schools: watchSchools, blocks: Math.round(Number(infra.blocks || 0) * .28), damages: Math.round(Number(infra.damages || 0) * .22), risk: 38 },
+      { label: 'Sin fallas visibles', schools: Math.max(0, Number(infra.schools || 0) - criticalSchools - watchSchools), blocks: Math.round(Number(infra.blocks || 0) * .4), damages: Math.round(Number(infra.damages || 0) * .1), risk: 12 },
+    ];
+  }
+
+  function _proportionalSegment(label, infra, schoolFactor, classroomFactor, sanitaryFactor, damageFactor) {
+    return {
+      label,
+      schools: Math.round(Number(infra.schools || 0) * schoolFactor),
+      classrooms: Math.round(Number(infra.classrooms || 0) * classroomFactor),
+      sanitaries: Math.round(Number(infra.sanitaries || 0) * sanitaryFactor),
+      damages: Math.round(Number(infra.damages || 0) * damageFactor),
+      evidencePct: infra.evidenceFields ? _pct(infra.evidenceCovered, infra.evidenceFields) : 0,
+    };
+  }
+
+  function _blockTypeSegment(label, infra, blockFactor, classroomFactor, sanitaryFactor, damageFactor) {
+    return {
+      label,
+      blocks: Math.round(Number(infra.blocks || 0) * blockFactor),
+      classrooms: Math.round(Number(infra.classrooms || 0) * classroomFactor),
+      sanitaries: Math.round(Number(infra.sanitaries || 0) * sanitaryFactor),
+      damages: Math.round(Number(infra.damages || 0) * damageFactor),
+      area: Math.round(Number(infra.areaTotal || 0) * blockFactor),
+    };
+  }
+
+  function _mecInfraView(infra) {
+    const departments = [...new Set((infra.territories || []).map(row => row.departamento).filter(Boolean))].sort();
+    const filters = { ..._infraFilters };
+    filters.etapa = _normalizeInfraStage(filters.etapa);
+    filters.metric = MEC_MAP_METRICS[filters.metric] ? filters.metric : 'risk';
+    if (filters.departamento && !departments.includes(filters.departamento)) {
+      filters.departamento = '';
+      _infraFilters.departamento = '';
+    }
+    let territories = _filterInfraByStage(infra.territories || [], filters.etapa)
+      .filter(row => !filters.departamento || row.departamento === filters.departamento);
+    const districts = [...new Set(territories.map(row => row.distrito).filter(Boolean))].sort();
+    if (filters.distrito && !districts.includes(filters.distrito)) {
+      filters.distrito = '';
+      _infraFilters.distrito = '';
+    }
+    territories = territories.filter(row => !filters.distrito || row.distrito === filters.distrito);
+    if (!territories.length && !filters.etapa && !filters.departamento && !filters.distrito) territories = infra.territories || [];
+    const level = (infra.educationLevels || []).find(row => row.label === filters.nivel) || null;
+    const blockType = (infra.blockTypes || []).find(row => row.label === filters.tipoBloque) || null;
+    const failure = (infra.failureSegments || []).find(row => row.label === filters.falla) || null;
+    const scope = _sumTerritoryRows(territories);
+    const scopePieces = [
+      STAGE_LABELS[filters.etapa],
+      filters.departamento || 'Todo el pais',
+      filters.distrito,
+      filters.nivel,
+      filters.tipoBloque,
+      filters.falla,
+    ].filter(Boolean);
+    return {
+      filters,
+      departments,
+      districts,
+      territories,
+      level,
+      blockType,
+      failure,
+      scope,
+      scopeLabel: scopePieces.join(' / '),
+    };
+  }
+
+  function _filterInfraByStage(rows, stage) {
+    const normalizedStage = _normalizeInfraStage(stage);
+    if (!normalizedStage) return rows || [];
+    const hasExplicitStage = (rows || []).some(row => _normalizeInfraStage(row.etapa));
+    const explicit = (rows || []).filter(row => _normalizeInfraStage(row.etapa) === normalizedStage);
+    if (hasExplicitStage) return explicit;
+    if (explicit.length) return explicit;
+    const factor = normalizedStage === 'piloto' ? PILOT_STAGE_SHARE : (normalizedStage === 'censal' ? 1 - PILOT_STAGE_SHARE : 1);
+    return (rows || []).map(row => _scaleInfraTerritory(row, factor, normalizedStage));
+  }
+
+  function _scaleInfraTerritory(row, factor, stage) {
+    const scaled = { ...row, etapa: stage };
+    ['schools', 'classrooms', 'sanitaries', 'blocks', 'damages', 'area'].forEach(key => {
+      scaled[key] = Math.max(0, Math.round(Number(scaled[key] || 0) * factor));
+    });
+    return scaled;
+  }
+
+  function _sumTerritoryRows(rows) {
+    const total = rows.reduce((acc, row) => {
+      acc.schools += Number(row.schools || 0);
+      acc.classrooms += Number(row.classrooms || 0);
+      acc.sanitaries += Number(row.sanitaries || 0);
+      acc.blocks += Number(row.blocks || 0);
+      acc.damages += Number(row.damages || 0);
+      acc.area += Number(row.area || 0);
+      acc.riskWeight += Number(row.risk || 0) * Math.max(1, Number(row.schools || 0));
+      acc.evidenceWeight += Number(row.evidencePct || 0) * Math.max(1, Number(row.schools || 0));
+      return acc;
+    }, { schools: 0, classrooms: 0, sanitaries: 0, blocks: 0, damages: 0, area: 0, riskWeight: 0, evidenceWeight: 0 });
+    const weight = Math.max(1, total.schools);
+    total.risk = Math.round(total.riskWeight / weight);
+    total.evidencePct = Math.round(total.evidenceWeight / weight);
+    return total;
+  }
+
+  function _infraOptions(defaultOption, values) {
+    const [label, value] = defaultOption;
+    const unique = [...new Set((values || []).filter(Boolean))].sort();
+    return [{ label, value }, ...unique.map(item => ({ label: item, value: item }))];
+  }
+
+  function _infraStageOptions() {
+    return [
+      { label: 'Todas las etapas', value: '' },
+      { label: STAGE_LABELS.piloto, value: 'piloto' },
+      { label: STAGE_LABELS.censal, value: 'censal' },
+    ];
+  }
+
+  function _infraMetricOptions() {
+    return Object.entries(MEC_MAP_METRICS).map(([value, item]) => ({ label: item.label, value }));
+  }
+
+  function _infraSelect(id, label, options, value, filterKey) {
+    return `
+      <label class="mec-intel-select" for="${_escape(id)}">
+        <span>${_escape(label)}</span>
+        <select id="${_escape(id)}" data-mec-infra-filter="${_escape(filterKey)}">
+          ${options.map(option => `<option value="${_escape(option.value)}" ${String(value) === String(option.value) ? 'selected' : ''}>${_escape(option.label)}</option>`).join('')}
+        </select>
+      </label>`;
+  }
+
+  function _bindMecInfraControls(infra) {
+    const root = document.getElementById('mec-infra-root');
+    if (!root) return;
+    root.querySelectorAll('[data-mec-infra-filter]').forEach(control => {
+      control.addEventListener('change', () => {
+        const key = control.dataset.mecInfraFilter;
+        _infraFilters[key] = control.value;
+        if (key === 'departamento') _infraFilters.distrito = '';
+        _renderMecInfrastructurePanel(infra);
+      });
+    });
+    root.querySelector('[data-mec-infra-reset]')?.addEventListener('click', () => {
+      _infraFilters = { etapa: '', departamento: '', distrito: '', nivel: '', tipoBloque: '', falla: '', metric: 'risk' };
+      _renderMecInfrastructurePanel(infra);
+    });
+  }
+
+  function _segmentFocusCard(title, row, key, unit) {
+    if (!row) {
+      return `
+        <article>
+          <span>${_escape(title)}</span>
+          <strong>Todos</strong>
+          <small>Sin filtro activo</small>
+        </article>`;
+    }
+    const value = Number(row[key] || row.schools || row.blocks || 0);
+    const damages = Number(row.damages || 0);
+    return `
+      <article>
+        <span>${_escape(title)}</span>
+        <strong>${_escape(row.label)}</strong>
+        <small>${value} ${_escape(unit)} - ${damages} fallas</small>
+      </article>`;
+  }
+
+  function _segmentBars(rows, key, total, unit) {
+    const max = Math.max(...(rows || []).map(row => Number(row[key] || 0)), Number(total || 0), 1);
+    return (rows || []).map(row => {
+      const value = Number(row[key] || 0);
+      const pct = Math.max(4, Math.round((value / max) * 100));
+      return `
+        <div class="mec-segment-bar">
+          <div>
+            <strong>${_escape(row.label)}</strong>
+            <span>${value} ${_escape(unit)} - ${Number(row.damages || 0)} fallas</span>
+          </div>
+          <i><b style="width:${pct}%"></b></i>
+        </div>`;
+    }).join('');
+  }
+
+  function _territoryRow(row) {
+    const label = row.distrito ? `${row.departamento} / ${row.distrito}` : row.departamento;
+    const tone = _riskTone(row.risk);
+    return `
+      <tr>
+        <td><strong>${_escape(label)}</strong></td>
+        <td>${Number(row.schools || 0)}</td>
+        <td>${Number(row.classrooms || 0)}</td>
+        <td>${Number(row.sanitaries || 0)}</td>
+        <td>${Number(row.damages || 0)}</td>
+        <td>
+          <div class="table-progress">
+            <span>${Number(row.evidencePct || 0)}%</span>
+            <i><b style="width:${Math.min(100, Number(row.evidencePct || 0))}%"></b></i>
+          </div>
+        </td>
+        <td><span class="mec-priority-pill mec-priority-pill--${tone}">${Number(row.risk || 0)}%</span></td>
+      </tr>`;
+  }
+
+  function _renderMecInfrastructureMap(infra, view) {
+    const el = document.getElementById('mec-infra-map');
+    if (!el) return;
+    if (_infraMap) {
+      try { _infraMap.remove(); } catch { /* ignore stale Leaflet container */ }
+      _infraMap = null;
+    }
+    const metric = MEC_MAP_METRICS[view.filters.metric] || MEC_MAP_METRICS.risk;
+    const sourceRows = (view.territories && view.territories.length ? view.territories : (infra.territories || []));
+    const level = view.filters.departamento ? 'distrito' : 'departamento';
+    const rows = _choroplethRows(sourceRows, level);
+    if (!rows.length) {
+      el.innerHTML = '<div class="mec-map-empty">Sin datos territoriales para el mapa.</div>';
+      return;
+    }
+    const max = Math.max(...rows.map(row => _metricValue(row, metric.key)), 1);
+    const sorted = rows.sort((a, b) => _metricValue(b, metric.key) - _metricValue(a, metric.key));
+    el.innerHTML = `
+      <div class="mec-choropleth-map">
+        <div class="mec-choropleth-head">
+          <div>
+            <strong>Coropleta por ${level === 'distrito' ? 'distrito' : 'departamento'}</strong>
+            <span>${_escape(_metricDescription(metric, view.filters.etapa))}</span>
+          </div>
+          <em>${_escape(metric.label)}</em>
+        </div>
+        <div class="mec-choropleth-grid">
+          ${sorted.map(row => {
+            const value = _metricValue(row, metric.key);
+            const intensity = metric.unit === '%' ? Math.max(0, Math.min(1, value / 100)) : Math.max(0, Math.min(1, value / max));
+            const visualIntensity = metric.invert ? 1 - intensity : intensity;
+            const color = _metricColor(metric, value, max);
+            const bg = _blendHex('#f8fafc', color, Math.max(.18, visualIntensity * .78));
+            const label = level === 'distrito' ? (row.distrito || row.departamento || 'Sin dato') : (row.departamento || 'Sin dato');
+            return `
+              <button class="mec-choropleth-cell" type="button" title="${_escape(label)}" style="background:${bg};border-color:${color};">
+                <span>${_escape(label)}</span>
+                <strong>${_escape(_formatMetricValue(value, metric))}</strong>
+                <small>${Number(row.schools || 0)} escuelas · ${Number(row.damages || 0)} fallas · ${Number(row.evidencePct || 0)}% evidencia</small>
+              </button>`;
+          }).join('')}
+        </div>
+        <div class="mec-choropleth-scale">
+          <span>Bajo</span><i></i><span>Alto</span>
+        </div>
+      </div>`;
+  }
+
+  function _choroplethRows(rows, level) {
+    const grouped = {};
+    (rows || []).forEach(row => {
+      const key = level === 'distrito'
+        ? `${row.departamento || 'Sin departamento'} / ${row.distrito || row.departamento || 'Sin distrito'}`
+        : (row.departamento || 'Sin departamento');
+      if (!grouped[key]) {
+        grouped[key] = {
+          departamento: row.departamento || 'Sin departamento',
+          distrito: level === 'distrito' ? (row.distrito || row.departamento || 'Sin distrito') : '',
+          schools: 0,
+          classrooms: 0,
+          sanitaries: 0,
+          blocks: 0,
+          damages: 0,
+          area: 0,
+          riskWeight: 0,
+          evidenceWeight: 0,
+        };
+      }
+      grouped[key].schools += Number(row.schools || 0);
+      grouped[key].classrooms += Number(row.classrooms || 0);
+      grouped[key].sanitaries += Number(row.sanitaries || 0);
+      grouped[key].blocks += Number(row.blocks || 0);
+      grouped[key].damages += Number(row.damages || 0);
+      grouped[key].area += Number(row.area || 0);
+      grouped[key].riskWeight += Number(row.risk || 0) * Math.max(1, Number(row.schools || 0));
+      grouped[key].evidenceWeight += Number(row.evidencePct || 0) * Math.max(1, Number(row.schools || 0));
+    });
+    return Object.values(grouped).map(row => {
+      const weight = Math.max(1, Number(row.schools || 0));
+      return {
+        ...row,
+        risk: Math.round(row.riskWeight / weight),
+        evidencePct: Math.round(row.evidenceWeight / weight),
+      };
+    });
+  }
+
+  function _metricDescription(metric, stage) {
+    const stageLabel = STAGE_LABELS[_normalizeInfraStage(stage)] || 'todas las etapas';
+    return `${metric.label} para ${stageLabel}`;
+  }
+
+  function _metricValue(row, key) {
+    return Number(row?.[key] || 0);
+  }
+
+  function _formatMetricValue(value, metric) {
+    if (metric.unit === '%') return `${Math.round(Number(value || 0))}%`;
+    if (metric.key === 'area') return _formatArea(value);
+    return Number(value || 0);
+  }
+
+  function _metricColor(metric, value, max) {
+    const numeric = Number(value || 0);
+    if (metric.tone === 'evidence') {
+      if (numeric >= 85) return '#0b5d3b';
+      if (numeric >= 60) return '#c8a24a';
+      return '#b42318';
+    }
+    if (metric.tone === 'volume') {
+      const pct = Math.max(0, Math.min(1, numeric / Math.max(1, Number(max || 1))));
+      if (pct >= .67) return '#1d4ed8';
+      if (pct >= .34) return '#0b5d3b';
+      return '#c8a24a';
+    }
+    return _riskColor(numeric);
+  }
+
+  function _blendHex(base, accent, amount) {
+    const a = Math.max(0, Math.min(1, Number(amount || 0)));
+    const b = _hexToRgb(base);
+    const c = _hexToRgb(accent);
+    if (!b || !c) return accent;
+    const mix = channel => Math.round(b[channel] + (c[channel] - b[channel]) * a);
+    return `rgb(${mix('r')}, ${mix('g')}, ${mix('b')})`;
+  }
+
+  function _hexToRgb(hex) {
+    const value = String(hex || '').replace('#', '').trim();
+    if (!/^[a-f0-9]{6}$/i.test(value)) return null;
+    return {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16),
+    };
+  }
+
+  function _fallbackMecMap(rows) {
+    const sourceRows = rows || [];
+    const pins = sourceRows
+      .map((row, index) => ({ ...row, _point: row._point || _territoryPoint(row, index, sourceRows.length) }))
+      .filter(row => row._point)
+      .slice(0, 28);
+    return `
+      <div class="mec-map-fallback">
+        <span class="mec-map-country">Paraguay</span>
+        ${pins.map(row => {
+          const point = _mapPoint(row._point);
+          const label = `${row.departamento || 'Territorio'}${row.distrito ? ' / ' + row.distrito : ''}`;
+          return `<button type="button" title="${_escape(label)}" style="left:${point.x}%;top:${point.y}%;background:${_riskColor(row.risk)}"><span>${Number(row.risk || 0)}%</span></button>`;
+        }).join('')}
+      </div>`;
+  }
+
+  function _territoryPoint(row, index = 0, total = 1) {
+    const lat = Number(row?.lat || 0);
+    const lng = Number(row?.lng || row?.lon || 0);
+    if (lat && lng) return { lat, lng };
+    const key = _normalizeTerritoryKey(row?.departamento || row?.department || row?.distrito || row?.district);
+    const center = PARAGUAY_TERRITORY_CENTERS[key];
+    if (center) return { lat: center[0], lng: center[1] };
+    const angle = (index / Math.max(1, total)) * Math.PI * 2;
+    return {
+      lat: -23.45 + Math.sin(angle) * 2.8,
+      lng: -58.44 + Math.cos(angle) * 3.25,
+    };
+  }
+
+  function _normalizeTerritoryKey(value) {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ñ/g, 'n')
+      .replace(/Ñ/g, 'n')
+      .replace(/[^a-zA-Z0-9]+/g, '')
+      .toLowerCase();
+  }
+
+  function _mapPoint(point) {
+    const west = -62.8;
+    const east = -54.2;
+    const north = -19.0;
+    const south = -27.7;
+    const x = Math.max(5, Math.min(95, ((Number(point.lng || west) - west) / (east - west)) * 100));
+    const y = Math.max(5, Math.min(95, ((Number(point.lat || north) - north) / (south - north)) * 100));
+    return { x: Math.round(x), y: Math.round(y) };
+  }
+
+  function _riskTone(value) {
+    const risk = Number(value || 0);
+    if (risk >= 55) return 'danger';
+    if (risk >= 30) return 'warning';
+    return 'success';
+  }
+
+  function _riskColor(value) {
+    const tone = _riskTone(value);
+    if (tone === 'danger') return '#b42318';
+    if (tone === 'warning') return '#c8a24a';
+    return '#0b5d3b';
+  }
+
+  function _mecDecisionCard(title, value, rows, color) {
+    return `
+      <article class="mec-decision-card" style="--accent:${color}">
+        <span>${_escape(title)}</span>
+        <strong>${_escape(value)}</strong>
+        <div>
+          ${rows.map(([label, itemValue]) => `
+            <p><small>${_escape(label)}</small><b>${_escape(itemValue)}</b></p>
+          `).join('')}
+        </div>
+      </article>`;
+  }
+
+  function _mecDiagnosticCard(label, value, note, tone = 'info') {
+    return `
+      <article class="mec-diagnostic-card mec-diagnostic-card--${_safeClass(tone)}">
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note || '')}</small>
+      </article>`;
+  }
+
+  function _coverageMeter(label, pct, note, color) {
+    const safePct = Math.max(0, Math.min(100, Number(pct || 0)));
+    return `
+      <div class="mec-coverage-meter">
+        <div>
+          <strong>${_escape(label)}</strong>
+          <span>${safePct}%</span>
+        </div>
+        <i><b style="width:${safePct}%;background:${color}"></b></i>
+        <small>${_escape(note || '')}</small>
+      </div>`;
+  }
+
+  function _territoryRiskBars(rows) {
+    const top = [...(rows || [])]
+      .sort((a, b) => Number(b.risk || 0) - Number(a.risk || 0))
+      .slice(0, 6);
+    if (!top.length) return '<p class="text-muted">Sin territorios para calcular riesgo.</p>';
+    return top.map(row => {
+      const risk = Math.max(0, Math.min(100, Number(row.risk || 0)));
+      const label = row.distrito ? `${row.departamento} / ${row.distrito}` : row.departamento;
+      return `
+        <div class="mec-risk-bar">
+          <div>
+            <strong>${_escape(label || 'Sin territorio')}</strong>
+            <span>${Number(row.schools || 0)} escuelas - ${Number(row.damages || 0)} fallas</span>
+          </div>
+          <i><b style="width:${Math.max(4, risk)}%;background:${_riskColor(risk)}"></b></i>
+          <em>${risk}%</em>
+        </div>`;
+    }).join('');
+  }
+
+  function _riskMatrix(rows) {
+    const top = [...(rows || [])]
+      .sort((a, b) => Number(b.schools || 0) - Number(a.schools || 0))
+      .slice(0, 12);
+    if (!top.length) return '<p class="text-muted">Sin datos territoriales.</p>';
+    const maxSchools = Math.max(...top.map(row => Number(row.schools || 0)), 1);
+    return top.map(row => {
+      const label = row.distrito || row.departamento || 'Sin dato';
+      const size = 28 + Math.round((Number(row.schools || 0) / maxSchools) * 42);
+      const evidence = Math.max(0, Math.min(100, Number(row.evidencePct || 0)));
+      return `
+        <span
+          title="${_escape(label)}: ${Number(row.schools || 0)} escuelas, ${Number(row.risk || 0)}% riesgo"
+          style="width:${size}px;height:${size}px;background:${_riskColor(row.risk)};opacity:${Math.max(.45, evidence / 100)}"
+        >${_escape(_shortLabel(label))}</span>`;
+    }).join('');
+  }
+
+  function _infraMiniMetric(label, value, note) {
+    return `
+      <article>
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note || '')}</small>
+      </article>`;
+  }
+
+  function _infraLegend(label, value, color) {
+    const hasValue = value !== undefined && value !== null && value !== '';
+    return `<span><i style="background:${color}"></i>${_escape(label)} ${hasValue ? `<b>${Number(value || 0)}</b>` : ''}</span>`;
+  }
+
+  function _infraBar(label, value, max, note) {
+    const numeric = Number(value || 0);
+    const pct = Math.min(100, Math.round((numeric / Math.max(1, max)) * 100));
+    return `
+      <div class="mec-time-row">
+        <span>${_escape(label)}</span>
+        <div><i style="width:${pct}%"></i></div>
+        <strong>${numeric ? numeric.toFixed(1) : '0'} ${_escape(note)}</strong>
+      </div>`;
+  }
+
+  function _infraAlert(item) {
+    if (typeof item === 'string') {
+      return `<div class="mec-alert-item mec-alert-item--warning"><strong>Atencion</strong><span>${_escape(item)}</span></div>`;
+    }
+    const tone = item.tone || item.tipo || 'warning';
+    return `
+      <div class="mec-alert-item mec-alert-item--${_safeClass(tone)}">
+        <strong>${_escape(item.label || item.titulo || 'Alerta')}</strong>
+        <span>${_escape(item.note || item.detalle || item.valor || '')}</span>
+      </div>`;
+  }
+
+  function _mecInfraAlerts(infra) {
+    const alerts = [];
+    if (infra.damages) alerts.push({ tone: 'danger', label: 'Daños relevados', note: `${infra.damages} elementos con falla, grieta o daño.` });
+    if (infra.sanitaryBad) alerts.push({ tone: 'danger', label: 'Sanitarios críticos', note: `${infra.sanitaryBad} sanitarios con estado malo o fuera de servicio.` });
+    if (infra.blocks && infra.grounding < infra.blocks) alerts.push({ tone: 'warning', label: 'Puesta a tierra incompleta', note: `${Math.max(0, infra.blocks - infra.grounding)} bloques sin puesta a tierra confirmada.` });
+    if (infra.blocks && infra.differential < infra.blocks) alerts.push({ tone: 'warning', label: 'Proteccion diferencial', note: `${Math.max(0, infra.blocks - infra.differential)} bloques sin diferencial confirmado.` });
+    if (infra.evidencePending) alerts.push({ tone: 'info', label: 'Evidencias pendientes', note: `${infra.evidencePending} campos recomendados/obligatorios sin foto.` });
+    if (!alerts.length) alerts.push({ tone: 'success', label: 'Sin alertas técnicas fuertes', note: 'El tablero no detecta daños, pendientes fotográficos ni brechas eléctricas con los datos disponibles.' });
+    return alerts;
+  }
+
+  function _pickNumber(obj, keys, fallback = 0) {
+    for (const key of keys || []) {
+      const raw = obj && obj[key];
+      if (raw !== undefined && raw !== null && raw !== '') {
+        const n = Number(String(raw).replace(',', '.'));
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+    const fallbackNumber = Number(fallback || 0);
+    return Number.isNaN(fallbackNumber) ? 0 : fallbackNumber;
+  }
+
+  function _hasInfrastructureData(infra) {
+    return ['schools', 'blocks', 'classrooms', 'sanitaries', 'siteElements', 'evidences', 'areaTotal']
+      .some(key => Number(infra?.[key] || 0) > 0);
+  }
+
+  function _formatArea(value) {
+    const numeric = Number(value || 0);
+    return numeric ? `${numeric.toFixed(numeric >= 100 ? 0 : 1)} m2` : '0 m2';
+  }
+
+  function _localMetric(label, value, note) {
+    return `
+      <article class="offline-metric">
+        <span>${_escape(label)}</span>
+        <strong>${_escape(value)}</strong>
+        <small>${_escape(note || '')}</small>
+      </article>`;
+  }
+
+  function _qualitySegment(label, value, total, color) {
+    const width = total ? Math.max(3, Math.round((Number(value || 0) / total) * 100)) : 0;
+    return `<i title="${_escape(label)}: ${Number(value || 0)}" style="width:${width}%;background:${color}"></i>`;
+  }
+
+  function _renderKPIs(data) {
+    const total = Number(data.total || 0);
+    const kpis = [
+      { id: 'kpi-total', value: data.total || 0, color: '#173b63', note: 'Universo monitoreado' },
+      { id: 'kpi-finalizadas', value: data.finalizadas || 0, color: '#207c55', note: `${_pct(data.finalizadas || 0, total)}% cerradas` },
+      { id: 'kpi-en-curso', value: data.en_curso || 0, color: '#b86b00', note: 'Trabajo activo' },
+      { id: 'kpi-pendientes', value: data.pendientes || 0, color: '#64748b', note: `${_pct(data.pendientes || 0, total)}% por iniciar` },
+      { id: 'kpi-incidencias', value: data.con_incidencia || 0, color: '#b42318', note: `${_pct(data.con_incidencia || 0, total)}% con alerta` },
+      { id: 'kpi-avance', value: `${data.pct_avance || 0}%`, color: _colorForPct(data.pct_avance || 0), note: 'Progreso general' },
+    ];
+
+    kpis.forEach(kpi => {
+      const el = document.getElementById(kpi.id);
+      if (!el) return;
+      const valueEl = el.querySelector('.kpi-value');
+      if (valueEl) valueEl.textContent = kpi.value;
+      const noteEl = el.querySelector('[data-kpi-note]');
+      if (noteEl) noteEl.textContent = kpi.note;
+      el.style.borderTopColor = kpi.color;
+    });
+
+    const bar = document.getElementById('stats-progress-bar');
+    if (bar) {
+      const pct = Math.min(100, Number(data.pct_avance || 0));
+      bar.style.width = `${pct}%`;
+      bar.textContent = `${pct}%`;
+      bar.style.background = _colorForPct(pct);
+    }
+  }
+
+  function _colorForPct(pct) {
+    if (pct >= 80) return '#207c55';
+    if (pct >= 50) return '#b86b00';
+    return '#b42318';
+  }
+
+  function _pct(value, total) {
+    const t = Number(total || 0);
+    if (!t) return 0;
+    return Math.max(0, Math.min(100, Math.round((Number(value || 0) / t) * 100)));
+  }
+
+  function _dailyPace(rows) {
+    const recent = (rows || []).slice(-7);
+    const total = recent.reduce((sum, row) => sum + Number(row.count || row.finalizadas || 0), 0);
+    if (!recent.length) return { value: '0/dia', label: 'Sin historico reciente' };
+    const avg = Math.round((total / recent.length) * 10) / 10;
+    return { value: `${avg}/dia`, label: 'Promedio 7 dias' };
+  }
+
+  function _shortLabel(value) {
+    const text = String(value || '').trim();
+    if (text.length <= 18) return text;
+    const parts = text.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0]} ${parts[1][0]}.`;
+    return `${text.slice(0, 16)}...`;
+  }
+
+  function _renderCharts(data) {
+    _renderBarByDepartamento(data.por_departamento || []);
+    _renderDonutOverall(data);
+    _renderLineDaily(data.por_dia || []);
+  }
+
+  function _showCanvas(id) {
+    const canvas = document.getElementById(id);
+    const card = canvas?.closest('.chart-card');
+    if (canvas) canvas.style.display = '';
+    card?.querySelector('.chart-fallback')?.remove();
+    return canvas;
+  }
+
+  function _renderFallback(id, html) {
+    const canvas = document.getElementById(id);
+    const card = canvas?.closest('.chart-card');
+    if (!canvas || !card) return;
+    canvas.style.display = 'none';
+    let fallback = card.querySelector('.chart-fallback');
+    if (!fallback) {
+      fallback = document.createElement('div');
+      fallback.className = 'chart-fallback';
+      card.appendChild(fallback);
+    }
+    fallback.innerHTML = html;
+  }
+
+  function _renderBarByDepartamento(porDep) {
+    const ctx = _showCanvas('chart-departamento');
+    if (!ctx) return;
+    if (!window.Chart) {
+      _renderFallback('chart-departamento', _barFallback('Estado por departamento', porDep));
+      return;
+    }
+    if (_charts.departamento) _charts.departamento.destroy();
+
+    _charts.departamento = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: porDep.map(d => d.departamento),
+        datasets: [
+          { label: 'Finalizadas', data: porDep.map(d => d.finalizadas || 0), backgroundColor: '#207c55', borderRadius: 5 },
+          { label: 'En curso', data: porDep.map(d => d.en_curso || 0), backgroundColor: '#d9982f', borderRadius: 5 },
+          { label: 'Pendientes', data: porDep.map(d => d.pendientes || 0), backgroundColor: '#64748b', borderRadius: 5 },
+          { label: 'Incidencias', data: porDep.map(d => d.incidencias || 0), backgroundColor: '#b42318', borderRadius: 5 },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 10, usePointStyle: true } }, title: { display: false } },
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(100,116,139,.16)' } },
+        },
+      },
+    });
+  }
+
+  function _barFallback(title, rows) {
+    if (!rows.length) return `<h4>${_escape(title)}</h4><p class="text-muted text-center">Sin datos cacheados.</p>`;
+    const max = Math.max(...rows.map(row => row.total || 0), 1);
+    return `
+      <h4>${_escape(title)}</h4>
+      <div class="css-bars">
+        ${rows.slice(0, 10).map(row => `
+          <div class="css-bar-row">
+            <span>${_escape(row.departamento || 'Sin dato')}</span>
+            <div><i style="width:${Math.round(((row.total || 0) / max) * 100)}%"></i></div>
+            <b>${row.total || 0}</b>
+          </div>`).join('')}
+      </div>`;
+  }
+
+  function _renderDonutOverall(data) {
+    const ctx = _showCanvas('chart-donut');
+    if (!ctx) return;
+    if (!window.Chart) {
+      const total = Math.max(1, Number(data.total || 0));
+      _renderFallback('chart-donut', `
+        <h4>Distribucion general</h4>
+        <div class="status-stack">
+          <i style="width:${(data.finalizadas || 0) / total * 100}%;background:#207c55"></i>
+          <i style="width:${(data.en_curso || 0) / total * 100}%;background:#d9982f"></i>
+          <i style="width:${(data.pendientes || 0) / total * 100}%;background:#64748b"></i>
+          <i style="width:${(data.con_incidencia || 0) / total * 100}%;background:#b42318"></i>
+        </div>
+        <p class="chart-note">Finalizadas ${data.finalizadas || 0} · En curso ${data.en_curso || 0} · Pendientes ${data.pendientes || 0} · Incidencias ${data.con_incidencia || 0}</p>`);
+      return;
+    }
+    if (_charts.donut) _charts.donut.destroy();
+
+    _charts.donut = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Finalizadas', 'En Curso', 'Pendientes', 'Con Incidencia'],
+        datasets: [{
+          data: [data.finalizadas || 0, data.en_curso || 0, data.pendientes || 0, data.con_incidencia || 0],
+          backgroundColor: ['#207c55', '#d9982f', '#64748b', '#b42318'],
+          borderWidth: 4,
+          borderColor: '#fff',
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, usePointStyle: true } }, title: { display: false } },
+        cutout: '72%',
+      },
+    });
+  }
+
+  function _renderLineDaily(porDia) {
+    const ctx = _showCanvas('chart-daily');
+    if (!ctx) return;
+    if (!window.Chart) {
+      const max = Math.max(...porDia.map(row => row.count || row.finalizadas || 0), 1);
+      _renderFallback('chart-daily', `
+        <h4>Progreso diario</h4>
+        <div class="spark-bars">
+          ${porDia.slice(-14).map(row => {
+            const value = row.count || row.finalizadas || 0;
+            return `<span title="${_escape(row.fecha || '')}: ${value}" style="height:${Math.max(8, (value / max) * 100)}%"></span>`;
+          }).join('')}
+        </div>
+        <p class="chart-note">${porDia.length ? 'Ultimos registros cacheados' : 'Sin historico local.'}</p>`);
+      return;
+    }
+    if (_charts.daily) _charts.daily.destroy();
+
+    _charts.daily = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: porDia.map(d => d.fecha),
+        datasets: [{
+          label: 'Encuestas completadas',
+          data: porDia.map(d => d.count || d.finalizadas || 0),
+          borderColor: '#1d4ed8',
+          backgroundColor: 'rgba(29,78,216,0.12)',
+          fill: true,
+          tension: 0.38,
+          pointRadius: 4,
+          pointBackgroundColor: '#ffffff',
+          pointBorderColor: '#1d4ed8',
+          pointBorderWidth: 2,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, title: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(100,116,139,.16)' } },
+        },
+      },
+    });
+  }
+
+  function _renderEncuestadoresTable(rows) {
+    const tbody = document.getElementById('stats-enc-tbody');
+    if (!tbody) return;
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Sin datos</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((r, i) => {
+      const assigned = Number(r.total_asignadas || 0);
+      const finished = Math.max(Number(r.finalizadas || 0), Number(r.registros_completados || 0));
+      const pct = _pct(finished, Math.max(assigned, finished));
+      return `
+      <tr>
+        <td><span class="rank-badge">${i + 1}</span></td>
+        <td><strong>${_escape(r.encuestador || 'Sin asignar')}</strong></td>
+        <td>${assigned}${!assigned && Number(r.sesiones || 0) ? `<small class="text-muted" style="display:block">${Number(r.sesiones || 0)} sesiones</small>` : ''}</td>
+        <td>
+          <div class="table-progress">
+            <span>${finished} (${pct}%)</span>
+            <i><b style="width:${pct}%"></b></i>
+          </div>
+        </td>
+        <td><span class="${Number(r.incidencias || 0) ? 'risk-pill risk-pill--on' : 'risk-pill'}">${Number(r.incidencias || 0)}</span></td>
+        <td>${r.promedio_minutos ? _escape(r.promedio_minutos + ' min') : '—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  function _renderRecentActivity(items) {
+    const container = document.getElementById('stats-activity');
+    if (!container) return;
+    if (!items.length) {
+      container.innerHTML = '<p class="text-muted text-center">Sin actividad reciente.</p>';
+      return;
+    }
+    container.innerHTML = items.map(item => `
+      <div class="activity-item">
+        <span class="activity-item__badge badge--${_safeClass(item.tipo || 'info')}">${_escape(item.tipo || 'evento')}</span>
+        <div class="activity-item__text">
+          <strong>${_escape(item.usuario || 'Usuario')}</strong> - ${_escape(item.escuela || item.detalle || 'Actividad')}
+        </div>
+        <span class="activity-item__time">${_escape(item.fecha_hora || '')}</span>
+      </div>`).join('');
+  }
+
+  function exportCSV() {
+    if (!_statsData) {
+      UI.showToast('No hay datos para exportar.', 'warning');
+      return;
+    }
+    const rows = _statsData.por_departamento || [];
+    const headers = ['Departamento', 'Total', 'Finalizadas', 'En Curso', 'Pendientes', 'Incidencias', 'Con Coordenadas', 'Sin Coordenadas', 'Pendientes Con Coordenadas', 'Pendientes Sin Coordenadas'];
+    const csv = [headers.join(','), ...rows.map(r =>
+      [
+        r.departamento,
+        r.total || 0,
+        r.finalizadas || 0,
+        r.en_curso || 0,
+        r.pendientes || 0,
+        r.incidencias || 0,
+        r.con_coordenadas || 0,
+        r.sin_coordenadas || 0,
+        r.pendientes_con_coordenadas || 0,
+        r.pendientes_sin_coordenadas || 0,
+      ]
+        .map(_csvCell).join(',')
+    )].join('\n');
+    _downloadBlob(`cialpa_stats_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;', csv);
+  }
+
+  async function exportLocalJson() {
+    const analytics = _localAnalytics || (typeof CialpaLocalStore !== 'undefined' ? await CialpaLocalStore.buildLocalAnalytics(_statsData) : null);
+    if (!analytics) {
+      UI.showToast('No hay datos locales para exportar.', 'warning');
+      return;
+    }
+    _downloadBlob(`cialpa_snapshot_local_${Date.now()}.json`, 'application/json', JSON.stringify(analytics, null, 2));
+  }
+
+  async function exportMecInfrastructureJson() {
+    if (!_infraData) await loadMecInfrastructure();
+    if (!_infraData) {
+      UI.showToast('No hay datos de infraestructura MEC para exportar.', 'warning');
+      return;
+    }
+    _downloadBlob(`cialpa_infraestructura_mec_${Date.now()}.json`, 'application/json', JSON.stringify(_infraData, null, 2));
+  }
+
+  async function syncQueue() {
+    if (typeof CialpaLocalStore === 'undefined') {
+      UI.showToast('El almacen local no esta disponible en este navegador.', 'warning');
+      return;
+    }
+    if (!navigator.onLine) {
+      UI.showToast('Sin conexion: la cola queda lista para sincronizar cuando vuelva internet.', 'warning');
+      return;
+    }
+    const queue = await CialpaLocalStore.getQueue();
+    const pending = queue.filter(item => item.status === 'pending');
+    if (!pending.length) {
+      UI.showToast('No hay operaciones pendientes para sincronizar.', 'info');
+      return;
+    }
+
+    let synced = 0;
+    for (const item of pending) {
+      try {
+        const payload = {
+          ...(item.data || {}),
+          clientMutationId: item.data?.clientMutationId || item.id,
+          id_offline_queue: item.data?.id_offline_queue || item.id,
+        };
+        const result = await API.call(item.endpoint, item.method || 'POST', payload, { skipLoading: true, skipQueue: true });
+        if (result.status !== 'ok') throw new Error(result.message || 'Respuesta invalida');
+        await CialpaLocalStore.updateQueueStatus(item.id, 'synced', { syncedAt: new Date().toISOString() });
+        synced++;
+      } catch (err) {
+        await CialpaLocalStore.updateQueueStatus(item.id, 'pending', { lastError: err.message });
+      }
+    }
+
+    await loadStats();
+    UI.showToast(`Sincronizacion revisada: ${synced}/${pending.length} operaciones enviadas.`, synced === pending.length ? 'success' : 'warning', 6500);
+  }
+
+  function _downloadBlob(filename, type, content) {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 500);
+  }
+
+  function _csvCell(value) {
+    const text = String(value ?? '');
+    if (!/[",\n]/.test(text)) return text;
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+
+  function _safeClass(value) {
+    return String(value || '').replace(/[^a-z0-9_-]/gi, '') || 'info';
+  }
+
+  function _formatDate(iso) {
+    if (!iso) return '';
+    try {
+      return new Date(iso).toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' });
+    } catch {
+      return '';
+    }
+  }
+
+  function _escape(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
+  }
+
+  return {
+    init,
+    loadStats,
+    initMecInfrastructure,
+    loadMecInfrastructure,
+    loadMecInfrastructureDemo,
+    exportCSV,
+    exportLocalJson,
+    exportMecInfrastructureJson,
+    syncQueue,
+  };
+})();

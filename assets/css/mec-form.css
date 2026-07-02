@@ -1,0 +1,4050 @@
+/* CIALPA — Cuestionario MEC redisenado para carga de campo */
+
+.mec-header-actions {
+  display: flex;
+  gap: .5rem;
+  flex-wrap: wrap;
+}
+
+.mec-command {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: .9rem;
+  margin-bottom: .75rem;
+  padding: .75rem .85rem;
+  border: 1px solid #d8e0ea;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-eyebrow {
+  margin: 0 0 .25rem;
+  color: #2b6cb0;
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.mec-command h3 {
+  margin: 0 0 .25rem;
+  color: #172033;
+  font-size: 1.08rem;
+}
+
+.mec-command p {
+  max-width: 680px;
+  margin: 0;
+  color: #617083;
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
+.mec-command__stats {
+  display: grid;
+  grid-template-columns: 120px 165px;
+  gap: .65rem;
+  flex: 0 0 auto;
+}
+
+.mec-command__stats div {
+  min-height: 58px;
+  padding: .55rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f7fafc;
+}
+
+.mec-command__stats span {
+  display: block;
+  color: #718096;
+  font-size: .72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mec-command__stats strong {
+  display: block;
+  margin-top: .3rem;
+  color: #172033;
+  font-size: .92rem;
+}
+
+.mec-school-context {
+  position: sticky;
+  top: 0;
+  z-index: 44;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .75rem;
+  padding: .62rem .75rem;
+  background: #ffffff;
+  border: 1px solid #cfe0f3;
+  border-left: 5px solid #2b6cb0;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-school-context--compact {
+  position: relative;
+  top: auto;
+  z-index: 1;
+  margin-bottom: .55rem;
+}
+
+.mec-school-context div {
+  min-width: 0;
+}
+
+.mec-school-context span,
+.mec-school-context small {
+  display: block;
+  color: #607086;
+  font-size: .72rem;
+  font-weight: 800;
+}
+
+.mec-school-context span {
+  color: #2b6cb0;
+  text-transform: uppercase;
+}
+
+.mec-school-context strong {
+  display: block;
+  color: #172033;
+  font-size: .98rem;
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.mec-shell {
+  display: grid;
+  grid-template-columns: 204px minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.mec-rail {
+  position: sticky;
+  top: calc(var(--header-height) + 1rem);
+}
+
+.mec-stepper {
+  display: flex;
+  flex-direction: column;
+  gap: .42rem;
+  margin-bottom: .8rem;
+}
+
+.mec-step {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: .48rem;
+  width: 100%;
+  min-height: 54px;
+  padding: .5rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-step:hover {
+  border-color: #89a8cc;
+}
+
+.mec-step:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+  box-shadow: none;
+}
+
+.mec-step--active {
+  border-color: #2b6cb0;
+  background: #eef6ff;
+  box-shadow: 0 0 0 3px rgba(43, 108, 176, .11);
+}
+
+.mec-step__number {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: #e8eef6;
+  color: #2c4360;
+  font-weight: 800;
+}
+
+.mec-step--active .mec-step__number {
+  background: #2b6cb0;
+  color: #fff;
+}
+
+.mec-step__text strong,
+.mec-step__text small {
+  display: block;
+}
+
+.mec-step__text strong {
+  line-height: 1.15;
+  font-size: .86rem;
+}
+
+.mec-step__text small {
+  margin-top: .25rem;
+  color: #66788d;
+  font-size: .68rem;
+}
+
+.mec-rail__actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .5rem;
+  margin-bottom: .8rem;
+}
+
+.mec-autosave-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: .35rem .65rem;
+  border: 1px solid rgba(40, 167, 69, .24);
+  border-radius: 999px;
+  background: rgba(40, 167, 69, .09);
+  color: #146c2e;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.mec-validation-summary {
+  margin-bottom: .75rem;
+  padding: .8rem;
+  border: 1px solid #f2c2c2;
+  border-radius: var(--radius-md);
+  background: #fff7f7;
+  color: var(--color-danger);
+  font-size: .84rem;
+  line-height: 1.4;
+}
+
+.mec-validation-summary:empty {
+  display: none;
+}
+
+.mec-validation-summary ul {
+  list-style: disc;
+  padding-left: 1.1rem;
+  margin-top: .4rem;
+}
+
+.mec-validation-summary--ok {
+  border-color: #bfe7cb;
+  background: #f4fbf6;
+  color: var(--color-success);
+}
+
+.mec-questionnaire {
+  min-width: 0;
+}
+
+.mec-stage-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 42;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: .75rem;
+  margin-bottom: .75rem;
+  padding: .55rem .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-stage-toolbar .btn {
+  flex: 0 0 auto;
+  min-height: 40px;
+}
+
+.mec-stage-current {
+  order: 4;
+  flex: 1 0 100%;
+  min-width: 0;
+  padding: .42rem .55rem 0;
+  border-top: 1px solid #edf2f7;
+  color: #66788d;
+  font-size: .78rem;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.mec-stage-picker {
+  flex: 1 1 360px;
+  min-width: min(360px, 100%);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .45rem;
+  align-items: center;
+  margin: 0;
+}
+
+.mec-stage-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: .45rem;
+  margin-left: auto;
+}
+
+.mec-stage-actions .btn {
+  white-space: nowrap;
+}
+
+.mec-stage-picker span {
+  color: #415068;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.mec-stage-buttons {
+  display: flex;
+  gap: .35rem;
+  overflow-x: auto;
+  padding-bottom: .1rem;
+  scrollbar-width: thin;
+}
+
+.mec-stage-button {
+  min-height: 38px;
+  flex: 0 0 auto;
+  padding: .45rem .62rem;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #fff;
+  color: #334155;
+  font-size: .74rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mec-stage-button:hover {
+  border-color: #8fb0d3;
+  background: #f1f7ff;
+}
+
+.mec-stage-button--active {
+  border-color: #173f68;
+  background: #173f68;
+  color: #fff;
+}
+
+.mec-stage-button--quick {
+  border-color: #b6d4c7;
+  background: #f0fdf4;
+  color: #14532d;
+}
+
+.mec-stage-button--quick:hover {
+  border-color: #5fb888;
+  background: #dcfce7;
+}
+
+.mec-module {
+  display: none;
+  border: 1px solid #d8e0ea;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.mec-module--active {
+  display: block;
+}
+
+.mec-module__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f7fafc;
+}
+
+.mec-module__header h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 1.25rem;
+}
+
+.mec-module__header p:not(.mec-eyebrow) {
+  margin: .25rem 0 0;
+  color: #617083;
+}
+
+.mec-module__badge {
+  min-width: 8.5rem;
+  padding: .45rem .65rem;
+  border-radius: var(--radius-full);
+  background: #e8f3ff;
+  color: #1f5d99;
+  font-size: .78rem;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mec-module__body {
+  padding: 1rem;
+}
+
+.mec-section {
+  padding: 1rem;
+  margin-bottom: .9rem;
+  border: 1px solid #cbd7e6;
+  border-left: 5px solid #2b6cb0;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 1px 0 rgba(23, 32, 51, .04);
+}
+
+.mec-section:last-child {
+  margin-bottom: 0;
+}
+
+.mec-section__header {
+  margin-bottom: .85rem;
+}
+
+.mec-section__header h4 {
+  margin: 0;
+  color: #245a95;
+  font-size: .98rem;
+}
+
+.mec-field-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .85rem;
+}
+
+.mec-field {
+  min-width: 0;
+  padding: .75rem;
+  border: 1px solid #e5ebf2;
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+}
+
+.mec-field--hidden {
+  display: none;
+}
+
+.mec-label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: .75rem;
+  min-height: 28px;
+  margin-bottom: .45rem;
+  color: #172033;
+  font-size: .86rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.mec-label > span:last-child:not(:first-child) {
+  flex: 0 0 auto;
+  padding: .13rem .36rem;
+  border-radius: var(--radius-full);
+  background: #edf2f7;
+  color: #718096;
+  font-size: .66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mec-required {
+  color: var(--color-danger);
+  font-weight: 800;
+}
+
+.mec-info-btn {
+  width: 20px;
+  height: 20px;
+  margin-left: .35rem;
+  border: 1px solid #b8c6d8;
+  border-radius: 50%;
+  background: #fff;
+  color: #245a95;
+  font-size: .76rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.mec-info-btn:hover {
+  border-color: #2b6cb0;
+  background: #eaf4ff;
+}
+
+.mec-help-modal p + p {
+  margin-top: .7rem;
+}
+
+.mec-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: .45rem;
+}
+
+.mec-options--columns {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.mec-option {
+  --choice-active-bg: #173b63;
+  --choice-active-border: #102a43;
+  --choice-active-text: #ffffff;
+  --choice-ring: rgba(23, 59, 99, .24);
+  position: relative;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .5rem .6rem;
+  border: 1px solid #d8e0ea;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #27364a;
+  font-size: .87rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.mec-option:hover {
+  border-color: #8fb0d3;
+  background: #f7fbff;
+}
+
+.mec-option.mec-choice--success,
+.mec-option.mec-choice--warning,
+.mec-option.mec-choice--danger,
+.mec-option.mec-choice--muted {
+  border-color: var(--choice-border);
+  background: var(--choice-bg);
+  color: var(--choice-text);
+}
+
+.mec-option:has(input:checked) {
+  border-color: var(--choice-active-border, #2b6cb0);
+  background: var(--choice-active-bg, #eaf4ff);
+  color: var(--choice-active-text, #173f68);
+  box-shadow: 0 0 0 2px var(--choice-ring, rgba(43, 108, 176, .1));
+}
+
+.mec-option--active {
+  border-color: var(--choice-active-border, #2b6cb0);
+  background: var(--choice-active-bg, #eaf4ff);
+  color: var(--choice-active-text, #173f68);
+  box-shadow: 0 0 0 2px var(--choice-ring, rgba(43, 108, 176, .1));
+}
+
+.mec-option input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.mec-input-with-unit {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.mec-input-with-unit .form-control {
+  min-width: 0;
+}
+
+.mec-unit {
+  color: var(--color-text-muted);
+  font-size: .85rem;
+  min-width: 2rem;
+}
+
+.mec-hint {
+  display: block;
+  margin-top: .35rem;
+  color: #718096;
+  font-size: .76rem;
+  line-height: 1.35;
+}
+
+.mec-error {
+  min-height: 1rem;
+  margin-top: .3rem;
+  color: var(--color-danger);
+  font-size: .78rem;
+}
+
+.mec-evidence {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .35rem .55rem;
+  align-items: center;
+  margin-top: .65rem;
+  padding-top: .65rem;
+  border-top: 1px solid #e5ebf2;
+}
+
+.mec-evidence-input {
+  display: none;
+}
+
+.mec-evidence__label {
+  color: #27364a;
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.mec-evidence__state {
+  grid-column: 1 / -1;
+  color: #718096;
+  font-size: .75rem;
+}
+
+.mec-field--invalid {
+  border-color: rgba(220, 53, 69, .45);
+  background: #fff8f8;
+}
+
+.mec-field--invalid .form-control,
+.mec-field--invalid .mec-options {
+  outline: 2px solid rgba(220, 53, 69, .16);
+  border-radius: var(--radius-sm);
+}
+
+.mec-planned {
+  border: 1px dashed #cbd5e1;
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  background: #f8fafc;
+}
+
+.mec-planned p + p {
+  margin-top: .35rem;
+}
+
+.mec-sketch__layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.mec-sketch__tools {
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+}
+
+.mec-sketch-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .45rem;
+  padding: .55rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.mec-sketch-meta .form-group {
+  margin-bottom: 0;
+}
+
+.mec-sketch-meta .form-group--wide {
+  grid-column: 1 / -1;
+}
+
+.mec-sketch-meta label {
+  margin-bottom: .22rem;
+  color: #415068;
+  font-size: .7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.mec-sketch-meta--summary {
+  display: block;
+}
+
+.mec-sketch-meta--summary strong,
+.mec-sketch-meta--summary span {
+  display: block;
+}
+
+.mec-sketch-meta--summary strong {
+  color: #172033;
+  font-size: .92rem;
+}
+
+.mec-sketch-meta--summary span {
+  margin-top: .18rem;
+  color: #667085;
+  font-size: .78rem;
+  line-height: 1.3;
+}
+
+.mec-sketch__actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: .45rem;
+}
+
+.mec-sketch-toolset {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: .45rem;
+  padding: .6rem;
+  margin-top: .65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.mec-sketch-tool {
+  min-height: 64px;
+  padding: .45rem .35rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #27364a;
+  display: grid;
+  place-items: center;
+  gap: .25rem;
+  font-size: .72rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.mec-sketch-tool__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #eef3f8;
+  color: #173f68;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.mec-sketch-toolset--site {
+  background: #f7fef9;
+  border-color: #bbf7d0;
+}
+
+.mec-sketch-tool--site {
+  border-color: #bbf7d0;
+}
+
+.mec-sketch-tool__icon--site {
+  background: #dcfce7;
+  color: #166534;
+  font-size: .82rem;
+  font-weight: 950;
+}
+
+.mec-sketch-tool--active {
+  border-color: #2b6cb0 !important;
+  background: #eaf4ff !important;
+  color: #173f68 !important;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, .12);
+}
+
+.mec-sketch-tool--active .mec-sketch-tool__icon {
+  background: #2b6cb0;
+  color: #fff;
+}
+
+.mec-sketch--locked .mec-sketch-canvas-wrap {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, .14);
+}
+
+.mec-lock-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: .32rem .62rem;
+  border-radius: 999px;
+  background: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  font-size: .75rem;
+  font-weight: 900;
+}
+
+.mec-lock-notice {
+  margin-bottom: .75rem;
+  padding: .65rem .75rem;
+  border: 1px solid #fcd34d;
+  border-radius: var(--radius-md);
+  background: #fffbeb;
+  color: #92400e;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.mec-sketch__board {
+  min-width: 0;
+}
+
+.mec-sketch-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin-bottom: .5rem;
+  color: #617083;
+  font-size: .8rem;
+  font-weight: 800;
+}
+
+.mec-sketch-canvas-wrap {
+  width: 100%;
+  max-height: 72vh;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #fbfcfe;
+}
+
+.mec-sketch__board canvas {
+  width: 100%;
+  aspect-ratio: 76 / 46;
+  display: block;
+  background: #fbfcfe;
+  touch-action: none;
+  transform-origin: top left;
+  max-width: none;
+}
+
+.mec-sketch__board small {
+  display: block;
+  margin-top: .45rem;
+  color: #718096;
+  font-size: .76rem;
+}
+
+.mec-selection-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-top: .55rem;
+  padding: .65rem .75rem;
+  border: 1px solid #b7c8dc;
+  border-left: 4px solid #2b6cb0;
+  border-radius: var(--radius-md);
+  background: #f8fbff;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, .08);
+}
+
+.mec-selection-dock--empty {
+  border-left-color: #94a3b8;
+  background: #f8fafc;
+  box-shadow: none;
+}
+
+.mec-selection-dock__main {
+  min-width: 0;
+}
+
+.mec-selection-dock span {
+  display: block;
+  color: #58718d;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.mec-selection-dock strong {
+  display: block;
+  color: #172033;
+  font-size: .95rem;
+  line-height: 1.15;
+}
+
+.mec-selection-dock small {
+  display: block;
+  margin-top: .2rem;
+  color: #5f6f83;
+  font-size: .74rem;
+  line-height: 1.28;
+}
+
+.mec-selection-dock__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: .35rem;
+}
+
+.mec-selection-pulse {
+  animation: mecSelectionPulse 1.05s ease-out;
+}
+
+@keyframes mecSelectionPulse {
+  0% { box-shadow: 0 0 0 0 rgba(43, 108, 176, .28); }
+  70% { box-shadow: 0 0 0 8px rgba(43, 108, 176, 0); }
+  100% { box-shadow: none; }
+}
+
+.mec-object-form .form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .75rem;
+}
+
+.mec-choice-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: .5rem;
+}
+
+.mec-choice-buttons--compact {
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: .32rem;
+}
+
+.mec-choice-buttons--tiny {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+
+.mec-choice {
+  --choice-active-bg: #173b63;
+  --choice-active-border: #102a43;
+  --choice-active-text: #ffffff;
+  --choice-ring: rgba(23, 59, 99, .24);
+  min-height: 46px;
+  padding: .62rem .7rem;
+  border: 1px solid var(--choice-border, #d8e0ea);
+  border-radius: var(--radius-md);
+  background: var(--choice-bg, #fff);
+  color: var(--choice-text, #27364a);
+  font-size: .88rem;
+  font-weight: 750;
+  line-height: 1.16;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.mec-choice:hover,
+.mec-choice:focus-visible {
+  outline: none;
+  border-color: var(--choice-hover-border, #8fb0d3);
+  background: var(--choice-hover-bg, #f7fbff);
+  transform: translateY(-1px);
+}
+
+.mec-choice--active,
+.mec-choice[aria-pressed="true"] {
+  border-color: var(--choice-active-border, #2b6cb0);
+  background: var(--choice-active-bg, #eaf4ff) !important;
+  color: var(--choice-active-text, #173f68) !important;
+  box-shadow: 0 0 0 2px var(--choice-ring, rgba(43, 108, 176, .1));
+}
+
+.mec-choice--success {
+  --choice-bg: #eefaf1;
+  --choice-border: #bfe6ca;
+  --choice-text: #24543a;
+  --choice-hover-bg: #e1f6e7;
+  --choice-hover-border: #8fd0a1;
+  --choice-active-bg: #2f9e56;
+  --choice-active-border: #217b42;
+  --choice-active-text: #fff;
+  --choice-ring: rgba(47, 158, 86, .18);
+}
+
+.mec-choice--warning {
+  --choice-bg: #fff8e6;
+  --choice-border: #efd48a;
+  --choice-text: #745016;
+  --choice-hover-bg: #fff1c7;
+  --choice-hover-border: #d4ad45;
+  --choice-active-bg: #d8941f;
+  --choice-active-border: #a96f13;
+  --choice-active-text: #fff;
+  --choice-ring: rgba(216, 148, 31, .2);
+}
+
+.mec-choice--danger {
+  --choice-bg: #fff0f0;
+  --choice-border: #efb9b9;
+  --choice-text: #7a2929;
+  --choice-hover-bg: #ffe3e3;
+  --choice-hover-border: #df8d8d;
+  --choice-active-bg: #c94a4a;
+  --choice-active-border: #9e3232;
+  --choice-active-text: #fff;
+  --choice-ring: rgba(201, 74, 74, .2);
+}
+
+.mec-choice--muted {
+  --choice-bg: #f3f6fa;
+  --choice-border: #d3dce7;
+  --choice-text: #4d5c6d;
+  --choice-hover-bg: #e9eef5;
+  --choice-hover-border: #acbacb;
+  --choice-active-bg: #607085;
+  --choice-active-border: #435166;
+  --choice-active-text: #fff;
+  --choice-ring: rgba(96, 112, 133, .18);
+}
+
+.mec-object-evidence {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  flex-wrap: wrap;
+  margin-top: .85rem;
+  padding: .75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.mec-object-note {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: .55rem;
+  align-items: start;
+  margin: .8rem 0;
+  padding: .65rem .75rem;
+  border: 1px solid #bfd3e8;
+  border-radius: var(--radius-md);
+  background: #f7fbff;
+  color: #314158;
+}
+
+.mec-object-note span {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #173b63;
+  color: #ffffff;
+  font-size: .78rem;
+  font-weight: 900;
+}
+
+.mec-object-note p {
+  margin: 0;
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.mec-criteria-help {
+  display: grid;
+  gap: .32rem;
+  padding: .65rem .75rem;
+  border: 1px solid #c7d7ea;
+  border-left: 4px solid #2b6cb0;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #344054;
+  font-size: .82rem;
+  line-height: 1.35;
+}
+
+.mec-criteria-help strong {
+  color: #173f68;
+  font-size: .78rem;
+  text-transform: uppercase;
+}
+
+.mec-criteria-help span {
+  display: block;
+}
+
+.mec-shape-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: .7rem;
+}
+
+.mec-shape-button {
+  min-height: 104px;
+  display: grid;
+  place-items: center;
+  gap: .45rem;
+  padding: .75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #173f68;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 850;
+  touch-action: manipulation;
+}
+
+.mec-shape-button:hover,
+.mec-shape-button:focus-visible {
+  outline: none;
+  border-color: #2b6cb0;
+  background: #f1f7ff;
+  box-shadow: 0 0 0 3px rgba(43, 108, 176, .14);
+}
+
+.mec-shape-button__icon {
+  width: 54px;
+  height: 42px;
+  display: block;
+  border: 3px solid #15803d;
+  background: rgba(21, 128, 61, .08);
+}
+
+.mec-shape-button__icon--circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+}
+
+.mec-shape-button__icon--oval {
+  width: 62px;
+  height: 38px;
+  border-radius: 999px;
+}
+
+.mec-shape-button__icon--triangle {
+  width: 0;
+  height: 0;
+  border-left: 30px solid transparent;
+  border-right: 30px solid transparent;
+  border-bottom: 52px solid rgba(21, 128, 61, .75);
+  background: transparent;
+}
+
+.mec-shape-button__icon--polygon {
+  width: 56px;
+  height: 48px;
+  clip-path: polygon(18% 8%, 70% 0, 100% 42%, 82% 92%, 28% 100%, 0 56%);
+}
+
+.mec-shape-button__icon--football,
+.mec-shape-button__icon--basketball,
+.mec-shape-button__icon--tennis {
+  width: 68px;
+  height: 42px;
+  border-width: 2px;
+  background-color: rgba(21, 128, 61, .08);
+}
+
+.mec-shape-button__icon--football {
+  background-image:
+    linear-gradient(90deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%),
+    radial-gradient(circle at 50% 50%, transparent 0 17%, #15803d 18% 21%, transparent 22%),
+    linear-gradient(90deg, transparent 0 12%, #15803d 12% 15%, transparent 15% 85%, #15803d 85% 88%, transparent 88%);
+}
+
+.mec-shape-button__icon--basketball {
+  background-image:
+    linear-gradient(90deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%),
+    radial-gradient(circle at 50% 50%, transparent 0 14%, #15803d 15% 18%, transparent 19%),
+    linear-gradient(90deg, transparent 0 20%, #15803d 20% 23%, transparent 23% 77%, #15803d 77% 80%, transparent 80%);
+}
+
+.mec-shape-button__icon--tennis {
+  background-image:
+    linear-gradient(90deg, transparent 49%, #15803d 49%, #15803d 51%, transparent 51%),
+    linear-gradient(90deg, transparent 21%, #15803d 21%, #15803d 24%, transparent 24% 76%, #15803d 76%, #15803d 79%, transparent 79%),
+    linear-gradient(0deg, transparent 48%, #15803d 48%, #15803d 52%, transparent 52%);
+}
+
+.mec-shape-button__icon--space {
+  display: grid;
+  place-items: center;
+  color: #0f5132;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.mec-object-evidence span {
+  color: #617083;
+  font-size: .84rem;
+  font-weight: 700;
+}
+
+.mec-object-evidence__preview {
+  flex: 1 1 100%;
+}
+
+.mec-evidence-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: .45rem;
+  width: 100%;
+}
+
+.mec-evidence-preview figure,
+.mec-evidence-preview__chip {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #d8e3ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.mec-evidence-preview img {
+  display: block;
+  width: 100%;
+  height: 68px;
+  object-fit: cover;
+}
+
+.mec-evidence-preview figcaption,
+.mec-evidence-preview__chip,
+.mec-evidence-preview__empty {
+  color: #536274;
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.mec-evidence-preview figcaption {
+  padding: .28rem .36rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mec-evidence-preview__chip {
+  display: grid;
+  min-height: 68px;
+  align-content: center;
+  padding: .35rem;
+  text-align: center;
+}
+
+.mec-evidence-preview__empty {
+  margin: 0;
+  padding: .35rem 0 0;
+}
+
+.mec-repeat-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+
+.mec-repeat-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: .55rem;
+  margin-bottom: .9rem;
+}
+
+.mec-block-tabs {
+  display: flex;
+  gap: .5rem;
+  overflow-x: auto;
+  padding: .15rem .05rem .65rem;
+  margin-bottom: .65rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mec-block-tab {
+  flex: 0 0 auto;
+  min-width: 132px;
+  padding: .55rem .7rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-block-tab--active {
+  border-color: #e84c22;
+  background: #fff7ed;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .12);
+}
+
+.mec-block-tab strong,
+.mec-block-tab span {
+  display: block;
+}
+
+.mec-block-tab span {
+  margin-top: .15rem;
+  color: #667085;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.mec-repeat-item {
+  min-height: 66px;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-repeat-item--active {
+  border-color: #2b6cb0;
+  background: #eef6ff;
+  box-shadow: 0 0 0 2px rgba(43, 108, 176, .12);
+}
+
+.mec-repeat-item strong,
+.mec-repeat-item span {
+  display: block;
+}
+
+.mec-repeat-item span {
+  margin-top: .18rem;
+  color: #667085;
+  font-size: .78rem;
+  line-height: 1.25;
+}
+
+.mec-sanitary-list {
+  display: grid;
+  gap: .85rem;
+}
+
+.mec-sanitary-card {
+  padding: .85rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-sanitary-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .8rem;
+}
+
+.mec-sanitary-card__header strong,
+.mec-sanitary-card__header span {
+  display: block;
+}
+
+.mec-sanitary-card__header span {
+  color: #667085;
+  font-size: .82rem;
+}
+
+.mec-sanitary-groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: .75rem;
+  margin: .75rem 0;
+}
+
+.mec-sanitary-details {
+  margin-top: .85rem;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.mec-sanitary-details summary {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #172033;
+  font-size: .86rem;
+  font-weight: 900;
+}
+
+.mec-sanitary-details[open] summary {
+  margin-bottom: .65rem;
+}
+
+.mec-sanitary-plan {
+  margin: .9rem 0;
+  padding: .75rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.mec-sanitary-plan__header {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: .65rem;
+}
+
+.mec-sanitary-plan__header strong,
+.mec-sanitary-plan__header span {
+  display: block;
+}
+
+.mec-sanitary-plan__header span {
+  color: #667085;
+  font-size: .8rem;
+}
+
+.mec-sanitary-plan__header > div:last-child {
+  display: flex;
+  gap: .4rem;
+  flex-wrap: wrap;
+}
+
+.mec-sanitary-fixtures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: .45rem;
+  margin: .5rem 0 .75rem;
+}
+
+.mec-sanitary-fixture {
+  min-height: 52px;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+  color: #27364a;
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .55rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-sanitary-fixture span {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #eef6ff;
+  color: #173f68;
+  display: grid;
+  place-items: center;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.mec-sanitary-fixture strong {
+  font-size: .78rem;
+  line-height: 1.15;
+}
+
+.mec-sanitary-svg {
+  width: 100%;
+  max-height: 280px;
+  display: block;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.mec-choice-buttons--compact .mec-choice {
+  min-height: 36px;
+  padding: .42rem .48rem;
+  font-size: .75rem;
+}
+
+.mec-choice-buttons--tiny .mec-choice {
+  min-height: 30px;
+  padding: .28rem .34rem;
+  font-size: .66rem;
+}
+
+.mec-sanitary-cabin-panel {
+  margin: .65rem 0 .45rem;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #ffffff;
+}
+
+.mec-sanitary-cabin-panel summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: #172033;
+  font-size: .82rem;
+  font-weight: 900;
+}
+
+.mec-cabin-add-row {
+  margin: .45rem 0 .55rem;
+}
+
+.mec-cabin-button-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: .4rem;
+}
+
+.mec-cabin-add-button {
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: .35rem;
+  padding: .4rem .45rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mec-cabin-add-button:hover {
+  border-color: #8fb0d3;
+  background: #eef6ff;
+}
+
+.mec-cabin-add-button span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #173f68;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.mec-cabin-add-button strong {
+  min-width: 0;
+  font-size: .72rem;
+  line-height: 1.12;
+}
+
+.mec-cabin-fixture-list {
+  display: grid;
+  gap: .42rem;
+}
+
+.mec-cabin-fixture {
+  display: grid;
+  grid-template-columns: minmax(120px, .75fr) minmax(210px, 1.4fr) auto;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem;
+  border: 1px solid #edf2f7;
+  border-radius: var(--radius-sm);
+  background: #f8fafc;
+}
+
+.mec-cabin-fixture strong {
+  color: #27364a;
+  font-size: .78rem;
+}
+
+.school-plan {
+  display: grid;
+  gap: 1rem;
+}
+
+.school-plan__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  gap: .4rem;
+}
+
+.school-plan__kpis--side {
+  grid-template-columns: 1fr 1fr;
+  gap: .32rem;
+  margin-bottom: .75rem;
+}
+
+.school-plan-kpi {
+  min-height: 54px;
+  display: grid;
+  align-content: center;
+  gap: .12rem;
+  padding: .48rem .58rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #fbfdff;
+  box-shadow: none;
+}
+
+.school-plan-kpi span {
+  display: block;
+  color: #667085;
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.school-plan-kpi strong {
+  display: block;
+  margin: 0;
+  color: #172033;
+  font-size: 1.02rem;
+  line-height: 1.05;
+}
+
+.school-plan-kpi small {
+  display: none;
+  color: #718096;
+  line-height: 1.25;
+}
+
+.school-plan-builder {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .85rem;
+  padding: .8rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.school-plan-builder__state {
+  min-width: 220px;
+}
+
+.school-plan-builder__state span {
+  display: block;
+  color: #667085;
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan-builder__state strong {
+  display: block;
+  margin-top: .15rem;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.school-plan-builder__state small {
+  display: block;
+  margin-top: .12rem;
+  color: #667085;
+  line-height: 1.28;
+}
+
+.school-plan-builder__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+
+.school-plan-builder__controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .58rem;
+  flex-wrap: wrap;
+}
+
+.school-plan-nudge {
+  display: grid;
+  gap: .18rem;
+  justify-items: center;
+  padding: .28rem .34rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.school-plan-nudge__label {
+  color: #667085;
+  font-size: .56rem;
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.school-plan-nudge__pad {
+  display: grid;
+  grid-template-columns: repeat(3, 24px);
+  grid-template-rows: repeat(3, 24px);
+  gap: 2px;
+  align-items: center;
+  justify-items: center;
+}
+
+.school-plan-nudge__button {
+  width: 24px;
+  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #172033;
+  font-size: .72rem;
+  font-weight: 950;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.school-plan-nudge__button:hover {
+  border-color: #6b8fb9;
+  background: #eef6ff;
+}
+
+.school-plan-nudge__step {
+  color: #667085;
+  font-size: .56rem;
+  font-weight: 900;
+}
+
+.school-plan-audit {
+  display: grid;
+  gap: .72rem;
+  padding: .9rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.school-plan-audit__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.school-plan-audit__header span {
+  display: block;
+  color: #667085;
+  font-size: .72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan-audit__header strong {
+  display: block;
+  margin-top: .16rem;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.school-plan-audit__score {
+  min-width: 82px;
+  text-align: right;
+  color: #172033;
+}
+
+.school-plan-audit__score b {
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.school-plan-audit__score small {
+  color: #667085;
+  font-weight: 800;
+}
+
+.school-plan-audit__bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #eef2f7;
+}
+
+.school-plan-audit__bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2f855a;
+}
+
+.school-plan-audit--watch .school-plan-audit__bar span {
+  background: #b7791f;
+}
+
+.school-plan-audit--danger .school-plan-audit__bar span {
+  background: #c53030;
+}
+
+.school-plan-audit__stats {
+  display: flex;
+  gap: .55rem;
+  flex-wrap: wrap;
+  color: #526071;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.school-plan-audit__stats span {
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: .24rem;
+  padding: .22rem .45rem;
+  border: 1px solid #edf2f7;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.school-plan-audit__issues {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: .55rem;
+}
+
+.school-plan-audit-issue {
+  width: 100%;
+  min-height: 118px;
+  display: grid;
+  align-content: start;
+  gap: .22rem;
+  padding: .62rem .68rem;
+  border: 1px solid #dbe5f1;
+  border-left: 4px solid #718096;
+  border-radius: 8px;
+  background: #fbfdff;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.school-plan-audit-issue:hover {
+  border-color: #8fb0d3;
+  background: #f1f7ff;
+}
+
+.school-plan-audit-issue span {
+  color: #526071;
+  font-size: .66rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan-audit-issue strong,
+.school-plan-audit-issue small,
+.school-plan-audit-issue em {
+  display: block;
+}
+
+.school-plan-audit-issue small {
+  color: #667085;
+  line-height: 1.28;
+}
+
+.school-plan-audit-issue em {
+  margin-top: .1rem;
+  color: #1f5d99;
+  font-size: .72rem;
+  font-style: normal;
+  font-weight: 900;
+}
+
+.school-plan-audit-issue--critical {
+  border-left-color: #c53030;
+}
+
+.school-plan-audit-issue--warning {
+  border-left-color: #b7791f;
+}
+
+.school-plan-audit-issue--info {
+  border-left-color: #2b6cb0;
+}
+
+.school-plan-audit-empty {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: .18rem;
+  padding: .7rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #27364a;
+}
+
+.school-plan-audit-empty small {
+  color: #667085;
+  line-height: 1.25;
+}
+
+.school-plan__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8px minmax(170px, var(--plan-side-width, 220px));
+  gap: .6rem .35rem;
+  align-items: start;
+}
+
+.school-plan__layout--side-wide {
+  --plan-side-width: 300px;
+}
+
+.school-plan__layout--side-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.school-plan__layout--side-hidden .school-plan__layout-resize,
+.school-plan__layout--side-hidden .school-plan__side {
+  display: none;
+}
+
+.school-plan__layout-resize {
+  align-self: stretch;
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.school-plan__layout-resize span {
+  width: 4px;
+  height: min(100%, 120px);
+  border-radius: 999px;
+  background: #c9d9ef;
+  transition: background .16s ease, box-shadow .16s ease;
+}
+
+.school-plan__layout-resize:hover span,
+.school-plan__layout-resize:focus-visible span,
+.school-plan__layout-resize--active span {
+  background: #e84c22;
+  box-shadow: 0 0 0 4px rgba(232, 76, 34, .14);
+}
+
+.school-plan__board,
+.school-plan__side {
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.school-plan__board {
+  padding: .55rem;
+}
+
+.school-plan__toolbar {
+  display: block;
+  margin-bottom: .65rem;
+}
+
+.school-plan-ribbon {
+  width: 100%;
+  border: 1px solid #d8e1eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+
+.school-plan-ribbon__tabs {
+  display: flex;
+  align-items: end;
+  gap: .18rem;
+  padding: .28rem .32rem 0;
+  border-bottom: 1px solid #d8e1eb;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.school-plan-ribbon__tab {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .32rem .62rem .34rem;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: #526071;
+  font-size: .72rem;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.school-plan-ribbon__tab--active {
+  background: #fff;
+  border-color: #d8e1eb;
+  color: #0f3766;
+  box-shadow: 0 -1px 0 rgba(15, 55, 102, .04);
+}
+
+.school-plan-ribbon__panel {
+  min-height: 50px;
+  display: flex;
+  align-items: stretch;
+  gap: .34rem;
+  padding: .32rem .38rem;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.school-plan-ribbon__group {
+  min-width: max-content;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: .16rem;
+  padding-right: .34rem;
+  border-right: 1px solid #d8e1eb;
+}
+
+.school-plan-ribbon__group:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+.school-plan-ribbon__group--wide {
+  min-width: 0;
+}
+
+.school-plan-ribbon__group-title {
+  color: #667085;
+  font-size: .58rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.school-plan-ribbon__group-body,
+.school-plan-ribbon__zoom,
+.school-plan-ribbon__basemap,
+.school-plan-ribbon__canvas,
+.school-plan-ribbon__panelmode,
+.school-plan-ribbon__checks {
+  display: flex;
+  align-items: center;
+  gap: .28rem;
+  flex-wrap: nowrap;
+}
+
+.school-plan-ribbon__button {
+  min-width: 44px;
+  min-height: 34px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .1rem;
+  padding: .22rem .36rem;
+  line-height: 1.05;
+}
+
+.school-plan-ribbon__button--wide {
+  min-width: 70px;
+}
+
+.school-plan-ribbon__button--primary-basemap {
+  min-width: 64px;
+  border-color: #e84c22 !important;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .16);
+}
+
+.school-plan-ribbon__button--street-overlay.school-plan-ribbon__button--active {
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .18);
+}
+
+.school-plan-ribbon__icon {
+  min-height: 15px;
+  font-size: .92rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.school-plan-ribbon__label {
+  max-width: 72px;
+  overflow: hidden;
+  color: inherit;
+  font-size: .58rem;
+  font-weight: 900;
+  line-height: 1.02;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.school-plan-ribbon__button:disabled {
+  opacity: .48;
+  cursor: not-allowed;
+}
+
+.school-plan-ribbon__zoom-value {
+  min-width: 44px;
+  color: #44546a;
+  font-size: .78rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.school-plan-ribbon__basemap small {
+  min-width: 92px;
+  color: #667085;
+  font-size: .62rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.school-plan-ribbon__check {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: .26rem;
+  padding: .25rem .42rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #fff;
+  color: #415068;
+  font-size: .66rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.school-plan-ribbon__check input {
+  width: 13px;
+  height: 13px;
+}
+
+.school-plan-ribbon .mec-sketch-toolset--compact {
+  padding: 0;
+  overflow-x: visible;
+}
+
+.school-plan__kpis--side .school-plan-kpi {
+  min-height: 42px;
+  padding: .34rem .42rem;
+}
+
+.school-plan__tools-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: .45rem;
+  align-items: center;
+  margin: -.25rem 0 .6rem;
+  padding: .38rem .45rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.school-plan__tools-label {
+  color: #526071;
+  font-size: .68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan__layers,
+.school-plan__exports {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+
+.school-plan__exports .btn-sm,
+.school-plan-basemap-actions .btn-sm {
+  min-height: 30px;
+  padding: .26rem .48rem;
+  font-size: .7rem;
+}
+
+.school-plan__tools-row .mec-sketch-toolset {
+  margin-top: 0;
+  min-width: 0;
+}
+
+.mec-sketch-toolset--compact {
+  display: flex;
+  gap: .34rem;
+  padding: .28rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.mec-sketch-toolset--compact .mec-sketch-tool {
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-content: start;
+  place-items: center start;
+  min-width: 88px;
+  min-height: 38px;
+  padding: .26rem .34rem;
+  gap: .28rem;
+  font-size: .62rem;
+  line-height: 1.05;
+  text-align: left;
+}
+
+.mec-sketch-toolset--compact .mec-sketch-tool__icon {
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: .64rem;
+}
+
+.school-plan__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: #617083;
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+.school-plan__layers label {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .3rem .5rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #415068;
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.school-plan__layers input {
+  width: 14px;
+  height: 14px;
+}
+
+.school-plan__canvas-wrap {
+  position: relative;
+  width: 100%;
+  max-height: 78vh;
+  overflow: auto;
+  border: 1px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+}
+
+.school-plan-floating-actions {
+  position: absolute;
+  top: .65rem;
+  left: .65rem;
+  z-index: 24;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  margin: 0;
+  padding: .28rem;
+  background: rgba(255, 255, 255, .96);
+  border: 1px solid #cfe0f3;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
+}
+
+.school-plan__canvas-stage {
+  position: relative;
+  min-width: max-content;
+  min-height: 420px;
+}
+
+.mec-section--block-plan {
+  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.mec-section--block-plan .school-plan {
+  gap: .65rem;
+}
+
+.mec-section--block-plan .school-plan__layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mec-section--block-plan .school-plan__side,
+.mec-section--block-plan .school-plan__kpis {
+  display: none;
+}
+
+.mec-section--block-plan .school-plan-builder {
+  padding: .6rem;
+}
+
+.mec-section--block-plan .school-plan-builder__state small {
+  display: none;
+}
+
+.mec-section--block-plan .school-plan__canvas-wrap {
+  max-height: min(58vh, 520px);
+}
+
+.school-plan-basemap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #e2e8f0;
+}
+
+.school-plan-basemap--empty {
+  background: transparent;
+}
+
+.school-plan-basemap__tiles {
+  position: absolute;
+  inset: 0;
+  will-change: transform, filter, opacity;
+}
+
+.school-plan-basemap__tiles img {
+  position: absolute;
+  display: block;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.school-plan-basemap__tiles--street-overlay {
+  z-index: 1;
+  filter: contrast(1.2) saturate(.85);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.school-plan-basemap__tiles--cadastral-overlay {
+  z-index: 2;
+  filter: contrast(1.18) saturate(1.15);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+.school-plan-basemap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(rgba(15,23,42,.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15,23,42,.07) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: .24;
+}
+
+.school-plan-basemap__attribution {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  z-index: 3;
+  padding: .12rem .28rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,.82);
+  color: #334155;
+  font-size: .58rem;
+  font-weight: 800;
+}
+
+.school-plan__board canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+  max-width: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.school-plan__board canvas.school-plan__canvas--basemap-drag {
+  cursor: grab;
+}
+
+.school-plan__board canvas.school-plan__canvas--basemap-drag:active {
+  cursor: grabbing;
+}
+
+.school-plan-basemap-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+  padding: .2rem .3rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.school-plan-basemap-actions small {
+  color: #526071;
+  font-size: .68rem;
+  font-weight: 850;
+}
+
+.school-plan-basemap-actions__primary-source {
+  border-color: #e84c22 !important;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .14);
+  font-weight: 950;
+}
+
+.school-plan-basemap-panel {
+  display: grid;
+  gap: .65rem;
+  margin: -.15rem 0 .7rem;
+  padding: .75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.school-plan-basemap-panel__header,
+.school-plan-basemap-panel__adjust,
+.school-plan-basemap-panel__offset {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem;
+  flex-wrap: wrap;
+}
+
+.school-plan-basemap-panel__header span {
+  display: block;
+  color: #15546b;
+  font-size: .72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.school-plan-basemap-panel__header strong {
+  display: block;
+  margin-top: .12rem;
+  color: #172033;
+  font-size: .92rem;
+}
+
+.school-plan-basemap-panel__header small {
+  display: block;
+  margin-top: .08rem;
+  color: #667085;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.school-plan-basemap-panel__notice {
+  padding: .48rem .58rem;
+  border: 1px solid #bdd7c8;
+  border-radius: 7px;
+  background: #eef8f2;
+  color: #0b4b32;
+  font-size: .76rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.school-plan-basemap-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: .55rem;
+}
+
+.school-plan-basemap-panel label {
+  display: grid;
+  gap: .22rem;
+  color: #475467;
+  font-size: .72rem;
+  font-weight: 900;
+}
+
+.school-plan-basemap-panel input {
+  min-height: 34px;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  padding: .34rem .48rem;
+  background: #ffffff;
+  color: #172033;
+  font: inherit;
+}
+
+.school-plan-basemap-panel input[type="range"] {
+  padding: 0;
+}
+
+.school-plan-basemap-panel__check span {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: .38rem;
+  padding: .34rem .48rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.school-plan-basemap-panel__check input {
+  width: 16px;
+  height: 16px;
+}
+
+.school-plan-basemap-panel b {
+  color: #172033;
+  font-size: .72rem;
+}
+
+.school-plan-basemap-panel__nudge {
+  display: grid;
+  grid-template-columns: repeat(4, 38px);
+  gap: .35rem;
+}
+
+.school-plan-basemap-panel__scale {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex-wrap: wrap;
+}
+
+.school-plan-basemap-panel__offset label {
+  width: 128px;
+}
+
+.school-plan__side {
+  padding: .58rem;
+}
+
+.school-plan__side h3 {
+  margin: 0 0 .65rem;
+  color: #172033;
+  font-size: 1rem;
+}
+
+.school-plan__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .65rem;
+  margin-bottom: .75rem;
+  color: #617083;
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.school-plan__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+}
+
+.school-plan__legend i {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 2px;
+}
+
+.legend-room { background: #172033; }
+.legend-door { background: #2f855a; }
+.legend-window { background: #2b6cb0; }
+.legend-outlet { background: #b7791f; }
+.legend-switchboard { background: #854d0e; }
+.legend-light { background: #d69e2e; }
+.legend-fan { background: #0e7490; }
+.legend-ac { background: #2563eb; }
+.legend-damage { background: #c53030; }
+.legend-sanitary { background: #805ad5; }
+.legend-site { background: #15803d; }
+
+.school-plan__list {
+  display: grid;
+  gap: .5rem;
+}
+
+.school-plan-tree {
+  display: grid;
+  gap: .58rem;
+}
+
+.school-plan-tree__branch,
+.school-plan-tree__floor {
+  position: relative;
+}
+
+.school-plan-tree__summary {
+  min-height: 46px;
+  display: grid;
+  gap: .1rem;
+  padding: .58rem .66rem .58rem 1.9rem;
+  border: 1px solid #dbe5f1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #27364a;
+  cursor: pointer;
+  list-style: none;
+  touch-action: manipulation;
+}
+
+.school-plan-tree__summary::-webkit-details-marker {
+  display: none;
+}
+
+.school-plan-tree__summary::before {
+  content: ">";
+  position: absolute;
+  left: .72rem;
+  top: .62rem;
+  color: #2b6cb0;
+  font-size: 1rem;
+  font-weight: 900;
+  transition: transform .16s ease;
+}
+
+.school-plan-tree__branch[open] > .school-plan-tree__summary::before,
+.school-plan-tree__floor[open] > .school-plan-tree__summary::before {
+  transform: rotate(90deg);
+}
+
+.school-plan-tree__summary span,
+.school-plan-tree__summary small {
+  display: block;
+}
+
+.school-plan-tree__summary span {
+  color: #172033;
+  font-size: .88rem;
+  font-weight: 900;
+}
+
+.school-plan-tree__summary small {
+  color: #667085;
+  font-size: .74rem;
+  line-height: 1.25;
+}
+
+.school-plan-tree__summary--block {
+  border-color: #c7d7ea;
+  background: #f1f7ff;
+}
+
+.school-plan-tree__summary--floor {
+  min-height: 40px;
+  background: #fff;
+}
+
+.school-plan-tree__summary--site {
+  border-color: #bbf7d0;
+  background: #f7fef9;
+}
+
+.school-plan-tree__summary--rooms {
+  border-color: #bfdbfe;
+  background: #f8fbff;
+}
+
+.school-plan-tree__summary--sanitaries {
+  border-color: #c4b5fd;
+  background: #fbfaff;
+}
+
+.school-plan-tree__summary--other-space {
+  min-height: 38px;
+  border-color: #bbf7d0;
+  background: #fbfefc;
+}
+
+.school-plan-tree__branch--locked > .school-plan-tree__summary {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.school-plan-tree__children {
+  display: grid;
+  gap: .45rem;
+  margin: .44rem 0 0 .72rem;
+  padding-left: .78rem;
+  border-left: 2px solid rgba(43, 108, 176, .22);
+}
+
+.school-plan-tree__children--floor {
+  margin-left: .42rem;
+  border-left-color: rgba(23, 32, 51, .16);
+}
+
+.school-plan-tree__children--floor-group {
+  margin-left: .28rem;
+  border-left-color: rgba(23, 32, 51, .12);
+}
+
+.school-plan-tree__empty {
+  margin: 0;
+  padding: .42rem .52rem;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  color: #667085;
+  font-size: .78rem;
+}
+
+.school-plan-group {
+  display: grid;
+  gap: .45rem;
+}
+
+.school-plan-group__children {
+  display: grid;
+  gap: .4rem;
+  padding-left: .75rem;
+  border-left: 2px solid rgba(43, 108, 176, .18);
+}
+
+.school-plan-group__children--actions {
+  display: flex;
+  flex-wrap: wrap;
+  padding: .4rem 0 0 .75rem;
+}
+
+.school-plan-object {
+  width: 100%;
+  min-height: 62px;
+  padding: .65rem;
+  border: 1px solid #dbe5f1;
+  border-radius: var(--radius-md);
+  background: #f8fafc;
+  color: #27364a;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.school-plan-object:hover,
+.school-plan-object:focus-visible {
+  outline: none;
+  border-color: #8fb0d3;
+  background: #f1f7ff;
+}
+
+.school-plan-object--active {
+  border-color: #e84c22 !important;
+  background: #fff7ed !important;
+  color: #172033;
+  box-shadow: 0 0 0 2px rgba(232, 76, 34, .13);
+}
+
+.school-plan-object--child {
+  min-height: 54px;
+  background: #fbfdff;
+}
+
+.school-plan-object--site {
+  border-color: #bbf7d0;
+  background: #f7fef9;
+}
+
+.school-plan-object--space {
+  border-color: #fed7aa;
+  background: #fffaf5;
+}
+
+.school-plan-object--locked {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.school-plan-object__type {
+  display: block;
+  color: #2b6cb0;
+  font-size: .7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.school-plan-object strong,
+.school-plan-object small {
+  display: block;
+}
+
+.school-plan-object small {
+  margin-top: .15rem;
+  color: #667085;
+  line-height: 1.25;
+}
+
+@media (max-width: 1040px) {
+  .mec-command {
+    flex-direction: column;
+  }
+
+  .mec-command__stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mec-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-sketch__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .school-plan__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .school-plan__layout-resize {
+    display: none;
+  }
+
+  .mec-rail {
+    display: none;
+  }
+
+  .mec-stepper {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .mec-school-context {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mec-command__stats,
+  .mec-field-grid,
+  .mec-rail__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-stage-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mec-module__header {
+    flex-direction: column;
+  }
+
+  .mec-module__badge {
+    min-width: 0;
+  }
+
+  .mec-choice-buttons {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .mec-choice {
+    min-height: 50px;
+    padding: .72rem .58rem;
+    font-size: .86rem;
+  }
+
+  .school-plan__toolbar,
+  .school-plan__layers,
+  .school-plan__exports {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+/* ── Densidad móvil/tablet para carga de campo, v2.5.18 ───── */
+@media (max-width: 1024px) {
+  .mec-header-actions {
+    gap: .35rem;
+  }
+
+  .mec-command {
+    gap: .75rem;
+    margin-bottom: .75rem;
+    padding: .8rem;
+  }
+
+  .mec-command h3 {
+    font-size: 1.05rem;
+  }
+
+  .mec-command p {
+    font-size: .84rem;
+  }
+
+  .mec-command__stats {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .45rem;
+  }
+
+  .mec-command__stats div {
+    min-height: 58px;
+    padding: .55rem;
+  }
+
+  .mec-command__stats span {
+    font-size: .66rem;
+  }
+
+  .mec-command__stats strong {
+    font-size: .9rem;
+  }
+
+  .mec-shell {
+    gap: .75rem;
+  }
+
+  .mec-stepper {
+    gap: .45rem;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  }
+
+  .mec-step {
+    min-height: 52px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: .45rem;
+    padding: .48rem;
+  }
+
+  .mec-step__number {
+    width: 28px;
+    height: 28px;
+    font-size: .78rem;
+  }
+
+  .mec-step__text strong {
+    font-size: .82rem;
+  }
+
+  .mec-step__text small {
+    margin-top: .1rem;
+    font-size: .68rem;
+  }
+
+  .mec-rail__actions {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: .4rem;
+  }
+
+  .mec-autosave-pill {
+    min-height: 28px;
+    padding: .25rem .5rem;
+    font-size: .72rem;
+  }
+
+  .mec-stage-toolbar {
+    gap: .45rem;
+    padding: .5rem .6rem;
+  }
+
+  .mec-stage-current {
+    font-size: .76rem;
+  }
+
+  .mec-stage-picker {
+    flex: 1 1 210px;
+    min-width: 0;
+  }
+
+  .mec-module__header {
+    gap: .6rem;
+    padding: .75rem;
+  }
+
+  .mec-module__header h3 {
+    font-size: 1.02rem;
+  }
+
+  .mec-module__header p:not(.mec-eyebrow) {
+    font-size: .82rem;
+  }
+
+  .mec-module__badge {
+    min-width: 0;
+    padding: .32rem .55rem;
+    font-size: .7rem;
+  }
+
+  .mec-module__body {
+    padding: .7rem;
+  }
+
+  .mec-section {
+    margin-bottom: .65rem;
+    padding: .7rem;
+  }
+
+  .mec-section__header {
+    margin-bottom: .55rem;
+  }
+
+  .mec-section__header h4 {
+    font-size: .88rem;
+  }
+
+  .mec-field-grid {
+    grid-template-columns: repeat(auto-fit, minmax(176px, 1fr));
+    gap: .55rem;
+  }
+
+  .mec-field {
+    padding: .55rem;
+  }
+
+  .mec-label {
+    min-height: 0;
+    margin-bottom: .32rem;
+    font-size: .78rem;
+  }
+
+  .mec-info-btn {
+    width: 18px;
+    height: 18px;
+    font-size: .66rem;
+  }
+
+  .mec-options {
+    grid-template-columns: repeat(auto-fit, minmax(98px, 1fr));
+    gap: .32rem;
+  }
+
+  .mec-options--columns {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  }
+
+  .mec-option {
+    min-height: 36px;
+    padding: .36rem .44rem;
+    font-size: .78rem;
+  }
+
+  .mec-option input {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mec-input-with-unit {
+    gap: .32rem;
+  }
+
+  .mec-unit {
+    min-width: 1.5rem;
+    font-size: .74rem;
+  }
+
+  .mec-hint,
+  .mec-error,
+  .mec-evidence__state {
+    font-size: .68rem;
+  }
+
+  .mec-evidence {
+    gap: .3rem .4rem;
+    margin-top: .45rem;
+    padding-top: .45rem;
+  }
+
+  .mec-repeat-toolbar {
+    gap: .35rem;
+    margin-bottom: .5rem;
+  }
+
+  .mec-repeat-list {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: .4rem;
+    margin-bottom: .6rem;
+  }
+
+  .mec-repeat-item {
+    min-height: 52px;
+    padding: .48rem;
+  }
+
+  .mec-block-tabs {
+    gap: .35rem;
+    margin-bottom: .5rem;
+    padding-bottom: .45rem;
+  }
+
+  .mec-block-tab {
+    min-width: 112px;
+    padding: .45rem .55rem;
+  }
+
+  .mec-sanitary-card {
+    padding: .65rem;
+  }
+
+  .mec-sanitary-groups {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .5rem;
+  }
+
+  .mec-sanitary-plan {
+    margin: .65rem 0;
+    padding: .58rem;
+  }
+
+  .mec-sketch__layout {
+    gap: .7rem;
+  }
+
+  .mec-sketch__tools {
+    gap: .45rem;
+  }
+
+  .mec-sketch__actions {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: .35rem;
+  }
+
+  .mec-sketch-toolset {
+    grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+    gap: .3rem;
+    margin-top: .45rem;
+    padding: .4rem;
+  }
+
+  .mec-sketch-tool {
+    min-height: 50px;
+    padding: .32rem .22rem;
+    font-size: .66rem;
+  }
+
+  .mec-sketch-tool__icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
+    font-size: 1rem;
+  }
+
+  .mec-sketch-zoom {
+    flex-wrap: wrap;
+    margin-bottom: .35rem;
+    font-size: .72rem;
+  }
+
+  .mec-sketch__board small {
+    font-size: .68rem;
+  }
+
+  .mec-selection-dock {
+    align-items: stretch;
+    flex-direction: column;
+    gap: .45rem;
+    margin-top: .45rem;
+    padding: .55rem;
+  }
+
+  .mec-selection-dock strong {
+    font-size: .86rem;
+  }
+
+  .mec-selection-dock small {
+    font-size: .68rem;
+  }
+
+  .mec-selection-dock__actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+
+  .mec-selection-dock__actions .btn {
+    min-width: 0;
+    padding-inline: .35rem;
+  }
+
+  .mec-object-form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .5rem;
+  }
+
+  .mec-choice-buttons {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: .35rem;
+  }
+
+  .mec-choice {
+    min-height: 38px;
+    padding: .42rem .5rem;
+    border-width: 1px;
+    font-size: .78rem;
+  }
+
+  .mec-object-evidence {
+    gap: .45rem;
+    margin-top: .55rem;
+    padding: .55rem;
+  }
+
+  .school-plan {
+    gap: .7rem;
+  }
+
+  .school-plan__kpis {
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: .35rem;
+  }
+
+  .school-plan-kpi {
+    min-height: 48px;
+    padding: .4rem .48rem;
+  }
+
+  .school-plan-kpi span {
+    font-size: .58rem;
+  }
+
+  .school-plan-kpi strong {
+    font-size: .94rem;
+  }
+
+  .school-plan-builder {
+    align-items: stretch;
+    flex-direction: column;
+    gap: .55rem;
+    padding: .62rem;
+  }
+
+  .school-plan-builder__actions {
+    justify-content: flex-start;
+  }
+
+  .school-plan-builder__controls {
+    justify-content: flex-start;
+  }
+
+  .school-plan-audit {
+    gap: .55rem;
+    padding: .62rem;
+  }
+
+  .school-plan-audit__header strong {
+    font-size: .88rem;
+  }
+
+  .school-plan-audit__score {
+    min-width: 64px;
+  }
+
+  .school-plan-audit__score b {
+    font-size: 1.25rem;
+  }
+
+  .school-plan-audit__issues {
+    grid-template-columns: 1fr;
+    gap: .42rem;
+  }
+
+  .school-plan-audit-issue {
+    min-height: 92px;
+    padding: .52rem;
+  }
+
+  .school-plan__layout {
+    gap: .7rem;
+  }
+
+  .school-plan__layout-resize {
+    display: none;
+  }
+
+  .school-plan__board,
+  .school-plan__side {
+    border-radius: 6px;
+  }
+
+  .school-plan__board,
+  .school-plan__side {
+    padding: .6rem;
+  }
+
+  .school-plan__toolbar {
+    gap: .45rem;
+    margin-bottom: .5rem;
+  }
+
+  .school-plan-ribbon__panel {
+    min-height: 58px;
+    padding: .36rem;
+    gap: .36rem;
+  }
+
+  .school-plan-ribbon__tab {
+    padding: .28rem .46rem .3rem;
+    font-size: .66rem;
+  }
+
+  .school-plan-ribbon__button {
+    min-width: 46px;
+    min-height: 40px;
+    padding: .2rem .3rem;
+  }
+
+  .school-plan-ribbon__label {
+    max-width: 58px;
+    font-size: .54rem;
+  }
+
+  .school-plan__layers label {
+    min-height: 28px;
+    padding: .22rem .38rem;
+    font-size: .68rem;
+  }
+
+  .school-plan-object {
+    min-height: 48px;
+    padding: .48rem;
+  }
+
+  .school-plan-object--child {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 700px) {
+  .mec-command {
+    margin-bottom: .55rem;
+    padding: .6rem;
+  }
+
+  .mec-command__stats div {
+    min-height: 50px;
+    padding: .42rem;
+  }
+
+  .mec-command__stats span {
+    font-size: .6rem;
+  }
+
+  .mec-command__stats strong {
+    margin-top: .18rem;
+    font-size: .82rem;
+  }
+
+  .mec-stepper {
+    display: flex;
+    gap: .35rem;
+    overflow-x: auto;
+    padding-bottom: .25rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mec-step {
+    min-width: 126px;
+    min-height: 44px;
+    grid-template-columns: 24px minmax(0, 1fr);
+    padding: .36rem;
+    scroll-snap-align: start;
+  }
+
+  .mec-step__number {
+    width: 24px;
+    height: 24px;
+    font-size: .7rem;
+  }
+
+  .mec-step__text strong {
+    font-size: .74rem;
+  }
+
+  .mec-step__text small {
+    display: none;
+  }
+
+  .mec-rail__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-stage-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin: 0 0 .5rem;
+    padding: .42rem;
+    border-radius: 6px;
+  }
+
+  .mec-stage-toolbar .btn {
+    flex: 1 1 calc(50% - .3rem);
+  }
+
+  .mec-stage-current {
+    flex: 1 1 100%;
+    padding: .35rem .3rem 0;
+    font-size: .68rem;
+  }
+
+  .mec-stage-picker {
+    flex: 1 1 100%;
+    min-width: 0;
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .mec-stage-actions {
+    flex: 1 1 100%;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .mec-module__header {
+    flex-direction: column;
+    padding: .58rem;
+  }
+
+  .mec-module__header h3 {
+    font-size: .92rem;
+  }
+
+  .mec-module__header p:not(.mec-eyebrow) {
+    font-size: .76rem;
+  }
+
+  .mec-module__badge {
+    align-self: flex-start;
+    padding: .28rem .45rem;
+    font-size: .64rem;
+  }
+
+  .mec-module__body {
+    padding: .5rem;
+  }
+
+  .mec-section {
+    margin-bottom: .5rem;
+    padding: .55rem;
+  }
+
+  .mec-section__header h4 {
+    font-size: .8rem;
+  }
+
+  .mec-field-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: .4rem;
+  }
+
+  .mec-field {
+    padding: .42rem;
+  }
+
+  .mec-label {
+    font-size: .72rem;
+  }
+
+  .mec-label > span:last-child:not(:first-child) {
+    font-size: .58rem;
+  }
+
+  .mec-options,
+  .mec-options--columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-option {
+    min-height: 34px;
+    padding: .32rem .36rem;
+    font-size: .72rem;
+  }
+
+  .mec-evidence {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-evidence__label,
+  .mec-evidence__state {
+    font-size: .68rem;
+  }
+
+  .mec-repeat-toolbar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-repeat-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-repeat-item {
+    min-height: 46px;
+    padding: .4rem;
+  }
+
+  .mec-repeat-item strong {
+    font-size: .74rem;
+  }
+
+  .mec-repeat-item span {
+    font-size: .66rem;
+  }
+
+  .mec-sketch-toolset {
+    grid-template-columns: repeat(5, minmax(42px, 1fr));
+    margin-top: .35rem;
+  }
+
+  .mec-sketch-tool {
+    min-height: 44px;
+    font-size: .6rem;
+  }
+
+  .mec-sketch-tool__icon {
+    width: 24px;
+    height: 24px;
+    font-size: .95rem;
+  }
+
+  .mec-sketch__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-sketch-canvas-wrap {
+    max-height: 54dvh;
+  }
+
+  .mec-choice-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-choice {
+    min-height: 36px;
+    padding: .36rem .4rem;
+    font-size: .72rem;
+  }
+
+  .mec-sanitary-card__header {
+    flex-direction: column;
+    margin-bottom: .5rem;
+  }
+
+  .mec-sanitary-groups {
+    grid-template-columns: minmax(0, 1fr);
+    gap: .4rem;
+  }
+
+  .mec-sanitary-plan {
+    margin: .55rem 0;
+    padding: .5rem;
+  }
+
+  .mec-sanitary-svg {
+    max-height: 210px;
+  }
+
+  .school-plan__kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .school-plan-kpi {
+    min-height: 44px;
+    padding: .35rem .42rem;
+  }
+
+  .school-plan-kpi strong {
+    font-size: .88rem;
+  }
+
+  .school-plan__toolbar {
+    gap: .4rem;
+    margin-bottom: .45rem;
+  }
+
+  .school-plan__layers,
+  .school-plan__exports {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .35rem;
+  }
+
+  .school-plan__layers label {
+    justify-content: center;
+  }
+
+  .school-plan-basemap-actions {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+
+  .school-plan-basemap-panel__adjust,
+  .school-plan-basemap-panel__offset {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .school-plan-basemap-panel__offset label {
+    width: 100%;
+  }
+
+  .school-plan__board canvas {
+    min-height: 220px;
+  }
+
+  .school-plan__legend {
+    gap: .25rem .45rem;
+    font-size: .68rem;
+  }
+
+  .school-plan-object {
+    min-height: 42px;
+    padding: .4rem;
+  }
+
+  .school-plan-object__type {
+    font-size: .58rem;
+  }
+
+  .school-plan-object strong {
+    font-size: .74rem;
+  }
+
+  .school-plan-object small {
+    font-size: .64rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .mec-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mec-stage-picker,
+  .mec-stage-current {
+    flex: 1 1 100%;
+  }
+
+  .mec-options,
+  .mec-options--columns,
+  .mec-choice-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mec-stage-toolbar .btn,
+  .mec-rail__actions .btn,
+  .mec-repeat-toolbar .btn,
+  .mec-sketch__actions .btn {
+    min-width: 0;
+  }
+
+  .mec-sketch-toolset {
+    grid-template-columns: repeat(4, minmax(42px, 1fr));
+  }
+
+  .school-plan__layers,
+  .school-plan__exports {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .school-plan-ribbon__tab {
+    min-width: 58px;
+    justify-content: center;
+    padding-left: .34rem;
+    padding-right: .34rem;
+  }
+
+  .school-plan-ribbon__tab b {
+    font-size: .6rem;
+  }
+
+  .school-plan-ribbon__group-title {
+    font-size: .54rem;
+  }
+
+  .school-plan-ribbon__button {
+    min-width: 44px;
+  }
+}
+
+@media (pointer: coarse) and (max-width: 1024px) {
+  .mec-stepper,
+  .mec-block-tabs,
+  .mec-sketch-canvas-wrap,
+  .school-plan__canvas-wrap,
+  .school-plan__board,
+  .school-plan__list {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .mec-step,
+  .mec-option,
+  .mec-choice,
+  .mec-sketch-tool,
+  .school-plan-object {
+    touch-action: manipulation;
+  }
+
+  .school-plan__toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: .45rem 0;
+    background: #fff;
+  }
+
+  .school-plan__layers label,
+  .school-plan__exports .btn,
+  .mec-stage-button,
+  .mec-choice {
+    min-height: 44px;
+  }
+
+  .school-plan__canvas-wrap {
+    max-height: 68dvh;
+  }
+
+  .school-plan__board canvas {
+    touch-action: none;
+    max-height: none;
+  }
+}
+
+/* Visual harmonization v2.5.46 */
+.mec-command,
+.mec-stage-toolbar,
+.mec-section,
+.mec-planned,
+.mec-sketch-meta,
+.mec-sketch-toolset,
+.mec-sketch-canvas-wrap,
+.mec-sanitary-card,
+.mec-sanitary-plan,
+.mec-sanitary-cabin-panel,
+.school-plan-kpi,
+.school-plan-builder,
+.school-plan-audit,
+.school-plan__board,
+.school-plan__side,
+.school-plan__canvas-wrap {
+  border-color: #d8e1eb;
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.mec-command,
+.mec-section,
+.school-plan-builder,
+.school-plan-audit,
+.school-plan__board,
+.school-plan__side {
+  background: #ffffff;
+}
+
+.mec-section__header,
+.mec-stage-toolbar,
+.mec-sketch-meta,
+.mec-sketch-toolset,
+.mec-sanitary-cabin-panel {
+  background: #f8fafc;
+}
+
+.mec-eyebrow,
+.mec-section__header span,
+.school-plan-builder__state span,
+.school-plan-audit__header span,
+.school-plan-kpi span {
+  letter-spacing: .04em;
+}
+
+.school-plan__kpis--side .school-plan-kpi span {
+  font-size: .55rem;
+}
+
+.mec-command h3,
+.mec-section__header h3,
+.school-plan__side h3,
+.school-plan-builder__state strong,
+.school-plan-audit__header strong {
+  letter-spacing: 0;
+}
+
+.mec-step,
+.mec-stage-button,
+.mec-choice,
+.mec-option,
+.mec-sketch-tool,
+.school-plan-object,
+.school-plan__layers label {
+  border-radius: 7px;
+}
+
+.mec-step--active,
+.mec-stage-button--active,
+.mec-sketch-tool--active {
+  box-shadow: inset 0 0 0 1px rgba(47, 128, 170, .12);
+}
+
+.mec-choice--active,
+.mec-option--active {
+  box-shadow: 0 0 0 2px var(--choice-ring, rgba(23, 59, 99, .24));
+}
+
+.mec-step--active,
+.mec-stage-button--active {
+  border-color: #2f80aa;
+  background: #e8f2fb;
+  color: #173b63;
+}
+
+.mec-step--active .mec-step__number,
+.mec-stage-button--active {
+  background: #173b63;
+  color: #ffffff;
+}
+
+.mec-sketch__layout,
+.school-plan__layout {
+  gap: .85rem;
+}
+
+.mec-sketch-tool {
+  min-height: 62px;
+  background: #ffffff;
+}
+
+.mec-sketch-tool__icon {
+  border-radius: 7px;
+  background: #eef3f8;
+}
+
+.mec-sketch-canvas-wrap,
+.school-plan__canvas-wrap {
+  background:
+    linear-gradient(rgba(23, 59, 99, .045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 59, 99, .045) 1px, transparent 1px),
+    #fbfdff;
+  background-size: 20px 20px;
+}
+
+.mec-sketch__board canvas,
+.school-plan__board canvas {
+  background-color: transparent;
+}
+
+.mec-sketch-zoom,
+.school-plan__zoom {
+  min-height: 34px;
+  padding: .18rem .25rem;
+  border: 1px solid #d8e1eb;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.mec-sketch-zoom .btn-sm,
+.school-plan__zoom .btn-sm {
+  min-width: 34px;
+  padding-inline: .55rem;
+}
+
+.school-plan-kpi {
+  min-height: 54px;
+  padding: .48rem .58rem;
+}
+
+.school-plan-kpi strong {
+  margin: 0;
+  font-size: 1.02rem;
+}
+
+.school-plan__kpis--side .school-plan-kpi strong {
+  font-size: .82rem;
+}
+
+.school-plan__legend {
+  padding: .55rem;
+  border: 1px solid #edf2f7;
+  border-radius: 7px;
+  background: #fbfdff;
+}
+
+.school-plan-object {
+  background: #fbfdff;
+}
+
+.school-plan-object--active {
+  border-color: #d94a24 !important;
+  background: #fff7ed !important;
+  box-shadow: 0 0 0 2px rgba(217, 74, 36, .12);
+}
+
+.mec-section {
+  border-color: #bdcbe0;
+  border-left-color: #1d5f99;
+  background: #ffffff;
+}
+
+.mec-section:nth-of-type(odd) {
+  background: #f7fbff;
+}
+
+.mec-section:nth-of-type(even) {
+  border-left-color: #b45309;
+  background: #fffaf5;
+}
+
+.mec-field {
+  border-color: #cad6e5;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .8), 0 1px 0 rgba(23, 32, 51, .04);
+}
+
+.mec-field:focus-within {
+  border-color: #2f80aa;
+  box-shadow: 0 0 0 2px rgba(47, 128, 170, .16);
+}
+
+.mec-canvas-hover-tooltip {
+  position: fixed;
+  z-index: 6000;
+  display: none;
+  width: max-content;
+  max-width: min(310px, calc(100vw - 24px));
+  max-height: min(70vh, 420px);
+  overflow: auto;
+  padding: .55rem .65rem;
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: 7px;
+  background: #102033;
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, .26);
+  pointer-events: none;
+}
+
+.mec-canvas-hover-tooltip--visible {
+  display: grid;
+  gap: .16rem;
+}
+
+.mec-canvas-hover-tooltip small {
+  color: #b9d4f5;
+  font-size: .68rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+}
+
+.mec-canvas-hover-tooltip strong {
+  font-size: .88rem;
+  line-height: 1.2;
+}
+
+.mec-canvas-hover-tooltip span {
+  color: #e6edf7;
+  font-size: .75rem;
+  line-height: 1.25;
+}
+
+.mec-canvas-hover-tooltip b {
+  color: #ffffff;
+}
+
+.mec-canvas-hover-tooltip__photos {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .32rem;
+  margin-top: .28rem;
+}
+
+.mec-canvas-hover-tooltip__photos figure {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+}
+
+.mec-canvas-hover-tooltip__photos img {
+  display: block;
+  width: 100%;
+  height: 46px;
+  object-fit: cover;
+}
+
+.mec-canvas-hover-tooltip__photos figcaption,
+.mec-canvas-hover-tooltip__photo-chip {
+  display: block;
+  padding: .16rem .22rem;
+  color: #dbeafe;
+  font-size: .58rem;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.mec-canvas-hover-tooltip__photo-chip {
+  min-height: 46px;
+  align-content: center;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .08);
+}
+
+body.mec-drawing-fullscreen-active {
+  overflow: hidden;
+}
+
+.mec-drawing-board--fullscreen {
+  position: fixed !important;
+  inset: 10px;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: .85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+}
+
+.mec-drawing-board--fullscreen .mec-sketch-zoom,
+.mec-drawing-board--fullscreen .school-plan__toolbar {
+  flex: 0 0 auto;
+}
+
+.mec-drawing-board--fullscreen .mec-sketch-canvas-wrap,
+.mec-drawing-board--fullscreen .school-plan__canvas-wrap {
+  flex: 1 1 auto;
+  max-height: none;
+  min-height: 0;
+}
+
+.mec-drawing-board--fullscreen small {
+  flex: 0 0 auto;
+}
