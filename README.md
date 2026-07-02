@@ -1,8 +1,13 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.202** | Paraguay 2026
+**Version 2.6.203** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.203
+
+- Se mantiene el frontend corregido y se vuelve a apuntar la PWA al backend GAS publico estable para evitar el `403` del redeploy sobre el endpoint principal.
+- El saneamiento territorial sigue activo en cliente para no mostrar distritos serializados como fecha aunque el backend estable siga siendo el fallback operativo.
 
 ## Novedades v2.6.202
 

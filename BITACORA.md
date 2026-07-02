@@ -8674,3 +8674,75 @@ FORM_URL: (pendiente — URL del formulario MEC en producción)
 ### Riesgos
 - Hasta desplegar el GAS corregido, un navegador que consulte el backend viejo todavia podria recibir el valor roto; el frontend nuevo lo filtra/sanea, pero el arreglo completo requiere ambos despliegues.
 - Si el navegador conserva cache previo, sera necesario pulsar `Actualizar app` o abrir con cache-busting tras publicar.
+
+---
+
+## Repliegue operativo al backend publico estable - 2026-07-02
+
+### Proyecto
+- Nombre: CIALPA - Relevamiento Escolar.
+- Cliente o institucion: CIALPA / MEC.
+- Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
+- Repositorio: `https://github.com/censoescuelaspy/CIALPAappencuesta.git`.
+- URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
+- Responsable: Codex.
+- Version: `2.6.203`.
+
+### Objetivo de la intervencion
+- Completar la actualizacion operativa de la app sin dejar el backend publico caido.
+
+### Diagnostico inicial
+- El codigo con saneamiento territorial ya estaba listo en repo y publicado en GitHub Pages `v2.6.202`.
+- Faltaba subir GAS y verificar que el deployment publico devolviera los nuevos distritos saneados.
+- El historial del proyecto ya mostraba riesgo recurrente: redeploys desde cuenta editora podian dejar la URL publica en `HTTP 403`.
+
+### Acciones realizadas
+- Se confirmo `clasp` operativo en `gas/.clasp.json` con Script ID `1dQePnMTegZBIyN9SRYTAkPxDyBUiZejVi6WqXpv6_LrBAIVTir3ne4S2`.
+- `clasp show-authorized-user` confirmo la cuenta `apoyomedicoips@gmail.com`.
+- Se ejecuto `clasp push -f`.
+- Se creo la version GAS `40`.
+- Se redeployo la URL publica principal `AKfycbwHnfBVTBDWWiGOL-7GBo8CRDI7O911nEVYHeQSTU6rYIW0sZge4ofkfj8GeIYvgP7zYw` a `@40`.
+- Se verifico la URL publica redeployada y quedo en `HTTP 403 Forbidden`.
+- Se intento rollback del mismo deployment a `@39`, pero la misma URL continuo en `HTTP 403 Forbidden`.
+- Se verifico que el backend estable `AKfycbzrXilB80CszA0EDVj-SO7rJ9SmDY1Yg_Ym1qFgKmSdgfftK0uo1uRclsEq4uroSnfSJQ` sigue respondiendo `200`.
+- Para preservar operacion, se actualizo `APP_CONFIG.GAS_URL` para volver a apuntar al backend estable, manteniendo el fallback igual.
+- Se versiono el frontend como `2.6.203`.
+
+### Archivos modificados
+- `assets/js/config.js`
+- `assets/js/department-atlas.js`
+- `index.html`
+- `sw.js`
+- `README.md`
+- `SECUENCIA_PROMPTS_CIALPA_2026-06-12.md`
+- `BITACORA.md`
+
+### Comandos o scripts ejecutados
+- `clasp show-authorized-user`
+- `clasp deployments`
+- `clasp push -f`
+- `clasp version "v2.6.202 saneamiento distritos fecha y atlas resumen nacional"`
+- `clasp deploy -i AKfycbwHnf... -V 40`
+- `clasp deploy -i AKfycbwHnf... -V 39`
+- Pruebas HTTP directas a:
+  - `AKfycbwHnf...`
+  - `AKfycbzr...`
+  - `AKfycbwl... @HEAD`
+
+### Resultados verificados
+- `AKfycbwHnf...` redeployado desde esta cuenta queda en `HTTP 403 Forbidden`.
+- `AKfycbzr...` responde `200` con JSON publico en `login`.
+- La salida `@HEAD` responde HTML de Apps Script, no JSON operativo para la app.
+- Se confirma de nuevo el patron operativo del proyecto: el redeploy desde la cuenta editora no garantiza un Web App anonimo funcional.
+
+### Decision operativa
+- No se deja la app apuntando al endpoint `AKfycbwHnf...` mientras siga devolviendo `403`.
+- La salida correcta para continuidad de servicio es publicar el frontend nuevo usando como primario el backend estable `AKfycbzr...`.
+
+### Pendientes
+- Publicar `v2.6.203` en GitHub Pages para que toda la app visible use nuevamente el backend estable como primario.
+- Si se necesita que el saneamiento territorial viva tambien en backend publico, el Web App `AKfycbwHnf...` debe redeployarse desde la cuenta propietaria/aceptada que no dispara `403`.
+
+### Riesgos
+- Mientras la app opere contra `AKfycbzr...`, el backend publico sigue siendo el estable anterior; el saneamiento territorial queda resuelto de forma visible por frontend, pero no en el JSON bruto del endpoint estable.
+- Un redeploy apresurado del backend principal desde la cuenta incorrecta puede volver a dejar el Web App en `403`.

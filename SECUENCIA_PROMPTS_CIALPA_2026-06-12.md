@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.202`.
+- Version vigente de esta intervencion: `2.6.203`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -29,6 +29,7 @@
 - Luego se reporto que el ensayo 3D resultaba muy pesado y se pidio eliminar todo lo relacionado al plano 3D.
 - Finalmente se pidio responder y resolver una consulta operativa del Atlas: ver todos los departamentos al mismo tiempo o, al menos, los totales departamentales simultaneos.
 - Luego se reporto un problema territorial adicional: algunos distritos aparecian como textos de fecha con huso horario, por ejemplo `Thu Dec 25 2025 00:00:00 GMT-0300`, afectando nombres y conteos.
+- Luego se solicito que se realizara todo lo necesario para dejar la app actualizada y operativa, incluyendo push a GAS y validacion del endpoint publico.
 
 ## Decision tecnica de esta intervencion
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
@@ -67,6 +68,9 @@
 - Para `2.6.202`, se identifico que el caso de San Pedro no era `Union`, sino el distrito `25 DE DICIEMBRE` mal interpretado como fecha desde la hoja/serializacion.
 - Se agrego saneamiento de etiquetas territoriales en frontend y backend para convertir esos textos de fecha nuevamente a nombres como `25 DE DICIEMBRE`.
 - El mapa y el cuestionario inicial dejan de poblar selectores con opciones tipo `Thu Dec 25 2025 ... GMT-0300`, evitando conteos mezclados entre distritos validos.
+- Se ejecuto `clasp push -f`, se creo la version GAS `40` y se redeployo el Web App `AKfycbwHnf...`.
+- La prueba directa confirmo que ese redeploy vuelve a dejar la URL publica en `HTTP 403 Forbidden`, repitiendo el bloqueo historico de deploys hechos desde la cuenta editora.
+- Para no dejar la app inoperativa, en `2.6.203` el frontend vuelve a apuntar como `GAS_URL` al backend publico estable `AKfycbzr...`, manteniendo el saneamiento territorial del lado cliente y la operacion visible de la PWA.
 - En `2.6.194`, el panel de detalle/lista del Atlas pasa a una zona amplia debajo del mapa y la tabla suma columnas: codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
 - Para `2.6.195`, el Atlas separa mapa/tabla con contexto de apilamiento, scroll del modulo, breakpoint menor a 1180 px sin scroll intermedio y encabezados sticky.
 - En `2.6.195`, los encabezados de tabla son botones sortables por codigo, escuela, distrito/localidad, zona, estado, mapa y asignacion.
