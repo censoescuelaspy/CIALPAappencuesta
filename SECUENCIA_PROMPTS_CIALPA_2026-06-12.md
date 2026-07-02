@@ -4,7 +4,7 @@
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.204`.
+- Version vigente de esta intervencion: `2.6.205`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -166,3 +166,4 @@
 - Para `2.6.204`, el Atlas agrega una vista separada `Mapa nacional` con poligonos ADM1 coloreados por cantidad de escuelas, mas `Copiar imagen` e `Imprimir mapa nacional`.
 - Se agrego `assets/data/paraguay-adm1-simplified.geojson` desde geoBoundaries como capa local del coropletico nacional.
 - Se verifico por exportacion CSV directa de la hoja oficial `listado_ini` que el padron vigente contiene `5462` escuelas de datos mas una fila de encabezado, consistente con `diagnosticoPadron` del backend publico.
+- Para `2.6.205`, la vista `Mapa nacional` agrega el boton `Imprimir solo mapa`, que genera una hoja limpia con solo la lamina cartografica.

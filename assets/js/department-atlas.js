@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * department-atlas.js, atlas departamental con mapa e impresion multipagina
- * Version: 2.6.204
+ * Version: 2.6.205
  */
 
 const DepartmentAtlasModule = (() => {
@@ -141,11 +141,12 @@ const DepartmentAtlasModule = (() => {
     _renderAll();
   }
 
-  async function printPdf() {
+  async function printPdf(options = {}) {
     if (!_schools.length) {
       UI.showToast('El atlas todavia no tiene padron cargado para imprimir.', 'warning', 6000);
       return;
     }
+    const mapOnly = Boolean(options.mapOnly);
     if (_viewMode === VIEW_MODE_CHOROPLETH && !_boundaryGeoJson) {
       try {
         await _ensureBoundaryGeoJson();
@@ -157,7 +158,7 @@ const DepartmentAtlasModule = (() => {
     const root = document.getElementById('atlas-print-root');
     if (!root) return;
     if (_viewMode === VIEW_MODE_CHOROPLETH) {
-      root.innerHTML = _printChoroplethPage();
+      root.innerHTML = mapOnly ? _printChoroplethMapOnlyPage() : _printChoroplethPage();
     } else {
       root.innerHTML = [_printOverviewPage()]
         .concat(_departments.map(department => _printPage(department.label)))
@@ -189,6 +190,12 @@ const DepartmentAtlasModule = (() => {
     if (printBtn && printBtn.dataset.bound !== 'true') {
       printBtn.dataset.bound = 'true';
       printBtn.addEventListener('click', printPdf);
+    }
+
+    const printMapOnlyBtn = document.getElementById('atlas-print-map-only-btn');
+    if (printMapOnlyBtn && printMapOnlyBtn.dataset.bound !== 'true') {
+      printMapOnlyBtn.dataset.bound = 'true';
+      printMapOnlyBtn.addEventListener('click', () => printPdf({ mapOnly: true }));
     }
 
     const copyBtn = document.getElementById('atlas-copy-btn');
@@ -377,6 +384,16 @@ const DepartmentAtlasModule = (() => {
         : 'Disponible en la vista Mapa nacional';
       copyBtn.classList.toggle('btn-primary', enabled);
       copyBtn.classList.toggle('btn-outline', !enabled);
+    }
+    const printMapOnlyBtn = document.getElementById('atlas-print-map-only-btn');
+    if (printMapOnlyBtn) {
+      const enabled = _viewMode === VIEW_MODE_CHOROPLETH;
+      printMapOnlyBtn.disabled = !enabled;
+      printMapOnlyBtn.title = enabled
+        ? 'Imprimir solamente el mapa nacional sin tablas ni texto lateral'
+        : 'Disponible en la vista Mapa nacional';
+      printMapOnlyBtn.classList.toggle('btn-primary', enabled);
+      printMapOnlyBtn.classList.toggle('btn-outline', !enabled);
     }
   }
 
@@ -805,7 +822,7 @@ const DepartmentAtlasModule = (() => {
             <h1>Mapa nacional por departamento</h1>
           </div>
           <div>
-            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.204')}</strong>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.205')}</strong>
             <small>${_escape(_formatDateTime(new Date()))}</small>
           </div>
         </header>
@@ -834,6 +851,26 @@ const DepartmentAtlasModule = (() => {
         <footer class="atlas-print-footer">
           Fuente: padron oficial CIALPA/MEC cargado en la app y limites ADM1 simplificados de geoBoundaries.
         </footer>
+      </section>`;
+  }
+
+  function _printChoroplethMapOnlyPage() {
+    const summaries = _departmentSummaries(_schools || []);
+    return `
+      <section class="atlas-print-page atlas-print-page--map-only">
+        <header class="atlas-print-header atlas-print-header--compact">
+          <div>
+            <span>CIALPA - Atlas departamental</span>
+            <h1>Mapa nacional por departamento</h1>
+          </div>
+          <div>
+            <strong>${_escape(APP_CONFIG.VERSION || 'v2.6.205')}</strong>
+            <small>${_escape(_formatDateTime(new Date()))}</small>
+          </div>
+        </header>
+        <div class="atlas-print-map-only-body">
+          ${_renderPrintChoroplethMap(summaries)}
+        </div>
       </section>`;
   }
 
@@ -1155,7 +1192,7 @@ const DepartmentAtlasModule = (() => {
   function _ensureBoundaryGeoJson() {
     if (_boundaryGeoJson) return Promise.resolve(_boundaryGeoJson);
     if (_boundaryGeoJsonPromise) return _boundaryGeoJsonPromise;
-    _boundaryGeoJsonPromise = fetch(`${BOUNDARY_GEOJSON_URL}?v=${encodeURIComponent(APP_CONFIG.VERSION || '2.6.204')}`, { cache: 'no-store' })
+    _boundaryGeoJsonPromise = fetch(`${BOUNDARY_GEOJSON_URL}?v=${encodeURIComponent(APP_CONFIG.VERSION || '2.6.205')}`, { cache: 'no-store' })
       .then(response => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();

@@ -1617,6 +1617,27 @@ td {
   page-break-after: auto;
 }
 
+.atlas-print-page--map-only {
+  grid-template-rows: auto 1fr;
+  min-height: auto;
+  height: 100vh;
+}
+
+.atlas-print-header--compact {
+  margin-bottom: 4mm;
+}
+
+.atlas-print-map-only-body {
+  display: grid;
+  min-height: 0;
+}
+
+.atlas-print-page--map-only .atlas-print-map,
+.atlas-print-page--map-only .atlas-choropleth-card {
+  min-height: 0;
+  height: 100%;
+}
+
 .atlas-print-header,
 .atlas-print-footer {
   display: flex;
