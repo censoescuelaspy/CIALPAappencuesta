@@ -4,6 +4,41 @@
 
 ---
 
+## Migracion al padron MEC RUE 2026 - 2026-07-16 - v2.6.206
+
+### Objetivo
+- Reemplazar el padron base de la app por `ListadoMECversionNUEVA16julio2026.xlsx` sin perder borradores, entregas, sesiones ni estados de campo.
+- Revisar si el cambio de marco obliga a volver a seleccionar la muestra piloto.
+
+### Diagnostico y decision
+- El padron vigente de la app tenia `5462` escuelas; la nueva nomina contiene `5448` codigos validos y unicos: `33` altas, `47` bajas y saldo neto de `-14`.
+- `5016` escuelas tienen coordenadas validas y `432` permanecen en el padron sin marcador.
+- Los `86` codigos de la muestra piloto siguen presentes. No se redibuja la muestra ni se descarta trabajo de campo: se recalibran ponderadores contra el nuevo marco de `983` escuelas elegibles y se preservan los valores originales.
+- El objetivo teorico sigue siendo `88`. Cualquier ampliacion con dos reservas se tratara como decision operativa separada, no como parte automatica de esta migracion.
+- Los formularios de escuelas retiradas se conservan como historial administrativo y dejan de contar dentro del universo vigente.
+
+### Cambios implementados
+- `tools/simulation/prepare_mec_roster_2026.py`: transformacion reproducible, validaciones, comparacion de marcos y generacion de payload privado para Sheets.
+- `assets/data/r01-schools-public.json`: catalogo publico regenerado sin responsables, telefonos ni correos.
+- `gas/sheets.gs`: comparacion canonica de codigos y recuperacion administrativa de registros historicos fuera del padron actual.
+- `docs/INFORME_MIGRACION_PADRON_MEC_2026-07-16.md`: informe de diferencias, impacto operativo y recomendacion muestral.
+- Version de frontend y cache actualizada a `2.6.206`.
+
+### Validacion y cierre
+- La hoja oficial se renombro a `lista_oficial_escuelas_RUE_2026`, con zona horaria `America/Asuncion`.
+- `listado_ini` quedo activo con `5448` filas y `muestra_piloto_def` con `86`; los respaldos `listado_ini_legacy_2025_20260716` y `muestra_piloto_legacy_2025_20260716` permanecen ocultos.
+- Control remoto previo al intercambio: `5448` codigos exactos y unicos, `5016` pares de coordenadas, `86` codigos piloto exactos y suma de ponderadores `983`.
+- `diagnosticoPadron` confirmo desde `official_sheet`: `total=5448`, `con_coordenadas=5016`, `muestra_piloto=86` y `filas_operativas=128`.
+- `clasp push -f` subio 8 archivos y se creo GAS version `41`.
+- El redeploy del endpoint que estaba estable a GAS `41` respondio `403`; el rollback a `23` mantuvo el `403`. Para recuperar operacion se verifico el deployment publico GAS `19`, que devuelve el nuevo padron, y el frontend se apunto temporalmente a ese endpoint.
+- `assets/js/admin.js` conserva la aprobacion de solicitudes con una ruta compatible: asigna la escuela y luego resuelve la incidencia cuando el endpoint no reconoce la accion compuesta.
+
+### Pendiente externo
+- Publicar GAS version `41` desde la cuenta propietaria del Web App y, despues de confirmar respuesta JSON anonima, devolver `GAS_URL` al deployment actualizado. Hasta entonces funciona el backend publico version `19`, pero la recuperacion directa de escuelas historicas fuera del padron no esta desplegada.
+- Pendiente al momento de esta entrada: commit/push Git y verificacion final de GitHub Pages.
+
+---
+
 ## Medidas calculadas de perimetros georreferenciados - 2026-06-11 - v2.6.180
 
 ### Objetivo

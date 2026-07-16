@@ -1,10 +1,10 @@
-# Secuencia de prompts - CIALPA - ultima edicion 2026-07-02
+# Secuencia de prompts - CIALPA - ultima edicion 2026-07-16
 
 ## Proyecto
 - Nombre: CIALPA - Relevamiento Escolar.
 - Ruta local: `G:\Mi unidad\CIALPA\06_APP`.
 - URL publica: https://censoescuelaspy.github.io/CIALPAappencuesta/
-- Version vigente de esta intervencion: `2.6.204`.
+- Version vigente de esta intervencion: `2.6.206`.
 
 ## Secuencia resumida
 - Se solicito estudiar la bitacora del proyecto CIALPA y continuar una nueva version enfocada en registro arquitectonico, electrico, desague y conexion de agua, manteniendo danos y fallas.
@@ -30,8 +30,16 @@
 - Finalmente se pidio responder y resolver una consulta operativa del Atlas: ver todos los departamentos al mismo tiempo o, al menos, los totales departamentales simultaneos.
 - Luego se reporto un problema territorial adicional: algunos distritos aparecian como textos de fecha con huso horario, por ejemplo `Thu Dec 25 2025 00:00:00 GMT-0300`, afectando nombres y conteos.
 - Luego se solicito que se realizara todo lo necesario para dejar la app actualizada y operativa, incluyendo push a GAS y validacion del endpoint publico.
+- El 2026-07-16 se recibio una nueva planilla MEC y se solicito regenerar por completo el padron base de la app y de la hoja en linea, evaluando tambien el efecto sobre la muestra piloto ya tomada.
 
 ## Decision tecnica de esta intervencion
+- Para `2.6.206`, el nuevo marco se fija en `5448` codigos validos y unicos: `33` altas y `47` bajas respecto de las `5462` escuelas de la app.
+- Se mantienen los `86` codigos piloto porque todos continúan en el marco y ya existe captura operativa; se recalibran ponderadores sobre el marco elegible actualizado de `983` escuelas y se conservan los ponderadores originales para auditoria.
+- Los formularios no se eliminan cuando una escuela sale del padron: quedan consultables como historial administrativo, pero no integran el total vigente.
+- La migracion de Sheets usa pestañas de preparacion verificadas y conserva las pestañas anteriores ocultas como respaldo antes del intercambio de nombres.
+- La hoja oficial quedo migrada y `diagnosticoPadron` confirmo `5448/5016/86`, conservando `128` filas operativas.
+- GAS version `41` quedo creada, pero el redeploy desde la cuenta editora produjo `403` incluso despues del rollback; el frontend usa temporalmente el deployment publico version `19`, verificado contra el nuevo marco.
+- La aprobacion de solicitudes mantiene compatibilidad en frontend mediante `asignarEscuela` y `resolverIncidencia` cuando el deployment publico no expone la accion compuesta.
 - `REGISTRO GUIADO` reutiliza el plano canvas de `MecFormModule`; por eso Catastro se implemento como teselas WMS transparentes bajo el canvas y sobre la base satelital/alta resolucion.
 - Se reutilizo `APP_CONFIG.MAP_CADASTRAL_LAYERS` para mantener una sola fuente oficial de URL, capa, opacidad y metadatos de Catastro SNC.
 - Las teselas WMS se solicitan con `WIDTH=512` y `HEIGHT=512` para mejorar nitidez visual en la superposicion.

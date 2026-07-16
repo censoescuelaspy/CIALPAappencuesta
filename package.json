@@ -11,6 +11,7 @@
     "imagery:worklist": "node tools/earthengine/build_pilot_imagery_worklist.mjs",
     "imagery:ee-batch": "node tools/earthengine/generate_pilot_earthengine_batch.mjs",
     "build:r01-schools": "node tools/simulation/build_r01_public_schools.mjs",
+    "prepare:mec-roster": "py -3 -X utf8 tools/simulation/prepare_mec_roster_2026.py",
     "embed:schools": "node tools/simulation/embed_schools_csv.mjs",
     "db:api": "node tools/database/cialpa_db_api.mjs",
     "db:check": "node --check tools/database/cialpa_db_api.mjs",

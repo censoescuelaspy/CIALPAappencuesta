@@ -1,5 +1,24 @@
 # Simulacion de cargas CIALPA
 
+## Preparar una nueva version del padron MEC
+
+El generador `prepare_mec_roster_2026.py` transforma la planilla MEC recibida en
+los artefactos usados por CIALPA, valida codigos y coordenadas, y recalibra los
+ponderadores de la muestra piloto sin volver a seleccionar escuelas.
+
+```powershell
+npm.cmd run prepare:mec-roster -- --source="H:\Mi unidad\ListadoMECversionNUEVA16julio2026.xlsx" --pilot="G:\Mi unidad\CIALPA\03_DATOS\Inventarios_Escuelas\escuelas_muestra_final.xlsx"
+```
+
+El JSON publico se escribe en `assets/data/r01-schools-public.json` y solo
+contiene identificadores, nombre y ubicacion territorial. Los libros y
+payloads completos se generan en `tools/simulation/private-output/`, una ruta
+ignorada por Git porque puede contener responsables y datos de contacto.
+
+Antes de reemplazar las pestañas activas de Google Sheets, cargar el resultado
+en pestañas de preparacion, verificar cantidad, encabezados y codigos extremos,
+y conservar ocultas las pestañas anteriores como respaldo.
+
 Este arnes permite probar el circuito critico de la version vigente de CIALPA:
 
 - login contra el Web App de Apps Script;

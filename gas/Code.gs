@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * Code.gs — Main Google Apps Script entry point
- * Version: 2.6.180
+ * Version: 2.6.206
  *
  * Deploy as Web App:
  *   Execute as: Me

@@ -1,8 +1,16 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.204** | Paraguay 2026
+**Version 2.6.206** | Paraguay 2026
 
 Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+
+## Novedades v2.6.206
+
+- Se reemplaza el padrón base por la nómina MEC-DGPE RUE 2026 del `2026-07-16`, con `5448` códigos locales válidos y únicos.
+- El catálogo público se regenera sin responsables, teléfonos ni correos; `5016` escuelas tienen coordenadas válidas y `432` quedan identificadas sin marcador.
+- Se conservan los `86` códigos de la muestra piloto y se recalibran sus ponderadores contra el marco 2026, manteniendo los valores originales en columnas separadas.
+- Los registros históricos de escuelas retiradas del padrón se preservan sin volver a contarse dentro del universo vigente; la recuperación directa queda incorporada en GAS v41 para su siguiente despliegue propietario.
+- El frontend usa el deployment público de respaldo verificado y conserva la aprobación de solicitudes mediante acciones compatibles cuando el endpoint no expone la operación compuesta.
 
 ## Novedades v2.6.204
 

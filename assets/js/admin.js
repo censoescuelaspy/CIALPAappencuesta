@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * admin.js — Configuration, encuestadores CRUD, and audit log (admin only)
- * Version: 2.6.185
+ * Version: 2.6.206
  */
 
 const AdminModule = (() => {
@@ -692,7 +692,21 @@ const AdminModule = (() => {
     );
     if (!confirmed) return;
     try {
-      const result = await API.aprobarSolicitudRelevamiento({ id_incidencia: id });
+      let result = await API.aprobarSolicitudRelevamiento({ id_incidencia: id });
+      if (result.status !== 'ok' && /acci[oó]n desconocida/i.test(String(result.message || ''))) {
+        const assignment = await API.asignarEscuela({
+          id_escuela: solicitud?.id_escuela || solicitud?.codigo_local || '',
+          codigo_local: solicitud?.codigo_local || '',
+          encuestador_asignado: solicitud?.usuario || '',
+        });
+        if (assignment.status !== 'ok') throw new Error(assignment.message || 'No se pudo asignar la escuela.');
+        const resolution = await API.resolverIncidencia(
+          id,
+          `Aprobada desde CIALPA. Escuela asignada a ${solicitud?.usuario || 'el solicitante'}.`
+        );
+        if (resolution.status !== 'ok') throw new Error(resolution.message || 'La escuela se asigno, pero no se pudo cerrar la solicitud.');
+        result = { status: 'ok', message: `Solicitud aprobada. Escuela asignada a ${solicitud?.usuario || 'el solicitante'}.` };
+      }
       if (result.status !== 'ok') throw new Error(result.message);
       UI.showToast(result.message || 'Solicitud aprobada y escuela asignada.', 'success', 6500);
       loadSolicitudesRelevamiento();

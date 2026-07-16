@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * sheets.gs, servicio de datos y operación de campo
- * Version 2.6.180
+ * Version 2.6.206
  */
 
 const SheetsService = (() => {
@@ -10,6 +10,7 @@ const SheetsService = (() => {
   const OFFICIAL_SCHOOLS_SPREADSHEET_ID = '1Auz5pIrUzAdc2uN0UkiBNwlV3stjq0bPcnCcsEraWmU';
   const OFFICIAL_SCHOOLS_FULL_SHEET = 'listado_ini';
   const OFFICIAL_SCHOOLS_PILOT_SHEET = 'muestra_piloto_def';
+  const OFFICIAL_SCHOOLS_FRAME_VERSION = 'RUE_2026_2026-07-16';
 
   const OP_COLS_ESCUELAS = [
     'id_escuela', 'codigo_local', 'nombre', 'departamento', 'distrito', 'localidad', 'zona',
@@ -113,6 +114,7 @@ const SheetsService = (() => {
         total: rows.length,
         schema: 'canonical_v2_1',
         source: source.source,
+        frame_version: OFFICIAL_SCHOOLS_FRAME_VERSION,
         embedded_updated_at: source.embeddedUpdatedAt || '',
       }
     };
@@ -120,11 +122,29 @@ const SheetsService = (() => {
 
   function getEscuela(id, options) {
     const source = _escuelasRawRows_();
-    const found = source.rows
+    let found = source.rows
       .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || idx + 2))
       .find(r => _idMatch(r, id));
+    let outsideCurrentRoster = false;
+    if (!found) {
+      found = _operationalSchoolByCandidates_(_schoolIdentityCandidates_(id));
+      outsideCurrentRoster = Boolean(found);
+    }
     if (!found) return { status: 'error', message: 'Escuela no encontrada.' };
-    return { status: 'ok', data: _attachMecDraftToSchool_(found, options || {}), meta: { source: source.source } };
+    const data = _attachMecDraftToSchool_(found, options || {});
+    if (outsideCurrentRoster) {
+      data.fuera_padron_actual = 'true';
+      data.estado_padron = 'historico_fuera_padron';
+    }
+    return {
+      status: 'ok',
+      data,
+      meta: {
+        source: outsideCurrentRoster ? 'operational_history' : source.source,
+        frame_version: OFFICIAL_SCHOOLS_FRAME_VERSION,
+        fuera_padron_actual: outsideCurrentRoster,
+      }
+    };
   }
 
   function _attachMecDraftToSchool_(school, options) {
@@ -189,6 +209,7 @@ const SheetsService = (() => {
         con_coordenadas: withCoords,
         muestra_piloto: pilot,
         filas_operativas: operationalRows,
+        frame_version: OFFICIAL_SCHOOLS_FRAME_VERSION,
         embedded_updated_at: source.embeddedUpdatedAt || '',
       }
     };
@@ -2758,9 +2779,21 @@ const SheetsService = (() => {
     const candidates = _schoolIdentityCandidates_.apply(null, arguments);
     if (!candidates.length) return null;
     const source = _escuelasRawRows_();
-    return source.rows
+    const current = source.rows
       .map((r, idx) => _normalizarEscuela(r, r.__row_number || r.__embedded_csv_row || r.__official_sheet_row || idx + 2))
       .find(r => candidates.some(candidate => _idMatch(r, candidate))) || null;
+    return current || _operationalSchoolByCandidates_(candidates);
+  }
+
+  function _operationalSchoolByCandidates_(candidates) {
+    if (!Array.isArray(candidates) || !candidates.length) return null;
+    try {
+      return _sheetToObjects(SHEET_NAMES.ESCUELAS)
+        .map((row, idx) => _normalizarEscuela(row, row.__row_number || idx + 2))
+        .find(row => candidates.some(candidate => _idMatch(row, candidate))) || null;
+    } catch (err) {
+      return null;
+    }
   }
 
   function _appendEmbeddedEscuelaOperationalRow_(id) {
@@ -2889,11 +2922,11 @@ const SheetsService = (() => {
 
   function _idMatch(e, id) {
     const v = _txt(id);
-    const digits = _digits(v);
+    const codeKey = _schoolCodeKey_(v);
     return _same(e.id_escuela, v)
       || _same(e.codigo_local, v)
-      || (digits && _same(_digits(e.id_escuela), digits))
-      || (digits && _same(_digits(e.codigo_local), digits));
+      || (codeKey && _same(_schoolCodeKey_(e.id_escuela), codeKey))
+      || (codeKey && _same(_schoolCodeKey_(e.codigo_local), codeKey));
   }
 
   function _updateEscuelaOperational(id, fields) {
@@ -3818,6 +3851,12 @@ const SheetsService = (() => {
 
   function _digits(v) {
     return _txt(v).replace(/\D+/g, '');
+  }
+
+  function _schoolCodeKey_(v) {
+    const digits = _digits(v);
+    if (!digits) return '';
+    return digits.replace(/^0+/, '') || '0';
   }
 
   function _num(v) {
