@@ -18,12 +18,16 @@
     "db:schema": "node tools/database/apply_schema.mjs",
     "db:consolidate": "node tools/database/consolidate_db_queue.mjs",
     "db:install-tools": "powershell -ExecutionPolicy Bypass -File tools/database/install_database_prereqs.ps1",
-    "db:local": "powershell -ExecutionPolicy Bypass -File tools/database/setup_local_postgres.ps1"
+    "db:local": "powershell -ExecutionPolicy Bypass -File tools/database/setup_local_postgres.ps1",
+    "prepare:capital-central-pilot": "py -3 -X utf8 tools/simulation/prepare_capital_central_pilot_2026.py",
+    "audit:ui": "playwright test tools/simulation/cialpa_ui_audit.spec.mjs --config=tools/simulation/playwright.config.mjs --workers=1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.52.0"
   },
   "dependencies": {
+    "lucide": "^0.468.0",
     "pg": "^8.21.0"
   }
 }

@@ -121,11 +121,13 @@ const JornadaModule = (() => {
     if (!container) return;
     container.innerHTML = `
       <input class="form-control" id="jt-search" type="search"
+             aria-label="Buscar escuela en mi jornada"
              placeholder="Buscar escuela..."
              value="${_escape(_filterText)}"
              oninput="JornadaModule._onSearchInput(this.value)"
              style="min-width:200px;max-width:260px;">
       <select class="form-control" id="jt-estado"
+              aria-label="Filtrar mi jornada por estado"
               onchange="JornadaModule._onEstadoChange(this.value)"
               style="min-width:160px;max-width:180px;">
         <option value="">Todos los estados</option>
@@ -233,7 +235,7 @@ const JornadaModule = (() => {
         return `<th style="cursor:pointer;user-select:none;white-space:nowrap;"
                     class="${sorted ? 'sorted' : ''}"
                     onclick="JornadaModule.sortBy('${_escape(c.key)}')">${_escape(c.label)}${arrow}</th>`;
-      }).join('') + '<th style="width:90px;"></th></tr>';
+      }).join('') + '<th scope="col" style="width:90px;">Acciones</th></tr>';
     }
 
     const rows = _filtered(_buildRows());

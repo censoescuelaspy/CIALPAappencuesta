@@ -29,5 +29,14 @@ export default defineConfig({
         deviceScaleFactor: 2,
       },
     },
+    {
+      name: 'mobile-touch',
+      use: {
+        browserName: 'chromium',
+        viewport: { width: 390, height: 844 },
+        hasTouch: true,
+        deviceScaleFactor: 2,
+      },
+    },
   ],
 });

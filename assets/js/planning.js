@@ -197,14 +197,14 @@ const PlanningModule = (() => {
     if (!root) return;
     const summary = _summary();
     root.innerHTML = `
-      <div class="planning-tabs" role="tablist">
-        <button class="${_activeTab === 'tiempos' ? 'active' : ''}" type="button" onclick="PlanningModule.switchTab('tiempos')">Estimacion de tiempos</button>
-        <button class="${_activeTab === 'asignaciones' ? 'active' : ''}" type="button" onclick="PlanningModule.switchTab('asignaciones')">Distribucion de escuelas</button>
+      <div class="planning-tabs" role="tablist" aria-label="Vistas de planificación">
+        <button id="planning-tab-tiempos" role="tab" aria-controls="planning-panel-tiempos" aria-selected="${_activeTab === 'tiempos'}" tabindex="${_activeTab === 'tiempos' ? '0' : '-1'}" class="${_activeTab === 'tiempos' ? 'active' : ''}" type="button" onclick="PlanningModule.switchTab('tiempos')">Estimación de tiempos</button>
+        <button id="planning-tab-asignaciones" role="tab" aria-controls="planning-panel-asignaciones" aria-selected="${_activeTab === 'asignaciones'}" tabindex="${_activeTab === 'asignaciones' ? '0' : '-1'}" class="${_activeTab === 'asignaciones' ? 'active' : ''}" type="button" onclick="PlanningModule.switchTab('asignaciones')">Distribución de escuelas</button>
       </div>
-      <section class="planning-panel ${_activeTab === 'tiempos' ? 'planning-panel--active' : ''}">
+      <section id="planning-panel-tiempos" role="tabpanel" aria-labelledby="planning-tab-tiempos" class="planning-panel ${_activeTab === 'tiempos' ? 'planning-panel--active' : ''}" ${_activeTab === 'tiempos' ? '' : 'hidden'}>
         ${_renderTimePanel(summary)}
       </section>
-      <section class="planning-panel ${_activeTab === 'asignaciones' ? 'planning-panel--active' : ''}">
+      <section id="planning-panel-asignaciones" role="tabpanel" aria-labelledby="planning-tab-asignaciones" class="planning-panel ${_activeTab === 'asignaciones' ? 'planning-panel--active' : ''}" ${_activeTab === 'asignaciones' ? '' : 'hidden'}>
         ${_renderAssignmentPanel(summary)}
       </section>`;
     Auth.applyRoleVisibility?.();
@@ -217,18 +217,18 @@ const PlanningModule = (() => {
     return `
       <div class="planning-settings card">
         <div class="planning-setting">
-          <label>Minutos base por escuela</label>
-          <input class="form-control form-control-sm" type="number" min="10" step="5" value="${_escape(_settings.baseMinutes)}"
+          <label for="planning-base-minutes">Minutos base por escuela</label>
+          <input id="planning-base-minutes" class="form-control form-control-sm" type="number" min="10" step="5" value="${_escape(_settings.baseMinutes)}"
             onchange="PlanningModule.setSetting('baseMinutes', this.value)">
         </div>
         <div class="planning-setting">
-          <label>Jornada util por encuestador</label>
-          <input class="form-control form-control-sm" type="number" min="1" step=".5" value="${_escape(_settings.hoursPerDay)}"
+          <label for="planning-hours-day">Jornada útil por encuestador</label>
+          <input id="planning-hours-day" class="form-control form-control-sm" type="number" min="1" step=".5" value="${_escape(_settings.hoursPerDay)}"
             onchange="PlanningModule.setSetting('hoursPerDay', this.value)">
         </div>
         <div class="planning-setting">
-          <label>Meta de cierre</label>
-          <input class="form-control form-control-sm" type="number" min="1" step="1" value="${_escape(_settings.targetDays)}"
+          <label for="planning-target-days">Meta de cierre (días)</label>
+          <input id="planning-target-days" class="form-control form-control-sm" type="number" min="1" step="1" value="${_escape(_settings.targetDays)}"
             onchange="PlanningModule.setSetting('targetDays', this.value)">
         </div>
         <button class="btn btn-sm btn-outline" type="button" onclick="PlanningModule.exportCSV()">Exportar CSV</button>
@@ -246,7 +246,7 @@ const PlanningModule = (() => {
       <div class="planning-two-col">
         <article class="card">
           <div class="card__header">
-            <h4 class="card__title">Carga por estado</h4>
+            <h3 class="card__title">Carga por estado</h3>
             <span class="badge badge--info">${summary.progressPct}% avance</span>
           </div>
           <div class="planning-progress"><i style="width:${summary.progressPct}%"></i></div>

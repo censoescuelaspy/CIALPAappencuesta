@@ -962,7 +962,7 @@ const StatsModule = (() => {
         <section class="mec-intel-filters" aria-label="Segmentación de infraestructura">
           <div class="mec-intel-filters__intro">
             <span class="eyebrow">Explorador segmentable</span>
-            <h4>Cruce por territorio, nivel, bloque y presencia de fallas</h4>
+            <h3>Cruce por territorio, nivel, bloque y presencia de fallas</h3>
             <p>La misma base puede verse por departamento, distrito, nivel educativo, tipología edilicia o criticidad técnica.</p>
           </div>
           <div class="mec-intel-filter-grid">
@@ -1013,7 +1013,7 @@ const StatsModule = (() => {
               </div>
               <strong>${view.scope.schools}</strong>
             </div>
-            <div id="mec-infra-map" class="mec-infra-map" role="img" aria-label="Mapa de infraestructura MEC"></div>
+            <div id="mec-infra-map" class="mec-infra-map" role="region" aria-label="Mapa interactivo de infraestructura MEC"></div>
             <div class="mec-map-legend">
               ${_infraLegend('Baja prioridad', '', '#0b5d3b')}
               ${_infraLegend('Media', '', '#c8a24a')}

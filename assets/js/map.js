@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * map.js — Leaflet map module
- * Version: 2.6.191
+ * Version: 2.6.207
  */
 
 const MapModule = (() => {
@@ -391,6 +391,10 @@ const MapModule = (() => {
     _map.on('overlayadd overlayremove', event => {
       if (event.layer === _cadastralLayer) _updateCadastralState();
       if (event.layer === _perimeterLayer) _updatePerimeterCount();
+      if (event.layer === _routeLayer) {
+        _routesVisible = event.type === 'overlayadd';
+        _setMapToggleButtonState('map-routes-btn', _routesVisible);
+      }
     });
     _map.on('zoomend', _updateCadastralState);
     _map.on('click', _handleCadastralClick);
@@ -426,6 +430,8 @@ const MapModule = (() => {
     L.control.scale({ imperial: false }).addTo(_map);
     updateOfflineStatus();
     _updateCadastralState();
+    _setMapToggleButtonState('map-routes-btn', _routesVisible);
+    _updatePerimeterCount();
 
     return _map;
   }
@@ -1654,6 +1660,7 @@ const MapModule = (() => {
   function toggleRoutes() {
     _routesVisible = !_routesVisible;
     _renderRoutes(_filteredEscuelas);
+    _setMapToggleButtonState('map-routes-btn', _routesVisible);
     UI.showToast(_routesVisible ? 'Rutas visibles.' : 'Rutas ocultas.', 'info');
   }
 

@@ -451,7 +451,7 @@ const AdminModule = (() => {
         <strong>Resumen por censista</strong>
         <small class="text-muted">${items.length} usuario${items.length === 1 ? '' : 's'} con carga visible</small>
       </div>
-      <div class="table-wrapper">
+      <div class="table-wrapper" aria-label="Resumen por censista">
         <table>
           <thead>
             <tr>
@@ -521,7 +521,15 @@ const AdminModule = (() => {
   function _updateFormulariosMecSortButtons() {
     document.querySelectorAll('[data-formularios-sort]').forEach(button => {
       const active = button.dataset.formulariosSort === _formulariosMecSort.key;
-      button.setAttribute('aria-sort', active ? (_formulariosMecSort.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+      const sortState = active ? (_formulariosMecSort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+      const header = button.closest('th');
+      if (header) header.setAttribute('aria-sort', sortState);
+      button.removeAttribute('aria-sort');
+      button.setAttribute('aria-pressed', String(active));
+      const label = button.textContent.trim();
+      button.setAttribute('aria-label', active
+        ? `${label}, orden ${_formulariosMecSort.dir === 'asc' ? 'ascendente' : 'descendente'}`
+        : `Ordenar por ${label}`);
     });
   }
 

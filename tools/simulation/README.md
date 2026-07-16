@@ -19,6 +19,27 @@ Antes de reemplazar las pestañas activas de Google Sheets, cargar el resultado
 en pestañas de preparacion, verificar cantidad, encabezados y codigos extremos,
 y conservar ocultas las pestañas anteriores como respaldo.
 
+## Redefinir el piloto para Capital y Central
+
+El generador `prepare_capital_central_pilot_2026.py` conserva las escuelas
+historicas de Capital y Central, evalua si el tamano reducido cumple el error
+muestral configurado y reemplaza de forma reproducible las escuelas de Alto
+Parana cuando hace falta. La seleccion usa la semilla `20260716` y estratos
+`Departamento x Zona x Grupo de matricula`.
+
+```powershell
+npm.cmd run prepare:capital-central-pilot -- `
+  --source="H:\Mi unidad\ListadoMECversionNUEVA16julio2026.xlsx" `
+  --pilot="G:\Mi unidad\CIALPA\03_DATOS\Inventarios_Escuelas\escuelas_muestra_final.xlsx" `
+  --output-xlsx="G:\Mi unidad\CIALPA\03_DATOS\Inventarios_Escuelas\Muestra_CIALPA_Capital_Central_RUE_2026_2026-07-16.xlsx"
+```
+
+El libro resultante contiene la muestra final, la equivalencia entre cada
+escuela saliente y entrante, el resumen metodologico y el diccionario de
+campos. El payload para actualizar `muestra_piloto_def` queda en
+`tools/simulation/private-output/`, fuera de Git. La operacion no elimina
+formularios ni evidencias historicas de Alto Parana.
+
 Este arnes permite probar el circuito critico de la version vigente de CIALPA:
 
 - login contra el Web App de Apps Script;

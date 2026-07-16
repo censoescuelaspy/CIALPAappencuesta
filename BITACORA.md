@@ -4,6 +4,54 @@
 
 ---
 
+## Piloto Capital y Central y auditoria integral de la app - 2026-07-16 - v2.6.207
+
+### Objetivo
+- Limitar el piloto a Capital y Central, sustituyendo las instituciones de Alto Parana sin perder la parte util de la muestra historica.
+- Reevaluar funcionalidad, permisos, mapas, filtros, accesibilidad y presentacion responsive de la app.
+- Mantener el foco del registro en ubicacion, medidas, tipo y configuracion arquitectonica, electrica, desague y agua, conservando danos y fallas.
+
+### Decision muestral
+- Marco elegible con coordenadas: `640` escuelas (`115` Capital y `525` Central).
+- La muestra reducida retenida quedaba en `55` escuelas y un error maximo estimado de `12,64 %`; no cumplia el criterio previo de `10 %` al `95 %` de confianza.
+- Se conservaron esas `55` instituciones y se seleccionaron `31` reemplazos para mantener `n=86`, con error maximo estimado de `9,84 %`.
+- Asignacion final: `15` Capital y `71` Central, con cobertura de los `20` distritos del marco y ponderadores que expanden a `640`.
+- Seleccion reproducible con semilla `20260716` y digest de codigos `c065513e0a3079e5e6437bd672ad0abe70192e8a42d7ccdac1f125e36760c79d`.
+
+### Datos y artefactos
+- `tools/simulation/prepare_capital_central_pilot_2026.py`: seleccion, balance distrital, ponderacion, validaciones y exportaciones reproducibles.
+- `docs/INFORME_MUESTRA_PILOTO_CAPITAL_CENTRAL_2026-07-16.md`: informe metodologico agregado sin datos de contacto.
+- Excel operativo generado en `03_DATOS/Inventarios_Escuelas/Muestra_CIALPA_Capital_Central_RUE_2026_2026-07-16.xlsx`.
+- La hoja oficial `muestra_piloto_def` fue actualizada a `86` filas y `47` columnas; se dejo respaldo oculto `muestra_piloto_backup_pre_CC_20260716` y control oculto `control_piloto_CC_20260716`.
+- Verificacion remota: `55` retenidas, `31` reemplazos, `15` Capital, `71` Central y `0` Alto Parana en la muestra activa.
+
+### Interfaz y funcionalidad
+- Inicio comunica `Piloto Capital + Central` y la composicion `15 + 71`; en produccion se oculta la escuela ficticia de demostracion.
+- Mapa reorganizado en conteos y barra de herramientas desplazable, con filtro `Piloto Capital/Central (86)` y estados visibles para rutas, perimetros y catastro.
+- Encabezado movil reducido a iconos con etiquetas accesibles; el manual pasa al encabezado y se elimina el boton flotante que solapaba contenido.
+- Se incorporo `lucide 0.468.0` como dependencia y copia local precacheada para mantener iconos disponibles sin conexion.
+- Se corrigieron etiquetas de filtros, fechas y archivos, roles de pestanas, `aria-sort`, regiones desplazables y el mapa interactivo de infraestructura.
+- Los colores primario, exito, advertencia, incidencia y estados del mapa se ajustaron para contraste AA.
+- Inicio acepta las variantes de claves `finalizada/finalizadas`, `pendiente/pendientes` y `porcentaje_avance/pct_avance` del backend.
+- La cabecera se aislo por encima de las capas Leaflet para evitar composicion oscura en capturas y dispositivos moviles.
+
+### Pruebas y evidencia
+- `npm audit` y `npm audit --omit=dev`: `0` vulnerabilidades.
+- `node --check` sobre todos los JavaScript y el service worker: sin errores.
+- Excel abierto en Microsoft Excel en modo lectura: `4` hojas, `86` filas, `86` codigos unicos, `15` Capital y `71` Central.
+- Auditoria Playwright/Axe sobre los `15` modulos en `1366x900`, `1024x768` tactil y `390x844` tactil: `0` violaciones Axe, `0` errores de pagina, `0` solicitudes fallidas y `0` desbordes.
+- Prueba funcional demo: conteos de Inicio, cambio visual de rutas/perimetros, filtro piloto, seleccion de rol Admin y apertura del Registro guiado.
+- La auditoria UI se ejecuta con un worker para evitar falsos negativos del servidor HTTP local durante descargas simultaneas.
+- Reejecucion de la seleccion desde ambos Excel de origen: `86` escuelas, digest identico `c065513e0a3079e5e6437bd672ad0abe70192e8a42d7ccdac1f125e36760c79d`, sin campos personales de contacto.
+- El endpoint `diagnosticoPadron` reconoce `muestra_piloto=86`, `total=5448`, `con_coordenadas=5016` y `filas_operativas=128`.
+
+### Estado de publicacion
+- La actualizacion de la hoja oficial ya esta activa y es visible para el backend.
+- El codigo `v2.6.207` se publica en `origin/main` mediante un commit unico despues de la autorizacion expresa del usuario.
+- La URL publica se verifica con cache-busting al terminar el build de GitHub Pages; el backend ya lee la nueva muestra de `86` escuelas.
+
+---
+
 ## Migracion al padron MEC RUE 2026 - 2026-07-16 - v2.6.206
 
 ### Objetivo

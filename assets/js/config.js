@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.206
+ * Version: 2.6.207
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.206',
-  EDITION_LABEL: 'Edicion vigente v2.6.206',
+  VERSION: '2.6.207',
+  EDITION_LABEL: 'Edicion vigente v2.6.207',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
   SPREADSHEET_URL: 'https://docs.google.com/spreadsheets/d/1HYjRYqV3XGId3HnYiCpCiJCogoqGheC2SmyPQFS-fCg/edit',
@@ -28,6 +28,15 @@ const APP_CONFIG = {
   FINAL_REPORT_EMAIL: 'censoescuelaspy@gmail.com',
   DEFAULT_SCHOOL_ESTIMATE_MINUTES: 45,
   DEFAULT_WORKDAY_HOURS: 6,
+  PILOT_2026: {
+    label: 'Piloto Capital + Central',
+    sampleSize: 86,
+    frameSize: 640,
+    departments: ['Capital', 'Central'],
+    allocation: { Capital: 15, Central: 71 },
+    retained: 55,
+    replacements: 31,
+  },
 
   // Map defaults (Paraguay center)
   MAP_CENTER: [-23.4, -58.0],
@@ -118,10 +127,6 @@ const APP_CONFIG = {
     ENCUESTADOR: 'encuestador',
   },
 
-  // Usuarios con permisos administrativos reales. El rol admin en la hoja
-  // debe existir, pero la UI restringe herramientas sensibles a esta lista.
-  ADMIN_USERS: ['diego.meza', 'noelia.mendoza', 'latiffi.chelala'],
-
   // Survey states
   STATES: {
     PENDIENTE: 'pendiente',
@@ -135,10 +140,10 @@ const APP_CONFIG = {
 
   // State colors (matches CSS variables)
   STATE_COLORS: {
-    pendiente: '#6c757d',
-    en_curso: '#fd7e14',
-    finalizada: '#28a745',
-    incidencia: '#dc3545',
+    pendiente: '#59636e',
+    en_curso: '#a85200',
+    finalizada: '#18743a',
+    incidencia: '#b42332',
     parcial: '#0d6efd',
     suspendida: '#6f42c1',
     revisar: '#ffc107',

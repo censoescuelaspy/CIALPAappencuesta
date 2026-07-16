@@ -1,8 +1,19 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.206** | Paraguay 2026
+**Version 2.6.207** | Paraguay 2026
 
-Sistema web para la gestión del relevamiento de infraestructura y condiciones de establecimientos educativos en Paraguay.
+Sistema web para registrar ubicación, medidas, tipologías y configuración arquitectónica, eléctrica, de desagüe y conexión de agua de establecimientos educativos, conservando el registro de daños y fallas.
+
+## Novedades v2.6.207
+
+- El piloto queda restringido a Capital y Central con `86` escuelas: `15` de Capital y `71` de Central.
+- Se conservan `55` instituciones de la muestra histórica y se reemplazan las `31` de Alto Paraná mediante selección determinística por estrato y cobertura de los `20` distritos del nuevo marco.
+- La muestra alcanza un error máximo estimado de `9,84 %` al `95 %` de confianza sobre un marco elegible de `640` escuelas.
+- Inicio y Mapa muestran explícitamente el alcance `Piloto Capital + Central`; el filtro piloto identifica las `86` escuelas vigentes.
+- La interfaz incorpora iconos locales, encabezado móvil compacto, barras horizontales para herramientas del mapa, colores activos consistentes y contraste reforzado.
+- Se corrigen nombres accesibles, navegación por teclado, pestañas, ordenamiento de tablas y regiones desplazables en los módulos administrativos y operativos.
+- Se agrega una auditoría Playwright reutilizable para escritorio, tableta y teléfono, con Axe, capturas, control de desbordes y pruebas de filtros, estados activos, permisos admin y acceso al Registro guiado.
+- El cálculo reproducible y su informe quedan en `tools/simulation/prepare_capital_central_pilot_2026.py` y `docs/INFORME_MUESTRA_PILOTO_CAPITAL_CENTRAL_2026-07-16.md`.
 
 ## Novedades v2.6.206
 

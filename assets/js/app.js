@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.200
+ * Version: 2.6.207
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -11,6 +11,8 @@ const UI = (() => {
 
   let _loadingEl = null;
   let _toastContainer = null;
+  let _accessibilityObserver = null;
+  let _accessibilityTimer = null;
 
   function init() {
     _loadingEl = document.getElementById('global-loading');
@@ -23,7 +25,14 @@ const UI = (() => {
         setButtonChoice(button.dataset.choiceTarget, button.dataset.choiceValue);
       });
     }
-    requestAnimationFrame(() => refreshButtonChoices(document));
+    requestAnimationFrame(() => {
+      refreshButtonChoices(document);
+      enhanceAccessibility(document);
+    });
+    if (!_accessibilityObserver && typeof MutationObserver !== 'undefined') {
+      _accessibilityObserver = new MutationObserver(() => _scheduleAccessibilityRefresh());
+      _accessibilityObserver.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   function setLoading(visible, message = 'Cargando...') {
@@ -192,6 +201,35 @@ const UI = (() => {
     });
   }
 
+  function _scheduleAccessibilityRefresh() {
+    window.clearTimeout(_accessibilityTimer);
+    _accessibilityTimer = window.setTimeout(() => enhanceAccessibility(document), 90);
+  }
+
+  function enhanceAccessibility(root = document) {
+    const scope = root?.querySelectorAll ? root : document;
+    const regions = [
+      ...(scope.matches?.('.page-content, .table-wrapper, #map-school-list') ? [scope] : []),
+      ...scope.querySelectorAll('.page-content, .table-wrapper, #map-school-list'),
+    ];
+    regions.forEach(region => {
+      if (!region.isConnected || region.hidden) return;
+      const style = window.getComputedStyle(region);
+      const scrollable = (region.scrollHeight > region.clientHeight + 2 && /(auto|scroll)/.test(style.overflowY))
+        || (region.scrollWidth > region.clientWidth + 2 && /(auto|scroll)/.test(style.overflowX));
+      if (!scrollable) return;
+      if (!region.hasAttribute('tabindex')) region.setAttribute('tabindex', '0');
+      if (!region.hasAttribute('role')) {
+        region.setAttribute('role', region.classList.contains('page-content') ? 'group' : 'region');
+      }
+      if (!region.hasAttribute('aria-label')) {
+        const panel = region.closest('.module-panel');
+        const heading = panel?.querySelector('.page-header h2, h2, h3');
+        region.setAttribute('aria-label', heading?.textContent?.trim() || 'Contenido desplazable');
+      }
+    });
+  }
+
   function _choiceInput(target) {
     if (!target) return null;
     return document.getElementById(target) || document.querySelector(`[name="${String(target).replace(/"/g, '\\"')}"]`);
@@ -213,8 +251,18 @@ const UI = (() => {
     closeModal,
     setButtonChoice,
     refreshButtonChoices,
+    enhanceAccessibility,
   };
 })();
+
+function _renderIcons() {
+  if (!window.lucide || typeof window.lucide.createIcons !== 'function') return;
+  try {
+    window.lucide.createIcons({ attrs: { 'aria-hidden': 'true', 'stroke-width': 2 } });
+  } catch (err) {
+    console.warn('[CIALPA] No se pudieron dibujar algunos iconos:', err);
+  }
+}
 
 function _escapeHtml(str) {
   return String(str ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -545,26 +593,26 @@ const AppController = (() => {
   'use strict';
 
   const MODULES = {
-    inicio: { label: 'Inicio', icon: '🏠', minRole: 'encuestador' },
-    mapa: { label: 'Mapa', icon: '🗺️', minRole: 'encuestador' },
-    atlas: { label: 'Atlas departamental', icon: 'DEP', minRole: 'supervisor' },
-    registro: { label: 'Registro guiado', icon: '>>', minRole: 'encuestador' },
-    encuesta: { label: 'Migrar RUE-MEC', icon: '⇄', minRole: 'encuestador' },
-    mec: { label: 'Cuestionario MEC', icon: '📝', minRole: 'encuestador' },
-    plano: { label: 'Plano escuela', icon: '▦', minRole: 'encuestador' },
-    arquitectura: { label: 'Metodologia y datos', icon: 'MET', minRole: 'encuestador' },
-    encuestadores: { label: 'Encuestadores', icon: 'ENC', minRole: 'admin' },
-    manual: { label: 'Manual', icon: '📖', minRole: 'encuestador' },
-    incidencias: { label: 'Solicitudes', icon: 'SOL', minRole: 'encuestador' },
-    comentarios: { label: 'Comentarios app', icon: 'COM', minRole: 'encuestador' },
-    jornada: { label: 'Mi Jornada', icon: '📅', minRole: 'encuestador' },
-    estadisticas: { label: 'Resultados globales', icon: '📊', minRole: 'supervisor' },
-    infraestructura: { label: 'Infraestructura MEC', icon: 'MEC', minRole: 'supervisor' },
-    'cuestionario-inicial': { label: 'Cuestionario inicial', icon: 'R01', minRole: 'supervisor' },
-    ubicacion: { label: 'Ubicación real', icon: 'GPS', minRole: 'supervisor' },
-    planificacion: { label: 'Planificación', icon: '⏱', minRole: 'supervisor' },
-    configuracion: { label: 'Configuración', icon: '⚙️', minRole: 'admin' },
-    auditoria: { label: 'Auditoría', icon: '🔍', minRole: 'admin' },
+    inicio: { label: 'Inicio', icon: 'home', minRole: 'encuestador' },
+    mapa: { label: 'Mapa', icon: 'map', minRole: 'encuestador' },
+    atlas: { label: 'Atlas departamental', icon: 'map-pinned', minRole: 'supervisor' },
+    registro: { label: 'Registro guiado', icon: 'clipboard-list', minRole: 'encuestador' },
+    encuesta: { label: 'Migrar RUE-MEC', icon: 'refresh-cw', minRole: 'encuestador' },
+    mec: { label: 'Cuestionario MEC', icon: 'clipboard-check', minRole: 'encuestador' },
+    plano: { label: 'Plano escuela', icon: 'panels-top-left', minRole: 'encuestador' },
+    arquitectura: { label: 'Metodología y datos', icon: 'workflow', minRole: 'encuestador' },
+    encuestadores: { label: 'Encuestadores', icon: 'users', minRole: 'admin' },
+    manual: { label: 'Manual', icon: 'book-open', minRole: 'encuestador' },
+    incidencias: { label: 'Solicitudes', icon: 'circle-alert', minRole: 'encuestador' },
+    comentarios: { label: 'Comentarios app', icon: 'message-square', minRole: 'encuestador' },
+    jornada: { label: 'Mi jornada', icon: 'calendar-days', minRole: 'encuestador' },
+    estadisticas: { label: 'Resultados globales', icon: 'chart-no-axes-combined', minRole: 'supervisor' },
+    infraestructura: { label: 'Infraestructura MEC', icon: 'building-2', minRole: 'supervisor' },
+    'cuestionario-inicial': { label: 'Cuestionario inicial', icon: 'file-question', minRole: 'supervisor' },
+    ubicacion: { label: 'Ubicación real', icon: 'map-pin-check', minRole: 'supervisor' },
+    planificacion: { label: 'Planificación', icon: 'route', minRole: 'supervisor' },
+    configuracion: { label: 'Configuración', icon: 'settings', minRole: 'admin' },
+    auditoria: { label: 'Auditoría', icon: 'search-check', minRole: 'admin' },
   };
 
   const START_MODULE = 'inicio';
@@ -594,6 +642,7 @@ const AppController = (() => {
     if (typeof CialpaLocalStore !== 'undefined') CialpaLocalStore.init();
     ManualModule.renderModal();
     _applyVersionLabels();
+    _renderIcons();
     _bindPwaEvents();
     _bindLaunchHomeReset();
     _registerServiceWorker();
@@ -620,6 +669,7 @@ const AppController = (() => {
 
     _bindAuthForms();
     _showAuthPanel('login');
+    _renderIcons();
   }
 
   // ── Main app shell ─────────────────────────────────────────────────────────
@@ -727,6 +777,7 @@ const AppController = (() => {
       _buildSidebar();
       _renderUserBar();
       Auth.applyRoleVisibility();
+      _renderIcons();
       _bindGlobalEvents();
       _startAdminAlerts();
     } catch (err) {
@@ -801,7 +852,7 @@ const AppController = (() => {
       .map(([id, mod]) => `
         <li class="nav-item" data-module="${id}">
           <a href="#" onclick="AppController.showModule('${id}'); return false;">
-            <span class="nav-icon">${mod.icon}</span>
+            <span class="nav-icon"><i data-lucide="${mod.icon}" aria-hidden="true"></i></span>
             <span class="nav-label">${mod.label}</span>
           </a>
         </li>`).join('');
@@ -810,7 +861,7 @@ const AppController = (() => {
       nav.insertAdjacentHTML('beforeend', `
         <li class="nav-item nav-item--external">
           <a href="#" onclick="AppController.openWorkbook(); return false;" title="Abrir Google Sheets: mec_borradores, escuelas, evidencias y entregas finales">
-            <span class="nav-icon">LB</span>
+            <span class="nav-icon"><i data-lucide="table-2" aria-hidden="true"></i></span>
             <span class="nav-label">Datos en Sheets</span>
           </a>
         </li>`);
@@ -843,12 +894,14 @@ const AppController = (() => {
     if (bar) {
       bar.innerHTML = `
         <span class="app-edition-badge">${_escapeHtml(APP_CONFIG.EDITION_LABEL || `v${APP_CONFIG.VERSION}`)}</span>
-        <button id="install-app-btn-header" class="btn btn-sm btn-primary" onclick="AppController.installApp()">Instalar</button>
-        ${Auth.canAccess('admin') ? '<button id="admin-alerts-btn" class="btn btn-sm btn-outline" onclick="AppController.enableAdminAlerts()" title="Activar notificaciones de solicitudes">Alertas<span id="admin-alert-count" class="badge badge--warning" style="margin-left:.35rem;display:none;">0</span></button>' : ''}
-        <button class="btn btn-sm btn-outline" onclick="AppController.updateApp()">Actualizar</button>
+        <button id="install-app-btn-header" class="btn btn-sm btn-primary header-action" type="button" onclick="AppController.installApp()" aria-label="Instalar aplicación" title="Instalar aplicación"><i data-lucide="download" aria-hidden="true"></i><span class="header-action-label">Instalar</span></button>
+        ${Auth.canAccess('admin') ? '<button id="admin-alerts-btn" class="btn btn-sm btn-outline header-action" type="button" onclick="AppController.enableAdminAlerts()" aria-label="Activar alertas" title="Activar notificaciones de solicitudes"><i data-lucide="bell" aria-hidden="true"></i><span class="header-action-label">Alertas</span><span id="admin-alert-count" class="badge badge--warning" style="margin-left:.2rem;display:none;">0</span></button>' : ''}
+        <button class="btn btn-sm btn-outline header-action" type="button" onclick="AppController.updateApp()" aria-label="Actualizar aplicación" title="Actualizar aplicación"><i data-lucide="refresh-cw" aria-hidden="true"></i><span class="header-action-label">Actualizar</span></button>
+        <button class="btn btn-sm btn-outline header-action" type="button" onclick="ManualModule.open()" aria-label="Abrir manual" title="Abrir manual"><i data-lucide="circle-help" aria-hidden="true"></i><span class="header-action-label">Manual</span></button>
         <span class="user-bar__name">${_escapeHtml(`${user.nombres || ''} ${user.apellidos || ''}`.trim())}</span>
         <span class="user-bar__role badge badge--role">${_escapeHtml(_rolLabel(user.rol))}</span>`;
     }
+    _renderIcons();
     _refreshInstallButtons();
   }
 
@@ -1114,9 +1167,12 @@ const AppController = (() => {
       const btn = document.getElementById(id);
       if (!btn) return;
       btn.disabled = installed;
-      btn.textContent = installed
+      const label = installed
         ? 'App instalada'
         : (appleMobile ? (id.includes('home') ? 'Instalar en iPad/iPhone' : 'Instalar iOS') : (id.includes('home') ? 'Instalar app en celular' : 'Instalar'));
+      const labelElement = btn.querySelector('.header-action-label');
+      if (labelElement) labelElement.textContent = label;
+      else btn.textContent = label;
       btn.title = installed ? 'La app ya está instalada en este dispositivo.' : 'Instalar CIALPA como app web en el celular.';
       if (appleMobile && !installed) btn.title = 'En iPad/iPhone use Safari: Compartir > Agregar a pantalla de inicio.';
     });
@@ -1493,7 +1549,10 @@ const AppController = (() => {
     // Update page title
     const mod = MODULES[targetModuleId];
     if (mod) document.title = `${mod.label} — ${APP_CONFIG.APP_NAME}`;
-    return initPromise;
+    return Promise.resolve(initPromise).finally(() => {
+      _renderIcons();
+      UI.enhanceAccessibility(panel || document);
+    });
   }
 
   function _ensureVisibleModule(moduleId = 'inicio', force = false) {
@@ -1694,17 +1753,25 @@ const AppController = (() => {
   }
 
   async function _initInicio() {
+    const exampleCard = document.getElementById('inicio-escuela-ejemplo');
+    const demoMode = !APP_CONFIG.GAS_URL || APP_CONFIG.GAS_URL === 'YOUR_GAS_WEB_APP_URL';
+    if (exampleCard) exampleCard.hidden = !demoMode;
     // Summary counts on home
     try {
       const result = await API.getStats({}, { skipLoading: true });
       if (result.status === 'ok') {
         const d = result.data;
         const el = id => document.getElementById(id);
-        if (el('inicio-total')) el('inicio-total').textContent = d.total || 0;
-        if (el('inicio-final')) el('inicio-final').textContent = d.finalizadas || 0;
-        if (el('inicio-curso')) el('inicio-curso').textContent = d.en_curso || 0;
-        if (el('inicio-pendiente')) el('inicio-pendiente').textContent = d.pendientes || 0;
-        if (el('inicio-avance')) el('inicio-avance').textContent = (d.pct_avance || 0) + '%';
+        const number = (...values) => {
+          const value = values.find(item => item !== undefined && item !== null && item !== '');
+          const parsed = Number(value);
+          return Number.isFinite(parsed) ? parsed : 0;
+        };
+        if (el('inicio-total')) el('inicio-total').textContent = number(d.total, d.total_escuelas);
+        if (el('inicio-final')) el('inicio-final').textContent = number(d.finalizadas, d.finalizada, d.relevadas);
+        if (el('inicio-curso')) el('inicio-curso').textContent = number(d.en_curso, d.enCurso);
+        if (el('inicio-pendiente')) el('inicio-pendiente').textContent = number(d.pendientes, d.pendiente);
+        if (el('inicio-avance')) el('inicio-avance').textContent = number(d.pct_avance, d.porcentaje_avance, d.avance) + '%';
       }
     } catch { /* non-fatal */ }
   }

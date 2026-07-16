@@ -736,6 +736,7 @@ const InitialQuestionnaire = (() => {
           <div class="card initial-admin-card">
             <h4>1. Cargar contactos</h4>
             <p class="text-muted">Acepta Excel o CSV con columnas como codigo_local, escuela, director, correo, celular, departamento y distrito.</p>
+            <label class="initial-file-label" for="initial-contacts-file">Archivo de contactos</label>
             <input type="file" id="initial-contacts-file" accept=".xlsx,.xls,.csv" />
             <div class="initial-admin-card__actions">
               <button class="btn btn-primary btn-sm" data-initial-read>Leer archivo</button>
