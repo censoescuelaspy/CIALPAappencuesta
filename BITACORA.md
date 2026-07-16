@@ -35,7 +35,9 @@
 
 ### Pendiente externo
 - Publicar GAS version `41` desde la cuenta propietaria del Web App y, despues de confirmar respuesta JSON anonima, devolver `GAS_URL` al deployment actualizado. Hasta entonces funciona el backend publico version `19`, pero la recuperacion directa de escuelas historicas fuera del padron no esta desplegada.
-- Pendiente al momento de esta entrada: commit/push Git y verificacion final de GitHub Pages.
+- Implementacion publicada en `origin/main` con commit `8e02dc9`; GitHub Pages termino el build con estado `built`.
+- Verificacion publica con cache-busting: `index.html`, `config.js` y `sw.js` respondieron HTTP 200 y muestran `2.6.206`; el JSON publico contiene `5448` filas y el endpoint operativo confirma `5448/5016/86` con `128` filas operativas preservadas.
+- Inspeccion visual en Chrome limpio: formulario de acceso visible, version `v2.6.206` y sin pantalla en blanco ni solapamientos en escritorio.
 
 ---
 
