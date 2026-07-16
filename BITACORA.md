@@ -25,7 +25,9 @@
 - `node --check` sin errores en los archivos JavaScript modificados y `npm audit` con `0` vulnerabilidades.
 - Auditoria local en escritorio, tableta y movil: `4` pruebas aprobadas, `2` omitidas por diseno, `0` errores de pagina, `0` solicitudes fallidas, `0` violaciones serias y sin desborde del cuerpo o panel activo.
 - Prueba con el padron real minimizado: `5448` escuelas cargadas, filtro activo `86/5448`, `86` con marcador y ambos controles sincronizados.
-- Commit y push a `origin/main` autorizados expresamente por el usuario; la publicacion se verifica despues del build de GitHub Pages.
+- Commit funcional `8f42f22` enviado a `origin/main`; GitHub Pages termino el build con estado `built` sobre ese mismo hash.
+- Verificacion publica sin cache: `index.html`, `assets/js/config.js` y `sw.js` responden HTTP `200` con `v2.6.208`, y el boton `map-pilot-filter-btn` esta presente.
+- Prueba Playwright funcional sobre la URL publica: `1 passed`; el backend confirma `5448/5016/86` y `128` filas operativas.
 
 ---
 

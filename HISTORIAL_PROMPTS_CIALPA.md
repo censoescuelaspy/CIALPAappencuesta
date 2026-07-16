@@ -1,6 +1,6 @@
 # Historial de instrucciones CIALPA
 
-Ultima actualizacion: 2026-07-16 09:44 America/Asuncion
+Ultima actualizacion: 2026-07-16 09:49 America/Asuncion
 
 Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye credenciales, tokens, datos personales ni transcripciones completas.
 
@@ -16,7 +16,7 @@ Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye
 - Endurecer la prueba funcional para validar el cambio efectivo del total mostrado por el mapa.
 - Corregir `Limpiar` para vaciar los filtros ocultos y conservar el ultimo listado unicamente como respaldo offline.
 - Validacion real: `5448` escuelas pasan a `86` al activar la muestra; pruebas responsive y de accesibilidad aprobadas.
-- Commit y push de `v2.6.208` autorizados expresamente para publicar la correccion.
+- `v2.6.208` publicada en `origin/main` con commit funcional `8f42f22`; GitHub Pages y la prueba funcional publica quedaron aprobados.
 
 ## 2026-07-16 - Piloto Capital y Central y revision integral
 
