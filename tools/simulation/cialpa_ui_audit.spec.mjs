@@ -35,7 +35,7 @@ async function forceLocalDemo(page) {
 }
 
 async function loginAsDemoAdmin(page) {
-  await page.goto('/?ui_audit=1', { waitUntil: 'domcontentloaded' });
+  await page.goto('./?ui_audit=1', { waitUntil: 'domcontentloaded' });
   await page.locator('#login-usuario').fill('admin');
   await page.locator('#login-password').fill('admin123');
   await page.locator('#login-form button[type="submit"]').click();

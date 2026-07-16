@@ -47,7 +47,7 @@
 
 ### Estado de publicacion
 - La actualizacion de la hoja oficial ya esta activa y es visible para el backend.
-- El codigo `v2.6.207` se publica en `origin/main` mediante un commit unico despues de la autorizacion expresa del usuario.
+- El codigo `v2.6.207` se publica en `origin/main` despues de la autorizacion expresa del usuario, incluyendo el hotfix de la prueba para la ruta base de GitHub Pages.
 - La URL publica se verifica con cache-busting al terminar el build de GitHub Pages; el backend ya lee la nueva muestra de `86` escuelas.
 
 ---
