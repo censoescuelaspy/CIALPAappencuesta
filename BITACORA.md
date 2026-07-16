@@ -4,6 +4,31 @@
 
 ---
 
+## Recuperacion del filtro de muestra en el mapa - 2026-07-16 - v2.6.208
+
+### Diagnostico
+- La hoja oficial esta correcta: `5448` escuelas y `86` codigos piloto con coincidencia exacta en el padron publicado.
+- El frontend conservaba `getEscuelas` hasta 24 horas en IndexedDB sin separar el cache por version del marco MEC.
+- El fallback historico podia marcar como piloto todo un listado pequeno sin metadatos explicitos; esto hacia que el filtro no redujera el mapa o que quedara vacio con datos de demostracion.
+- La prueba anterior confirmaba el estado visual del boton, pero no comprobaba el total de escuelas resultante.
+
+### Cambios
+- `APP_CONFIG.ROSTER_FRAME_VERSION` identifica el marco `RUE_2026_2026-07-16` y forma parte de la clave de cache de `getEscuelas`.
+- La carga normal usa coincidencia exacta de cache; el ultimo listado queda reservado como respaldo cuando no hay conexion.
+- Se agrega el boton directo `Solo muestra (86)` en la barra del mapa, sincronizado con el selector lateral y con estado activo visible.
+- Al activar la muestra sin otros filtros, la app valida el total esperado y fuerza una lectura de red si detecta un listado incompleto o anterior.
+- Se elimina la inferencia automatica de muestra sobre listados pequenos.
+- `Limpiar` vacia tambien los campos ocultos para que ningun filtro permanezca activo internamente.
+- La auditoria Playwright prepara datos piloto explicitos y exige que la vista pase de `5` a `2` escuelas en su escenario controlado.
+
+### Estado
+- `node --check` sin errores en los archivos JavaScript modificados y `npm audit` con `0` vulnerabilidades.
+- Auditoria local en escritorio, tableta y movil: `4` pruebas aprobadas, `2` omitidas por diseno, `0` errores de pagina, `0` solicitudes fallidas, `0` violaciones serias y sin desborde del cuerpo o panel activo.
+- Prueba con el padron real minimizado: `5448` escuelas cargadas, filtro activo `86/5448`, `86` con marcador y ambos controles sincronizados.
+- Commit y push a `origin/main` autorizados expresamente por el usuario; la publicacion se verifica despues del build de GitHub Pages.
+
+---
+
 ## Piloto Capital y Central y auditoria integral de la app - 2026-07-16 - v2.6.207
 
 ### Objetivo

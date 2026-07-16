@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.207
+ * Version: 2.6.208
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -1807,7 +1807,7 @@ const AppController = (() => {
   async function _refreshMapRosterFromNetwork() {
     try {
       const fresh = await API.getEscuelas({}, { forceNetwork: true });
-      if (fresh.status !== 'ok') return;
+      if (fresh.status !== 'ok') return null;
       fresh.data = _prepareMapRosterData(fresh);
       _warnIfRosterSourceLooksIncomplete(fresh);
       MapModule.loadMarkers(fresh.data || []);
@@ -1815,42 +1815,16 @@ const AppController = (() => {
       _applyMapFiltersNow();
       MapModule.loadPerimeters({ silent: true });
       MapModule.updateOfflineStatus();
+      return fresh;
     } catch (err) {
       console.warn('[CIALPA] No se pudo refrescar el padron en segundo plano:', err);
+      return null;
     }
   }
 
   function _prepareMapRosterData(result) {
     const data = Array.isArray(result?.data) ? result.data : [];
-    const source = String(result?.meta?.source || '').toLowerCase();
-    const realRows = data.filter(row => !row.es_ejemplo);
-    if (!source || source === 'embedded_csv' || realRows.length === 0 || realRows.length > 150 || realRows.some(_mapRowLooksPilot)) {
-      return data;
-    }
-    let order = 0;
-    return data.map(row => {
-      if (row.es_ejemplo) return row;
-      order += 1;
-      return {
-        ...row,
-        en_muestra_piloto: 'true',
-        prioridad_operativa: row.prioridad_operativa && row.prioridad_operativa !== 'media' ? row.prioridad_operativa : 'piloto',
-        orden_muestra_piloto: row.orden_muestra_piloto || row.orden_visita || String(order),
-      };
-    });
-  }
-
-  function _mapRowLooksPilot(row) {
-    const normalize = value => String(value ?? '')
-      .trim()
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '');
-    const trueish = value => ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(normalize(value));
-    return trueish(row?.en_muestra_piloto)
-      || trueish(row?.muestra_piloto)
-      || normalize(row?.prioridad_operativa).includes('piloto')
-      || String(row?.orden_muestra_piloto ?? '').trim() !== '';
+    return data;
   }
 
   function _warnIfRosterSourceLooksIncomplete(result) {
@@ -1885,6 +1859,54 @@ const AppController = (() => {
     if (typeof MapModule !== 'undefined' && typeof MapModule.applyFilters === 'function') {
       MapModule.applyFilters(_readMapFilters());
     }
+    _syncPilotMapFilterButton();
+  }
+
+  function _pilotMapFilterIsActive() {
+    const value = String(document.getElementById('filter-piloto')?.value || '').trim().toLowerCase();
+    return ['true', '1', 'si', 's', 'yes', 'y', 'piloto', 'muestra', 'muestra_piloto'].includes(value);
+  }
+
+  function _syncPilotMapFilterButton() {
+    const button = document.getElementById('map-pilot-filter-btn');
+    if (!button) return;
+    const active = _pilotMapFilterIsActive();
+    button.setAttribute('aria-pressed', String(active));
+    button.classList.toggle('btn-primary', active);
+    button.classList.toggle('btn-outline', !active);
+    button.classList.toggle('map-layer-button--active', active);
+  }
+
+  async function togglePilotMapFilter() {
+    const input = document.getElementById('filter-piloto');
+    if (!input) return;
+    const activating = !_pilotMapFilterIsActive();
+    UI.setButtonChoice('filter-piloto', activating ? 'true' : '');
+    _syncPilotMapFilterButton();
+
+    if (!activating) {
+      UI.showToast('Filtro de muestra desactivado: se muestra todo el padron.', 'info', 4200);
+      return;
+    }
+
+    const expected = Number(APP_CONFIG.PILOT_2026?.sampleSize || 86);
+    const filters = _readMapFilters();
+    const hasOtherFilters = Object.entries(filters).some(([key, value]) => key !== 'piloto' && String(value || '').trim());
+    let visible = typeof MapModule?.getFiltered === 'function' ? MapModule.getFiltered().length : 0;
+
+    if (!hasOtherFilters && visible !== expected && navigator.onLine) {
+      UI.showToast('Actualizando el padron para recuperar la muestra vigente...', 'info', 5200);
+      await _refreshMapRosterFromNetwork();
+      visible = typeof MapModule?.getFiltered === 'function' ? MapModule.getFiltered().length : 0;
+    }
+
+    if (!visible) {
+      UI.showToast('No se encontraron escuelas de la muestra en el listado cargado. Use Actualizar app y vuelva a iniciar sesion.', 'warning', 9000);
+      return;
+    }
+
+    const suffix = hasOtherFilters ? ' con los demas filtros activos' : ` de ${expected}`;
+    UI.showToast(`Muestra piloto activa: ${visible}${suffix} escuelas visibles.`, visible === expected || hasOtherFilters ? 'success' : 'warning', 6200);
   }
 
   function _bindMapFilters() {
@@ -1921,10 +1943,13 @@ const AppController = (() => {
       clearBtn.dataset.bound = 'true';
       clearBtn.addEventListener('click', event => {
         event.preventDefault();
-        document.getElementById('map-filter-form')?.reset();
+        const filterForm = document.getElementById('map-filter-form');
+        filterForm?.reset();
+        filterForm?.querySelectorAll('input[type="hidden"]').forEach(input => { input.value = ''; });
         if (typeof MapModule.populateDistrictButtons === 'function') MapModule.populateDistrictButtons('');
-        UI.refreshButtonChoices(document.getElementById('map-filter-form'));
+        UI.refreshButtonChoices(filterForm);
         MapModule.clearFilters();
+        _syncPilotMapFilterButton();
       });
     }
 
@@ -1985,6 +2010,7 @@ const AppController = (() => {
     openWorkbook,
     openEvidenceFolder,
     printPlanPdf,
+    togglePilotMapFilter,
     logout,
   };
 })();

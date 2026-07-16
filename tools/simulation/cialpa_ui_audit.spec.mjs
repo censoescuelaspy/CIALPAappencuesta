@@ -164,6 +164,14 @@ test.describe('CIALPA integral UI audit', () => {
     await forceLocalDemo(page);
     await loginAsDemoAdmin(page);
 
+    const exactCacheIsolation = await page.evaluate(async () => {
+      await CialpaLocalStore.rememberApi('uiAuditRoster', 'GET', {}, { status: 'ok', data: ['legacy'] });
+      const exact = await CialpaLocalStore.getApiExact('uiAuditRoster', { client_frame_version: 'RUE_2026_2026-07-16' });
+      const offlineFallback = await CialpaLocalStore.getApi('uiAuditRoster', { client_frame_version: 'RUE_2026_2026-07-16' });
+      return { exact: Boolean(exact), offlineFallback: offlineFallback?.response?.data?.[0] || '' };
+    });
+    expect(exactCacheIsolation).toEqual({ exact: false, offlineFallback: 'legacy' });
+
     await expect(page.locator('#inicio-final')).toHaveText('1');
     await expect(page.locator('#inicio-avance')).toHaveText('20%');
 
@@ -185,10 +193,32 @@ test.describe('CIALPA integral UI audit', () => {
     await perimetersButton.click();
     await expect(perimetersButton).toHaveAttribute('aria-pressed', 'true');
 
+    await page.evaluate(() => {
+      APP_CONFIG.PILOT_2026.sampleSize = 2;
+      const rows = MapModule.getEscuelas().map((school, index) => ({
+        ...school,
+        en_muestra_piloto: index < 2 ? 'true' : 'false',
+        muestra_piloto: index < 2 ? 'piloto' : '',
+        orden_muestra_piloto: index < 2 ? String(index + 1) : '',
+      }));
+      MapModule.loadMarkers(rows);
+      MapModule.populateFilterButtons();
+    });
+    await expect(page.locator('#map-count-total')).toHaveText('5');
+
     const pilotButton = page.locator('[data-choice-target="filter-piloto"][data-choice-value="true"]');
-    await pilotButton.click();
+    const pilotQuickButton = page.locator('#map-pilot-filter-btn');
+    await pilotQuickButton.click();
     await expect(page.locator('#filter-piloto')).toHaveValue('true');
     await expect(pilotButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(pilotQuickButton).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#map-count-total')).toHaveText('2');
+    await expect(page.locator('#map-count-summary')).toContainText('Vista filtrada: 2/5 escuelas');
+    await page.locator('#map-filter-clear').click();
+    await expect(page.locator('#filter-piloto')).toHaveValue('');
+    await expect(pilotButton).toHaveAttribute('aria-pressed', 'false');
+    await expect(pilotQuickButton).toHaveAttribute('aria-pressed', 'false');
+    await expect(page.locator('#map-count-total')).toHaveText('5');
 
     await page.evaluate(() => AppController.showModule('encuestadores'));
     await page.locator('#module-encuestadores .page-header button[onclick="AdminModule.openNewEncuestador()"]')

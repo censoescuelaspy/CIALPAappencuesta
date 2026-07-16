@@ -4472,7 +4472,7 @@ td {
 }
 
 /* ============================================================
-   Piloto Capital + Central y accesibilidad operativa v2.6.207
+   Piloto Capital + Central y accesibilidad operativa v2.6.208
    ============================================================ */
 
 :root {
@@ -8964,7 +8964,7 @@ textarea.form-control {
   }
 }
 
-/* Keep the v2.6.207 operational tokens last in the cascade. */
+/* Keep the v2.6.208 operational tokens last in the cascade. */
 :root {
   --color-primary: #c43b13;
   --color-primary-dark: #a62f0e;

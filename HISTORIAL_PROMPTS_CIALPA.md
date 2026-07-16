@@ -1,8 +1,22 @@
 # Historial de instrucciones CIALPA
 
-Ultima actualizacion: 2026-07-16 09:24 America/Asuncion
+Ultima actualizacion: 2026-07-16 09:44 America/Asuncion
 
 Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye credenciales, tokens, datos personales ni transcripciones completas.
+
+## 2026-07-16 - Recuperacion del filtro de muestra del mapa
+
+### Instruccion interpretada
+- Explicar y corregir por que el mapa dejo de permitir una vista confiable de las escuelas de la muestra piloto.
+
+### Decisiones y resultado
+- Confirmar primero que la hoja oficial conserva `5448` escuelas, `86` codigos piloto y coincidencia exacta entre ambas pestanas.
+- Separar el cache del listado por la version del marco MEC para evitar reutilizar la muestra anterior durante 24 horas.
+- Incorporar un acceso directo `Solo muestra (86)`, con estado activo visible y recarga automatica cuando el conteo no coincide.
+- Endurecer la prueba funcional para validar el cambio efectivo del total mostrado por el mapa.
+- Corregir `Limpiar` para vaciar los filtros ocultos y conservar el ultimo listado unicamente como respaldo offline.
+- Validacion real: `5448` escuelas pasan a `86` al activar la muestra; pruebas responsive y de accesibilidad aprobadas.
+- Commit y push de `v2.6.208` autorizados expresamente para publicar la correccion.
 
 ## 2026-07-16 - Piloto Capital y Central y revision integral
 

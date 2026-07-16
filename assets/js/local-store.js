@@ -133,6 +133,10 @@ const CialpaLocalStore = (() => {
       (await _storeGet('cache', `api:${endpoint}:latest`));
   }
 
+  async function getApiExact(endpoint, request = {}) {
+    return _storeGet('cache', apiKey(endpoint, request));
+  }
+
   async function rememberCatastro(record = {}) {
     const now = new Date().toISOString();
     const key = String(record.key || record.ccatastral || record.clave_comparacion || record.id || `catastro_${Date.now()}`).trim();
@@ -550,6 +554,7 @@ const CialpaLocalStore = (() => {
     apiKey,
     rememberApi,
     getApi,
+    getApiExact,
     rememberCatastro,
     getCatastro,
     listCatastro,

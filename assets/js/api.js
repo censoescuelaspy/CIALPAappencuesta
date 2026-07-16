@@ -1,7 +1,7 @@
 /**
  * CIALPA, Relevamiento Escolar
  * api.js, capa de integración con Google Apps Script
- * Version: 2.6.180
+ * Version: 2.6.208
  */
 
 const API = (() => {
@@ -1350,9 +1350,12 @@ const API = (() => {
 
   async function getEscuelas(filters = {}, options = {}) {
     const request = { ...(filters || {}) };
+    const frameVersion = String(APP_CONFIG.ROSTER_FRAME_VERSION || '').trim();
+    if (frameVersion) request.client_frame_version = frameVersion;
     const { preferCache = false, forceNetwork = false, cacheMaxAgeMs = 15 * 60 * 1000 } = options || {};
     if (preferCache && !forceNetwork && typeof CialpaLocalStore !== 'undefined') {
-      const cached = await CialpaLocalStore.getApi('getEscuelas', request).catch(() => null);
+      const readExactCache = CialpaLocalStore.getApiExact || CialpaLocalStore.getApi;
+      const cached = await readExactCache('getEscuelas', request).catch(() => null);
       const savedAt = cached?.savedAt ? Date.parse(cached.savedAt) : 0;
       const age = savedAt ? Date.now() - savedAt : 0;
       if (cached?.response?.status === 'ok' && (!savedAt || age <= cacheMaxAgeMs)) {
