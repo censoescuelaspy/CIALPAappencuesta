@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -28,13 +29,28 @@ def _load_worklist(path: Path) -> list[dict]:
     return rows
 
 
-def _find_tif(src_dir: Path, code: str) -> Path | None:
-    candidates: list[Path] = []
-    for path in src_dir.rglob(f"*{code}*"):
-        if path.suffix.lower() in {".tif", ".tiff"} and path.is_file():
-            candidates.append(path)
+def _build_tif_index(src_dir: Path) -> tuple[dict[str, list[Path]], int]:
+    by_numeric_token: dict[str, list[Path]] = {}
+    total = 0
+    for path in src_dir.rglob("*"):
+        if path.suffix.lower() not in {".tif", ".tiff"} or not path.is_file():
+            continue
+        total += 1
+        for token in set(re.findall(r"\d+", path.stem)):
+            by_numeric_token.setdefault(token, []).append(path)
+    return by_numeric_token, total
+
+
+def _find_tif(tif_index: dict[str, list[Path]], code: str, order: object = "") -> Path | None:
+    candidates = list(tif_index.get(code, []))
     if not candidates:
         return None
+    order_text = _school_code(order)
+    if order_text:
+        expected = re.compile(rf"(?:^|_){re.escape(order_text)}_{re.escape(code)}(?:_|$)", re.IGNORECASE)
+        ordered = [path for path in candidates if expected.search(path.stem)]
+        if ordered:
+            candidates = ordered
     nicfi = [path for path in candidates if "NICFI" in path.name.upper()]
     return sorted(nicfi or candidates, key=lambda item: (len(item.name), item.name))[0]
 
@@ -49,10 +65,14 @@ def main() -> None:
     parser.add_argument("--worklist", type=Path, default=DEFAULT_WORKLIST)
     parser.add_argument("--src-dir", type=Path, required=True, help="Carpeta donde se descargaron los GeoTIFF de Drive")
     parser.add_argument("--only", default="", help="Lista de codigos separados por coma")
-    parser.add_argument("--activate", action="store_true", help="Activa cada fuente local en config.js")
+    parser.add_argument("--activate", action="store_true", help="Activa cada fuente en el indice consumido por la app")
+    parser.add_argument("--license-confirmed", action="store_true")
+    parser.add_argument("--delivery", choices=["image", "tiles"], default="image")
+    parser.add_argument("--public-base-url", default="")
+    parser.add_argument("--buffer", type=float, default=100)
     parser.add_argument("--dry-run", action="store_true", help="Muestra que se instalaria sin convertir")
-    parser.add_argument("--min-zoom", type=int, default=17)
-    parser.add_argument("--max-zoom", type=int, default=20)
+    parser.add_argument("--min-zoom", type=int, default=14)
+    parser.add_argument("--max-zoom", type=int, default=19)
     parser.add_argument("--min-value", type=float, default=64)
     parser.add_argument("--max-value", type=float, default=5454)
     parser.add_argument("--gamma", type=float, default=1.4)
@@ -67,6 +87,8 @@ def main() -> None:
 
     only = {_school_code(item) for item in args.only.split(",") if _school_code(item)}
     schools = _load_worklist(worklist)
+    tif_index, tif_count = _build_tif_index(src_dir)
+    print(f"GeoTIFF indexados: {tif_count}")
     processed = 0
     missing: list[str] = []
 
@@ -75,7 +97,7 @@ def main() -> None:
         if not code or (only and code not in only):
             continue
 
-        tif_path = _find_tif(src_dir, code)
+        tif_path = _find_tif(tif_index, code, school.get("order") or school.get("orden"))
         if not tif_path:
             missing.append(code)
             continue
@@ -86,6 +108,10 @@ def main() -> None:
             str(tif_path),
             "--school-code",
             code,
+            "--delivery",
+            args.delivery,
+            "--buffer",
+            str(args.buffer),
             "--min-zoom",
             str(args.min_zoom),
             "--max-zoom",
@@ -101,8 +127,12 @@ def main() -> None:
         command += _arg_if_value("--department", school.get("department") or school.get("departamento"))
         command += _arg_if_value("--district", school.get("district") or school.get("distrito"))
         command += _arg_if_value("--locality", school.get("locality") or school.get("localidad"))
+        if args.public_base_url:
+            command += ["--public-url", f"{args.public_base_url.rstrip('/')}/{code}/nicfi-100m.png"]
         if args.activate:
             command.append("--activate")
+        if args.license_confirmed:
+            command.append("--license-confirmed")
 
         print(f"[{code}] {tif_path}")
         if args.dry_run:

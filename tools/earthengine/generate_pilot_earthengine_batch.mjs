@@ -24,12 +24,14 @@ Opciones:
   --worklist=RUTA       JSON privado creado por build_pilot_imagery_worklist.mjs.
   --out=RUTA            Script Earth Engine generado. Default: tools/earthengine/output/cialpa_pilot_batch_earthengine.js
   --start=N             Indice inicial dentro de la lista privada. Default: 0.
-  --limit=N             Cantidad de escuelas a exportar. Default: todas.
-  --buffer=N            Radio en metros por escuela. Default: 500.
+  --limit=N             Cantidad de escuelas del lote. Default: 25.
+  --buffer=N            Radio en metros por escuela. Default: 100.
+  --source=FUENTE       nicfi (4.77 m) o s2 (10 m). Default: nicfi.
+  --create-tasks=BOOL   true crea tareas tras el preflight. Default: true.
   --drive-folder=NOMBRE Carpeta Drive para exportaciones. Default: CIALPA_EE_PILOTO_ESCUELAS
   --prefix=TEXTO        Prefijo de archivos Drive. Default: CIALPA_PILOTO
   --start-date=AAAA-MM-DD  Fecha inicial NICFI. Default: 2024-01-01.
-  --end-date=AAAA-MM-DD    Fecha final NICFI. Default: 2026-01-01.
+  --end-date=AAAA-MM-DD    Fecha final exclusiva. Default: manana.
   --help                Muestra esta ayuda.
 `.trim();
 }
@@ -109,6 +111,15 @@ function dateLabel(startDate, endDate) {
   return `${startYear}_${endYear}`;
 }
 
+function tomorrowIsoDate() {
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function normalizeBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  return !['0', 'false', 'no', 'off'].includes(String(value).trim().toLowerCase());
+}
+
 function buildSchoolsJs(schools) {
   return schools.map(school => (
     '  {' +
@@ -127,13 +138,34 @@ function buildSchoolsJs(schools) {
 
 function buildEarthEngineScript(schools, options) {
   const startDate = normalizeText(options['start-date'] || '2024-01-01');
-  const endDate = normalizeText(options['end-date'] || '2026-01-01');
+  const endDate = normalizeText(options['end-date'] || tomorrowIsoDate());
   const label = dateLabel(startDate, endDate);
   const start = Math.max(0, normalizeNumber(options.start, 0));
-  const limit = Math.max(0, normalizeNumber(options.limit, 0));
-  const bufferMeters = Math.max(1, normalizeNumber(options.buffer, 500));
+  const limit = Math.max(0, normalizeNumber(options.limit, 25));
+  const bufferMeters = Math.max(1, normalizeNumber(options.buffer, 100));
   const driveFolder = normalizeText(options['drive-folder'] || 'CIALPA_EE_PILOTO_ESCUELAS');
   const exportPrefix = normalizeText(options.prefix || 'CIALPA_PILOTO');
+  const source = normalizeText(options.source || 'nicfi').toLowerCase();
+  const createTasks = normalizeBoolean(options['create-tasks'], true);
+  if (!['nicfi', 's2'].includes(source)) throw new Error(`Fuente no soportada: ${source}. Use nicfi o s2.`);
+
+  const sourceConfig = source === 'nicfi'
+    ? {
+      label: 'NICFI',
+      collection: "ee.ImageCollection('projects/planet-nicfi/assets/basemaps/americas')\n  .filterDate(SOURCE_START_DATE, SOURCE_END_DATE)",
+      image: "ee.Image(sourceCollection.filterBounds(roi).sort('system:time_start', false).first())\n    .select(['R', 'G', 'B'])\n    .clip(roi)",
+      scale: 4.77,
+      vis: "{ bands: ['R', 'G', 'B'], min: 64, max: 5454, gamma: 1.4 }",
+      notice: 'NICFI requiere alta previa de Planet y permiso de lectura en Earth Engine.',
+    }
+    : {
+      label: 'S2',
+      collection: "ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')\n  .filterDate(SOURCE_START_DATE, SOURCE_END_DATE)\n  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 40))\n  .map(maskSentinel2Clouds)",
+      image: "sourceCollection.filterBounds(roi).median()\n    .select(['B4', 'B3', 'B2'])\n    .clip(roi)",
+      scale: 10,
+      vis: "{ bands: ['B4', 'B3', 'B2'], min: 0, max: 3200, gamma: 1.2 }",
+      notice: 'Sentinel-2 sirve para probar el flujo, pero 10 m/pixel no es alta resolucion arquitectonica.',
+    };
 
   return `// CIALPA - Exportacion por lote de imagenes para escuelas piloto.
 // Generado por tools/earthengine/generate_pilot_earthengine_batch.mjs.
@@ -141,7 +173,8 @@ function buildEarthEngineScript(schools, options) {
 // IMPORTANTE: este archivo contiene coordenadas operativas; no subir a git.
 //
 // El fondo SATELLITE de Google que se ve en Earth Engine NO es exportable.
-// Este script exporta solo datasets Earth Engine, aqui NICFI/Planet.
+// Este script exporta una coleccion Earth Engine real: ${sourceConfig.label}.
+// ${sourceConfig.notice}
 
 var SCHOOLS = [
 ${buildSchoolsJs(schools)}
@@ -151,12 +184,13 @@ var BUFFER_METERS = ${bufferMeters};
 var DRIVE_FOLDER = ${js(driveFolder)};
 var EXPORT_PREFIX = ${js(exportPrefix)};
 var EXPORT_START_INDEX = ${start};
-var EXPORT_LIMIT = ${limit}; // 0 = todas las escuelas restantes.
-var PREVIEW_COUNT = 3;
-var NICFI_START_DATE = ${js(startDate)};
-var NICFI_END_DATE = ${js(endDate)};
-var EXPORT_SCALE_METERS = 4.77;
-var NICFI_VIS = { bands: ['R', 'G', 'B'], min: 64, max: 5454, gamma: 1.4 };
+var EXPORT_LIMIT = ${limit}; // Recomendado: 25 por lote; 0 = todas las restantes.
+var CREATE_EXPORT_TASKS = ${createTasks};
+var SOURCE_START_DATE = ${js(startDate)};
+var SOURCE_END_DATE = ${js(endDate)};
+var SOURCE_LABEL = ${js(sourceConfig.label)};
+var EXPORT_SCALE_METERS = ${sourceConfig.scale};
+var SOURCE_VIS = ${sourceConfig.vis};
 
 var endIndex = EXPORT_LIMIT > 0
   ? Math.min(SCHOOLS.length, EXPORT_START_INDEX + EXPORT_LIMIT)
@@ -167,13 +201,23 @@ print('CIALPA escuelas totales en archivo', SCHOOLS.length);
 print('CIALPA escuelas seleccionadas para export', selectedSchools.length);
 print('Rango de indices', EXPORT_START_INDEX, endIndex - 1);
 print('Carpeta Drive destino', DRIVE_FOLDER);
-print('Aviso', 'Iniciar las tareas desde la pestana Tasks. Para lotes grandes conviene usar EXPORT_START_INDEX/EXPORT_LIMIT.');
+print('Radio por escuela', BUFFER_METERS + ' m');
+print('Fuente', SOURCE_LABEL + ' a ' + EXPORT_SCALE_METERS + ' m/pixel');
+print('Aviso', 'Las tareas creadas se inician desde la pestana Tasks. Cambie EXPORT_START_INDEX para el siguiente lote.');
 
 Map.setOptions('SATELLITE');
 
-var nicfiBase = ee.ImageCollection('projects/planet-nicfi/assets/basemaps/americas')
-  .filterDate(NICFI_START_DATE, NICFI_END_DATE)
-  .sort('system:time_start', false);
+function maskSentinel2Clouds(image) {
+  var scl = image.select('SCL');
+  var keep = scl.neq(3)
+    .and(scl.neq(8))
+    .and(scl.neq(9))
+    .and(scl.neq(10))
+    .and(scl.neq(11));
+  return image.updateMask(keep);
+}
+
+var sourceCollection = ${sourceConfig.collection};
 
 var selectedFeatures = ee.FeatureCollection(selectedSchools.map(function(school) {
   return ee.Feature(ee.Geometry.Point([school.lon, school.lat]), {
@@ -186,27 +230,18 @@ var selectedFeatures = ee.FeatureCollection(selectedSchools.map(function(school)
 Map.addLayer(selectedFeatures, { color: 'red' }, 'Escuelas seleccionadas');
 
 if (selectedSchools.length > 0) {
-  Map.centerObject(ee.Geometry.Point([selectedSchools[0].lon, selectedSchools[0].lat]), 17);
+  Map.centerObject(ee.Geometry.Point([selectedSchools[0].lon, selectedSchools[0].lat]), 18);
 }
 
-selectedSchools.forEach(function(school, localIndex) {
-  var point = ee.Geometry.Point([school.lon, school.lat]);
-  var roi = point.buffer(BUFFER_METERS).bounds();
-  var nicfi = nicfiBase.filterBounds(roi);
-  var latest = ee.Image(nicfi.first()).clip(roi);
-  var rgb = latest.select(['R', 'G', 'B']);
-  var exportName = EXPORT_PREFIX + '_' + school.order + '_' + school.code + '_' + school.slug + '_NICFI_RGB_${label}';
+function imageForSchool(school, roi) {
+  return ${sourceConfig.image};
+}
 
-  if (localIndex < PREVIEW_COUNT) {
-    var roiOutline = ee.Image().byte().paint({
-      featureCollection: ee.FeatureCollection([ee.Feature(roi)]),
-      color: 1,
-      width: 2
-    });
-    Map.addLayer(roiOutline, { palette: ['yellow'] }, 'ROI ' + school.code, false);
-    Map.addLayer(latest, NICFI_VIS, 'NICFI preview ' + school.code, localIndex === 0);
-    print('NICFI cantidad imagenes ' + school.code, nicfi.size());
-  }
+function createExportForSchool(school) {
+  var point = ee.Geometry.Point([school.lon, school.lat]);
+  var roi = point.buffer(BUFFER_METERS);
+  var rgb = imageForSchool(school, roi);
+  var exportName = EXPORT_PREFIX + '_' + school.order + '_' + school.code + '_' + school.slug + '_' + SOURCE_LABEL + '_RGB_${label}';
 
   Export.image.toDrive({
     image: rgb,
@@ -221,6 +256,35 @@ selectedSchools.forEach(function(school, localIndex) {
       cloudOptimized: true
     }
   });
+}
+
+function showPreview(school) {
+  var point = ee.Geometry.Point([school.lon, school.lat]);
+  var roi = point.buffer(BUFFER_METERS);
+  var outline = ee.Image().byte().paint({
+    featureCollection: ee.FeatureCollection([ee.Feature(roi)]),
+    color: 1,
+    width: 2
+  });
+  Map.addLayer(imageForSchool(school, roi), SOURCE_VIS, SOURCE_LABEL + ' preview ' + school.code, true);
+  Map.addLayer(outline, { palette: ['yellow'] }, 'Radio ' + BUFFER_METERS + ' m', true);
+}
+
+sourceCollection.size().evaluate(function(count, error) {
+  if (error || !count) {
+    print('ERROR DE ACCESO O COLECCION VACIA', error || 'No hay imagenes en el periodo.');
+    print('No se creo ninguna tarea. Revise permisos, fechas y cuota del proyecto Earth Engine.');
+    return;
+  }
+  print('Preflight correcto. Imagenes disponibles en la coleccion', count);
+  if (selectedSchools.length) showPreview(selectedSchools[0]);
+  if (!CREATE_EXPORT_TASKS) {
+    print('Vista previa lista. Cambie CREATE_EXPORT_TASKS a true para crear el lote.');
+    return;
+  }
+  selectedSchools.forEach(createExportForSchool);
+  print('Tareas creadas', selectedSchools.length);
+  print('Siguiente paso', 'Abra Tasks y pulse Run en cada tarea.');
 });
 `;
 }

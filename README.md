@@ -1,8 +1,34 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.208** | Paraguay 2026
+**Version 2.6.211** | Paraguay 2026
 
 Sistema web para registrar ubicación, medidas, tipologías y configuración arquitectónica, eléctrica, de desagüe y conexión de agua de establecimientos educativos, conservando el registro de daños y fallas.
+
+## Novedades v2.6.211
+
+- El plano reduce a la mitad el grosor visual de los muros de aulas y sanitarios sin reducir sus zonas de selección táctil.
+- Si un sanitario está dentro de un aula, arrastrar desde un artefacto aún no seleccionado mueve el sanitario completo; una vez seleccionado el artefacto, el siguiente arrastre mueve solamente ese elemento.
+- El generador Earth Engine usa la muestra vigente de `86` escuelas, `15` de Capital y `71` de Central, y reconoce las columnas `CODIGO`, `NOMBRE`, `DEPTO`, `DIST`, `LAT_DEC` y `LNG_DEC`.
+- Se generan lotes de `25` escuelas con un círculo real de `100 m`, preflight previo y salida NICFI lista para pegar en Code Editor; existe una salida Sentinel-2 separada únicamente para validar el flujo.
+- El fondo Google `SATELLITE` del visor queda expresamente separado de las fuentes exportables: sirve para inspección, pero no puede descargarse mediante `Export.image.toDrive`.
+- El diagnóstico real sigue indicando dos bloqueos externos: `rapy-415107` está restringido por cuota no comercial y la cuenta no tiene permiso para leer la colección NICFI.
+
+## Novedades v2.6.210
+
+- El menú operativo elimina `Comentarios app`, `Cuestionario inicial`, `Ubicación real` e `Infraestructura MEC`, y agrega `Manual del encuestador` junto al Registro guiado.
+- El manual fue reescrito como procedimiento de campo paso a paso, tiene versión imprimible y queda disponible sin conexión dentro de la PWA.
+- Cada pregunta guiada incorpora una ayuda `(i)` con explicación breve, acceso al capítulo relacionado y enlace al documento completo.
+- Un perímetro existente queda protegido hasta pulsar `Editar perímetro`; luego se puede elegir `Mover completo` o `Ajustar vértices`, deshacer, guardar o cancelar sin perder la geometría anterior.
+- La app descubre imágenes por escuela mediante `assets/data/highres-school-index.json`, centra su cobertura geográfica y mantiene la satelital estable como respaldo fuera de la imagen.
+- El flujo Earth Engine genera el código y la lista para las `5.016` escuelas con coordenadas, en radios de `100 m`, convierte cada GeoTIFF a una imagen web georreferenciada y actualiza el índice de la app.
+- El preflight impide crear exportaciones si la colección no es accesible, la cola está llena o el lote supera el límite seguro; ninguna tarea fue iniciada mientras el proyecto Earth Engine siga restringido y NICFI no esté habilitado.
+
+## Novedades v2.6.209
+
+- La auditoria automatizada cubre las 20 vistas reales, permisos por rol, alta y recuperacion demo, reapertura de registros finalizados, filtros con 5448 escuelas, Atlas imprimible, cuestionario publico y PWA sin conexion.
+- Los campos del Registro MEC y los filtros de Auditoria incorporan nombres accesibles asociados a sus controles.
+- Se refuerza el contraste de textos auxiliares del Registro MEC y la prueba bloquea futuras regresiones serias o criticas de accesibilidad.
+- El muestreo de la herramienta de auditoria geografica recorre ahora todas las escuelas solicitadas, sin detenerse tras las primeras rondas territoriales.
 
 ## Novedades v2.6.208
 

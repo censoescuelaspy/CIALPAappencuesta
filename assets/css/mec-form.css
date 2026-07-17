@@ -59,7 +59,7 @@
 
 .mec-command__stats span {
   display: block;
-  color: #718096;
+  color: #526273;
   font-size: .72rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -201,7 +201,7 @@
 
 .mec-step__text small {
   margin-top: .25rem;
-  color: #66788d;
+  color: #526273;
   font-size: .68rem;
 }
 
@@ -285,7 +285,7 @@
   min-width: 0;
   padding: .42rem .55rem 0;
   border-top: 1px solid #edf2f7;
-  color: #66788d;
+  color: #526273;
   font-size: .78rem;
   font-weight: 700;
   line-height: 1.25;
@@ -473,7 +473,7 @@
   padding: .13rem .36rem;
   border-radius: var(--radius-full);
   background: #edf2f7;
-  color: #718096;
+  color: #526273;
   font-size: .66rem;
   font-weight: 800;
   text-transform: uppercase;
@@ -590,7 +590,7 @@
 .mec-hint {
   display: block;
   margin-top: .35rem;
-  color: #718096;
+  color: #526273;
   font-size: .76rem;
   line-height: 1.35;
 }
@@ -2275,6 +2275,74 @@
   border: 1px solid #cfe0f3;
   border-radius: var(--radius-md);
   box-shadow: 0 10px 22px rgba(15, 23, 42, .12);
+}
+
+.school-plan-floating-actions--property {
+  max-width: calc(100% - 1.3rem);
+  flex-wrap: wrap;
+  border-color: #d69e2e;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, .16);
+}
+
+.school-plan-floating-actions--editing {
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, .18), 0 10px 24px rgba(15, 23, 42, .16);
+}
+
+.school-plan-property-editor__state {
+  display: inline-flex;
+  min-width: 138px;
+  flex-direction: column;
+  gap: .08rem;
+  padding: 0 .35rem;
+  color: #173b63;
+  line-height: 1.15;
+}
+
+.school-plan-property-editor__state b {
+  font-size: .78rem;
+}
+
+.school-plan-property-editor__state small {
+  color: #475569;
+  font-size: .68rem;
+}
+
+.school-plan-property-editor__modes {
+  display: inline-flex;
+  align-items: center;
+  gap: .3rem;
+  padding-right: .42rem;
+  border-right: 1px solid #d7e0e8;
+}
+
+.school-plan__board canvas.school-plan__canvas--property-move {
+  cursor: move;
+}
+
+.school-plan__board canvas.school-plan__canvas--property-vertices {
+  cursor: crosshair;
+}
+
+@media (max-width: 720px) {
+  .school-plan-floating-actions--property {
+    right: .45rem;
+    left: .45rem;
+    max-width: none;
+    gap: .32rem;
+    padding: .4rem;
+  }
+
+  .school-plan-property-editor__state {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .school-plan-property-editor__modes {
+    flex: 1 1 auto;
+    padding-right: 0;
+    border-right: 0;
+  }
 }
 
 .school-plan__canvas-stage {

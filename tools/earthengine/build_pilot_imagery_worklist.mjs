@@ -215,9 +215,9 @@ function normalizeSchool(row, index = 0) {
   return {
     order: Number(pick(obj, ['orden_muestra_piloto', 'orden_visita', 'ENUMERA', 'orden']) || index + 1),
     code: numericCode || normalizeText(rawCode),
-    name: normalizeText(pick(obj, ['nombre', 'nombre_escuela', 'institucion', 'NOMBRE_INSTITUCION', 'Nombre'])),
-    department: normalizeText(pick(obj, ['departamento', 'DEPARTAMENTO', 'Departamento'])),
-    district: normalizeText(pick(obj, ['distrito', 'DISTRITO', 'Distrito'])),
+    name: normalizeText(pick(obj, ['nombre', 'NOMBRE', 'nombre_escuela', 'institucion', 'NOMBRE_INSTITUCION', 'Nombre'])),
+    department: normalizeText(pick(obj, ['departamento', 'DEPARTAMENTO', 'DEPTO', 'Departamento'])),
+    district: normalizeText(pick(obj, ['distrito', 'DISTRITO', 'DIST', 'Distrito'])),
     locality: normalizeText(pick(obj, ['localidad', 'LOCALIDAD', 'Localidad'])),
     lat,
     lon,

@@ -1,7 +1,7 @@
 /**
  * CIALPA - Relevamiento Escolar
  * config.js - Central application configuration
- * Version: 2.6.208
+ * Version: 2.6.211
  */
 
 const APP_CONFIG = {
@@ -18,8 +18,8 @@ const APP_CONFIG = {
 
   // App metadata
   APP_NAME: 'CIALPA - Relevamiento Escolar',
-  VERSION: '2.6.208',
-  EDITION_LABEL: 'Edicion vigente v2.6.208',
+  VERSION: '2.6.211',
+  EDITION_LABEL: 'Edicion vigente v2.6.211',
   ROSTER_FRAME_VERSION: 'RUE_2026_2026-07-16',
   LOGO_URL: 'assets/img/logo.png',
   PUBLIC_URL: 'https://censoescuelaspy.github.io/CIALPAappencuesta/',
@@ -67,6 +67,7 @@ const APP_CONFIG = {
   MAP_REAL_ROUTES_ENABLED: false,
   PLAN_BASEMAP_GOOGLE_SATELLITE_MAX_ZOOM: 21,
   PLAN_BASEMAP_HIGHRES_MAX_ZOOM: 19,
+  PLAN_BASEMAP_HIGHRES_INDEX_URL: 'assets/data/highres-school-index.json',
   // BEGIN CIALPA_HIGHRES_SOURCES
   PLAN_BASEMAP_HIGHRES_SOURCES: {
     '101095': {

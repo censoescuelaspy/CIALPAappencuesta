@@ -2039,7 +2039,7 @@ const GuidedRegisterModule = (() => {
         'Mueva los vertices del perimetro',
         'Seleccione el perimetro y arrastre directamente los puntos amarillos numerados. + Vertice agrega un nuevo punto al contorno; Confirmar perimetro bloquea esta etapa.',
         [
-          { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}`, primary: true },
+          { label: 'Editar perimetro', action: 'addPropertyBoundary', value: snap.propertyBoundary.id, primary: true },
           { label: '+ Vertice', action: 'propertyBoundaryAddVertex', value: snap.propertyBoundary.id },
           { label: '- Vertice', action: 'propertyBoundaryRemoveVertex', value: snap.propertyBoundary.id },
           { label: 'Extender abajo', action: 'extendPlanDown' },
@@ -2058,7 +2058,7 @@ const GuidedRegisterModule = (() => {
       'La ubicacion de la escuela y los bordes aproximados del predio ya estan guardados. Ahora puede pasar a bloques.',
       [
         { label: 'Siguiente', action: 'next', primary: true },
-        { label: 'Seleccionar perimetro', action: 'selectPlanItem', value: `site::${snap.propertyBoundary.id}` },
+        { label: 'Editar perimetro', action: 'addPropertyBoundary', value: snap.propertyBoundary.id },
         { label: 'Acometida', action: 'site', value: 'service_connection' },
         { label: 'Calles encima', action: 'basemapStreet' },
         { label: 'Catastro', action: 'basemapCatastro' },
@@ -3235,6 +3235,11 @@ const GuidedRegisterModule = (() => {
 
   function _guidedQuestionCard(question) {
     const info = _guidedQuestionInfo(question);
+    const stepId = STEPS[_activeIndex]?.id || '';
+    const contextText = `${question.title || ''} ${question.body || ''} ${info}`;
+    const manualSection = typeof ManualModule !== 'undefined' && ManualModule.sectionForContext
+      ? ManualModule.sectionForContext(stepId, contextText)
+      : ({ escuela: 'escuela', predio: 'perimetro', bloques: 'bloques', ambientes: 'ambientes', sanitarios: 'sanitarios', exteriores: 'servicios', cierre: 'cierre' }[stepId] || 'flujo');
     return `
       <section class="guided-next-card guided-next-card--question ${question.done ? 'guided-next-card--done' : ''}" aria-label="Pregunta guiada">
         <span>${_escape(question.kicker)}</span>
@@ -3250,8 +3255,12 @@ const GuidedRegisterModule = (() => {
             </button>`).join('')}
         </div>
         <details class="guided-info-note">
-          <summary><span aria-hidden="true">i</span><strong>Ayuda de campo y verificacion</strong></summary>
+          <summary><span aria-hidden="true">i</span><strong>Cómo completar este paso</strong></summary>
           <p>${_escape(info)}</p>
+          <div class="guided-info-note__actions">
+            <button class="btn btn-outline btn-sm" type="button" onclick="ManualModule.open('${_escape(manualSection)}')">Ver en el manual</button>
+            <a class="btn btn-outline btn-sm" href="manual/index.html#${_escape(manualSection)}" target="_blank" rel="noopener">Abrir documento</a>
+          </div>
         </details>
       </section>`;
   }
@@ -3439,6 +3448,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('Primero seleccione el perimetro del predio.', 'warning', 5200);
       return;
     }
+    mec.setPropertyBoundaryEditTool?.('vertices', item.id);
     mec.setPlanSiteElementShape(item.id, shape);
     _setFlag(_propertyBoundaryFlagKey(item), false);
     _saveState();
@@ -3452,6 +3462,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('Primero dibuje o seleccione el perimetro del predio.', 'warning', 5200);
       return;
     }
+    mec.setPropertyBoundaryEditTool?.('vertices', item.id);
     mec.addPlanSiteElementVertex(item.id);
     _setFlag(_propertyBoundaryFlagKey(item), false);
     _saveState();
@@ -3466,6 +3477,7 @@ const GuidedRegisterModule = (() => {
       UI.showToast('Primero dibuje o seleccione el perimetro del predio.', 'warning', 5200);
       return;
     }
+    mec.setPropertyBoundaryEditTool?.('vertices', item.id);
     mec.removePlanSiteElementVertex(item.id);
     _setFlag(_propertyBoundaryFlagKey(item), false);
     _saveState();
@@ -3485,6 +3497,8 @@ const GuidedRegisterModule = (() => {
       UI.showToast('Ajuste el perimetro en el plano antes de confirmarlo.', 'warning', 5200);
       return;
     }
+    const mec = typeof MecFormModule !== 'undefined' ? MecFormModule : null;
+    mec?.savePropertyBoundaryEdit?.(item.id);
     _setFlag(_propertyBoundaryFlagKey(item), true);
     _saveState();
     _refreshSoon(400);

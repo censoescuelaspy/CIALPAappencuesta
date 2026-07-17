@@ -16,12 +16,12 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
   <!-- App CSS -->
-  <link rel="stylesheet" href="assets/css/app.css?v=2.6.208" />
+  <link rel="stylesheet" href="assets/css/app.css?v=2.6.211" />
 
   <!-- Favicon placeholder -->
   <link rel="icon" type="image/png" href="assets/img/favicon.png" />
   <link rel="apple-touch-icon" href="assets/img/icon-192.png" />
-  <link rel="manifest" href="manifest.webmanifest?v=2.6.208" />
+  <link rel="manifest" href="manifest.webmanifest?v=2.6.211" />
 </head>
 <body>
 
@@ -171,7 +171,7 @@
     </form>
 
     <p style="text-align:center;margin-top:1.25rem;font-size:.8rem;color:#6c757d;">
-      Edición vigente <span class="app-version">v2.6.208</span> &mdash; CIALPA &copy; 2026
+      Edición vigente <span class="app-version">v2.6.211</span> &mdash; CIALPA &copy; 2026
     </p>
   </div>
 </div>
@@ -198,7 +198,7 @@
     </ul>
 
     <div class="sidebar__footer">
-      Edición vigente<br><strong class="app-version">v2.6.208</strong>
+      Edición vigente<br><strong class="app-version">v2.6.211</strong>
       <button class="sidebar__logout" type="button" onclick="AppController.logout()">Cerrar sesión</button>
     </div>
   </aside>
@@ -295,7 +295,6 @@
               <button class="btn btn-primary" onclick="AppController.showModule('registro')">Registro guiado</button>
               <button class="btn btn-secondary" onclick="AppController.showModule('mec')">Cuestionario MEC</button>
               <button class="btn btn-outline" onclick="AppController.showModule('jornada')">Mi Jornada</button>
-              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Cuestionario inicial</button>
               <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('planificacion')">Planificación</button>
               <button class="btn btn-outline" onclick="AppController.showModule('arquitectura')">Metodologia</button>
               <button class="btn btn-outline" onclick="ManualModule.open()" data-min-role="encuestador">Manual</button>
@@ -305,7 +304,7 @@
           <div class="card">
             <div class="card__header">
               <h4 class="card__title">App, registros y evidencias</h4>
-              <span class="badge badge--role">Edición <span class="app-version">v2.6.208</span></span>
+              <span class="badge badge--role">Edición <span class="app-version">v2.6.211</span></span>
             </div>
             <div class="ops-actions">
               <button id="install-app-btn-home" class="btn btn-primary" onclick="AppController.installApp()">Instalar app en celular</button>
@@ -313,7 +312,6 @@
               <button class="btn btn-outline" onclick="AppController.openWorkbook()">Libro en línea</button>
               <button class="btn btn-outline" onclick="AppController.openEvidenceFolder()">Fotos y evidencias</button>
               <button class="btn btn-primary" onclick="AppController.showModule('registro')">Abrir registro guiado</button>
-              <button class="btn btn-outline" data-min-role="supervisor" onclick="AppController.showModule('cuestionario-inicial')">Gestionar cuestionario inicial</button>
               <button class="btn btn-outline" onclick="AppController.showModule('plano')">Ver plano escuela</button>
             </div>
           </div>
@@ -932,18 +930,29 @@
       <div id="module-manual" class="module-panel">
         <div class="page-header">
           <h2>Manual del Encuestador</h2>
-          <a href="manual/index.html" target="_blank" class="btn btn-outline btn-sm">Ver manual completo</a>
+          <a href="manual/index.html" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Abrir versión imprimible</a>
         </div>
         <div class="page-content">
-          <div class="card">
-            <p>El manual del encuestador está disponible como panel lateral y como documento completo en formato Markdown. Use este material para operar la app web CIALPA, registrar evidencias y preparar la futura migración al RUE-MEC.</p>
-            <div style="margin-top:1rem;display:flex;gap:.75rem;flex-wrap:wrap;">
-              <button class="btn btn-primary" onclick="ManualModule.open()">Abrir manual</button>
-              <button class="btn btn-outline" onclick="ManualModule.open('aplicar')">Migración RUE-MEC</button>
-              <button class="btn btn-outline" onclick="ManualModule.open('incidencias')">Incidencias</button>
-              <button class="btn btn-outline" onclick="ManualModule.open('errores')">Errores frecuentes</button>
+          <section class="manual-module-intro" aria-labelledby="manual-module-title">
+            <span>Guía operativa de campo</span>
+            <h3 id="manual-module-title">Relevamiento de infraestructura, paso por paso</h3>
+            <p>Consulte cómo seleccionar la escuela, guardar la base mapa, editar el perímetro, medir bloques y ambientes, registrar instalaciones, daños o fallas, adjuntar fotos y finalizar sin perder datos.</p>
+            <div class="manual-module-actions">
+              <button class="btn btn-primary" type="button" onclick="ManualModule.open('flujo')">Comenzar el manual</button>
+              <button class="btn btn-outline" type="button" onclick="ManualModule.open('perimetro')">Editar un perímetro</button>
+              <button class="btn btn-outline" type="button" onclick="ManualModule.open('guardado')">Guardado y modo sin conexión</button>
+              <button class="btn btn-outline" type="button" onclick="ManualModule.open('problemas')">Resolver un problema</button>
             </div>
-          </div>
+          </section>
+          <ol class="manual-module-steps" aria-label="Resumen del procedimiento">
+            <li><b>Elegir escuela</b><span>Use el mapa, confirme código y ubicación.</span></li>
+            <li><b>Guardar base</b><span>Verifique satélite, calles o catastro antes de dibujar.</span></li>
+            <li><b>Dibujar predio</b><span>Mueva el contorno completo o ajuste sus vértices.</span></li>
+            <li><b>Registrar infraestructura</b><span>Cargue bloques, pisos, aulas, espacios y sanitarios.</span></li>
+            <li><b>Registrar servicios</b><span>Ubique electricidad, agua, desagüe y elementos exteriores.</span></li>
+            <li><b>Documentar hallazgos</b><span>Conserve daños, fallas, observaciones y fotos.</span></li>
+            <li><b>Revisar y finalizar</b><span>Corrija pendientes, sincronice y confirme el cierre.</span></li>
+          </ol>
         </div>
       </div>
 
@@ -1186,7 +1195,6 @@
             <p>Avance territorial, desempeño de campo, evidencias y alertas en una vista navegable.</p>
           </div>
           <div class="stats-hero__actions">
-            <button class="btn btn-sm btn-outline" onclick="AppController.showModule('infraestructura')">Infraestructura MEC</button>
             <button class="btn btn-sm btn-outline" onclick="StatsModule.exportCSV()">Exportar CSV</button>
             <button class="btn btn-sm btn-outline" onclick="StatsModule.exportLocalJson()">JSON local</button>
             <button class="btn btn-sm btn-primary" onclick="StatsModule.loadStats()">Actualizar</button>
@@ -1511,20 +1519,20 @@
               <div class="audit-filters">
                 <form id="audit-filter-form" class="form-row">
                   <div class="form-group" style="margin:0;">
-                    <label>Usuario</label>
-                    <input type="text" name="usuario" class="form-control form-control-sm" placeholder="Usuario..." />
+                    <label for="audit-user">Usuario</label>
+                    <input id="audit-user" type="text" name="usuario" class="form-control form-control-sm" placeholder="Usuario..." />
                   </div>
                   <div class="form-group" style="margin:0;">
-                    <label>Acción</label>
-                    <input type="text" name="accion" class="form-control form-control-sm" placeholder="Acción..." />
+                    <label for="audit-action">Acción</label>
+                    <input id="audit-action" type="text" name="accion" class="form-control form-control-sm" placeholder="Acción..." />
                   </div>
                   <div class="form-group" style="margin:0;">
-                    <label>Desde</label>
-                    <input type="date" name="fecha_desde" class="form-control form-control-sm" />
+                    <label for="audit-from">Desde</label>
+                    <input id="audit-from" type="date" name="fecha_desde" class="form-control form-control-sm" />
                   </div>
                   <div class="form-group" style="margin:0;">
-                    <label>Hasta</label>
-                    <input type="date" name="fecha_hasta" class="form-control form-control-sm" />
+                    <label for="audit-to">Hasta</label>
+                    <input id="audit-to" type="date" name="fecha_hasta" class="form-control form-control-sm" />
                   </div>
                   <div style="align-self:flex-end;">
                     <button type="button" class="btn btn-sm btn-primary" onclick="AdminModule.applyAuditFilters()">Filtrar</button>
@@ -1557,14 +1565,14 @@
         <div class="page-content">
           <div class="audit-filters">
             <form id="audit-filter-form-standalone" class="form-row">
-              <div class="form-group" style="margin:0;"><label>Usuario</label>
-                <input type="text" name="usuario" class="form-control form-control-sm" /></div>
-              <div class="form-group" style="margin:0;"><label>Acción</label>
-                <input type="text" name="accion" class="form-control form-control-sm" /></div>
-              <div class="form-group" style="margin:0;"><label>Desde</label>
-                <input type="date" name="fecha_desde" class="form-control form-control-sm" /></div>
-              <div class="form-group" style="margin:0;"><label>Hasta</label>
-                <input type="date" name="fecha_hasta" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label for="audit-user-standalone">Usuario</label>
+                <input id="audit-user-standalone" type="text" name="usuario" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label for="audit-action-standalone">Acción</label>
+                <input id="audit-action-standalone" type="text" name="accion" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label for="audit-from-standalone">Desde</label>
+                <input id="audit-from-standalone" type="date" name="fecha_desde" class="form-control form-control-sm" /></div>
+              <div class="form-group" style="margin:0;"><label for="audit-to-standalone">Hasta</label>
+                <input id="audit-to-standalone" type="date" name="fecha_hasta" class="form-control form-control-sm" /></div>
               <div style="align-self:flex-end;">
                 <button type="button" class="btn btn-sm btn-primary" onclick="AdminModule.applyAuditFilters()">Filtrar</button>
               </div>
@@ -1728,27 +1736,27 @@
      ──────────────────────────────────────────────────────────── -->
 
 <!-- Leaflet -->
-<script src="assets/vendor/lucide.min.js?v=2.6.208"></script>
+<script src="assets/vendor/lucide.min.js?v=2.6.211"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <!-- Leaflet MarkerCluster -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <!-- App scripts -->
-<script src="assets/js/config.js?v=2.6.208"></script>
-<script src="assets/js/local-store.js?v=2.6.208"></script>
-<script src="assets/js/geo-measure.js?v=2.6.208"></script>
-<script src="assets/js/api.js?v=2.6.208"></script>
-<script src="assets/js/auth.js?v=2.6.208"></script>
-<script src="assets/js/map.js?v=2.6.208"></script>
-<script src="assets/js/survey.js?v=2.6.208"></script>
-<script src="assets/js/stats.js?v=2.6.208"></script>
-<script src="assets/js/department-atlas.js?v=2.6.208"></script>
-<script src="assets/js/location-audit.js?v=2.6.208"></script>
-<script src="assets/js/planning.js?v=2.6.208"></script>
-<script src="assets/js/admin.js?v=2.6.208"></script>
-<script src="assets/js/jornada.js?v=2.6.208"></script>
-<script src="assets/js/manual.js?v=2.6.208"></script>
-<script src="assets/js/initial-questionnaire.js?v=2.6.208"></script>
-<script src="assets/js/app.js?v=2.6.208"></script>
+<script src="assets/js/config.js?v=2.6.211"></script>
+<script src="assets/js/local-store.js?v=2.6.211"></script>
+<script src="assets/js/geo-measure.js?v=2.6.211"></script>
+<script src="assets/js/api.js?v=2.6.211"></script>
+<script src="assets/js/auth.js?v=2.6.211"></script>
+<script src="assets/js/map.js?v=2.6.211"></script>
+<script src="assets/js/survey.js?v=2.6.211"></script>
+<script src="assets/js/stats.js?v=2.6.211"></script>
+<script src="assets/js/department-atlas.js?v=2.6.211"></script>
+<script src="assets/js/location-audit.js?v=2.6.211"></script>
+<script src="assets/js/planning.js?v=2.6.211"></script>
+<script src="assets/js/admin.js?v=2.6.211"></script>
+<script src="assets/js/jornada.js?v=2.6.211"></script>
+<script src="assets/js/manual.js?v=2.6.211"></script>
+<script src="assets/js/initial-questionnaire.js?v=2.6.211"></script>
+<script src="assets/js/app.js?v=2.6.211"></script>
 
 <script>
   // Set today's date in Inicio module

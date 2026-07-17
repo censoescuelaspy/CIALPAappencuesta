@@ -12,6 +12,116 @@ Hay dos caminos complementarios:
    ortofoto/submetro. El fondo Google `SATELLITE` visible en Earth Engine no es
    un `ee.Image` exportable.
 
+## Padron MEC 2026 completo: radio de 100 m
+
+El padron `ListadoMECversionNUEVA16julio2026.xlsx` contiene `5.448` escuelas:
+`5.016` tienen un par de coordenadas valido y `432` quedan excluidas del lote
+hasta corregir su ubicacion. El flujo completo usa una ventana circular de
+`100 m` alrededor del punto de cada escuela.
+
+### 1. Generar la worklist y el codigo para Code Editor
+
+```powershell
+npm run imagery:all:prepare
+```
+
+O indicando la fuente de forma explicita:
+
+```powershell
+py -3 -X utf8 tools\earthengine\prepare_all_school_100m_exports.py --source="H:\Mi unidad\ListadoMECversionNUEVA16julio2026.xlsx"
+```
+
+Salidas privadas, ignoradas por Git:
+
+```text
+tools/earthengine/output/all-schools-100m-worklist.json
+tools/earthengine/output/cialpa_all_schools_100m_earthengine.js
+```
+
+El segundo archivo es el codigo listo para pegar en Google Earth Engine Code
+Editor. Empieza con `CREATE_EXPORT_TASKS = false`; primero debe comprobarse que
+la vista previa NICFI abre sin error. Para crear tareas, cambiarlo a `true` y
+avanzar `EXPORT_START_INDEX` en lotes de `25`.
+
+### 2. Comprobar acceso y lanzar lotes desde Python
+
+Instalar dependencias solo si falta alguna:
+
+```powershell
+py -3 -m pip install -r tools\earthengine\requirements.txt
+```
+
+Prueba sin Earth Engine:
+
+```powershell
+npm run imagery:all:dry-run
+```
+
+Comprobacion real de acceso, sin exportar:
+
+```powershell
+py -3 tools\earthengine\start_all_school_100m_exports.py --project=rapy-415107 --preflight-only
+```
+
+Primer lote real, solamente despues de que el preflight sea correcto:
+
+```powershell
+py -3 tools\earthengine\start_all_school_100m_exports.py --project=rapy-415107 --start=0 --limit=25
+```
+
+Siguientes lotes:
+
+```powershell
+py -3 tools\earthengine\start_all_school_100m_exports.py --project=rapy-415107 --start=25 --limit=25
+py -3 tools\earthengine\start_all_school_100m_exports.py --project=rapy-415107 --start=50 --limit=25
+```
+
+El lanzador verifica acceso a la coleccion antes de crear tareas y limita la
+cola para no intentar someter las `5.016` exportaciones juntas.
+
+### 3. Convertir descargas e incorporarlas a la app
+
+Una sola escuela, sin activarla aun:
+
+```powershell
+py -3 tools\earthengine\install_school_highres.py "H:\CIALPA_EE_TODAS_ESCUELAS_100M\CIALPA_ESC_100M_1_10029.tif" --school-code=10029 --buffer=100
+```
+
+El modo por defecto crea un unico PNG georreferenciado por escuela, no una
+piramide de cientos de tiles. La app lo superpone a la satelital estable y usa
+`assets/data/highres-school-index.json` para descubrir que escuelas tienen
+imagen instalada.
+
+Para un lote descargado:
+
+```powershell
+py -3 tools\earthengine\install_all_school_highres_batch.py --worklist="tools\earthengine\output\all-schools-100m-worklist.json" --src-dir="H:\CIALPA_EE_TODAS_ESCUELAS_100M"
+```
+
+La activacion exige confirmar de forma expresa que el uso y destino cumplen la
+licencia de la fuente:
+
+```powershell
+py -3 tools\earthengine\install_all_school_highres_batch.py --worklist="tools\earthengine\output\all-schools-100m-worklist.json" --src-dir="H:\CIALPA_EE_TODAS_ESCUELAS_100M" --activate --license-confirmed
+```
+
+Para servir las imagenes desde almacenamiento de objetos en vez de incluirlas
+en Git, agregar `--public-base-url="https://HOST/ruta/schools"`. El indice
+guardara esa URL estable para cada codigo.
+
+### Limitacion verificada el 2026-07-17
+
+La autenticacion Earth Engine funciona y Sentinel-2 responde consultas, pero el
+proyecto `rapy-415107` informa que supero la cuota de computo no comercial y
+esta en modo restringido. La cuenta tambien responde
+`earthengine.assets.get denied` para
+`projects/planet-nicfi/assets/basemaps/americas`. La cola contiene tareas
+anteriores en estado `READY`, por lo que no se iniciaron exportaciones CIALPA.
+
+NICFI tiene pixel de `4,77 m`, no resolucion submetro, y posee restricciones de
+uso, reproduccion y distribucion. No debe publicarse el lote en GitHub Pages
+hasta resolver acceso, cuota y licencia.
+
 ## Flujo para toda la muestra piloto
 
 La lista con coordenadas no debe subirse al repositorio. Por eso el flujo genera
@@ -34,10 +144,10 @@ $env:CIALPA_API_TOKEN='token-de-sesion'
 node tools\earthengine\build_pilot_imagery_worklist.mjs
 ```
 
-Opcion desde CSV/JSON privado ya exportado:
+Opcion desde la muestra privada Capital/Central vigente:
 
 ```powershell
-node tools\earthengine\build_pilot_imagery_worklist.mjs --input="C:\privado\muestra_piloto.csv"
+node tools\earthengine\build_pilot_imagery_worklist.mjs --input="tools\simulation\private-output\muestra_piloto_capital_central.csv"
 ```
 
 Salida esperada:
@@ -49,17 +159,25 @@ tools/earthengine/output/pilot-schools-worklist.json
 ### 2. Generar script Earth Engine por lote
 
 ```powershell
-node tools\earthengine\generate_pilot_earthengine_batch.mjs
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --source=nicfi --buffer=100 --start=0 --limit=25 --create-tasks=true --out="tools\earthengine\output\CIALPA_MUESTRA_CAPITAL_CENTRAL_NICFI_100M.js"
 ```
 
 Salida esperada:
 
 ```text
-tools/earthengine/output/cialpa_pilot_batch_earthengine.js
+tools/earthengine/output/CIALPA_MUESTRA_CAPITAL_CENTRAL_NICFI_100M.js
 ```
 
 Abrir ese archivo, pegarlo en Google Earth Engine Code Editor y ejecutar. El
-script crea una tarea `Export.image.toDrive` por escuela seleccionada.
+script contiene las `86` escuelas vigentes, comprueba primero la coleccion y
+crea hasta `25` tareas `Export.image.toDrive` para circulos de `100 m`. Para los
+lotes siguientes, cambiar `EXPORT_START_INDEX` a `25`, `50` y `75`.
+
+Salida de control Sentinel-2, util solo para probar permisos y exportacion:
+
+```powershell
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --source=s2 --buffer=100 --start=0 --limit=25 --create-tasks=false --out="tools\earthengine\output\CIALPA_MUESTRA_CAPITAL_CENTRAL_S2_100M_PRUEBA.js"
+```
 
 Importante: en Code Editor, Earth Engine deja esas tareas en la pestaña
 `Tasks`; normalmente hay que iniciarlas una por una. Para evitar ese paso,
@@ -76,7 +194,7 @@ py -3 -m pip install earthengine-api
 Autenticar y lanzar las exportaciones desde Python:
 
 ```powershell
-py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi
+py -3 tools\earthengine\start_pilot_ee_exports.py --authenticate --project=rapy-415107 --source=nicfi --preflight-only
 ```
 
 Ese comando lee:
@@ -85,7 +203,7 @@ Ese comando lee:
 tools/earthengine/output/pilot-schools-worklist.json
 ```
 
-y ejecuta automaticamente `task.start()` para cada escuela. Earth Engine decide
+y, sin `--preflight-only`, ejecuta automaticamente `task.start()` para cada escuela. Earth Engine decide
 cuantas tareas corren en paralelo y cuantas quedan en cola.
 
 Para probar sin iniciar tareas reales:
@@ -108,9 +226,10 @@ tareas iniciadas.
 Para procesar por partes, generar o editar el script con indices:
 
 ```powershell
-node tools\earthengine\generate_pilot_earthengine_batch.mjs --start=0 --limit=25
-node tools\earthengine\generate_pilot_earthengine_batch.mjs --start=25 --limit=25
-node tools\earthengine\generate_pilot_earthengine_batch.mjs --start=50 --limit=25
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --buffer=100 --start=0 --limit=25
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --buffer=100 --start=25 --limit=25
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --buffer=100 --start=50 --limit=25
+node tools\earthengine\generate_pilot_earthengine_batch.mjs --buffer=100 --start=75 --limit=25
 ```
 
 En Earth Engine tambien se pueden ajustar:
@@ -184,9 +303,8 @@ operativa de alta resolucion.
 
 ## Notas operativas
 
-- La muestra piloto vigente fue diagnosticada como `86` escuelas en el backend.
-  El usuario puede referirse a "casi 90"; el flujo soporta todas las que vengan
-  en la worklist privada.
+- La muestra piloto vigente tiene `86` escuelas: `15` de Capital y `71` de
+  Central. El generador valida que todas tengan codigo, nombre y coordenadas.
 - Si Earth Engine muestra `ImageCollection asset ... not found` o `caller does
   not have access`, falta habilitar acceso Planet/NICFI en esa cuenta.
 - NICFI tiene resolucion aproximada de `4.77 m`; puede mejorar contexto, pero no

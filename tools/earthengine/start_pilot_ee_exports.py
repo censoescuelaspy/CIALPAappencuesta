@@ -13,7 +13,7 @@ import json
 import re
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -107,7 +107,7 @@ def _mask_s2_clouds(ee: Any, image: Any) -> Any:
 
 def _task_for_school(ee: Any, school: dict[str, Any], args: argparse.Namespace) -> Any:
     point = ee.Geometry.Point([school["lon"], school["lat"]])
-    roi = point.buffer(args.buffer).bounds()
+    roi = point.buffer(args.buffer)
     export_name = _export_name(school, args.prefix, args.source, args.start_date, args.end_date)
 
     if args.source == "nicfi":
@@ -146,6 +146,46 @@ def _task_for_school(ee: Any, school: dict[str, Any], args: argparse.Namespace) 
     )
 
 
+def _preflight(ee: Any, school: dict[str, Any], args: argparse.Namespace, batch_size: int) -> dict[str, int]:
+    point = ee.Geometry.Point([school["lon"], school["lat"]])
+    roi = point.buffer(args.buffer)
+    try:
+        if args.source == "nicfi":
+            ee.data.getAsset(NICFI_COLLECTION)
+            collection = (
+                ee.ImageCollection(NICFI_COLLECTION)
+                .filterBounds(roi)
+                .filterDate(args.start_date, args.end_date)
+            )
+        else:
+            collection = (
+                ee.ImageCollection(S2_COLLECTION)
+                .filterBounds(roi)
+                .filterDate(args.start_date, args.end_date)
+            )
+        image_count = int(collection.size().getInfo() or 0)
+    except Exception as exc:
+        raise SystemExit(
+            "Preflight fallido: la fuente no es accesible con esta cuenta/proyecto. "
+            "NICFI requiere alta de Planet y permiso Earth Engine. Detalle: " + str(exc)
+        ) from exc
+    if image_count <= 0:
+        raise SystemExit("Preflight fallido: no hay imagenes para la primera escuela y el periodo indicado.")
+
+    counts: dict[str, int] = {}
+    for task in ee.data.getTaskList() or []:
+        state = str(task.get("state") or "UNKNOWN")
+        counts[state] = counts.get(state, 0) + 1
+    queued = counts.get("READY", 0) + counts.get("RUNNING", 0)
+    if queued + batch_size > args.max_queue:
+        raise SystemExit(
+            f"Preflight detenido: hay {queued} tareas READY/RUNNING y el lote de {batch_size} "
+            f"superaria --max-queue={args.max_queue}."
+        )
+    print(f"Preflight OK: {image_count} imagen(es) cubren la primera escuela; cola READY/RUNNING={queued}.")
+    return counts
+
+
 def _write_log(records: list[dict[str, Any]], args: argparse.Namespace) -> Path:
     DEFAULT_LOG_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -167,16 +207,18 @@ def main() -> None:
     parser.add_argument("--project", default="", help="Google Cloud project registered for Earth Engine")
     parser.add_argument("--authenticate", action="store_true", help="Run ee.Authenticate() before initializing")
     parser.add_argument("--start", type=int, default=0, help="Zero-based start index")
-    parser.add_argument("--limit", type=int, default=0, help="0 means all remaining schools")
+    parser.add_argument("--limit", type=int, default=25, help="0 means all remaining schools")
     parser.add_argument("--only", default="", help="Comma-separated school codes")
-    parser.add_argument("--buffer", type=float, default=650)
+    parser.add_argument("--buffer", type=float, default=100)
     parser.add_argument("--drive-folder", default="CIALPA_EE_PILOTO_ESCUELAS")
     parser.add_argument("--prefix", default="CIALPA_PILOTO")
     parser.add_argument("--start-date", default="2024-01-01")
-    parser.add_argument("--end-date", default="2026-01-01")
+    parser.add_argument("--end-date", default=(datetime.now().astimezone().date() + timedelta(days=1)).isoformat())
     parser.add_argument("--scale", type=float, default=4.77)
     parser.add_argument("--max-pixels", type=float, default=1e9)
     parser.add_argument("--sleep", type=float, default=0.5, help="Seconds between task submissions")
+    parser.add_argument("--max-queue", type=int, default=250)
+    parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -215,6 +257,14 @@ def main() -> None:
     if args.source == "nicfi":
         print("Nota: NICFI requiere acceso Planet/NICFI habilitado para esta cuenta Earth Engine.")
 
+    if not args.dry_run:
+        if ee is None:
+            raise RuntimeError("Earth Engine no inicializado.")
+        queue_counts = _preflight(ee, selected[0], args, len(selected))
+        if args.preflight_only:
+            print(json.dumps({"status": "ok", "queue": queue_counts}, ensure_ascii=True))
+            return
+
     records: list[dict[str, Any]] = []
     for school in selected:
         export_name = _export_name(school, args.prefix, args.source, args.start_date, args.end_date)
@@ -241,7 +291,10 @@ def main() -> None:
 
     log_path = _write_log(records, args)
     print(f"Log: {log_path}")
-    print("Listo. Las tareas quedan iniciadas o en cola en Earth Engine; Drive recibira los GeoTIFF al completarse.")
+    if args.dry_run:
+        print("Dry-run completo. No se creo ni inicio ninguna tarea Earth Engine.")
+    else:
+        print("Listo. Las tareas quedan iniciadas o en cola en Earth Engine; Drive recibira los GeoTIFF al completarse.")
 
 
 if __name__ == "__main__":

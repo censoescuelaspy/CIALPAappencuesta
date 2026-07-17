@@ -275,10 +275,16 @@ function selectSample(schools, limit, mode) {
     if (candidate) output.push(candidate);
   }
   let cursor = 0;
-  while (output.length < target && cursor < groupList.length * 2) {
+  let emptyGroupsInARow = 0;
+  while (output.length < target && emptyGroupsInARow < groupList.length) {
     const group = groupList[cursor % groupList.length];
     const candidate = group.shift();
-    if (candidate) output.push(candidate);
+    if (candidate) {
+      output.push(candidate);
+      emptyGroupsInARow = 0;
+    } else {
+      emptyGroupsInARow++;
+    }
     cursor++;
   }
   return output;

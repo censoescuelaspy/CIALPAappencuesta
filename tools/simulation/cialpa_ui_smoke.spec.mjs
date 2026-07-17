@@ -7,7 +7,7 @@ test.describe('CIALPA UI smoke', () => {
   test.skip(!user || !password, 'Defina CIALPA_USER y CIALPA_PASSWORD para ejecutar login real.');
 
   test('abre app, inicia sesion y llega al registro guiado', async ({ page }) => {
-    await page.goto('/?sim_ui=1', { waitUntil: 'networkidle' });
+    await page.goto('./?sim_ui=1', { waitUntil: 'networkidle' });
 
     await page.getByLabel(/usuario/i).fill(user);
     await page.getByLabel(/contrase/i).fill(password);

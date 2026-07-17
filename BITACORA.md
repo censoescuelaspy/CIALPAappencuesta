@@ -4,6 +4,122 @@
 
 ---
 
+## Earth Engine de 100 m y edicion de sanitarios - 2026-07-17 - v2.6.211
+
+### Objetivo y diagnostico
+- Resolver por que la URL publica seguia mostrando la misma edicion: la version local `v2.6.210` nunca habia sido enviada y GitHub Pages continuaba sirviendo `v2.6.208` tanto en `index.html` como en el cache del service worker.
+- Preparar codigo ejecutable de Earth Engine para las escuelas de la muestra vigente, con un circulo real de `100 m` alrededor de cada coordenada.
+- Reducir a la mitad el grosor visual de las paredes de aulas y sanitarios y permitir mover el sanitario completo aunque el puntero empiece sobre un inodoro u otro artefacto ubicado dentro de el.
+- El texto de referencia adjunto no era una solucion de descarga: utilizaba el mapa Google `SATELLITE` solo como fondo visual, conservaba una muestra anterior con `31` escuelas de Alto Parana y no creaba tareas `Export.image.toDrive`.
+
+### Earth Engine y muestra vigente
+- El generador ahora reconoce las columnas MEC `NOMBRE`, `DEPTO` y `DIST`, por lo que las exportaciones conservan identificadores y nombres legibles.
+- La worklist se regenero con `86/86` coordenadas y nombres: `15` escuelas de Capital y `71` de Central, sin Alto Parana.
+- Se genero un script autonomo NICFI con las `86` escuelas incrustadas, radio circular de `100 m`, lotes de `25`, vista previa y preflight antes de crear tareas.
+- Se genero tambien una variante Sentinel-2 de control para comprobar el flujo sin depender de NICFI. El lanzador Python valida acceso, existencia de imagenes y tamano de la cola antes de iniciar tareas.
+- El estado externo sigue bloqueado: `rapy-415107` informa modo restringido por cuota no comercial y la cuenta no puede leer `projects/planet-nicfi/assets/basemaps/americas`. No se creo ni inicio ninguna tarea CIALPA.
+
+### Plano arquitectonico
+- Las paredes del plano principal pasan de `5` a `2,5 px`; las aulas del croquis, de `8/10` a `4/5 px`; los sanitarios, de `3` a `1,5 px`; y los contornos de contexto, de `7` a `3,5 px`.
+- Al arrastrar desde un artefacto sanitario no seleccionado, el editor toma como objetivo el sanitario padre. Si el artefacto ya esta seleccionado, conserva la posibilidad de mover solamente ese artefacto.
+- La seleccion final queda en el sanitario desplazado, de modo que puede seguir ajustandose, abrir su ficha, deshacerse o rehacerse sin perder el contexto.
+
+### Pruebas y estado
+- `node --check` aprobo el formulario, los generadores, la plantilla, ambos scripts generados y la prueba Playwright; los siete scripts Python del flujo compilaron con `py_compile`.
+- Regeneracion reproducible aprobada: `86` escuelas, `86` nombres, `15` Capital y `71` Central. El dry-run Sentinel-2 no creo ni inicio tareas.
+- Playwright repitio tres veces el escenario de un sanitario con inodoro dentro de un aula: `3/3` aprobadas; se verificaron los espesores y el desplazamiento real del sanitario. Manual y fondo escolar de alta resolucion aprobaron tambien en escritorio y tableta.
+- La URL publica se comprobo sin cache al inicio y seguia en `v2.6.208`; la publicacion de `v2.6.211` queda sujeta al cierre de pruebas, commit, push y verificacion de GitHub Pages.
+
+---
+
+## Manual del encuestador, edición de perímetros e imágenes escolares - 2026-07-16 - v2.6.210 local
+
+### Objetivo y alcance
+- Simplificar la navegación de campo y reemplazar el manual desactualizado por una guía operativa completa del relevamiento de infraestructura.
+- Hacer inequívoca y reversible la edición de un perímetro ya guardado.
+- Preparar la cadena reproducible para obtener, instalar y mostrar una imagen georreferenciada en un radio de `100 m` para cada escuela con coordenadas.
+
+### Interfaz y manual
+- Se retiran de la navegación `Comentarios app`, `Cuestionario inicial`, `Ubicación real` e `Infraestructura MEC`; sus módulos internos se conservan para compatibilidad administrativa y recuperación directa, pero no tienen acceso operativo visible.
+- Se agrega `Manual del encuestador` inmediatamente después de `Registro guiado`.
+- `manual/MANUAL_ENCUESTADOR_CIALPA.md` y `manual/index.html` describen preparación, elección de escuela, ubicación, perímetro, bloques, ambientes, sanitarios, electricidad, agua, desagüe, daños, fallas, fotos, guardado y cierre.
+- Las preguntas del Registro guiado muestran una ayuda `(i)` contextual con resumen, botón al capítulo correspondiente y enlace al documento completo.
+- Se corrigió el nivel de superposición de los modales: el encabezado de la app ya no bloquea el cierre del manual.
+- El manual, su hoja de estilos y el índice de imágenes forman parte del paquete offline del service worker.
+
+### Perímetro existente
+- El polígono queda fijo y protegido al abrir un registro ya cargado.
+- `Editar perímetro` habilita dos herramientas visibles y excluyentes: `Mover completo` y `Ajustar vértices`.
+- Los vértices se numeran solamente durante el ajuste; `Cancelar` restaura la geometría inicial y `Guardar cambios` conserva las coordenadas y medidas recalculadas.
+- Los botones activables exponen estado visual y `aria-pressed` para mouse, tacto y tecnologías de asistencia.
+
+### Imágenes de 100 m y Earth Engine
+- El padrón MEC contiene `5.448` escuelas: `5.016` con coordenadas válidas entran al lote y `432` quedan identificadas como pendientes de georreferenciación.
+- `prepare_all_school_100m_exports.py` genera una worklist privada y un script de Code Editor para lotes de `25`, con `CREATE_EXPORT_TASKS=false` por defecto.
+- `start_all_school_100m_exports.py` valida colección, cuota, tamaño de lote y cola antes de iniciar cualquier tarea.
+- El instalador masivo indexa una sola vez los GeoTIFF descargados y usa coincidencia exacta de orden y código, evitando recorridos repetidos y asociaciones por subcadena.
+- Cada GeoTIFF se convierte por defecto en un PNG con transparencia y límites WGS84. `highres-school-index.json` permite que la app descubra la imagen sin ampliar indefinidamente `config.js`.
+- Al activar una imagen finita, la app centra sus límites, elimina desplazamientos heredados, la carga con prioridad y conserva la satelital estable debajo.
+
+### Pruebas y evidencia
+- Generación reproducible: `5.448/5.016/432`, radio `100 m`; script Earth Engine de `5.016` escuelas validado con `node --check`.
+- Dry-run del primer lote: `25` nombres de exportación válidos, sin tareas creadas.
+- Conversor probado con un GeoTIFF real: PNG `109 x 102`, límites WGS84 válidos y sin advertencias.
+- Python compilado para los seis scripts del flujo; coincidencia exacta de GeoTIFF probada contra códigos similares.
+- Playwright focalizado en escritorio, tableta táctil y móvil táctil: `6/6` pruebas aprobadas para manual, ayudas, edición reversible, índice dinámico y carga de imagen.
+- Auditoría integral local: `18` pruebas aprobadas y `18` omitidas por diseño en dispositivos táctiles; los barridos de las `20` vistas aprobaron en escritorio, tableta y móvil sin regresiones funcionales.
+- Prueba offline específica aprobada: marco de la app, manual completo e índice de imágenes disponibles desde el cache de la PWA.
+
+### Estado real y limitaciones
+- El preflight real se detuvo antes de exportar: `rapy-415107` está en modo restringido por cuota no comercial y la cuenta no puede leer `projects/planet-nicfi/assets/basemaps/americas`.
+- NICFI ofrece `4,77 m/pixel`, no resolución submétrica, y su uso, reproducción y distribución requieren confirmación de licencia. No se activó ni publicó ninguna imagen nueva.
+- Código local preparado como `v2.6.210`; no se hizo commit, push ni deployment. La URL pública sigue en la versión publicada anterior.
+
+---
+
+## Simulacion integral, accesibilidad y regresion responsive - 2026-07-16 - v2.6.209 local
+
+### Objetivo y alcance
+- Simular repetidamente los flujos principales de la app en escritorio, tableta y movil, sin escribir datos ficticios en produccion.
+- Verificar roles, persistencia local, mapa y filtros, Registro guiado, Atlas, cuestionario publico, administracion demo, exportacion, operacion offline, datos y endpoints publicos.
+- Corregir toda falla reproducible encontrada y convertirla en una comprobacion automatica.
+
+### Datos y servicios verificados
+- Padron fuente MEC: `5448` codigos validos y unicos, `5016` coordenadas validas y `18` departamentos.
+- Catalogo publico y pestana `listado_ini`: coincidencia exacta de los `5448` codigos del Excel fuente.
+- Muestra Capital/Central: `86` codigos exactos, `15` Capital, `71` Central, `55` retenidos, `31` reemplazos y `0` Alto Parana.
+- `diagnosticoPadron`: `total=5448`, `con_coordenadas=5016`, `muestra_piloto=86` y `filas_operativas=128`.
+- Controles de autorizacion publica: login sin datos y `getEscuelas` sin token fueron rechazados correctamente.
+
+### Simulaciones ejecutadas
+- Respuestas demo sin escritura productiva: lotes de `1`, `100` y `1000`; el lote mayor uso `1000` escuelas unicas, cubrio los `18` departamentos y genero estructuras, sanitarios, evidencias, danos y alertas validas.
+- Mapa sintetico con el padron completo: `5448` escuelas; filtro Capital `126`, filtro piloto `86`, busqueda por codigo `1` y lista visual limitada a `250` elementos.
+- Auditoria Playwright final de las `20` vistas: `3/3` barridos aprobados en `1366x900`, `1024x768` tactil y `390x844` tactil.
+- Corrida funcional final de escritorio: `10/10` escenarios aprobados, incluidos roles, alta y recuperacion demo, reapertura de escuela finalizada, JSON por portapapeles, comentarios, incidencias, usuarios, Atlas imprimible, cuestionario con `5448` escuelas y PWA offline.
+- Resultado de calidad final: `0` errores de pagina, `0` errores de consola, `0` solicitudes fallidas inesperadas, `0` violaciones Axe, `0` desbordes y `0` solapamientos en la navegacion movil guiada.
+- Metricas publicas de referencia: sin respuestas HTTP `4xx/5xx`; FCP observado entre `356 ms` y `2196 ms` segun dispositivo y estado del service worker.
+
+### Fallas encontradas y corregidas
+- La auditoria geografica `spread` se detenia tras pocas rondas: ahora recorre todos los grupos hasta completar el objetivo; se revisaron las `5016` escuelas con coordenadas.
+- La prueba smoke navegaba a la raiz del dominio en GitHub Pages: se corrigio a ruta relativa del proyecto.
+- `npm run simulate:ui` lanzaba tambien toda la auditoria: ahora ejecuta solo el smoke autenticado, con un worker.
+- El cuestionario independiente conservaba referencias de cache `2.6.130`: se alinearon con la version vigente.
+- Registro MEC y filtros de Auditoria tenian campos sin nombre accesible; se asociaron etiquetas y grupos.
+- Textos auxiliares de Registro MEC no alcanzaban contraste minimo; se reforzaron sus colores.
+- En movil, la barra inferior del Registro guiado podia superponer botones y mostrar acciones marcadas `hidden`; se reorganizo en dos filas, se respeto `hidden` globalmente y se agrego control geometrico de solapamientos.
+- La auditoria UI ahora cubre las `20` vistas y falla ante errores de consola, solicitudes inesperadas, violaciones serias, desbordes o solapamientos.
+
+### Incidencia del entorno de prueba
+- Una corrida final fallo cuando el servidor HTTP local quedo bloqueado por miles de lineas de acceso y produjo `ERR_FAILED/ECONNREFUSED`.
+- Se reinicio en el puerto `4174` sin log verboso; los tres barridos visuales aprobaron en `3,1 min` y la corrida funcional de escritorio aprobo `10/10` en `1,8 min`.
+
+### Estado real y limitaciones
+- Codigo local preparado como `v2.6.209`; la URL publica sigue en `v2.6.208` porque esta tarea no autorizo commit, push ni deployment.
+- No se realizaron escrituras reales autenticadas en GAS ni cambios en Sheets durante las simulaciones.
+- Sin `CIALPA_USER` y `CIALPA_PASSWORD` no se pudo validar de punta a punta un login productivo ni altas, cierres o sincronizaciones reales por rol; esos flujos quedaron cubiertos en modo demo y por controles publicos de autorizacion.
+
+---
+
 ## Recuperacion del filtro de muestra en el mapa - 2026-07-16 - v2.6.208
 
 ### Diagnostico

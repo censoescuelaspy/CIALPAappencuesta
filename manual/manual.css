@@ -14,7 +14,9 @@
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{
-  margin:0;
+  max-width:1160px;
+  margin:0 auto;
+  padding:1.25rem 1.5rem 4rem;
   font-family: "Segoe UI", Roboto, Arial, sans-serif;
   color:var(--ink);
   background:var(--bg);
@@ -34,6 +36,31 @@ main, .page{
   max-width:1160px;
   margin:0 auto;
   padding:2rem 1.5rem 4rem;
+}
+
+.manual-screen-actions{
+  position:sticky;
+  top:.5rem;
+  z-index:20;
+  justify-content:flex-end;
+  padding:.45rem;
+  background:rgba(243,246,251,.94);
+  border:1px solid var(--border);
+  border-radius:8px;
+  backdrop-filter:blur(8px);
+}
+
+.manual-screen-actions .btn{
+  border-color:var(--border);
+  color:var(--secondary);
+  background:var(--surface);
+  cursor:pointer;
+}
+
+.manual-screen-actions .btn.primary{
+  border-color:var(--primary);
+  color:#fff;
+  background:var(--primary);
 }
 header.hero{
   background:linear-gradient(135deg,var(--secondary),#0d2248);
@@ -117,6 +144,12 @@ nav#TOC{
 }
 nav#TOC ul{margin:.25rem 0 .25rem 1rem}
 nav#TOC a{text-decoration:none}
+nav#TOC > ul{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:.18rem 1rem;
+  padding-left:1.15rem;
+}
 .search-box{
   display:flex;
   gap:.65rem;
@@ -143,13 +176,15 @@ nav#TOC a{text-decoration:none}
 @media print{
   body{background:white}
   header.hero, nav#TOC, .search-box{box-shadow:none}
+  .manual-screen-actions{display:none}
   .content{box-shadow:none;border:0}
   a[href]:after{content:""}
 }
 @media(max-width:760px){
-  main,.page{padding:1rem .75rem 3rem}
+  body,main,.page{padding:1rem .75rem 3rem}
   .content{padding:1.1rem}
   header.hero{border-radius:16px}
   header.hero h1{font-size:1.55rem}
   table{font-size:.84rem}
+  nav#TOC > ul{grid-template-columns:1fr}
 }

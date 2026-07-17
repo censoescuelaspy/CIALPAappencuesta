@@ -1,24 +1,37 @@
 /**
- * CIALPA, Relevamiento Escolar
- * manual.js, visor rápido del Manual del Encuestador
- * Version: 2.2.0
+ * CIALPA - Manual operativo del encuestador.
+ * Visor contextual y enlaces al documento completo.
  */
 
 const ManualModule = (() => {
   'use strict';
 
   const SECTIONS = [
-    { id: 'alcance', title: '1. Alcance operativo' },
-    { id: 'flujo', title: '2. Flujo de trabajo' },
-    { id: 'escuelas', title: '3. Escuelas asignadas' },
-    { id: 'aplicar', title: '4. Migración RUE-MEC' },
-    { id: 'tiempos', title: '5. Medición de tiempos' },
-    { id: 'modulos', title: '6. Control por módulos' },
-    { id: 'incidencias', title: '7. Incidencias' },
-    { id: 'cierre', title: '8. Cierre y paquete CIALPA' },
-    { id: 'calidad', title: '9. Control de calidad' },
-    { id: 'errores', title: '10. Errores frecuentes' },
+    { id: 'flujo', title: '1. Recorrido completo' },
+    { id: 'preparacion', title: '2. Antes de salir' },
+    { id: 'escuela', title: '3. Elegir la escuela' },
+    { id: 'ubicacion', title: '4. Ubicacion y base mapa' },
+    { id: 'perimetro', title: '5. Perimetro del predio' },
+    { id: 'bloques', title: '6. Bloques y pisos' },
+    { id: 'ambientes', title: '7. Aulas y espacios' },
+    { id: 'sanitarios', title: '8. Sanitarios' },
+    { id: 'servicios', title: '9. Servicios y exteriores' },
+    { id: 'danos', title: '10. Danos y fallas' },
+    { id: 'fotos', title: '11. Fotos y evidencias' },
+    { id: 'guardado', title: '12. Guardado y conexion' },
+    { id: 'cierre', title: '13. Revision y cierre' },
+    { id: 'problemas', title: '14. Problemas frecuentes' },
   ];
+
+  const STEP_SECTIONS = {
+    escuela: 'escuela',
+    predio: 'perimetro',
+    bloques: 'bloques',
+    ambientes: 'ambientes',
+    sanitarios: 'sanitarios',
+    exteriores: 'servicios',
+    cierre: 'cierre',
+  };
 
   let _isOpen = false;
 
@@ -26,12 +39,17 @@ const ManualModule = (() => {
     _isOpen ? close() : open();
   }
 
-  function open(sectionId = null) {
+  function open(sectionId = 'flujo') {
     const modal = document.getElementById('modal-manual');
     if (!modal) return;
+    const searchInput = document.getElementById('manual-search');
+    if (searchInput?.value) {
+      searchInput.value = '';
+      search('');
+    }
     modal.classList.add('modal--visible');
     _isOpen = true;
-    if (sectionId) scrollToSection(sectionId);
+    requestAnimationFrame(() => scrollToSection(_validSection(sectionId)));
   }
 
   function close() {
@@ -42,56 +60,84 @@ const ManualModule = (() => {
   }
 
   function scrollToSection(sectionId) {
-    const el = document.getElementById(`manual-section-${sectionId}`);
+    const id = _validSection(sectionId);
+    const el = document.getElementById(`manual-section-${id}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      _highlightNav(sectionId);
+      _highlightNav(id);
     }
+  }
+
+  function _searchText(value = '') {
+    return String(value || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  function sectionForContext(stepId = '', text = '') {
+    const normalized = _searchText(text);
+    if (/foto|evidencia|camara|drive/.test(normalized)) return 'fotos';
+    if (/sin conexion|offline|sincron|guardar|sheets/.test(normalized)) return 'guardado';
+    if (/dano|falla|fisura|humedad|rotura|riesgo/.test(normalized)) return 'danos';
+    if (/agua|desague|inodoro|lavamanos|sanitario/.test(normalized)) return 'sanitarios';
+    if (/electric|acometida|tablero|puesta a tierra|tanque|pozo/.test(normalized)) return 'servicios';
+    return STEP_SECTIONS[String(stepId || '').toLowerCase()] || 'flujo';
+  }
+
+  function openContext(stepId = '', text = '') {
+    open(sectionForContext(stepId, text));
+  }
+
+  function _validSection(sectionId) {
+    const requested = String(sectionId || '').replace(/^manual-section-/, '');
+    return SECTIONS.some(section => section.id === requested) ? requested : 'flujo';
   }
 
   function _highlightNav(sectionId) {
     document.querySelectorAll('.manual-nav__item').forEach(item => {
-      item.classList.toggle('active', item.dataset.section === sectionId);
+      const active = item.dataset.section === sectionId;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-current', active ? 'true' : 'false');
     });
   }
 
   function search(query) {
-    const q = (query || '').trim().toLowerCase();
+    const q = _searchText(query).trim();
     const container = document.getElementById('manual-content');
     if (!container) return;
     container.querySelectorAll('.manual-section').forEach(section => {
-      const text = section.textContent.toLowerCase();
-      section.style.display = !q || text.includes(q) ? '' : 'none';
+      section.hidden = Boolean(q && !_searchText(section.textContent).includes(q));
     });
   }
 
   function renderModal() {
-    const existing = document.getElementById('modal-manual');
-    if (existing) return;
-
+    if (document.getElementById('modal-manual')) return;
     const modal = document.createElement('div');
     modal.id = 'modal-manual';
     modal.className = 'modal modal--manual';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'manual-dialog-title');
     modal.innerHTML = `
       <div class="modal__overlay" onclick="ManualModule.close()"></div>
       <div class="modal__panel modal__panel--drawer">
         <div class="modal__header">
-          <h2>Manual del Encuestador</h2>
+          <h2 id="manual-dialog-title">Manual del encuestador</h2>
           <div class="manual-header-actions">
-            <input id="manual-search" type="text" class="form-control form-control-sm"
-              placeholder="Buscar en el manual..." oninput="ManualModule.search(this.value)" />
-            <a href="manual/index.html" target="_blank" class="btn btn-sm btn-outline">Ver manual completo</a>
-            <a href="manual/MANUAL_ENCUESTADOR_CIALPA.md" target="_blank" class="btn btn-sm btn-outline">Ver Markdown</a>
-            <button class="modal__close" onclick="ManualModule.close()">&times;</button>
+            <input id="manual-search" type="search" class="form-control form-control-sm"
+              aria-label="Buscar en el manual" placeholder="Buscar..." oninput="ManualModule.search(this.value)">
+            <a href="manual/index.html" target="_blank" rel="noopener" class="btn btn-sm btn-outline">Version imprimible</a>
+            <button class="modal__close" type="button" onclick="ManualModule.close()" aria-label="Cerrar manual">&times;</button>
           </div>
         </div>
         <div class="modal__body manual-modal-body">
-          <nav class="manual-nav">
+          <nav class="manual-nav" aria-label="Capitulos del manual">
             <ul>
-              ${SECTIONS.map(s => `
-                <li class="manual-nav__item" data-section="${s.id}"
-                    onclick="ManualModule.scrollToSection('${s.id}')">
-                  ${s.title}
+              ${SECTIONS.map(section => `
+                <li class="manual-nav__item" data-section="${section.id}"
+                    onclick="ManualModule.scrollToSection('${section.id}')">
+                  ${section.title}
                 </li>`).join('')}
             </ul>
           </nav>
@@ -100,105 +146,163 @@ const ManualModule = (() => {
           </div>
         </div>
       </div>`;
-
     document.body.appendChild(modal);
-    const content = modal.querySelector('.manual-content');
-    if (content) content.addEventListener('scroll', _onContentScroll);
+    modal.querySelector('.manual-content')?.addEventListener('scroll', _onContentScroll);
   }
 
   function _onContentScroll() {
-    const sections = document.querySelectorAll('.manual-section');
-    let current = null;
-    sections.forEach(s => {
-      const rect = s.getBoundingClientRect();
-      if (rect.top < 200) current = s.id.replace('manual-section-', '');
+    const content = document.getElementById('manual-content');
+    if (!content) return;
+    const contentTop = content.getBoundingClientRect().top;
+    let current = 'flujo';
+    content.querySelectorAll('.manual-section:not([hidden])').forEach(section => {
+      if (section.getBoundingClientRect().top <= contentTop + 80) {
+        current = section.id.replace('manual-section-', '');
+      }
     });
-    if (current) _highlightNav(current);
+    _highlightNav(current);
   }
 
   function _buildContent() {
-    return SECTIONS.map(s => `
-      <section class="manual-section" id="manual-section-${s.id}">
-        <h3>${s.title}</h3>
-        ${_getSectionContent(s.id)}
+    return SECTIONS.map(section => `
+      <section class="manual-section" id="manual-section-${section.id}">
+        <h3>${section.title}</h3>
+        ${_getSectionContent(section.id)}
+        <p class="manual-section__document-link"><a href="manual/index.html#${section.id}" target="_blank" rel="noopener">Abrir este capitulo en el documento completo</a></p>
       </section>`).join('<hr>');
   }
 
   function _getSectionContent(id) {
     const contents = {
-      alcance: `
-        <p>La app web CIALPA funciona como consola operativa de campo y cuestionario técnico propio. Su finalidad es seleccionar la escuela correcta, registrar respuestas, evidencias, croquis, inicio y cierre del relevamiento, medir tiempos, documentar incidencias y producir información útil para supervisión, cronogramas y control de calidad.</p>
-        <p><strong>Regla básica:</strong> todo relevamiento iniciado en CIALPA debe cerrarse en CIALPA y quedar preparado para futura migración al RUE-MEC.</p>`,
       flujo: `
+        <ol class="manual-checklist">
+          <li>Inicie sesion y revise su jornada.</li>
+          <li>Elija la escuela en Mapa e inicie o continue el registro.</li>
+          <li>Confirme identidad, coordenadas y base mapa.</li>
+          <li>Dibuje y confirme el perimetro del predio.</li>
+          <li>Cargue bloques, pisos, aulas, otros espacios y sanitarios.</li>
+          <li>Ubique conexiones de electricidad, agua, desague y exteriores.</li>
+          <li>Registre danos, fallas, observaciones y fotos donde correspondan.</li>
+          <li>Revise pendientes, sincronice y finalice.</li>
+        </ol>
+        <p><strong>Alcance:</strong> registre ubicacion, tipo, cantidad, medidas y relacion espacial. Los danos y fallas se conservan; no invente una calificacion general si no puede verificarla.</p>`,
+      preparacion: `
+        <ul>
+          <li>Dispositivo cargado, cargador o bateria externa y navegador actualizado.</li>
+          <li>Permisos de ubicacion y camara habilitados.</li>
+          <li>Cinta metrica o medidor laser, libreta y contacto del supervisor.</li>
+          <li>App abierta antes de perder conectividad y escuelas asignadas visibles.</li>
+        </ul>
+        <p>Pruebe el acceso, el mapa y una foto antes de salir. No comparta su usuario ni deje una sesion abierta en un dispositivo ajeno.</p>`,
+      escuela: `
         <ol>
-          <li>Inicie sesión en CIALPA.</li>
-          <li>Verifique su escuela asignada.</li>
-          <li>Registre la llegada al local escolar.</li>
-          <li>Complete el cuestionario CIALPA.</li>
-          <li>Agregue fotos en los ítems que lo requieran.</li>
-          <li>Registre módulos, pausas o incidencias relevantes.</li>
-          <li>Vuelva a CIALPA y cierre el relevamiento.</li>
-          <li>Registre identificador de paquete, último módulo u observación final.</li>
+          <li>Abra <strong>Mapa</strong> y use los filtros necesarios.</li>
+          <li>Seleccione el marcador correcto por codigo y nombre.</li>
+          <li>Pulse <strong>Iniciar/continuar registro</strong>.</li>
+          <li>Confirme departamento, distrito, localidad y coordenadas.</li>
+        </ol>
+        <p>Si el local no coincide, vuelva al mapa. No continúe un plano bajo el codigo de otra escuela.</p>`,
+      ubicacion: `
+        <ol>
+          <li>Pulse <strong>Usar coordenadas MEC</strong>.</li>
+          <li>Active la imagen disponible: alta resolucion, satelite, calles o catastro.</li>
+          <li>Mueva, acerque o gire la base hasta reconocer el predio.</li>
+          <li>Pulse <strong>Guardar base</strong> cuando la referencia sea correcta.</li>
+        </ol>
+        <p>Una imagen de alta resolucion se ofrece solo si existe para esa escuela. Si falla, la app mantiene la satelital estable como respaldo.</p>`,
+      perimetro: `
+        <ol>
+          <li>Pulse <strong>Dibujar perimetro</strong> o seleccione el ya guardado.</li>
+          <li>En un perimetro existente, pulse <strong>Editar perimetro</strong>.</li>
+          <li>Use <strong>Mover completo</strong> para trasladar el poligono sin deformarlo.</li>
+          <li>Use <strong>Ajustar vertices</strong> para arrastrar los puntos numerados.</li>
+          <li>Agregue o quite vertices solo cuando la forma lo requiera.</li>
+          <li>Pulse <strong>Guardar cambios</strong>; use <strong>Cancelar</strong> para restaurar la forma anterior.</li>
+        </ol>
+        <p>La app calcula longitud de lados, perimetro y area a partir de las coordenadas. El contorno es una referencia de relevamiento, no reemplaza una mensura catastral.</p>`,
+      bloques: `
+        <ol>
+          <li>Cree un bloque y registre largo, ancho, denominacion y cantidad de pisos.</li>
+          <li>Arrastrelo dentro del perimetro y girelo para coincidir con la implantacion.</li>
+          <li>Agregue cada piso registrable y confirme sus medidas.</li>
+          <li>Registre circulacion, pilares y componentes electricos visibles cuando correspondan.</li>
+          <li>Guarde el bloque antes de iniciar otro.</li>
         </ol>`,
-      escuelas: `
-        <p>Antes de iniciar, confirme código de local, nombre, departamento, distrito, coordenadas y estado operativo. Si la escuela no aparece, aparece duplicada o tiene datos incompatibles, reporte al supervisor. No cree registros informales ni seleccione otra escuela parecida.</p>
-        <table class="manual-table">
-          <tr><th>Estado</th><th>Acción esperada</th></tr>
-          <tr><td>Pendiente</td><td>Puede iniciar visita.</td></tr>
-          <tr><td>En curso</td><td>Verifique si corresponde a su sesión activa.</td></tr>
-          <tr><td>Parcial</td><td>Continúe solo con instrucción del supervisor.</td></tr>
-          <tr><td>Finalizada</td><td>No reabra salvo autorización.</td></tr>
-          <tr><td>Con incidencia</td><td>Revise la observación y coordine solución.</td></tr>
-        </table>`,
-      aplicar: `
-        <p>El módulo <strong>Migrar RUE-MEC</strong> está en desarrollo. Por ahora CIALPA conserva el dato maestro, los tiempos, las evidencias y el cierre operativo.</p>
-        <p><strong>Importante:</strong> la integración de migración se habilitará cuando exista un canal técnico definido para importar los datos al RUE-MEC.</p>`,
-      tiempos: `
-        <p>El tiempo total se calcula entre el inicio del relevamiento en CIALPA y el cierre registrado en CIALPA. Si hubo pausas largas, problemas de conectividad o interrupciones, descríbalas en observaciones.</p>
-        <p>Estos tiempos permiten estimar duración promedio por escuela, carga diaria de trabajo, complejidad por tipo de local y necesidades de personal para la encuesta grande.</p>`,
-      modulos: `
-        <p>Cuando el relevamiento sea complejo, registre tiempos por módulo: identificación, exteriores, servicios, electricidad, bloques, áreas de recreación, aulas, dependencias, laboratorios, talleres, sanitarios, evidencias y revisión final.</p>
-        <p>No cierre el relevamiento con módulos abiertos sin explicación.</p>`,
-      incidencias: `
-        <p>Registre incidencia ante escuela cerrada, responsable ausente, rechazo, falta de conectividad, error de app, ubicación incorrecta, GPS no disponible, problema de seguridad o interrupción operativa.</p>
-        <p>Todo cierre parcial o reprogramación debe incluir motivo, módulo pendiente, fecha tentativa y observación breve.</p>`,
+      ambientes: `
+        <ol>
+          <li>Indique cuantas aulas o espacios existen en el piso activo.</li>
+          <li>Cree cada ambiente, ubique su forma y registre largo y ancho.</li>
+          <li>Seleccione su tipo: aula, direccion, biblioteca, comedor, deposito u otro.</li>
+          <li>Ubique puertas, ventanas, tomas, luces, ventiladores, aires y tableros visibles.</li>
+          <li>Confirme cada ambiente antes de pasar al siguiente.</li>
+        </ol>
+        <p>Las medidas deben representar el espacio observado. Use la ficha para corregir datos y el plano para posicionar.</p>`,
+      sanitarios: `
+        <ol>
+          <li>Indique si el bloque o piso tiene sanitario.</li>
+          <li>Ubique el ambiente y registre largo, ancho, uso y destino.</li>
+          <li>Registre disponibilidad y origen de agua.</li>
+          <li>Registre el tipo de desague o descarga verificable.</li>
+          <li>Ubique puertas, ventanas, cabinas, inodoros, lavamanos, duchas y urinarios.</li>
+          <li>Confirme la ficha y documente danos o fallas visibles.</li>
+        </ol>`,
+      servicios: `
+        <p>Ubique los elementos donde realmente se observan y registre tipo, medidas y relacion con el bloque o predio.</p>
+        <ul>
+          <li><strong>Electricidad:</strong> acometida, medidor, tablero, protecciones, puesta a tierra, tomas y luminarias.</li>
+          <li><strong>Agua:</strong> conexion, medidor, tanque, pozo, bomba y puntos de abastecimiento.</li>
+          <li><strong>Desague:</strong> red, camara, pozo ciego, registros y descargas visibles.</li>
+          <li><strong>Exteriores:</strong> accesos, veredas, patios, galerias, canchas, cercos y otros elementos relevantes.</li>
+        </ul>`,
+      danos: `
+        <p>Los danos y fallas <strong>deben registrarse</strong>. Ubique el marcador en el elemento afectado y describa el hallazgo sin diagnosticar causas que no pudo comprobar.</p>
+        <ul>
+          <li>Indique elemento, ubicacion, tipo de dano o falla y extension aproximada.</li>
+          <li>Adjunte una foto de contexto y otra de detalle cuando sea util.</li>
+          <li>Registre riesgo inmediato solo si existe una condicion observable.</li>
+          <li>No use el campo para opiniones generales de calidad.</li>
+        </ul>`,
+      fotos: `
+        <ul>
+          <li>Tome primero una vista general y luego el detalle.</li>
+          <li>Evite rostros, documentos personales y contenido ajeno al relevamiento.</li>
+          <li>Asocie cada foto al ambiente u objeto correcto antes de continuar.</li>
+          <li>Revise el contador: puede quedar pendiente de Drive mientras no haya conexion.</li>
+        </ul>`,
+      guardado: `
+        <p>El borrador se conserva localmente durante la carga. Cuando hay conexion, la app intenta sincronizar con Sheets y subir evidencias a Drive.</p>
+        <ol>
+          <li>Si aparece <strong>Sin conexion</strong>, continue sin cerrar el navegador.</li>
+          <li>Al recuperar señal, pulse sincronizar y espere la confirmacion.</li>
+          <li>No borre datos del navegador ni reinstale la app con cargas pendientes.</li>
+          <li>Antes de finalizar, revise que no queden fotos ni borradores pendientes.</li>
+        </ol>`,
       cierre: `
         <ol>
-          <li>Confirme que el cuestionario CIALPA terminó o que el cierre parcial está justificado.</li>
-          <li>Cierre módulos pendientes.</li>
-          <li>Registre identificador de paquete o último módulo disponible.</li>
-          <li>Indique si el relevamiento fue completo, parcial o con incidencia.</li>
-          <li>Presione <strong>Finalizar relevamiento</strong>.</li>
-          <li>Verifique que el estado de la escuela cambie correctamente.</li>
+          <li>Abra <strong>Revision y salida</strong>.</li>
+          <li>Recorra la lista de pendientes y vuelva al elemento indicado para corregirlo.</li>
+          <li>Confirme que identidad, perimetro, bloques, ambientes, sanitarios y exteriores correspondan.</li>
+          <li>Sincronice borrador y fotos.</li>
+          <li>Finalice completo; use cierre parcial solo con motivo y pendiente claramente registrado.</li>
+          <li>Vuelva al mapa y compruebe el nuevo estado de la escuela.</li>
         </ol>`,
-      calidad: `
-        <ul>
-          <li>Código y nombre de escuela coinciden con la asignación.</li>
-          <li>Coordenadas dentro del rango esperado para Paraguay.</li>
-          <li>Inicio y cierre registrados.</li>
-          <li>Evidencias fotográficas asociadas a los ítems que lo requieren.</li>
-          <li>Incidencias cargadas.</li>
-          <li>Identificador de paquete registrado cuando exista.</li>
-          <li>Observación final clara.</li>
-        </ul>`,
-      errores: `
-        <h4>No aparecen escuelas</h4>
-        <p>Revise filtros, actualice datos y reinicie sesión. Si persiste, reporte al administrador para revisar la hoja de escuelas seleccionadas.</p>
-        <h4>La migración al RUE-MEC todavía no está activa</h4>
-        <p>Continúe la carga en CIALPA. La exportación/migración se conectará en una etapa posterior.</p>
-        <h4>Se perdió conectividad</h4>
-        <p>Continúe la carga en CIALPA si tiene datos suficientes. Registre incidencia si afecta el avance o la sincronización.</p>
-        <h4>Quedó una sesión abierta</h4>
-        <p>Ingrese nuevamente a la escuela y cierre la sesión si corresponde. Si no puede hacerlo, avise al supervisor.</p>`
+      problemas: `
+        <h4>No aparece una escuela</h4><p>Limpie filtros, actualice el padrón y confirme su asignacion. Si sigue ausente, registre una solicitud.</p>
+        <h4>No se ve alta resolucion</h4><p>No todas las escuelas tienen imagen local. Use satelite estable y no detenga el relevamiento.</p>
+        <h4>No puedo mover el perimetro</h4><p>Seleccione el contorno, pulse Editar perimetro y active Mover completo o Ajustar vertices.</p>
+        <h4>La app dice sin conexion</h4><p>La carga queda local. No borre el navegador; recupere señal y sincronice.</p>
+        <h4>El registro finalizado no muestra datos</h4><p>No cree otro. Vuelva al mapa, abra Ver/editar y reporte al supervisor si el borrador no se restaura.</p>`,
     };
-    return contents[id] || '<p>Contenido no disponible. Consulte la versión completa del manual.</p>';
+    return contents[id] || '<p>Consulte el documento completo del manual.</p>';
   }
 
   return {
     toggle,
     open,
+    openContext,
     close,
     scrollToSection,
+    sectionForContext,
     search,
     renderModal,
     SECTIONS,

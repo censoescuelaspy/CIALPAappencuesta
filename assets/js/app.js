@@ -1,7 +1,7 @@
 /**
  * CIALPA — Relevamiento Escolar
  * app.js — Main application controller (router, init, global state)
- * Version: 2.6.208
+ * Version: 2.6.211
  */
 
 // ── UI utilities ──────────────────────────────────────────────────────────────
@@ -602,7 +602,7 @@ const AppController = (() => {
     plano: { label: 'Plano escuela', icon: 'panels-top-left', minRole: 'encuestador' },
     arquitectura: { label: 'Metodología y datos', icon: 'workflow', minRole: 'encuestador' },
     encuestadores: { label: 'Encuestadores', icon: 'users', minRole: 'admin' },
-    manual: { label: 'Manual', icon: 'book-open', minRole: 'encuestador' },
+    manual: { label: 'Manual del encuestador', icon: 'book-open-check', minRole: 'encuestador' },
     incidencias: { label: 'Solicitudes', icon: 'circle-alert', minRole: 'encuestador' },
     comentarios: { label: 'Comentarios app', icon: 'message-square', minRole: 'encuestador' },
     jornada: { label: 'Mi jornada', icon: 'calendar-days', minRole: 'encuestador' },
@@ -845,7 +845,7 @@ const AppController = (() => {
     const nav = document.getElementById('sidebar-nav');
     if (!nav) return;
 
-    const primaryModules = ['inicio', 'arquitectura', 'mapa', 'atlas', 'registro', 'jornada', 'encuestadores', 'incidencias', 'comentarios', 'cuestionario-inicial', 'planificacion', 'ubicacion', 'configuracion', 'estadisticas', 'infraestructura'];
+    const primaryModules = ['inicio', 'arquitectura', 'mapa', 'atlas', 'registro', 'manual', 'jornada', 'encuestadores', 'incidencias', 'planificacion', 'configuracion', 'estadisticas'];
     nav.innerHTML = primaryModules
       .filter(id => MODULES[id] && Auth.canAccess(MODULES[id].minRole))
       .map(id => [id, MODULES[id]])
