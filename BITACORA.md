@@ -4,7 +4,7 @@
 
 ---
 
-## Imagen satelital local CBERS y aprovechamiento del plano - 2026-07-17 - v2.6.212 local
+## Imagen satelital local CBERS y aprovechamiento del plano - 2026-07-17 - v2.6.212 publicada
 
 ### Objetivo y diagnostico
 - El separador vertical del Registro guiado se ubicaba en una segunda fila implicita del `grid` cuando el panel lateral estaba oculto. Aunque no cumplia ninguna funcion, conservaba una altura minima y dejaba una franja vacia bajo el plano.
@@ -21,6 +21,7 @@
 - `node --check` aprobo `mec-form.js`, `guided-register.js` y la prueba Playwright; el descargador aprobo `py_compile` y su interfaz `--help`.
 - Playwright aprobo la imagen CBERS real y la ocupacion del lienzo a `1900 x 1029`: separador oculto, `868 px` disponibles y `866 px` ocupados por mapa y canvas.
 - La edicion de perimetro y el fondo escolar aprobaron en escritorio, tableta y movil. El sanitario anidado conserva el arrastre desde sus artefactos y aprobo nuevamente en escritorio.
+- El commit funcional `979d3a6` se envio a `origin/main`. GitHub Pages publico `v2.6.212`; se verificaron por HTTP el indice `87/87` y el WebP de `101091`, y la prueba Playwright final aprobo directamente sobre la URL publica.
 - CBERS PAN es una referencia visual gratuita de `2 m/pixel`; permite reconocer cubiertas y bloques suficientemente grandes, pero no reemplaza una mensura, el catastro ni una imagen comercial submetrica.
 
 ---

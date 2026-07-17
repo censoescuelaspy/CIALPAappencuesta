@@ -21,6 +21,7 @@ Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye
 - El descargador reproducible compara fechas y cobertura, conserva metadatos y reconoce codigos MEC con o sin ceros iniciales.
 - Pruebas de imagen real, perimetro y vistas responsive aprobadas; el movimiento del sanitario anidado volvio a aprobar con geometria actualizada despues del ajuste de alto.
 - Se mantiene la advertencia de uso: `2 m/pixel` es referencia para cubiertas y bloques, no mensura ni precision catastral.
+- `v2.6.212` publicada mediante `979d3a6`; version, indice `87/87`, imagen WebP y flujo Playwright verificados sin cache en GitHub Pages.
 
 ## 2026-07-17 - Version visible, imagenes de 100 m y movimiento de sanitarios
 
