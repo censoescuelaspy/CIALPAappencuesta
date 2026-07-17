@@ -1,8 +1,26 @@
 # Historial de instrucciones CIALPA
 
-Ultima actualizacion: 2026-07-17 06:15 America/Asuncion
+Ultima actualizacion: 2026-07-17 07:35 America/Asuncion
 
 Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye credenciales, tokens, datos personales ni transcripciones completas.
+
+## 2026-07-17 - Lienzo completo e imagenes CBERS locales
+
+### Instruccion interpretada
+- Eliminar el separador vertical inutil del Registro guiado, recuperar toda la altura desperdiciada y disponer de una imagen satelital gratuita que permita trazar el plano sin depender de la cuota de Earth Engine.
+
+### Decisiones
+- Corregir la fila implicita del `grid` y ajustar el alto logico del canvas al espacio visible, sin guardar un tamano especifico de la pantalla.
+- Usar el producto publico CBERS-4A/WPM L4 PAN de INPE, con `2 m` de resolucion y licencia `CC BY 4.0`, como alternativa reproducible a Earth Engine/NICFI.
+- Descargar una sola vez recortes de `100 m` de radio, convertirlos a WebP e incorporarlos a la app para que el trabajo de campo no consulte servicios satelitales externos.
+- No reemplazar automaticamente una base que el censista ya confirmo o guardo; permitir siempre alternar manualmente la fuente.
+
+### Resultado
+- Registro guiado probado a `1900 x 1029`: separador invisible y canvas de `866 px` dentro de `868 px` disponibles, sin la franja vacia reportada.
+- `87` imagenes instaladas y `87` entradas de indice validas, sin faltantes: muestra vigente `86/86` mas la escuela `101091`; peso conjunto `2,3 MiB`.
+- El descargador reproducible compara fechas y cobertura, conserva metadatos y reconoce codigos MEC con o sin ceros iniciales.
+- Pruebas de imagen real, perimetro y vistas responsive aprobadas; el movimiento del sanitario anidado volvio a aprobar con geometria actualizada despues del ajuste de alto.
+- Se mantiene la advertencia de uso: `2 m/pixel` es referencia para cubiertas y bloques, no mensura ni precision catastral.
 
 ## 2026-07-17 - Version visible, imagenes de 100 m y movimiento de sanitarios
 

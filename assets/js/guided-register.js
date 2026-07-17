@@ -1330,7 +1330,10 @@ const GuidedRegisterModule = (() => {
     if (!root) return;
     const base = _guidedBaseMapState(snap);
     const activeFor = action => {
-      if (action === 'basemapSatellite') return base.enabled && ['satellite', 'google_satellite', 'highres'].includes(base.source);
+      if (action === 'basemapSatellite') {
+        if (base.highresAvailable) return base.enabled && base.source === 'highres';
+        return base.enabled && ['satellite', 'google_satellite'].includes(base.source);
+      }
       if (action === 'basemapStreet') return base.enabled && base.streetOverlay;
       if (action === 'basemapCatastro') return base.enabled && base.cadastralOverlay;
       if (action === 'basemap') return base.enabled;
@@ -1346,7 +1349,7 @@ const GuidedRegisterModule = (() => {
       button.classList.toggle('btn-guided-active', active);
       button.setAttribute('aria-pressed', String(active));
       if (action === 'basemapSatellite') {
-        const label = base.highresAvailable ? 'Alta res.' : 'Satelite';
+        const label = base.highresAvailable ? 'Imagen local' : 'Satelite';
         button.textContent = label;
         button.title = base.highresAvailable
           ? (base.highresLabel || 'Imagen local de alta resolucion')
@@ -1355,7 +1358,7 @@ const GuidedRegisterModule = (() => {
     });
     const sourceName = base.source === 'google_satellite'
       ? 'Alta res.'
-      : (base.source === 'highres' ? 'Imagen alta res.' : 'Satelite');
+      : (base.source === 'highres' ? (base.highresLabel || 'Imagen local') : 'Satelite');
     const overlays = [
       base.streetOverlay ? 'calles' : '',
       base.cadastralOverlay ? 'catastro' : '',

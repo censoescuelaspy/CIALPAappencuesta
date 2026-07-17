@@ -1497,7 +1497,12 @@ const MecFormModule = (() => {
       general.id_escuela,
     ];
     const keys = rawValues
-      .flatMap(value => [String(value ?? '').trim(), _digits(value)])
+      .flatMap(value => {
+        const raw = String(value ?? '').trim();
+        const digits = _digits(value);
+        const normalizedDigits = digits.replace(/^0+(?=\d)/, '');
+        return [raw, digits, normalizedDigits];
+      })
       .filter(Boolean);
     for (const key of keys) {
       const source = sources[key];
@@ -1533,6 +1538,9 @@ const MecFormModule = (() => {
         _planBaseMapHighresIndexPromise = null;
       }
       if (_initialized && _activeSchoolPlanRoot()) {
+        if (_autoSelectPlanBaseMapHighres()) {
+          _saveDraft(false, { skipRemoteSync: true, skipGuidedSync: true });
+        }
         renderSchoolPlan();
         _scheduleGuidedRegisterSync('highres-index');
       }
@@ -1548,6 +1556,21 @@ const MecFormModule = (() => {
 
   function _planBaseMapHighresLabel(source = _planBaseMapHighresSource()) {
     return source?.label || 'Imagen local';
+  }
+
+  function _autoSelectPlanBaseMapHighres() {
+    const highres = _planBaseMapHighresSource();
+    if (!highres) return false;
+    const current = _data.__planBaseMap || {};
+    if (current.highresAutoDisabled || current.confirmed || current.savedAt) return false;
+    const currentSource = String(current.source || '').toLowerCase();
+    if (currentSource && ![PLAN_BASEMAP_SOURCE_STREET, PLAN_BASEMAP_SOURCE_SATELLITE].includes(currentSource)) return false;
+    const baseMap = _ensurePlanBaseMap();
+    baseMap.source = PLAN_BASEMAP_SOURCE_HIGHRES;
+    baseMap.highresAutoSelected = true;
+    const focused = _focusPlanBaseMapFiniteImage(baseMap, _planBaseMapSourceConfig(baseMap), 'context');
+    baseMap.enabled = focused || _planBaseMapHasCoords(baseMap);
+    return true;
   }
 
   function _planBaseMapContextPreset(source = _planBaseMapSource(_data.__planBaseMap)) {
@@ -2970,9 +2993,9 @@ const MecFormModule = (() => {
     return `
       <div class="school-plan-basemap-actions" aria-label="Base mapa del plano">
         <button class="btn ${active ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanBaseMap()">${active ? 'Base activa' : 'Base mapa'}</button>
-        ${highres ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline'} btn-sm school-plan-basemap-actions__primary-source" type="button" onclick="MecFormModule.setPlanBaseMapSource('highres')" title="Usar imagen local de alta resolucion">${_escape(_planBaseMapHighresLabel(highres))}</button>` : ''}
+        ${highres ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'btn-primary' : 'btn-outline'} btn-sm school-plan-basemap-actions__primary-source" type="button" onclick="MecFormModule.setPlanBaseMapSource('highres')" aria-pressed="${source === PLAN_BASEMAP_SOURCE_HIGHRES ? 'true' : 'false'}" title="Usar imagen local de alta resolucion">${_escape(_planBaseMapHighresLabel(highres))}</button>` : ''}
         ${hasGoogleSatellite ? `<button class="btn ${source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm school-plan-basemap-actions__primary-source" type="button" onclick="MecFormModule.setPlanBaseMapSource('google_satellite')" title="Usar Google satelital de alta resolucion">Alta res.</button>` : ''}
-        <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')">Satelite</button>
+        <button class="btn ${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.setPlanBaseMapSource('satellite')" aria-pressed="${source === PLAN_BASEMAP_SOURCE_SATELLITE ? 'true' : 'false'}">Satelite</button>
         <button class="btn ${streetsActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanStreetOverlay()" aria-pressed="${streetsActive ? 'true' : 'false'}" title="Mostrar nombres de calles encima de la satelital">Calles encima</button>
         ${cadastralAvailable ? `<button class="btn ${cadastralActive ? 'btn-primary' : 'btn-outline'} btn-sm" type="button" onclick="MecFormModule.togglePlanCadastralOverlay()" aria-pressed="${cadastralActive ? 'true' : 'false'}" title="Mostrar parcelas oficiales SNC encima de la base">Catastro</button>` : ''}
         ${cadastralAvailable ? `<button class="btn btn-outline btn-sm" type="button" onclick="MecFormModule.useCadastralParcelAsPreliminaryBoundary()" title="Crear un perimetro preliminar editable desde la parcela SNC ubicada bajo la escuela">Predio SNC</button>` : ''}
@@ -2998,7 +3021,9 @@ const MecFormModule = (() => {
       : 'Active Mover base para arrastrar, acercar y girar la base mapa sin perder la vista actual.';
     const sourceNotice = source === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE
       ? 'Google satelite se usa solo como fondo online para dibujar. La app guarda el perimetro con vertices lat/lon, accesos, bloques y otros vectores propios; la imagen de Google no se descarga ni funciona offline.'
-      : 'La base mapa es una referencia visual. Al guardar, el perimetro queda fijado por vertices lat/lon aunque la ficha completa de la escuela siga pendiente.';
+      : source === PLAN_BASEMAP_SOURCE_HIGHRES
+        ? `${_planBaseMapHighresLabel(highres)} es una imagen local libre para orientar el trazado. Confirme la ubicacion en campo: no reemplaza una mensura ni garantiza precision catastral.`
+        : 'La base mapa es una referencia visual. Al guardar, el perimetro queda fijado por vertices lat/lon aunque la ficha completa de la escuela siga pendiente.';
     return `
       <section class="school-plan-basemap-panel" aria-label="Configuracion de base mapa">
         <div class="school-plan-basemap-panel__header">
@@ -3584,6 +3609,7 @@ const MecFormModule = (() => {
         return;
       }
       baseMap.source = PLAN_BASEMAP_SOURCE_HIGHRES;
+      baseMap.highresAutoDisabled = false;
     } else if (requested === PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE) {
       if (!_hasGoogleSatelliteSource()) {
         UI.showToast('Configure GOOGLE_MAP_TILES_API_KEY para usar la satelital de Google.', 'warning', 6200);
@@ -3591,9 +3617,11 @@ const MecFormModule = (() => {
       }
       _googleMapTilesFallbackNotified = false;
       baseMap.source = PLAN_BASEMAP_SOURCE_GOOGLE_SATELLITE;
+      baseMap.highresAutoDisabled = true;
       _requestGoogleMapTilesSession();
     } else {
       baseMap.source = requested === PLAN_BASEMAP_SOURCE_SATELLITE ? PLAN_BASEMAP_SOURCE_SATELLITE : _preferredPlanBaseMapSource();
+      baseMap.highresAutoDisabled = true;
     }
     const nextSource = _planBaseMapSource(baseMap);
     const nextZoom = _clampPlanBaseMapZoom(previousZoom, PLAN_BASEMAP_DEFAULT_ZOOM, nextSource);
@@ -13889,6 +13917,7 @@ const MecFormModule = (() => {
     if (currentSchool && _sameSchoolIdentity(currentSchool, school)) {
       _prefillGeneralFromSelectedSchool(Boolean(options.force), school);
       _ensurePropertyBoundaryFromPerimeter(school);
+      _autoSelectPlanBaseMapHighres();
       _saveDraft(false);
       if (options.render) _render();
       return true;
@@ -13898,6 +13927,7 @@ const MecFormModule = (() => {
     _applyDraftValues(_draftForSchool(school, { allowGlobal: true }) || {});
     _prefillGeneralFromSelectedSchool(true, school);
     _ensurePropertyBoundaryFromPerimeter(school);
+    _autoSelectPlanBaseMapHighres();
     _selectedPlanId = null;
     _activePlanDrag = null;
     _selectedSketchObjectId = null;
@@ -14666,6 +14696,7 @@ const MecFormModule = (() => {
         </section>
       </div>`;
 
+    _fitGuidedPlanCanvasToAvailableHeight(root, canvasWidth, canvasHeight);
     _drawSchoolPlan();
     _applySchoolPlanZoom();
     _bindSchoolPlanCanvas();
@@ -16348,6 +16379,34 @@ const MecFormModule = (() => {
     const base = Math.max(PLAN_CANVAS_MIN_HEIGHT, 270 * rows);
     if (savedHeight) return Math.max(PLAN_CANVAS_MIN_HEIGHT, Math.min(PLAN_CANVAS_MAX_HEIGHT, savedHeight));
     return base;
+  }
+
+  function _fitGuidedPlanCanvasToAvailableHeight(root, logicalWidth, fallbackHeight) {
+    if (root?.id !== 'guided-school-plan-root' || !root.closest('.guided-register--map-inline')) return;
+    const wrap = root.querySelector('.school-plan__canvas-wrap');
+    const stage = root.querySelector('.school-plan__canvas-stage');
+    const canvas = root.querySelector('[data-school-plan-canvas]');
+    if (!wrap || !stage || !canvas) return;
+
+    const availableHeight = Math.floor(wrap.clientHeight || 0);
+    if (availableHeight <= 0) return;
+    const zoom = Math.max(.1, Number(_schoolPlanZoom) || 1);
+    const logicalHeight = Math.max(
+      Number(fallbackHeight) || PLAN_CANVAS_MIN_HEIGHT,
+      Math.min(PLAN_CANVAS_MAX_HEIGHT, Math.floor(availableHeight / zoom)),
+    );
+    const width = Math.max(1, Number(logicalWidth) || PLAN_CANVAS_MIN_WIDTH);
+
+    canvas.dataset.logicalWidth = String(width);
+    canvas.dataset.logicalHeight = String(logicalHeight);
+    canvas.width = width;
+    canvas.height = logicalHeight;
+    canvas.style.width = `${Math.round(width * zoom)}px`;
+    canvas.style.height = `${Math.round(logicalHeight * zoom)}px`;
+    stage.style.cssText = _schoolPlanStageStyle(width, logicalHeight);
+
+    const baseMapLayer = stage.querySelector('[data-plan-basemap]');
+    if (baseMapLayer) baseMapLayer.outerHTML = _renderPlanBaseMapLayer(width, logicalHeight);
   }
 
   function _drawSchoolPlanGrid(ctx, logical) {

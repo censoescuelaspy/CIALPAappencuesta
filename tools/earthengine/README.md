@@ -3,7 +3,7 @@
 Este directorio contiene los scripts para preparar imagenes por escuela y
 vincularlas al plano vivo de CIALPA.
 
-Hay dos caminos complementarios:
+Hay tres caminos complementarios:
 
 1. **Base Google online en la app**: sirve para dibujar manualmente perimetros,
    bloques, caminos y referencias con la mejor nitidez disponible en pantalla.
@@ -11,6 +11,9 @@ Hay dos caminos complementarios:
    exportable con licencia, por ejemplo NICFI/Planet en Earth Engine u otra
    ortofoto/submetro. El fondo Google `SATELLITE` visible en Earth Engine no es
    un `ee.Image` exportable.
+3. **CBERS-4A/WPM publico, sin Earth Engine**: `tools/imagery/` recorta por
+   HTTP solo los `100 m` alrededor de cada escuela desde el catalogo INPE,
+   instala una imagen panchromatica de `2 m` y actualiza el indice de la app.
 
 ## Padron MEC 2026 completo: radio de 100 m
 

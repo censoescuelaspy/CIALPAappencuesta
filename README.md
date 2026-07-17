@@ -1,8 +1,15 @@
 # CIALPA — Sistema de Relevamiento Escolar
 
-**Version 2.6.211** | Paraguay 2026
+**Version 2.6.212** | Paraguay 2026
 
 Sistema web para registrar ubicación, medidas, tipologías y configuración arquitectónica, eléctrica, de desagüe y conexión de agua de establecimientos educativos, conservando el registro de daños y fallas.
+
+## Novedades v2.6.212
+
+- El Registro guiado oculta el separador lateral que quedaba como una fila vacia bajo el plano y recupera ese espacio para el lienzo.
+- La app activa automaticamente la imagen escolar local cuando existe, conserva la satelital online como respaldo y permite volver a elegir la fuente manualmente.
+- Se incorpora un flujo independiente de Earth Engine para obtener recortes panchromaticos CBERS-4A/WPM de `2 m` y `100 m` de radio desde el catalogo publico de INPE.
+- Cada recorte compara varias fechas, descarta coberturas incompletas, queda disponible sin conexion despues del primer uso y muestra fuente, fecha y licencia `CC BY 4.0`.
 
 ## Novedades v2.6.211
 

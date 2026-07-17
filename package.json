@@ -12,6 +12,7 @@
     "imagery:ee-batch": "node tools/earthengine/generate_pilot_earthengine_batch.mjs",
     "imagery:all:prepare": "py -3 -X utf8 tools/earthengine/prepare_all_school_100m_exports.py",
     "imagery:all:dry-run": "py -3 -X utf8 tools/earthengine/start_all_school_100m_exports.py --dry-run --limit=25",
+    "imagery:cbers": "py -3 -X utf8 tools/imagery/download_cbers4a_wpm.py",
     "build:r01-schools": "node tools/simulation/build_r01_public_schools.mjs",
     "prepare:mec-roster": "py -3 -X utf8 tools/simulation/prepare_mec_roster_2026.py",
     "embed:schools": "node tools/simulation/embed_schools_csv.mjs",

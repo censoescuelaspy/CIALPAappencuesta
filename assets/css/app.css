@@ -1,7 +1,7 @@
 /* ============================================================
    CIALPA — Relevamiento Escolar
    app.css — Complete application styles
-   Version: 2.6.211
+   Version: 2.6.212
    ============================================================ */
 
 /* ── CSS Custom Properties ────────────────────────────────── */
@@ -4569,7 +4569,7 @@ td {
 }
 
 /* ============================================================
-   Piloto Capital + Central y accesibilidad operativa v2.6.211
+   Piloto Capital + Central y accesibilidad operativa v2.6.212
    ============================================================ */
 
 :root {
@@ -7724,10 +7724,15 @@ textarea.form-control {
   display: none;
 }
 
+.guided-register--map-inline #guided-school-plan-root .school-plan__layout-resize {
+  display: none;
+}
+
 .guided-register--map-inline #guided-school-plan-root .school-plan__layout {
   height: 100%;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .guided-register--map-inline #guided-school-plan-root,
@@ -9095,7 +9100,7 @@ textarea.form-control {
   }
 }
 
-/* Keep the v2.6.211 operational tokens last in the cascade. */
+/* Keep the v2.6.212 operational tokens last in the cascade. */
 :root {
   --color-primary: #c43b13;
   --color-primary-dark: #a62f0e;

@@ -402,7 +402,7 @@ test.describe('CIALPA integral UI audit', () => {
       schema: 'cialpa_highres_school_index_v1',
       count: 1,
       sources: {
-        ESC_DEMO_CIALPA: {
+        1: {
           active: true,
           label: 'Imagen 100 m',
           imageUrl: testImageUrl,
@@ -437,9 +437,22 @@ test.describe('CIALPA integral UI audit', () => {
     await expect(page.locator('#guided-register-root .guided-register')).toBeVisible();
     await page.waitForFunction(() => typeof MecFormModule !== 'undefined');
 
+    const inlineLayout = await page.locator('#guided-school-plan-root .school-plan__layout').evaluate(layout => {
+      const board = layout.querySelector('.school-plan__board');
+      const resize = layout.querySelector('.school-plan__layout-resize');
+      const layoutRect = layout.getBoundingClientRect();
+      const boardRect = board.getBoundingClientRect();
+      return {
+        resizeDisplay: getComputedStyle(resize).display,
+        trailingGap: Math.round(layoutRect.bottom - boardRect.bottom),
+      };
+    });
+    expect(inlineLayout.resizeDisplay).toBe('none');
+    expect(Math.abs(inlineLayout.trailingGap)).toBeLessThanOrEqual(12);
+
     const boundaryId = await page.evaluate(() => {
       MecFormModule.updateGuidedSchoolIdentity({
-        codigo_local: 'ESC_DEMO_CIALPA',
+        codigo_local: '0000001',
         latitud: '-25.300000',
         longitud: '-57.600000',
       }, { skipRemoteSync: true });
@@ -484,6 +497,8 @@ test.describe('CIALPA integral UI audit', () => {
     await writeFile(testInfo.outputPath('highres-activation.json'), JSON.stringify(activatedHighresState, null, 2), 'utf8');
     expect(activatedHighresState.highresAvailable).toBe(true);
     expect(activatedHighresState.source).toBe('highres');
+    await expect(page.locator('[data-guided-action="basemapSatellite"]').first()).toHaveText('Imagen local');
+    await expect(page.locator('[data-guided-action="basemapSatellite"]').first()).toHaveAttribute('aria-pressed', 'true');
 
     const highresImage = page.locator('#module-registro img[data-plan-basemap-source="highres"]');
     await expect(highresImage).toHaveCount(1);
@@ -507,6 +522,86 @@ test.describe('CIALPA integral UI audit', () => {
 
     await page.locator('#guided-school-plan-root').screenshot({
       path: testInfo.outputPath(`perimeter-highres-${testInfo.project.name}.png`),
+      animations: 'disabled',
+    });
+  });
+
+  test('loads the indexed CBERS image and keeps the guided plan compact', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop-chrome', 'The production-sized imagery check runs once on desktop.');
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 1900, height: 1029 });
+    await forceLocalDemo(page);
+    await loginAsDemoAdmin(page);
+
+    await page.evaluate(() => {
+      MapModule.loadMarkers([{
+        id_escuela: '101091',
+        codigo: '0101091',
+        codigo_local: '0101091',
+        nombre: 'ESCUELA BASICA N 1983',
+        departamento: 'CONCEPCION',
+        distrito: 'ITACUA',
+        localidad: 'LOCALIDAD A CONFIRMAR',
+        latitud: -22.47941972,
+        longitud: -57.84039611,
+        estado: 'Pendiente',
+      }]);
+      MapModule.startGuidedRegister('101091');
+    });
+    await expect(page.locator('#module-registro')).toBeVisible();
+    await page.waitForFunction(() => typeof MecFormModule !== 'undefined');
+
+    const state = await page.evaluate(async () => {
+      await MecFormModule.refreshPlanBaseMapHighresIndex();
+      return MecFormModule.getPlanBaseMapState();
+    });
+    expect(state.highresAvailable).toBe(true);
+    expect(state.highresLabel).toBe('CBERS-4A PAN 2 m');
+    expect(state.source).toBe('highres');
+
+    const image = page.locator('#module-registro img[data-plan-basemap-source="highres"]');
+    await expect(image).toHaveCount(1);
+    await expect.poll(() => image.evaluate(node => ({
+      loaded: node.complete && node.naturalWidth > 0,
+      naturalWidth: node.naturalWidth,
+      source: node.getAttribute('src'),
+    }))).toEqual({
+      loaded: true,
+      naturalWidth: 600,
+      source: 'assets/imagery/schools/101091/cbers4a-wpm-pan-100m.webp',
+    });
+
+    const layout = await page.locator('#guided-school-plan-root .school-plan__layout').evaluate(node => {
+      const board = node.querySelector('.school-plan__board');
+      const resize = node.querySelector('.school-plan__layout-resize');
+      const toolbar = node.querySelector('.school-plan__toolbar');
+      const wrap = node.querySelector('.school-plan__canvas-wrap');
+      const stage = node.querySelector('.school-plan__canvas-stage');
+      const canvas = node.querySelector('[data-school-plan-canvas]');
+      const nodeRect = node.getBoundingClientRect();
+      const boardRect = board.getBoundingClientRect();
+      return {
+        resizeDisplay: getComputedStyle(resize).display,
+        trailingGap: Math.round(nodeRect.bottom - boardRect.bottom),
+        slotHeight: Math.round(node.closest('.guided-school-map-shell__slot').getBoundingClientRect().height),
+        rootHeight: Math.round(node.closest('#guided-school-plan-root').getBoundingClientRect().height),
+        toolbarHeight: Math.round(toolbar.getBoundingClientRect().height),
+        wrapHeight: Math.round(wrap.getBoundingClientRect().height),
+        stageHeight: Math.round(stage.getBoundingClientRect().height),
+        canvasHeight: Math.round(canvas.getBoundingClientRect().height),
+      };
+    });
+    await writeFile(testInfo.outputPath('guided-layout-1900x1029.json'), JSON.stringify(layout, null, 2), 'utf8');
+    expect(layout.resizeDisplay).toBe('none');
+    expect(Math.abs(layout.trailingGap)).toBeLessThanOrEqual(12);
+    expect(Math.abs(layout.wrapHeight - layout.stageHeight)).toBeLessThanOrEqual(3);
+    expect(Math.abs(layout.stageHeight - layout.canvasHeight)).toBeLessThanOrEqual(1);
+    await expect(page.locator('[data-guided-action="basemapSatellite"]').first()).toHaveText('Imagen local');
+    await expect(page.locator('[data-guided-action="basemapSatellite"]').first()).toHaveAttribute('aria-pressed', 'true');
+
+    await page.screenshot({
+      path: testInfo.outputPath('guided-cbers-101091-1900x1029.png'),
+      fullPage: false,
       animations: 'disabled',
     });
   });
@@ -608,9 +703,15 @@ test.describe('CIALPA integral UI audit', () => {
     await canvas.scrollIntoViewIfNeeded();
     const canvasBox = await canvas.boundingBox();
     const canvasSize = await canvas.evaluate(element => ({ width: element.width, height: element.height }));
+    const currentFixtureArea = await page.evaluate(({ sanitaryId, fixtureId }) => (
+      MecFormModule.getPlanInteractionSnapshot().areas.find(
+        area => area.id === `sanitary::${sanitaryId}::${fixtureId}`,
+      )
+    ), { sanitaryId: ids.sanitaryId, fixtureId: ids.fixtureId });
     expect(canvasBox).toBeTruthy();
-    const startX = canvasBox.x + ((fixtureArea.x + fixtureArea.w / 2) / canvasSize.width) * canvasBox.width;
-    const startY = canvasBox.y + ((fixtureArea.y + fixtureArea.h / 2) / canvasSize.height) * canvasBox.height;
+    expect(currentFixtureArea).toBeTruthy();
+    const startX = canvasBox.x + ((currentFixtureArea.x + currentFixtureArea.w / 2) / canvasSize.width) * canvasBox.width;
+    const startY = canvasBox.y + ((currentFixtureArea.y + currentFixtureArea.h / 2) / canvasSize.height) * canvasBox.height;
     const deltaX = (32 / canvasSize.width) * canvasBox.width;
     const deltaY = (18 / canvasSize.height) * canvasBox.height;
     await page.mouse.move(startX, startY);
@@ -728,7 +829,7 @@ test.describe('CIALPA integral UI audit', () => {
     await page.evaluate(() => {
       MecFormModule.updateGuidedSchoolIdentity({
         ...MecFormModule.getSelectedSchool(),
-        direccion: 'Persistencia automatizada v2.6.211',
+        direccion: 'Persistencia automatizada v2.6.212',
       }, { skipRemoteSync: true });
     });
     await page.evaluate(() => AppController.showModule('mapa'));
@@ -742,7 +843,7 @@ test.describe('CIALPA integral UI audit', () => {
         blocks: draft.values?.__blocks?.length || 0,
       };
     });
-    expect(reopened).toEqual({ code: '0011007', address: 'Persistencia automatizada v2.6.211', blocks: 3 });
+    expect(reopened).toEqual({ code: '0011007', address: 'Persistencia automatizada v2.6.212', blocks: 3 });
 
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], {
       origin: new URL(page.url()).origin,
@@ -751,7 +852,7 @@ test.describe('CIALPA integral UI audit', () => {
     await expect(page.locator('.toast').filter({ hasText: /JSON copiado/i }).last()).toBeVisible();
     const exported = JSON.parse(await page.evaluate(() => navigator.clipboard.readText()));
     expect(exported.values?.__selectedSchool?.codigo_local).toBe('0011007');
-    expect(exported.values?.general?.direccion).toBe('Persistencia automatizada v2.6.211');
+    expect(exported.values?.general?.direccion).toBe('Persistencia automatizada v2.6.212');
 
     const geometry = await page.evaluate(() => GeoMeasure.measurePolygon([
       { lat: -25.3, lng: -57.6 },
@@ -930,7 +1031,7 @@ test.describe('CIALPA integral UI audit', () => {
       await context.setOffline(true);
       await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
       await expect(page.locator('#login-screen')).toBeVisible();
-      await expect(page.locator('.app-version').first()).toHaveText('v2.6.211');
+      await expect(page.locator('.app-version').first()).toHaveText('v2.6.212');
       const offlineState = await page.evaluate(() => ({
         online: navigator.onLine,
         leaflet: typeof window.L === 'object',

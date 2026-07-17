@@ -4,6 +4,27 @@
 
 ---
 
+## Imagen satelital local CBERS y aprovechamiento del plano - 2026-07-17 - v2.6.212 local
+
+### Objetivo y diagnostico
+- El separador vertical del Registro guiado se ubicaba en una segunda fila implicita del `grid` cuando el panel lateral estaba oculto. Aunque no cumplia ninguna funcion, conservaba una altura minima y dejaba una franja vacia bajo el plano.
+- Earth Engine continuaba limitado por la cuota del proyecto y por el acceso denegado a NICFI. Se adopto como alternativa el catalogo STAC publico de INPE, sin dependencia de Earth Engine durante la descarga ni durante el uso en campo.
+
+### Implementacion
+- En la vista integrada se oculta el separador lateral y el `grid` queda en una sola fila. El alto logico del lienzo se ajusta al alto real disponible sin persistir dimensiones propias de una pantalla.
+- Se agrego `tools/imagery/download_cbers4a_wpm.py`: consulta varias fechas CBERS-4A/WPM L4, valida cobertura, lee solo la ventana COG necesaria, selecciona el candidato mas util y genera un WebP de `600 x 600` para un radio de `100 m`.
+- Se instalaron `87` recortes panchromaticos de `2 m`: las `86` escuelas de la muestra Capital + Central y la escuela `101091` usada para reproducir el reporte. El indice y los archivos coinciden `87/87`, sin faltantes, con un peso total de `2,3 MiB`.
+- La app reconoce codigos MEC con o sin ceros iniciales, activa la imagen local en registros nuevos, respeta fuentes ya confirmadas y permite alternar manualmente entre imagen local y satelital online.
+- Cada entrada conserva fecha, producto, resolucion, limites, fuente y licencia `CC BY 4.0`. Una vez servidos por la app, los WebP no consumen cuota de Earth Engine ni requieren consultar INPE durante el relevamiento.
+
+### Pruebas y limites
+- `node --check` aprobo `mec-form.js`, `guided-register.js` y la prueba Playwright; el descargador aprobo `py_compile` y su interfaz `--help`.
+- Playwright aprobo la imagen CBERS real y la ocupacion del lienzo a `1900 x 1029`: separador oculto, `868 px` disponibles y `866 px` ocupados por mapa y canvas.
+- La edicion de perimetro y el fondo escolar aprobaron en escritorio, tableta y movil. El sanitario anidado conserva el arrastre desde sus artefactos y aprobo nuevamente en escritorio.
+- CBERS PAN es una referencia visual gratuita de `2 m/pixel`; permite reconocer cubiertas y bloques suficientemente grandes, pero no reemplaza una mensura, el catastro ni una imagen comercial submetrica.
+
+---
+
 ## Earth Engine de 100 m y edicion de sanitarios - 2026-07-17 - v2.6.211
 
 ### Objetivo y diagnostico

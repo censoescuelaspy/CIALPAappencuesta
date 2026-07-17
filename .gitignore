@@ -33,6 +33,7 @@ tools/earthengine/output/
 tools/earthengine/*.csv
 tools/earthengine/*.tif
 tools/earthengine/*.tiff
+tools/imagery/output/
 
 # Credenciales locales
 .env
