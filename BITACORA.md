@@ -28,7 +28,8 @@
 - `node --check` aprobo el formulario, los generadores, la plantilla, ambos scripts generados y la prueba Playwright; los siete scripts Python del flujo compilaron con `py_compile`.
 - Regeneracion reproducible aprobada: `86` escuelas, `86` nombres, `15` Capital y `71` Central. El dry-run Sentinel-2 no creo ni inicio tareas.
 - Playwright repitio tres veces el escenario de un sanitario con inodoro dentro de un aula: `3/3` aprobadas; se verificaron los espesores y el desplazamiento real del sanitario. Manual y fondo escolar de alta resolucion aprobaron tambien en escritorio y tableta.
-- La URL publica se comprobo sin cache al inicio y seguia en `v2.6.208`; la publicacion de `v2.6.211` queda sujeta al cierre de pruebas, commit, push y verificacion de GitHub Pages.
+- La URL publica se comprobo sin cache al inicio y seguia en `v2.6.208`; el commit funcional `d27a539` se envio luego a `origin/main` y GitHub Pages paso a servir `v2.6.211` tanto en `index.html` como en el cache del service worker.
+- Verificacion final sobre la URL publica: `3/3` pruebas Playwright aprobadas para edicion de perimetro y fondo escolar, sanitario anidado movible y marco PWA disponible sin conexion.
 
 ---
 

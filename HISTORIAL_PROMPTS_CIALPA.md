@@ -1,6 +1,6 @@
 # Historial de instrucciones CIALPA
 
-Ultima actualizacion: 2026-07-17 06:02 America/Asuncion
+Ultima actualizacion: 2026-07-17 06:15 America/Asuncion
 
 Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye credenciales, tokens, datos personales ni transcripciones completas.
 
@@ -22,6 +22,7 @@ Este archivo conserva decisiones de trabajo relevantes y sanitizadas. No incluye
 - Codigo NICFI y variante Sentinel-2 generados para `86` escuelas con nombres y coordenadas validas: `15` Capital y `71` Central, radio circular de `100 m` y tandas de `25`.
 - Espesores de pared reducidos a la mitad y arrastre del sanitario padre corregido cuando el gesto empieza sobre un inodoro u otro artefacto.
 - Validacion estatica aprobada, dry-run sin tareas y prueba Playwright del sanitario repetida `3/3`; la exportacion real sigue detenida por permiso NICFI y modo restringido de `rapy-415107`.
+- `v2.6.211` publicada en `origin/main`; GitHub Pages, service worker y tres pruebas funcionales sobre la URL publica quedaron verificados.
 
 ## 2026-07-16 - Manual de campo, perímetro editable e imágenes escolares de 100 m
 
